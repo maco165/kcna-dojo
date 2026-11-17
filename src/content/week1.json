@@ -1,0 +1,365 @@
+{
+  "week": 1,
+  "lessons": [
+    {
+      "id": "w1-l1",
+      "kind": "quiz",
+      "title": "コンテナと VM",
+      "summary": "4 択 · 5 問",
+      "domain": "Kubernetes Fundamentals",
+      "questions": [
+        {
+          "id": "w1-l1-q1",
+          "type": "choice",
+          "prompt": "コンテナが仮想マシン (VM) より軽く速く起動できる、いちばんの理由はどれ?",
+          "choices": [
+            { "id": "a", "text": "ホスト OS のカーネルを共有し、ゲスト OS を丸ごと起動しないから" },
+            { "id": "b", "text": "ハイパーバイザーの上で、ゲスト OS を小さく削っているから", "why": "それは軽量な VM の話です。コンテナはハイパーバイザーもゲスト OS も持ちません。" },
+            { "id": "c", "text": "ディスクを使わず、メモリの上だけで動くから", "why": "コンテナもイメージやボリュームとしてディスクを使います。" },
+            { "id": "d", "text": "CPU を仮想化せず、物理 CPU を 1 つ占有するから", "why": "コンテナは CPU を占有しません。cgroup で使える量を分け合います。" }
+          ],
+          "answer": "a",
+          "explanation": "VM はハイパーバイザーの上でゲスト OS ごと動きます。コンテナはホストのカーネルを共有し、アプリとその依存だけを分けて動かすので、起動が速く資源も少なくて済みます。",
+          "source": "https://kubernetes.io/ja/docs/concepts/overview/"
+        },
+        {
+          "id": "w1-l1-q2",
+          "type": "choice",
+          "prompt": "Linux でコンテナどうしを分ける仕組みの組み合わせとして正しいのはどれ?",
+          "choices": [
+            { "id": "a", "text": "ハイパーバイザーと BIOS", "why": "どちらも VM や機械の起動に関わるもので、コンテナの分離ではありません。" },
+            { "id": "b", "text": "namespace と cgroup" },
+            { "id": "c", "text": "cron と systemd", "why": "どちらも処理の起動や管理の仕組みで、分離はしません。" },
+            { "id": "d", "text": "iptables と DNS", "why": "通信の制御と名前の解決で、プロセスの分離とは別です。" }
+          ],
+          "answer": "b",
+          "explanation": "namespace はプロセスから見える範囲 (プロセス番号・ネットワーク・マウントなど) を分け、cgroup は CPU やメモリの使える量を制限します。この 2 つでコンテナが作られています。",
+          "source": "https://docs.docker.com/engine/security/"
+        },
+        {
+          "id": "w1-l1-q3",
+          "type": "choice",
+          "prompt": "コンテナイメージの説明として正しいのはどれ?",
+          "choices": [
+            { "id": "a", "text": "動いているコンテナの中を書き換えると、元のイメージも書き換わる", "why": "イメージは変わりません。コンテナの中の変更は、そのコンテナが消えると一緒に消えます。" },
+            { "id": "b", "text": "イメージには、それを動かすための OS のカーネルが入っている", "why": "カーネルはホストのものを使うので、イメージには入りません。" },
+            { "id": "c", "text": "アプリと、動かすのに要るライブラリや設定をまとめた、変更しないパッケージ" },
+            { "id": "d", "text": "イメージはノードごとに手で組み立てる必要がある", "why": "一度作ったイメージをレジストリに置けば、どのノードからも取ってこられます。" }
+          ],
+          "answer": "c",
+          "explanation": "コンテナイメージは、アプリと実行に要るものをまとめた、すぐ動かせるソフトウェアの包みです。コンテナは状態を持たず不変であることが前提で、直すときは新しいイメージを作って置き換えます。",
+          "source": "https://kubernetes.io/ja/docs/concepts/containers/"
+        },
+        {
+          "id": "w1-l1-q4",
+          "type": "choice",
+          "prompt": "動いているコンテナに不具合が見つかった。クラウドネイティブな直し方として正しいのはどれ?",
+          "choices": [
+            { "id": "a", "text": "コンテナに入ってファイルを直し、そのまま使い続ける", "why": "そのコンテナが作り直されると直した分が消え、どこで何を直したかも残りません。" },
+            { "id": "b", "text": "直したイメージを新しく作り、コンテナをそれに置き換える" },
+            { "id": "c", "text": "ノードを再起動して、コンテナが直るのを待つ", "why": "イメージが同じなら、再起動しても同じ不具合のコンテナが動きます。" },
+            { "id": "d", "text": "同じコンテナにもう 1 つアプリを入れて回り道させる", "why": "1 つのコンテナには 1 つの役割が基本です。" }
+          ],
+          "answer": "b",
+          "explanation": "コンテナは不変 (immutable) に扱います。動いているコンテナのコードは変えず、新しいイメージを作り、コンテナを作り直して入れ替えます。",
+          "source": "https://kubernetes.io/ja/docs/concepts/containers/"
+        },
+        {
+          "id": "w1-l1-q5",
+          "type": "choice",
+          "prompt": "Kubernetes でコンテナを動かすときの、配置できるいちばん小さな単位はどれ?",
+          "choices": [
+            { "id": "a", "text": "Node", "why": "Node はコンテナを動かす機械 (またはVM) で、単位としてはもっと大きいものです。" },
+            { "id": "b", "text": "Deployment", "why": "Deployment は Pod の数や更新を管理する、Pod より上の仕組みです。" },
+            { "id": "c", "text": "Pod" },
+            { "id": "d", "text": "コンテナ", "why": "Kubernetes はコンテナを直接は置かず、必ず Pod に包んで置きます。" }
+          ],
+          "answer": "c",
+          "explanation": "Pod は Kubernetes で作って管理できる、いちばん小さな単位です。1 つ以上のコンテナと、それらが共有するネットワークやストレージを持ちます。",
+          "source": "https://kubernetes.io/ja/docs/concepts/workloads/pods/"
+        }
+      ]
+    },
+    {
+      "id": "w1-l2",
+      "kind": "quiz",
+      "title": "イメージとレイヤー",
+      "summary": "Dockerfile とコマンドの穴埋め · 5 問",
+      "domain": "Kubernetes Fundamentals",
+      "questions": [
+        {
+          "id": "w1-l2-q1",
+          "type": "fill",
+          "prompt": "手元の index.html を、イメージの中の nginx の公開フォルダへ入れたい。空欄に入る命令は?",
+          "language": "dockerfile",
+          "code": "FROM nginx:1.27-alpine\n{{blank}} index.html /usr/share/nginx/html/index.html\nEXPOSE 80",
+          "answers": ["COPY", "ADD"],
+          "candidates": ["COPY", "RUN", "CMD", "ENV"],
+          "explanation": "COPY は手元のファイルをイメージに入れます。ADD でも入りますが、URL や圧縮ファイルの展開まで行うので、ただ入れるだけなら COPY が勧められています。",
+          "wrongNotes": {
+            "RUN": "RUN はイメージを作るときにコマンドを動かす命令で、手元のファイルは入れられません。",
+            "CMD": "CMD はコンテナを起動したときに動かすコマンドを決める命令です。",
+            "ENV": "ENV は環境変数を決める命令です。"
+          },
+          "source": "https://docs.docker.com/reference/dockerfile/#copy"
+        },
+        {
+          "id": "w1-l2-q2",
+          "type": "fill",
+          "prompt": "コンテナが起動したときに動かす、既定のコマンドを決めたい。空欄に入る命令は?",
+          "language": "dockerfile",
+          "code": "FROM python:3.12-slim\nCOPY app.py /app/app.py\n{{blank}} [\"python\", \"/app/app.py\"]",
+          "answers": ["CMD", "ENTRYPOINT"],
+          "candidates": ["CMD", "RUN", "FROM", "WORKDIR"],
+          "explanation": "CMD は起動したときの既定のコマンドです (起動時に別のコマンドを渡すと置き換わります)。ENTRYPOINT でも起動時に動き、こちらは置き換えずに引数を足す使い方になります。",
+          "wrongNotes": {
+            "RUN": "RUN はイメージを作るときに 1 回だけ動く命令で、コンテナの起動時には動きません。",
+            "FROM": "FROM は元にするイメージを決める命令で、1 行目に書きます。",
+            "WORKDIR": "WORKDIR は作業フォルダを決める命令です。"
+          },
+          "source": "https://docs.docker.com/reference/dockerfile/#cmd"
+        },
+        {
+          "id": "w1-l2-q3",
+          "type": "choice",
+          "prompt": "Dockerfile の RUN や COPY などの命令を 1 つ実行するたびに、イメージには何ができる?",
+          "choices": [
+            { "id": "a", "text": "読み取り専用のレイヤー (層) が 1 枚重なる" },
+            { "id": "b", "text": "新しいコンテナが 1 つ起動する", "why": "コンテナは docker run などで起動したときにできるもので、ビルドの命令ごとにはできません。" },
+            { "id": "c", "text": "新しい Pod が 1 つ作られる", "why": "Pod は Kubernetes の単位で、イメージを作る作業とは関係しません。" },
+            { "id": "d", "text": "イメージ全体の複製が 1 つ増える", "why": "変わった分だけが層として重なるので、全体の複製は作りません。" }
+          ],
+          "answer": "a",
+          "explanation": "ファイルを変える命令ごとに、その変更分が読み取り専用のレイヤーとして重なります。同じレイヤーは複数のイメージで共有され、変わっていない層はビルドのキャッシュも効きます。",
+          "source": "https://docs.docker.com/get-started/docker-concepts/building-images/understanding-image-layers/"
+        },
+        {
+          "id": "w1-l2-q4",
+          "type": "fill",
+          "prompt": "今のフォルダの Dockerfile から、hello:0.1 という名前のイメージを作りたい。空欄に入るサブコマンドは?",
+          "language": "bash",
+          "code": "docker {{blank}} -t hello:0.1 .",
+          "answers": ["build"],
+          "candidates": ["build", "run", "pull", "push"],
+          "output": "[+] Building 4.2s (7/7) FINISHED\n => [1/2] FROM docker.io/library/nginx:1.27-alpine\n => [2/2] COPY index.html /usr/share/nginx/html/index.html\n => naming to docker.io/library/hello:0.1",
+          "explanation": "docker build は Dockerfile からイメージを作ります。-t で名前とタグを付け、最後の . は Dockerfile と材料のファイルがあるフォルダです。",
+          "wrongNotes": {
+            "run": "run はイメージからコンテナを起動するコマンドです。",
+            "pull": "pull はレジストリからイメージを取ってくるコマンドです。",
+            "push": "push は作ったイメージをレジストリへ送るコマンドです。"
+          },
+          "source": "https://docs.docker.com/reference/cli/docker/buildx/build/"
+        },
+        {
+          "id": "w1-l2-q5",
+          "type": "choice",
+          "prompt": "Pod の定義でタグを書かずに image: nginx としたとき、Kubernetes が使うタグはどれ?",
+          "choices": [
+            { "id": "a", "text": "stable", "why": "stable という決まりはありません。" },
+            { "id": "b", "text": "ノードに入っている版のうち、いちばん新しいもの", "why": "ノードの中身で決まるのではなく、タグの既定の値で決まります。" },
+            { "id": "c", "text": "latest" },
+            { "id": "d", "text": "タグが無いのでエラーになる", "why": "エラーにはならず、既定のタグが補われます。" }
+          ],
+          "answer": "c",
+          "explanation": "タグを省くと latest として扱われます。latest は中身が変わりうるので、本番ではどの版か分かるタグ (や digest) を書くのが勧められています。",
+          "source": "https://kubernetes.io/docs/concepts/containers/images/"
+        }
+      ]
+    },
+    {
+      "id": "w1-l3",
+      "kind": "quiz",
+      "title": "OCI と CRI",
+      "summary": "コマンドの穴埋めと 4 択 · 5 問",
+      "domain": "Kubernetes Fundamentals",
+      "questions": [
+        {
+          "id": "w1-l3-q1",
+          "type": "fill",
+          "prompt": "kube-system の Pod を、どのノードで動いているかまで含めて一覧したい。空欄に入るサブコマンドは?",
+          "language": "bash",
+          "code": "kubectl {{blank}} pods -n kube-system -o wide",
+          "answers": ["get"],
+          "candidates": ["get", "describe", "logs", "top"],
+          "output": "NAME                      READY   STATUS    RESTARTS   AGE   IP          NODE\ncoredns-6799fbcd5-x2k9q   1/1     Running   0          12d   10.42.0.3   node1\ntraefik-d7c9c5778-7gq2p   1/1     Running   0          12d   10.42.0.8   node1",
+          "explanation": "get は一覧を出します。-n で namespace を選び、-o wide を付けると IP と NODE の列が増えます。",
+          "wrongNotes": {
+            "describe": "describe は 1 件ずつの詳細とイベントを出すので、一覧にはなりません。",
+            "logs": "logs はコンテナのログを読むコマンドです。",
+            "top": "top は CPU とメモリの使用量を出し、ノードの列は出ません。"
+          },
+          "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_get/"
+        },
+        {
+          "id": "w1-l3-q2",
+          "type": "choice",
+          "prompt": "CRI (Container Runtime Interface) の説明として正しいのはどれ?",
+          "choices": [
+            { "id": "a", "text": "コンテナイメージのファイルの形を決めた仕様", "why": "それは OCI の Image Specification です。" },
+            { "id": "b", "text": "kubelet がコンテナランタイムとやりとりするための、差し替えのきく接続口" },
+            { "id": "c", "text": "Pod どうしの通信をつなぐためのネットワークの仕様", "why": "それは CNI (Container Network Interface) の役目です。" },
+            { "id": "d", "text": "ストレージをコンテナにつなぐための仕様", "why": "それは CSI (Container Storage Interface) の役目です。" }
+          ],
+          "answer": "b",
+          "explanation": "CRI は kubelet とコンテナランタイムの間のやりとりを決めたプラグインの接続口です。kubelet は gRPC でランタイムに頼むので、containerd や CRI-O など CRI に対応したランタイムを、作り直さずに使い分けられます。",
+          "source": "https://kubernetes.io/docs/concepts/architecture/cri/"
+        },
+        {
+          "id": "w1-l3-q3",
+          "type": "choice",
+          "prompt": "OCI (Open Container Initiative) が定めている仕様の組み合わせはどれ?",
+          "choices": [
+            { "id": "a", "text": "ランタイムの仕様・イメージの仕様・配布の仕様" },
+            { "id": "b", "text": "CRI・CNI・CSI", "why": "これらは Kubernetes が定めた接続口で、OCI の仕様ではありません。" },
+            { "id": "c", "text": "Dockerfile の文法・docker コマンド・Docker Hub", "why": "これらは Docker 社の製品や書式で、業界で共通の仕様ではありません。" },
+            { "id": "d", "text": "Pod・Service・Deployment", "why": "これらは Kubernetes の API のリソースです。" }
+          ],
+          "answer": "a",
+          "explanation": "OCI はコンテナの業界標準を作る団体で、Runtime Specification (動かし方)、Image Specification (イメージの形)、Distribution Specification (配り方) の 3 つを定めています。これに沿っていれば、Docker で作ったイメージを containerd でも動かせます。",
+          "source": "https://opencontainers.org/"
+        },
+        {
+          "id": "w1-l3-q4",
+          "type": "fill",
+          "prompt": "ノード node1 の状態・資源・最近のイベントを詳しく見たい。空欄に入るサブコマンドは?",
+          "language": "bash",
+          "code": "kubectl {{blank}} node node1",
+          "answers": ["describe"],
+          "candidates": ["get", "describe", "logs", "top"],
+          "output": "Name:               node1\nRoles:              control-plane,master\nConditions:\n  Type             Status  Reason\n  Ready            True    KubeletReady\nSystem Info:\n  Container Runtime Version:  containerd://1.7.23-k3s2\nEvents:             <none>",
+          "explanation": "describe は 1 件の詳しい状態と、関係するイベントをまとめて出します。困ったときに最初に見るコマンドの 1 つです。",
+          "wrongNotes": {
+            "get": "get でも出せますが一覧の 1 行だけで、イベントや詳しい状態は出ません。",
+            "logs": "logs は Pod のコンテナのログを読むコマンドで、ノードには使えません。",
+            "top": "top は CPU とメモリの使用量だけを出します。"
+          },
+          "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_describe/"
+        },
+        {
+          "id": "w1-l3-q5",
+          "type": "choice",
+          "prompt": "Kubernetes 1.24 で kubelet から取り除かれたものはどれ?",
+          "choices": [
+            { "id": "a", "text": "CRI", "why": "CRI は今も kubelet とランタイムをつなぐ仕組みです。" },
+            { "id": "b", "text": "containerd", "why": "containerd は今も広く使われている CRI のランタイムです。" },
+            { "id": "c", "text": "dockershim" },
+            { "id": "d", "text": "runc", "why": "runc は OCI のランタイムで、containerd などが下で使っています。" }
+          ],
+          "answer": "c",
+          "explanation": "dockershim は、CRI に対応していなかった Docker Engine を kubelet につなぐための橋渡しで、kubelet に組み込まれていました。1.24 で取り除かれ、今は CRI に対応したランタイム (containerd や CRI-O) を使います。Docker で作ったイメージはそのまま動きます。",
+          "source": "https://kubernetes.io/blog/2022/02/17/dockershim-faq/"
+        }
+      ]
+    },
+    {
+      "id": "w1-l4",
+      "kind": "quiz",
+      "title": "containerd と k3s",
+      "summary": "出力を読む・コマンドの穴埋め · 5 問",
+      "domain": "Kubernetes Fundamentals",
+      "questions": [
+        {
+          "id": "w1-l4-q1",
+          "type": "choice",
+          "prompt": "k3s が標準で使うコンテナランタイムはどれ?",
+          "choices": [
+            { "id": "a", "text": "Docker Engine", "why": "k3s は Docker Engine が無くても動きます (使うには別の設定が要ります)。" },
+            { "id": "b", "text": "k3s に組み込まれた containerd" },
+            { "id": "c", "text": "CRI-O", "why": "CRI-O も CRI のランタイムですが、k3s の標準ではありません。" },
+            { "id": "d", "text": "ランタイムは使わず、kubelet が直接コンテナを動かす", "why": "kubelet は CRI を通してランタイムに頼みます。直接は動かしません。" }
+          ],
+          "answer": "b",
+          "explanation": "k3s は containerd を同梱していて、何も設定しなければそれを CRI のランタイムとして使います。そのため k3s のノードでは docker ps にコンテナが出てきません。",
+          "source": "https://docs.k3s.io/"
+        },
+        {
+          "id": "w1-l4-q2",
+          "type": "fill",
+          "prompt": "k3s のノードで、containerd が動かしているコンテナを CRI の道具で一覧したい。空欄に入るサブコマンドは?",
+          "language": "bash",
+          "code": "sudo k3s crictl {{blank}}",
+          "answers": ["ps"],
+          "candidates": ["ps", "images", "pods", "logs"],
+          "output": "CONTAINER       IMAGE           CREATED       STATE     NAME       POD ID          POD\n3f1c2b9d8e7a6   c69fa2e9cbf5f   12 days ago   Running   coredns    9a8b7c6d5e4f3   coredns-6799fbcd5-x2k9q\n7d6e5f4a3b2c1   1e3f5a7c9b2d4   12 days ago   Running   traefik    1b2c3d4e5f6a7   traefik-d7c9c5778-7gq2p",
+          "explanation": "crictl は CRI のランタイムを直接見る道具で、k3s には k3s crictl として入っています。ps で動いているコンテナを一覧します。docker ps の代わりに使います。",
+          "wrongNotes": {
+            "images": "images はノードにあるイメージの一覧で、動いているコンテナではありません。",
+            "pods": "pods は Pod (のサンドボックス) の一覧で、コンテナの一覧ではありません。",
+            "logs": "logs は 1 つのコンテナのログを読むので、コンテナの ID が要ります。"
+          },
+          "source": "https://docs.k3s.io/cli"
+        },
+        {
+          "id": "w1-l4-q3",
+          "type": "choice",
+          "prompt": "sudo k3s crictl images の出力の一部です。正しいのはどれ?",
+          "code": {
+            "language": "plaintext",
+            "text": "IMAGE                                       TAG      IMAGE ID        SIZE\ndocker.io/rancher/mirrored-coredns-coredns  1.12.0   c69fa2e9cbf5f   20.9MB\ndocker.io/library/hello                     0.1      0f1e2d3c4b5a6   21.4MB"
+          },
+          "choices": [
+            { "id": "a", "text": "hello:0.1 のイメージが、このノードの containerd に入っている" },
+            { "id": "b", "text": "hello のコンテナが、今このノードで動いている", "why": "images はイメージがあるかだけを出します。動いているかは crictl ps か kubectl get pods で見ます。" },
+            { "id": "c", "text": "hello のイメージは Docker Engine に入っている", "why": "crictl は CRI のランタイム (ここでは containerd) を見ています。" },
+            { "id": "d", "text": "このノードには Pod が 2 つある", "why": "イメージの数と Pod の数は関係しません。" }
+          ],
+          "answer": "a",
+          "explanation": "crictl images はノードのランタイムが持っているイメージの一覧です。docker.io/library/hello はタグを付けずに hello と書いたときの正式な名前です。",
+          "source": "https://docs.k3s.io/cli"
+        },
+        {
+          "id": "w1-l4-q4",
+          "type": "choice",
+          "prompt": "kubectl get nodes -o wide の出力の一部です。ここから分かることはどれ?",
+          "code": {
+            "language": "plaintext",
+            "text": "NAME      STATUS   ROLES                  VERSION        OS-IMAGE             CONTAINER-RUNTIME\nnode1     Ready    control-plane,master   v1.31.4+k3s1   Ubuntu 24.04.1 LTS   containerd://1.7.23-k3s2"
+          },
+          "choices": [
+            { "id": "a", "text": "このノードは Docker Engine でコンテナを動かしている", "why": "CONTAINER-RUNTIME の列は containerd です。" },
+            { "id": "b", "text": "このノードのコンテナランタイムは containerd で、準備ができている" },
+            { "id": "c", "text": "このノードではまだ Pod を置けない", "why": "STATUS が Ready なので、Pod を置ける状態です。" },
+            { "id": "d", "text": "このクラスタにはノードが 3 つある", "why": "出力に出ているノードは 1 つです。ROLES は役割の一覧です。" }
+          ],
+          "answer": "b",
+          "explanation": "-o wide を付けると OS やコンテナランタイムの列が増えます。STATUS の Ready は、kubelet が動いていて Pod を受け付けられることを表します。",
+          "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_get/"
+        },
+        {
+          "id": "w1-l4-q5",
+          "type": "fill",
+          "prompt": "Docker で作ったイメージを、k3s の containerd に取り込みたい。空欄に入るサブコマンドは?",
+          "language": "bash",
+          "code": "docker save hello:0.1 | sudo k3s ctr images {{blank}} -",
+          "answers": ["import"],
+          "candidates": ["import", "pull", "push", "export"],
+          "output": "unpacking docker.io/library/hello:0.1 (sha256:0f1e2d3c...)...done",
+          "explanation": "docker save はイメージを 1 つのファイル (tar) に書き出し、k3s ctr images import がそれを containerd に取り込みます。Docker と k3s はイメージの置き場所が別なので、レジストリを使わないときはこうして渡します。",
+          "wrongNotes": {
+            "pull": "pull はレジストリから取ってくるコマンドで、手元の tar は読めません。",
+            "push": "push はレジストリへ送るコマンドです。",
+            "export": "export は containerd のイメージを tar に書き出す、逆向きのコマンドです。"
+          },
+          "source": "https://docs.k3s.io/cli"
+        }
+      ]
+    },
+    {
+      "id": "w1-lab",
+      "kind": "lab",
+      "title": "週末の実習: 作ったイメージを k3s で動かす",
+      "summary": "家のクラスタで手を動かす · 7 手順",
+      "domain": "Kubernetes Fundamentals",
+      "source": "https://docs.k3s.io/cli",
+      "steps": [
+        { "text": "作業フォルダに index.html と Dockerfile を作る (Dockerfile は FROM nginx:1.27-alpine と COPY の 2 行)" },
+        { "text": "イメージを作る", "command": "docker build -t hello:0.1 ." },
+        { "text": "k3s の containerd に取り込む", "command": "docker save hello:0.1 | sudo k3s ctr images import -" },
+        { "text": "取り込めたことを CRI の道具で確かめる", "command": "sudo k3s crictl images | grep hello" },
+        { "text": "レジストリから取りに行かせずに Pod を起動する", "command": "kubectl run hello --image=hello:0.1 --image-pull-policy=Never" },
+        { "text": "Running になり、どのノードで動いているかを確かめる", "command": "kubectl get pod hello -o wide" },
+        { "text": "片付ける", "command": "kubectl delete pod hello" }
+      ]
+    }
+  ]
+}
