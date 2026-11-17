@@ -206,6 +206,34 @@ async function run(browser, name, width, height) {
   check(await page.getByText(/非公式の学習サイト/).isVisible(), `${tag} このサイトについてに非公式と書いてある`);
   await noHorizontalOverflow(page, width, `${tag} このサイトについて`);
 
+  // 9b. 復習: 予定が今日の問題を 2 つ入れて、復習の画面から解く
+  await page.evaluate(() => {
+    const p = JSON.parse(localStorage.getItem('kcna.v1') ?? '{"v":1}');
+    const d = new Date();
+    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    p.answers = { ...(p.answers ?? {}), 'w1-l1-q1': { right: 0, wrong: 1, last: '', stage: 0, nextReview: today }, 'w1-l2-q4': { right: 0, wrong: 1, last: '', stage: 0, nextReview: today } };
+    localStorage.setItem('kcna.v1', JSON.stringify(p));
+  });
+  await page.goto(`${BASE}#/review`);
+  await page.reload();
+  await page.getByRole('heading', { name: '今日の復習 2 問' }).waitFor();
+  check(true, `${tag} 復習の画面に今日の 2 問が出る`);
+  await page.getByRole('button', { name: '復習を始める' }).click();
+  // 1 問目 (4 択) は正解を選ぶ、2 問目 (穴埋め) は正解を打つ
+  const rq1 = l1.questions[0];
+  await page.getByRole('radio', { name: choiceLabel(rq1, rq1.answer) }).check();
+  await page.getByRole('button', { name: '確かめる' }).click();
+  await page.getByRole('button', { name: '次へ' }).click();
+  await page.getByRole('textbox', { name: '空欄' }).fill('build');
+  await page.getByRole('button', { name: '確かめる' }).click();
+  await page.getByRole('button', { name: '結果を見る' }).click();
+  await page.getByRole('heading', { name: 'レッスン完了' }).waitFor();
+  const afterReview = await page.evaluate(() => JSON.parse(localStorage.getItem('kcna.v1') ?? 'null'));
+  check(afterReview?.answers?.['w1-l1-q1']?.stage === 1 && afterReview?.answers?.['w1-l2-q4']?.stage === 1, `${tag} 復習で正解すると次は 3 日後になる (stage 1)`);
+  await page.getByRole('button', { name: '一覧へ戻る' }).click();
+  await page.getByRole('heading', { name: '今日の復習 0 問' }).waitFor();
+  check(await page.getByText(/今日の復習はありません。次は/).isVisible(), `${tag} 終えると今日の復習は 0 で、次の予定が出る`);
+
   // 10. 設定: 目標を変える・書き出す・読み込む・記録を消す
   await page.goto(`${BASE}#/settings`);
   await page.getByRole('heading', { name: '設定' }).waitFor();

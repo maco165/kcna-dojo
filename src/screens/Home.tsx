@@ -29,7 +29,8 @@ import {
 import { downloadProgress } from '../lib/download';
 import { SITE_NAME } from '../lib/site';
 import { currentStreak, dayKey, daysBetween, examDate, goalXp, todayXp, type Progress } from '../lib/progress';
-import { aboutHref, lessonHref, weekHref } from '../lib/route';
+import { aboutHref, lessonHref, reviewHref, weekHref } from '../lib/route';
+import { dueQuestions } from '../content';
 import { WIDE_QUERY, useMediaQuery } from '../lib/useMediaQuery';
 
 function formatDate(day: string): string {
@@ -191,7 +192,7 @@ function PhoneHome({ s, progress }: { s: Summary; progress: Progress }) {
         </div>
       </main>
 
-      <BottomTabs current="learn" />
+      <BottomTabs current="learn" reviewCount={dueQuestions(progress, new Date()).length} />
     </div>
   );
 }
@@ -234,6 +235,7 @@ type Row = Record<string, unknown> & { lesson: Lesson; status: LessonStatus };
 function DesktopHome({ s, progress }: { s: Summary; progress: Progress }) {
   const { meta, lessons, statuses } = s;
   const accuracy = domainAccuracy(progress);
+  const due = dueQuestions(progress, new Date());
   const rows: Row[] = lessons.map((l, i) => ({ id: l.id, lesson: l, status: statuses[i] }));
 
   const columns: TableColumn<Row>[] = [
@@ -361,10 +363,18 @@ function DesktopHome({ s, progress }: { s: Summary; progress: Progress }) {
             <Card padding={4}>
               <VStack gap={2}>
                 <HStack justify="between" vAlign="center">
-                  <h2 className="h-sm">今日の復習</h2>
-                  <Button size="sm" label="準備中" isDisabled />
+                  <h2 className="h-sm">今日の復習 {due.length} 問</h2>
+                  <Button size="sm" variant={due.length > 0 ? 'primary' : 'secondary'} label={due.length > 0 ? '始める' : '見る'} href={reviewHref} />
                 </HStack>
-                <Text type="supporting">間違えた問題を 1・3・7 日後に出します (準備中)</Text>
+                <Text type="supporting">
+                  {due.length > 0
+                    ? due
+                        .slice(0, 3)
+                        .map((r) => r.lesson.title)
+                        .filter((t, i, a) => a.indexOf(t) === i)
+                        .join(' / ')
+                    : '間違えた問題を 1・3・7 日後に出します'}
+                </Text>
               </VStack>
             </Card>
             <VStack gap={1}>

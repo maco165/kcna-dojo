@@ -3,6 +3,8 @@ import {
   DEFAULT_EXAM_DATE,
   DEFAULT_GOAL_XP,
   STORAGE_KEY,
+  completeReview,
+  dueReviewIds,
   examDate,
   exportFileName,
   goalXp,
@@ -10,6 +12,7 @@ import {
   parseProgressText,
   resetProgress,
   setProfile,
+  upcomingReview,
   completeLesson,
   currentStreak,
   emptyProgress,
@@ -166,6 +169,78 @@ describe('設定と記録の書き出し・読み込み・消す', () => {
   });
 });
 
+describe('復習の予定 (1・3・7 日後)', () => {
+  const q = 'w1-l1-q1';
+
+  it('初めてで正解した問題は、復習に入らない', () => {
+    const p = recordAnswer(emptyProgress(), q, true, at('2026-11-23'));
+    expect(p.answers[q].nextReview).toBeUndefined();
+    expect(dueReviewIds(p, at('2026-12-31'))).toEqual([]);
+  });
+
+  it('間違えると翌日、復習で正解するたびに 3 日後・7 日後、3 回続けて正解したら終わる', () => {
+    let p = recordAnswer(emptyProgress(), q, false, at('2026-11-23'));
+    expect(p.answers[q]).toMatchObject({ stage: 0, nextReview: '2026-11-24' });
+    expect(dueReviewIds(p, at('2026-11-23', 23))).toEqual([]);
+    expect(dueReviewIds(p, at('2026-11-24'))).toEqual([q]);
+    p = recordAnswer(p, q, true, at('2026-11-24'));
+    expect(p.answers[q]).toMatchObject({ stage: 1, nextReview: '2026-11-27' });
+    p = recordAnswer(p, q, true, at('2026-11-27'));
+    expect(p.answers[q]).toMatchObject({ stage: 2, nextReview: '2026-12-04' });
+    p = recordAnswer(p, q, true, at('2026-12-04'));
+    expect(p.answers[q].nextReview).toBeUndefined();
+    expect(dueReviewIds(p, at('2027-01-01'))).toEqual([]);
+  });
+
+  it('同じ日に間違えてすぐ正解しても、予定は翌日のまま (段階は進まない)', () => {
+    let p = recordAnswer(emptyProgress(), q, false, at('2026-11-23', 9));
+    p = recordAnswer(p, q, true, at('2026-11-23', 10));
+    p = recordAnswer(p, q, true, at('2026-11-23', 11));
+    expect(p.answers[q]).toMatchObject({ stage: 0, nextReview: '2026-11-24' });
+  });
+
+  it('予定の日より前に正解しても、間隔は進まない', () => {
+    let p = recordAnswer(emptyProgress(), q, false, at('2026-11-23'));
+    p = recordAnswer(p, q, true, at('2026-11-24'));
+    expect(p.answers[q]).toMatchObject({ stage: 1, nextReview: '2026-11-27' });
+    p = recordAnswer(p, q, true, at('2026-11-25'));
+    expect(p.answers[q]).toMatchObject({ stage: 1, nextReview: '2026-11-27' });
+  });
+
+  it('読み込みでも復習の予定を残す (実在する日付だけ)', () => {
+    const p = parseProgressText(JSON.stringify({ v: 1, answers: { a: { right: 0, wrong: 1, last: '', stage: 9, nextReview: '2026-11-24' }, b: { right: 0, wrong: 1, last: '', nextReview: '2026-02-31' } } }));
+    expect(p?.answers.a).toMatchObject({ stage: 2, nextReview: '2026-11-24' });
+    expect(p?.answers.b.nextReview).toBeUndefined();
+  });
+
+  it('復習の途中で間違えたら、翌日に戻す', () => {
+    let p = recordAnswer(emptyProgress(), q, false, at('2026-11-23'));
+    p = recordAnswer(p, q, true, at('2026-11-24'));
+    p = recordAnswer(p, q, false, at('2026-11-27'));
+    expect(p.answers[q]).toMatchObject({ stage: 0, nextReview: '2026-11-28' });
+  });
+
+  it('予定を過ぎた分も今日の復習に入り、早い順に並ぶ', () => {
+    let p = recordAnswer(emptyProgress(), 'a', false, at('2026-11-25'));
+    p = recordAnswer(p, 'b', false, at('2026-11-23'));
+    expect(dueReviewIds(p, at('2026-11-30'))).toEqual(['b', 'a']);
+  });
+
+  it('次の予定の日と件数', () => {
+    let p = recordAnswer(emptyProgress(), 'a', false, at('2026-11-23'));
+    p = recordAnswer(p, 'b', false, at('2026-11-23'));
+    expect(upcomingReview(p, at('2026-11-23'))).toEqual({ day: '2026-11-24', count: 2 });
+    expect(upcomingReview(emptyProgress(), at('2026-11-23'))).toBeNull();
+  });
+
+  it('復習を終えると XP が入り連続日数が進むが、レッスンの完了は付かない', () => {
+    const p = completeReview(emptyProgress(), 6, at('2026-11-24'));
+    expect(p.xp.total).toBe(6);
+    expect(p.streak).toEqual({ count: 1, lastDay: '2026-11-24' });
+    expect(p.lessons).toEqual({});
+  });
+});
+
 describe('壊れた・悪意のある記録を読み込んでも落ちない', () => {
   it('lessons と answers の中の形の違う値は捨てる', () => {
     const p = parseProgressText(JSON.stringify({ v: 1, lessons: { 'w1-l1': null, 'w1-l2': 'x', 'w1-l3': { done: true, best: 'a' } }, answers: { q: 5 } }));
@@ -194,3 +269,4 @@ describe('壊れた・悪意のある記録を読み込んでも落ちない', (
     expect(saveProgress(emptyProgress(), memoryStorage())).toBe(true);
   });
 });
+

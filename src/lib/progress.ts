@@ -4,7 +4,14 @@
 export const STORAGE_KEY = 'kcna.v1';
 
 export type LessonRecord = { done: boolean; best: number; at: string };
-export type AnswerRecord = { right: number; wrong: number; last: string };
+/**
+ * 問題ごとの記録。復習の予定 (nextReview) があるものが復習の対象。
+ * stage は復習で続けて正解した回数 (0〜2)。
+ */
+export type AnswerRecord = { right: number; wrong: number; last: string; stage?: number; nextReview?: string };
+
+/** 復習の間隔 (日)。間違えたら翌日、復習で続けて正解するたびに 3 日後・7 日後、その次の正解で終わる */
+export const REVIEW_INTERVALS = [1, 3, 7] as const;
 
 /** 設定 (目標と受験日)。無ければ既定の値を使う */
 export type Profile = { dailyGoalXp: number; examDate: string };
@@ -101,6 +108,10 @@ export function normalizeProgress(raw: unknown): Progress | null {
         wrong: isCount(v.wrong) ? Math.floor(v.wrong) : 0,
         last: typeof v.last === 'string' ? v.last : '',
       };
+      if (isValidDay(v.nextReview)) {
+        a.nextReview = v.nextReview;
+        a.stage = isCount(v.stage) ? Math.min(Math.floor(v.stage), REVIEW_INTERVALS.length - 1) : 0;
+      }
       return a;
     }),
   };
@@ -155,13 +166,70 @@ function safeLocalStorage(): Storage | undefined {
 }
 
 export function recordAnswer(p: Progress, questionId: string, correct: boolean, now: Date): Progress {
+  const today = dayKey(now);
   const prev = p.answers[questionId] ?? { right: 0, wrong: 0, last: '' };
   const next: AnswerRecord = {
     right: prev.right + (correct ? 1 : 0),
     wrong: prev.wrong + (correct ? 0 : 1),
     last: now.toISOString(),
   };
+  if (!correct) {
+    // 間違えたら (初めてでも、復習の途中でも) 翌日からやり直す
+    next.stage = 0;
+    next.nextReview = addDays(today, REVIEW_INTERVALS[0]);
+  } else if (prev.nextReview !== undefined && prev.nextReview <= today) {
+    // 予定の日が来た復習の対象を正解した: 間を空ける。3 回続けて正解したら終わり
+    const stage = (prev.stage ?? 0) + 1;
+    if (stage < REVIEW_INTERVALS.length) {
+      next.stage = stage;
+      next.nextReview = addDays(today, REVIEW_INTERVALS[stage]);
+    }
+  } else if (prev.nextReview !== undefined) {
+    // 予定の日より前に (レッスンのやり直しなどで) 正解しても、予定は進めずそのまま残す
+    next.stage = prev.stage ?? 0;
+    next.nextReview = prev.nextReview;
+  }
   return { ...p, answers: { ...p.answers, [questionId]: next } };
+}
+
+/** 今日までに予定が来ている復習の問題の id (予定の早い順) */
+export function dueReviewIds(p: Progress, now: Date): string[] {
+  const today = dayKey(now);
+  return Object.entries(p.answers)
+    .filter(([, a]) => a.nextReview !== undefined && a.nextReview <= today)
+    .sort(([, a], [, b]) => (a.nextReview! < b.nextReview! ? -1 : a.nextReview! > b.nextReview! ? 1 : 0))
+    .map(([id]) => id);
+}
+
+/** まだ来ていない復習のうち、いちばん近い予定の日と件数。isKnown で問題データにある id だけに絞れる */
+export function upcomingReview(p: Progress, now: Date, isKnown: (id: string) => boolean = () => true): { day: string; count: number } | null {
+  const today = dayKey(now);
+  const days = Object.entries(p.answers)
+    .filter(([id]) => isKnown(id))
+    .map(([, a]) => a.nextReview)
+    .filter((d): d is string => d !== undefined && d > today)
+    .sort();
+  if (days.length === 0) return null;
+  return { day: days[0], count: days.filter((d) => d === days[0]).length };
+}
+
+/** 学んだ日の XP を足し、連続日数を進める (レッスンと復習で共通) */
+function addActivity(p: Progress, xpGained: number, now: Date): Progress {
+  const today = dayKey(now);
+  let count: number;
+  if (p.streak.lastDay === today) count = Math.max(p.streak.count, 1);
+  else if (p.streak.lastDay === addDays(today, -1)) count = p.streak.count + 1;
+  else count = 1;
+  return {
+    ...p,
+    streak: { count, lastDay: today },
+    xp: { total: p.xp.total + xpGained, byDay: { ...p.xp.byDay, [today]: (p.xp.byDay[today] ?? 0) + xpGained } },
+  };
+}
+
+/** 今日の復習を終えた: XP を足し、連続日数を進める (レッスンの完了は付けない) */
+export function completeReview(p: Progress, xpGained: number, now: Date): Progress {
+  return addActivity(p, xpGained, now);
 }
 
 /** レッスンを終えた: 完了と最高の正答率を残し、XP を足し、連続日数を進める */
@@ -172,22 +240,11 @@ export function completeLesson(
   xpGained: number,
   now: Date,
 ): Progress {
-  const today = dayKey(now);
   const rate = score.total > 0 ? score.correct / score.total : 0;
   const prev = p.lessons[lessonId];
   const lesson: LessonRecord = { done: true, best: Math.max(prev?.best ?? 0, rate), at: now.toISOString() };
-
-  let count: number;
-  if (p.streak.lastDay === today) count = Math.max(p.streak.count, 1);
-  else if (p.streak.lastDay === addDays(today, -1)) count = p.streak.count + 1;
-  else count = 1;
-
-  return {
-    ...p,
-    streak: { count, lastDay: today },
-    xp: { total: p.xp.total + xpGained, byDay: { ...p.xp.byDay, [today]: (p.xp.byDay[today] ?? 0) + xpGained } },
-    lessons: { ...p.lessons, [lessonId]: lesson },
-  };
+  const after = addActivity(p, xpGained, now);
+  return { ...after, lessons: { ...after.lessons, [lessonId]: lesson } };
 }
 
 export function todayXp(p: Progress, now: Date): number {
