@@ -10,5 +10,6 @@ export function downloadProgress(p: Progress, now: Date): void {
   document.body.appendChild(a);
   a.click();
   a.remove();
-  URL.revokeObjectURL(url);
+  // 保存が始まる前に URL を無効にしないよう、少し待ってから片付ける
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

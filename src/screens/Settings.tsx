@@ -21,11 +21,15 @@ import {
   goalXp,
   parseProgressText,
   resetProgress,
+  saveProgress,
   setProfile,
   type Progress,
 } from '../lib/progress';
 import { SITE_NAME } from '../lib/site';
 import { WIDE_QUERY, useMediaQuery } from '../lib/useMediaQuery';
+
+/** 読み込むファイルの大きさの上限 */
+const MAX_IMPORT_BYTES = 1024 * 1024;
 
 type Props = { progress: Progress; updateProgress: (fn: (p: Progress) => Progress) => void };
 
@@ -49,7 +53,18 @@ function Body({ progress, updateProgress }: Props) {
     setLoaded(null);
     setDone(null);
     if (!one) return;
-    const parsed = parseProgressText(await one.text());
+    if (one.size > MAX_IMPORT_BYTES) {
+      setLoadError('ファイルが大きすぎます (1 MB まで)。クラネイで書き出した JSON のファイルを選んでください。');
+      return;
+    }
+    let text: string;
+    try {
+      text = await one.text();
+    } catch {
+      setLoadError('ファイルを読めませんでした。');
+      return;
+    }
+    const parsed = parseProgressText(text);
     if (!parsed) {
       setLoadError('このファイルは読めませんでした。クラネイで書き出した JSON のファイルを選んでください。');
       return;
@@ -115,7 +130,14 @@ function Body({ progress, updateProgress }: Props) {
                     variant="primary"
                     label="置き換える"
                     onClick={() => {
-                      updateProgress(() => loaded);
+                      // 目標と受験日を変えたことの無い端末の書き出しなら、今の設定を引き継ぐ
+                      const next = loaded.profile ? loaded : { ...loaded, profile: progress.profile };
+                      if (!saveProgress(next)) {
+                        setLoadError('このブラウザに保存できませんでした (容量の上限やプライベートモードなど)。今の記録はそのままです。');
+                        setLoaded(null);
+                        return;
+                      }
+                      updateProgress(() => next);
                       setFile(null);
                       setLoaded(null);
                       setDone('読み込んだ記録に置き換えました。');

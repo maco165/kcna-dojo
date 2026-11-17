@@ -8,6 +8,7 @@ import {
   examDate,
   exportFileName,
   goalXp,
+  isValidDay,
   parseProgressText,
   resetProgress,
   setProfile,
@@ -218,3 +219,33 @@ describe('復習の予定 (1・3・7 日後)', () => {
     expect(p.lessons).toEqual({});
   });
 });
+
+describe('壊れた・悪意のある記録を読み込んでも落ちない', () => {
+  it('lessons と answers の中の形の違う値は捨てる', () => {
+    const p = parseProgressText(JSON.stringify({ v: 1, lessons: { 'w1-l1': null, 'w1-l2': 'x', 'w1-l3': { done: true, best: 'a' } }, answers: { q: 5 } }));
+    expect(p?.lessons).toEqual({ 'w1-l3': { done: true, best: 0, at: '' } });
+    expect(p?.answers).toEqual({});
+  });
+
+  it('XP の日ごとの値・合計・連続日数は、0 以上の有限の数だけ受ける', () => {
+    const p = parseProgressText('{"v":1,"xp":{"total":1e400,"byDay":{"2026-11-18":"abc","2026-11-19":5,"あした":3}},"streak":{"count":-1,"lastDay":"2026-02-31"}}');
+    expect(p?.xp).toEqual({ total: 0, byDay: { '2026-11-19': 5 } });
+    expect(p?.streak).toEqual({ count: 0, lastDay: null });
+  });
+
+  it('実在しない受験日と、選べない目標 XP は既定の値に直す', () => {
+    for (const examDate of ['2027-02-31', '9999-99-99']) {
+      const p = parseProgressText(JSON.stringify({ v: 1, profile: { dailyGoalXp: 7, examDate } }));
+      expect(p?.profile).toEqual({ dailyGoalXp: DEFAULT_GOAL_XP, examDate: DEFAULT_EXAM_DATE });
+    }
+    expect(isValidDay('2028-02-29')).toBe(true);
+    expect(isValidDay('2027-02-29')).toBe(false);
+  });
+
+  it('保存できなければ false を返す', () => {
+    const full = { getItem: () => null, setItem: () => { throw new Error('QuotaExceededError'); } };
+    expect(saveProgress(emptyProgress(), full)).toBe(false);
+    expect(saveProgress(emptyProgress(), memoryStorage())).toBe(true);
+  });
+});
+

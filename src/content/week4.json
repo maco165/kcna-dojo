@@ -1,0 +1,802 @@
+{
+  "week": 4,
+  "lessons": [
+    {
+      "id": "w4-l1",
+      "kind": "quiz",
+      "title": "kubectl とコンテキスト",
+      "summary": "コマンドの穴埋めと 4 択 · 8 問",
+      "domain": "Kubernetes Fundamentals",
+      "questions": [
+        {
+          "id": "w4-l1-q1",
+          "type": "fill",
+          "prompt": "web.yaml に書いた Deployment をクラスタに反映したい。無ければ作り、あればファイルとの差分だけを更新する。空欄に入るサブコマンドは?",
+          "language": "bash",
+          "code": "kubectl {{blank}} -f web.yaml",
+          "answers": [
+            "apply"
+          ],
+          "candidates": [
+            "apply",
+            "get",
+            "explain",
+            "logs"
+          ],
+          "output": "deployment.apps/web created",
+          "explanation": "apply はファイルに書いた望む状態をクラスタに反映します。同じファイルを直してもう一度 apply すると、差分だけが更新されます (宣言型の管理)。",
+          "wrongNotes": {
+            "get": "get はリソースの一覧や状態を出すだけで、何も作りません。",
+            "explain": "explain はリソースの欄の説明を出すだけで、クラスタは変えません。",
+            "logs": "logs はコンテナのログを読むコマンドです。"
+          },
+          "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_apply/"
+        },
+        {
+          "id": "w4-l1-q2",
+          "type": "fill",
+          "prompt": "Pod のコンテナに書ける resources の欄に何があるかを、クラスタが持つ説明から調べたい。空欄に入るサブコマンドは?",
+          "language": "bash",
+          "code": "kubectl {{blank}} pods.spec.containers.resources",
+          "answers": [
+            "explain"
+          ],
+          "candidates": [
+            "explain",
+            "describe",
+            "get",
+            "edit"
+          ],
+          "output": "KIND:       Pod\nVERSION:    v1\n\nFIELD: resources <ResourceRequirements>\n\nDESCRIPTION:\n    Compute Resources required by this container.\n    ...\n\nFIELDS:\n  claims\t<[]ResourceClaim>\n    ...\n  limits\t<map[string]Quantity>\n    ...\n  requests\t<map[string]Quantity>\n    ...",
+          "explanation": "explain はリソースの種類とその欄の意味を、API の定義から出します。どこに何を書けばよいかを手元で確かめるのに使い、動いているリソースの中身は見ません。",
+          "wrongNotes": {
+            "describe": "describe は動いている 1 つのリソースの詳しい状態とイベントを出すもので、欄の説明ではありません。",
+            "get": "get は動いているリソースの一覧で、pods.spec... のような欄の道筋は受け付けません。",
+            "edit": "edit は動いているリソースをエディタで直すコマンドです。"
+          },
+          "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_explain/"
+        },
+        {
+          "id": "w4-l1-q3",
+          "type": "fill",
+          "prompt": "再起動をくり返す Pod がある。落ちる直前のコンテナ (1 つ前の実行) のログを読みたい。空欄に入るフラグは?",
+          "language": "bash",
+          "code": "kubectl logs web-7d4b9c6f5-x2k9q {{blank}}",
+          "answers": [
+            "--previous",
+            "-p"
+          ],
+          "candidates": [
+            "--previous",
+            "-f",
+            "--since=1h",
+            "--timestamps"
+          ],
+          "explanation": "--previous (-p) は、そのコンテナの 1 つ前の実行のログを出します。再起動のあとの今のログには、落ちた理由が残っていないことが多いので、まずこちらを読みます。",
+          "wrongNotes": {
+            "-f": "-f は今のコンテナのログを流し続けて追うもので、1 つ前の実行のログは出ません。",
+            "--since=1h": "--since は時間で絞るだけで、読むのは今のコンテナのログです。",
+            "--timestamps": "--timestamps は各行に時刻を付けるだけです。"
+          },
+          "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_logs/"
+        },
+        {
+          "id": "w4-l1-q4",
+          "type": "fill",
+          "prompt": "Pod の中で nginx -v を 1 回だけ動かしたい。kubectl の引数と、コンテナで動かすコマンドを分ける空欄は?",
+          "language": "bash",
+          "code": "kubectl exec web-7d4b9c6f5-x2k9q {{blank}} nginx -v",
+          "answers": [
+            "--"
+          ],
+          "candidates": [
+            "--",
+            "-c",
+            "-i",
+            "-n"
+          ],
+          "output": "nginx version: nginx/1.27.5",
+          "explanation": "exec は -- より後ろを、コンテナの中で動かすコマンドとして渡します。シェルに入るときも kubectl exec -it <Pod> -- sh のように -- で分けます。",
+          "wrongNotes": {
+            "-c": "-c はコマンドを動かすコンテナの名前を選ぶフラグで、後ろにコンテナ名が要ります。",
+            "-i": "-i は標準入力をコンテナにつなぐフラグで、コマンドとの区切りにはなりません。",
+            "-n": "-n は名前空間を選ぶフラグで、後ろに名前空間の名前が要ります。"
+          },
+          "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_exec/"
+        },
+        {
+          "id": "w4-l1-q5",
+          "type": "fill",
+          "prompt": "kubeconfig に入っている home というコンテキストに切り替えて、以降の kubectl をそのクラスタに向けたい。空欄に入るサブコマンドは?",
+          "language": "bash",
+          "code": "kubectl config {{blank}} home",
+          "answers": [
+            "use-context",
+            "use"
+          ],
+          "candidates": [
+            "use-context",
+            "get-contexts",
+            "set-context",
+            "view"
+          ],
+          "output": "Switched to context \"home\".",
+          "explanation": "use-context は kubeconfig の current-context を書き換え、以降の kubectl がそのコンテキストのクラスタ・ユーザー・名前空間を使うようにします。",
+          "wrongNotes": {
+            "get-contexts": "get-contexts はコンテキストの一覧を出すだけで、切り替えません。",
+            "set-context": "set-context はコンテキストの中身 (名前空間など) を作ったり直したりするもので、今使うものは変えません。",
+            "view": "view は kubeconfig の中身を表示するだけです。"
+          },
+          "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_config/kubectl_config_use-context/"
+        },
+        {
+          "id": "w4-l1-q6",
+          "type": "choice",
+          "prompt": "kubeconfig のコンテキスト (context) がまとめて持つものの組み合わせはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "クラスタ・ユーザー・名前空間"
+            },
+            {
+              "id": "b",
+              "text": "ノード・Pod・コンテナ",
+              "why": "コンテキストは接続先と接続の仕方の組で、クラスタの中の個々のリソースは持ちません。"
+            },
+            {
+              "id": "c",
+              "text": "イメージ・レジストリ・タグ",
+              "why": "これはコンテナのイメージの話で、kubeconfig には書きません。"
+            },
+            {
+              "id": "d",
+              "text": "requests・limits・HPA",
+              "why": "これはワークロードの資源の設定で、kubectl の接続先とは関係ありません。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "コンテキストは cluster・user・namespace の 3 つに名前を付けた組です。kubectl は current-context の組を使って通信するので、use-context で切り替えると接続先と既定の名前空間が一度に変わります。",
+          "source": "https://kubernetes.io/ja/docs/concepts/configuration/organize-cluster-access-kubeconfig/"
+        },
+        {
+          "id": "w4-l1-q7",
+          "type": "choice",
+          "prompt": "--kubeconfig フラグも環境変数 KUBECONFIG も無いとき、kubectl が読む kubeconfig はどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "カレントディレクトリの kubeconfig.yaml",
+              "why": "今いるフォルダのファイルは自動では読みません。"
+            },
+            {
+              "id": "b",
+              "text": "$HOME/.kube/config"
+            },
+            {
+              "id": "c",
+              "text": "/etc/kubernetes/kubeconfig",
+              "why": "既定の場所はホームの下で、/etc の下ではありません。"
+            },
+            {
+              "id": "d",
+              "text": "どれも読まず、毎回 --server を指定する必要がある",
+              "why": "既定のファイルがあれば、フラグ無しでそれを使います。"
+            }
+          ],
+          "answer": "b",
+          "explanation": "KUBECONFIG が無ければ、kubectl は既定の $HOME/.kube/config を使います。KUBECONFIG があればそこに並べたファイルを合わせて使い、--kubeconfig を付ければそれが優先されます。",
+          "source": "https://kubernetes.io/ja/docs/concepts/configuration/organize-cluster-access-kubeconfig/"
+        },
+        {
+          "id": "w4-l1-q8",
+          "type": "choice",
+          "prompt": "Pod が Pending のまま動かない。スケジューラがなぜ置けなかったかの理由 (イベント) を読むのに使うコマンドはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "kubectl describe pod <Pod 名>"
+            },
+            {
+              "id": "b",
+              "text": "kubectl logs <Pod 名>",
+              "why": "まだノードに置かれていないのでコンテナは起動しておらず、ログはありません。"
+            },
+            {
+              "id": "c",
+              "text": "kubectl explain pod",
+              "why": "explain は Pod という種類の欄の説明で、この Pod の状態は出ません。"
+            },
+            {
+              "id": "d",
+              "text": "kubectl get pod <Pod 名>",
+              "why": "get は STATUS が Pending であることまでで、理由のイベントは出ません。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "describe は Pod の詳しい状態の最後に Events を出し、置けなかったときはスケジューラの FailedScheduling とその理由が載ります。Pending の調べ方はまずこれです。",
+          "source": "https://kubernetes.io/ja/docs/tasks/debug/debug-application/debug-running-pod/"
+        }
+      ]
+    },
+    {
+      "id": "w4-l2",
+      "kind": "quiz",
+      "title": "requests と limits、HPA",
+      "summary": "YAML とコマンドの穴埋め・出力を読む · 7 問",
+      "domain": "Kubernetes Fundamentals",
+      "questions": [
+        {
+          "id": "w4-l2-q1",
+          "type": "choice",
+          "prompt": "スケジューラが Pod をどのノードに置くかを決めるときに見るのは、コンテナの resources のどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "requests"
+            },
+            {
+              "id": "b",
+              "text": "limits",
+              "why": "limits は動いている間の上限で、kubelet とカーネルが守らせます。置き場所の計算には requests を使います。"
+            },
+            {
+              "id": "c",
+              "text": "そのときノードで実際に使われている CPU とメモリだけ",
+              "why": "スケジューラは、置かれた Pod の requests の合計がノードの容量に収まるかで決めます。"
+            },
+            {
+              "id": "d",
+              "text": "resources は置き場所に関係しない",
+              "why": "requests を書くと、スケジューラはそれが収まるノードを探します。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "requests を書くと、スケジューラはそれを満たす空きのあるノードを選びます。limits は置いたあとに守らせる上限で、kubelet とコンテナランタイムが使います。",
+          "source": "https://kubernetes.io/ja/docs/concepts/configuration/manage-resources-containers/"
+        },
+        {
+          "id": "w4-l2-q2",
+          "type": "fill",
+          "prompt": "コンテナが使える量の上限を CPU 500m・メモリ 128Mi にしたい。空欄に入るキーは?",
+          "language": "yaml",
+          "code": "    resources:\n      requests:\n        memory: \"64Mi\"\n        cpu: \"250m\"\n      {{blank}}:\n        memory: \"128Mi\"\n        cpu: \"500m\"",
+          "answers": [
+            "limits"
+          ],
+          "candidates": [
+            "limits",
+            "requests",
+            "maximum",
+            "quota"
+          ],
+          "explanation": "limits は使える量の上限で、requests は置き場所を決めるときの見込みの量 (確保される量) です。1 つのコンテナに両方を書けます。",
+          "wrongNotes": {
+            "requests": "requests はすでに上にあり、上限ではなく確保してほしい量です。",
+            "maximum": "resources に maximum というキーはありません。",
+            "quota": "ResourceQuota は名前空間ごとの合計の枠を決める別のリソースで、コンテナの resources には書きません。"
+          },
+          "source": "https://kubernetes.io/ja/docs/concepts/configuration/manage-resources-containers/"
+        },
+        {
+          "id": "w4-l2-q3",
+          "type": "fill",
+          "prompt": "CPU を 0.5 個分要求したい。ミリ CPU の単位で書くとき、空欄に入る値は?",
+          "language": "yaml",
+          "code": "    resources:\n      requests:\n        cpu: \"{{blank}}\"",
+          "answers": [
+            "500m"
+          ],
+          "candidates": [
+            "500m",
+            "50m",
+            "0.5m",
+            "500Mi"
+          ],
+          "explanation": "CPU は 1 個を 1000m (ミリ CPU) で数えるので、0.5 個は 500m です。0.1 と 100m が同じ意味で、m の形が勧められています。",
+          "wrongNotes": {
+            "50m": "50m は 0.05 個分で、0.5 個の 10 分の 1 です。",
+            "0.5m": "1m より細かい値は許されません。0.5 個分なら 500m です。",
+            "500Mi": "Mi はメモリのバイトの単位 (メビバイト) で、CPU には使いません。"
+          },
+          "source": "https://kubernetes.io/ja/docs/concepts/configuration/manage-resources-containers/"
+        },
+        {
+          "id": "w4-l2-q4",
+          "type": "choice",
+          "prompt": "コンテナが limits を超えて使おうとしたとき、CPU とメモリで起きることの違いとして正しいのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "CPU は使える量が絞られ、メモリは OOM でプロセスが終了させられる"
+            },
+            {
+              "id": "b",
+              "text": "CPU は OOM で終了させられ、メモリは使える量が絞られる",
+              "why": "向きが逆です。メモリは絞って待たせることができないので、超えると終了させられます。"
+            },
+            {
+              "id": "c",
+              "text": "どちらもすぐにコンテナが終了させられる",
+              "why": "CPU を使いすぎたことでは終了させられません。絞られるだけです。"
+            },
+            {
+              "id": "d",
+              "text": "どちらも警告のイベントが出るだけで、超えたまま使い続けられる",
+              "why": "limits はカーネルが守らせる上限で、超えたまま使い続けることはできません。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "CPU の limits はスロットリング (使える時間を絞る) で守らせるので、遅くなっても止まりません。メモリの limits を超えるとカーネルの OOM でプロセスが終了させられ、再起動できる設定なら kubelet がコンテナを再起動します。",
+          "source": "https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/"
+        },
+        {
+          "id": "w4-l2-q5",
+          "type": "choice",
+          "prompt": "次の出力の Pod で起きたこととして、いちばん考えられるのはどれ?",
+          "code": {
+            "language": "bash",
+            "text": "$ kubectl get pod memory-demo\nNAME          READY   STATUS      RESTARTS      AGE\nmemory-demo   0/1     OOMKilled   2 (15s ago)   40s"
+          },
+          "choices": [
+            {
+              "id": "a",
+              "text": "コンテナがメモリの limits を超えて使おうとし、終了させられた"
+            },
+            {
+              "id": "b",
+              "text": "CPU の limits を超えて使い続けたので、終了させられた",
+              "why": "CPU を使いすぎても終了はさせられず、絞られるだけです。"
+            },
+            {
+              "id": "c",
+              "text": "requests が大きすぎて、置けるノードが無い",
+              "why": "置けないときは Pending のままで、コンテナは起動しません。再起動の回数も増えません。"
+            },
+            {
+              "id": "d",
+              "text": "イメージが取得できず、起動できない",
+              "why": "その場合は ErrImagePull や ImagePullBackOff になります。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "OOMKilled は、メモリが足りなくなってカーネルにプロセスを終了させられたことを示します。limits より多く使おうとするとこうなり、RESTARTS が増えていくのは kubelet が再起動しているからです。",
+          "source": "https://kubernetes.io/ja/docs/tasks/configure-pod-container/assign-memory-resource/"
+        },
+        {
+          "id": "w4-l2-q6",
+          "type": "choice",
+          "prompt": "HorizontalPodAutoscaler (HPA) の目標を「CPU の使用率 50%」にしたとき、この 50% は何に対する割合?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "Pod のコンテナの CPU の requests"
+            },
+            {
+              "id": "b",
+              "text": "Pod のコンテナの CPU の limits",
+              "why": "使用率の分母は limits ではなく requests です。"
+            },
+            {
+              "id": "c",
+              "text": "Pod が動いているノードの CPU の全体",
+              "why": "ノードの容量ではなく、Pod が要求した量に対する割合です。"
+            },
+            {
+              "id": "d",
+              "text": "クラスタの全ノードの CPU の合計",
+              "why": "クラスタ全体ではなく、対象の Pod の requests に対する割合です。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "HPA は Pod ごとの使用量を、コンテナの requests に対する割合として計算し、その平均を目標と比べて Pod の数を増減します。requests を書いていない Pod では使用率を計算できません。",
+          "source": "https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/"
+        },
+        {
+          "id": "w4-l2-q7",
+          "type": "fill",
+          "prompt": "Deployment web の Pod の数を、負荷に合わせて 1〜5 の間で自動で増減させたい。空欄に入るサブコマンドは?",
+          "language": "bash",
+          "code": "kubectl {{blank}} deployment web --min=1 --max=5",
+          "answers": [
+            "autoscale"
+          ],
+          "candidates": [
+            "autoscale",
+            "scale",
+            "rollout",
+            "set"
+          ],
+          "output": "horizontalpodautoscaler.autoscaling/web autoscaled",
+          "explanation": "autoscale は、対象の Deployment などに HorizontalPodAutoscaler を作ります。--max は必ず要り、そのあとは HPA がメトリクスを見て Pod の数を決めます。",
+          "wrongNotes": {
+            "scale": "scale は Pod の数をその場で決めた数に変えるだけで、自動では増減しません。",
+            "rollout": "rollout は更新の進み具合を見たり、前の版に戻したりするコマンドです。",
+            "set": "set はイメージや resources などの欄を書き換えるコマンドで、HPA は作りません。"
+          },
+          "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_autoscale/"
+        }
+      ]
+    },
+    {
+      "id": "w4-l3",
+      "kind": "quiz",
+      "title": "スケジューラと Node affinity",
+      "summary": "出力を読む・YAML とコマンドの穴埋め · 6 問",
+      "domain": "Kubernetes Fundamentals",
+      "questions": [
+        {
+          "id": "w4-l3-q1",
+          "type": "choice",
+          "prompt": "kube-scheduler が Pod を置くノードを選ぶ流れとして正しいのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "条件を満たすノードに絞り込み (フィルタリング)、残ったノードに点を付けて (スコアリング) いちばん高いノードを選ぶ"
+            },
+            {
+              "id": "b",
+              "text": "全ノードに点を付けてから、点の低いノードを除いていく",
+              "why": "順番が逆です。先に置けないノードを除き、残りだけに点を付けます。"
+            },
+            {
+              "id": "c",
+              "text": "空いている CPU がいちばん多いノードを、条件を見ずに選ぶ",
+              "why": "requests・nodeSelector・taint などの条件で先に絞り込みます。"
+            },
+            {
+              "id": "d",
+              "text": "毎回ランダムに 1 つのノードを選ぶ",
+              "why": "ランダムに選ぶのは、点がいちばん高いノードが複数並んだときだけです。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "スケジューラはまずフィルタリングで Pod を置けるノードを探し (例: requests を満たす空きがあるか)、次にスコアリングで残ったノードを順位付けして最も高いノードに割り当てます。同じ点が並んだときはその中からランダムに選びます。",
+          "source": "https://kubernetes.io/ja/docs/concepts/scheduling-eviction/kube-scheduler/"
+        },
+        {
+          "id": "w4-l3-q2",
+          "type": "choice",
+          "prompt": "フィルタリングのあと、条件を満たすノードが 1 つも残らなかった。この Pod はどうなる?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "どのノードにも置かれず Pending のまま、置ける場所ができるのを待つ"
+            },
+            {
+              "id": "b",
+              "text": "条件を無視して、いちばん空いているノードに置かれる",
+              "why": "条件を満たさないノードには置きません。"
+            },
+            {
+              "id": "c",
+              "text": "スケジューラが Pod を消す",
+              "why": "Pod は消されず、スケジュールできない状態で残ります。"
+            },
+            {
+              "id": "d",
+              "text": "スケジューラが requests を自動で小さくして置き直す",
+              "why": "スケジューラは Pod の requests を書き換えません。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "候補のノードが空なら、その Pod はスケジュールできない状態になり、Pending のまま待ちます。ノードが増えたり空きができたりすると、あらためて置かれます。",
+          "source": "https://kubernetes.io/ja/docs/concepts/scheduling-eviction/kube-scheduler/"
+        },
+        {
+          "id": "w4-l3-q3",
+          "type": "choice",
+          "prompt": "Pending の Pod を describe したら、Events に次の行があった。原因として正しいのはどれ?",
+          "code": {
+            "language": "bash",
+            "text": "Events:\n  Type     Reason            Age   From               Message\n  ----     ------            ----  ----               -------\n  Warning  FailedScheduling  12s   default-scheduler  0/3 nodes are available: 3 Insufficient cpu. preemption: 0/3 nodes are available: 3 No preemption victims found for incoming pod."
+          },
+          "choices": [
+            {
+              "id": "a",
+              "text": "Pod の CPU の requests を満たす空きのあるノードが 1 つも無い"
+            },
+            {
+              "id": "b",
+              "text": "コンテナが CPU の limits に達して絞られている",
+              "why": "絞られるのは動き出してからの話です。この Pod はまだどのノードにも置かれていません。"
+            },
+            {
+              "id": "c",
+              "text": "イメージの取得に失敗している",
+              "why": "イメージの取得はノードに置かれたあとで、失敗すると ErrImagePull などが出ます。"
+            },
+            {
+              "id": "d",
+              "text": "3 台のノードがすべて止まっている (NotReady)",
+              "why": "Insufficient cpu は CPU の空きが足りないという理由で、ノードの停止とは別です。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "Insufficient cpu は、フィルタリングで CPU の requests が収まるノードが無かったことを示します。requests を小さくするか、空きのあるノードを足すと置けるようになります。",
+          "source": "https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#my-pods-are-pending-with-event-message-failedscheduling"
+        },
+        {
+          "id": "w4-l3-q4",
+          "type": "fill",
+          "prompt": "ラベル disktype=ssd を持つノードにだけ Pod を置きたい。いちばん簡単な書き方で、空欄に入るキーは?",
+          "language": "yaml",
+          "code": "apiVersion: v1\nkind: Pod\nmetadata:\n  name: nginx\nspec:\n  containers:\n  - name: nginx\n    image: nginx:1.27-alpine\n  {{blank}}:\n    disktype: ssd",
+          "answers": [
+            "nodeSelector"
+          ],
+          "candidates": [
+            "nodeSelector",
+            "nodeName",
+            "affinity",
+            "labels"
+          ],
+          "explanation": "nodeSelector に書いたラベルをすべて持つノードにだけ、スケジューラは Pod を置きます。もっと細かい条件 (In や「できれば」) を書きたいときは Node affinity を使います。",
+          "wrongNotes": {
+            "nodeName": "nodeName はノードの名前を 1 つ直接書く欄で、ラベルでは選べません。スケジューラも通りません。",
+            "affinity": "affinity は nodeAffinity などをこの下に入れ子で書く欄で、ラベルを直接は並べられません。",
+            "labels": "labels は metadata の下に書く Pod 自身のラベルで、置き場所の条件ではありません。"
+          },
+          "source": "https://kubernetes.io/ja/docs/tasks/configure-pod-container/assign-pods-nodes/"
+        },
+        {
+          "id": "w4-l3-q5",
+          "type": "fill",
+          "prompt": "nodeSelector で選べるように、ノード node1 にラベル disktype=ssd を付けたい。空欄に入るサブコマンドは?",
+          "language": "bash",
+          "code": "kubectl {{blank}} nodes node1 disktype=ssd",
+          "answers": [
+            "label"
+          ],
+          "candidates": [
+            "label",
+            "taint",
+            "annotate",
+            "describe"
+          ],
+          "output": "node/node1 labeled",
+          "explanation": "label はリソースにラベルを付けます。付いたかどうかは kubectl get nodes --show-labels で確かめられます。",
+          "wrongNotes": {
+            "taint": "taint はノードに Pod を寄せ付けない印を付けるもので、引き寄せるためのラベルとは逆の働きです。",
+            "annotate": "annotate は注釈を付けるもので、nodeSelector の条件には使われません。",
+            "describe": "describe はノードの詳しい状態を出すだけで、何も付けません。"
+          },
+          "source": "https://kubernetes.io/ja/docs/tasks/configure-pod-container/assign-pods-nodes/"
+        },
+        {
+          "id": "w4-l3-q6",
+          "type": "choice",
+          "prompt": "「できれば SSD のノードに置きたいが、合うノードが無ければ他のノードでもよい」という条件を書くのに合う Node affinity はどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "preferredDuringSchedulingIgnoredDuringExecution"
+            },
+            {
+              "id": "b",
+              "text": "requiredDuringSchedulingIgnoredDuringExecution",
+              "why": "required は満たすノードが無ければ置きません。nodeSelector と同じく必須の条件です。"
+            },
+            {
+              "id": "c",
+              "text": "nodeSelector",
+              "why": "nodeSelector も必須の条件で、合うノードが無ければ Pending になります。"
+            },
+            {
+              "id": "d",
+              "text": "nodeName",
+              "why": "nodeName は 1 つのノードを名指しするもので、「できれば」は書けません。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "preferred は合うノードを探しますが、無くても他のノードに置きます (weight で好みの強さを付けられます)。required は満たさない限り置きません。どちらも IgnoredDuringExecution で、置いたあとにラベルが変わっても Pod は動き続けます。",
+          "source": "https://kubernetes.io/ja/docs/concepts/scheduling-eviction/assign-pod-node/"
+        }
+      ]
+    },
+    {
+      "id": "w4-l4",
+      "kind": "quiz",
+      "title": "taint と toleration",
+      "summary": "コマンドと YAML の穴埋めと 4 択 · 6 問",
+      "domain": "Kubernetes Fundamentals",
+      "questions": [
+        {
+          "id": "w4-l4-q1",
+          "type": "choice",
+          "prompt": "taint と toleration を付ける先の組み合わせとして正しいのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "taint はノードに付け、toleration は Pod に付ける"
+            },
+            {
+              "id": "b",
+              "text": "taint は Pod に付け、toleration はノードに付ける",
+              "why": "向きが逆です。ノードが taint で Pod を退け、Pod が toleration でそれを許容します。"
+            },
+            {
+              "id": "c",
+              "text": "どちらもノードに付ける",
+              "why": "toleration は Pod の spec に書きます。"
+            },
+            {
+              "id": "d",
+              "text": "どちらも Pod に付ける",
+              "why": "taint はノードに付けるもので、kubectl taint nodes で付けます。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "taint はノードが合わない Pod を退けるための印で、toleration は Pod が「その taint があっても構わない」と示す設定です。Node affinity が Pod をノードに引き寄せるのとは逆向きの仕組みです。",
+          "source": "https://kubernetes.io/ja/docs/concepts/scheduling-eviction/taint-and-toleration/"
+        },
+        {
+          "id": "w4-l4-q2",
+          "type": "fill",
+          "prompt": "ノード node1 を GPU を使う Pod 専用にしたい。toleration を持たない Pod が置かれないように印を付ける。空欄に入るサブコマンドは?",
+          "language": "bash",
+          "code": "kubectl {{blank}} nodes node1 dedicated=gpu:NoSchedule",
+          "answers": [
+            "taint"
+          ],
+          "candidates": [
+            "taint",
+            "label",
+            "cordon",
+            "annotate"
+          ],
+          "output": "node/node1 tainted",
+          "explanation": "taint はノードに key=value:effect の形の印を付けます。外すときは同じものの末尾に - を付けて kubectl taint nodes node1 dedicated=gpu:NoSchedule- と打ちます。",
+          "wrongNotes": {
+            "label": "ラベルは Pod を引き寄せる条件に使うもので、合わない Pod を退けることはできません。",
+            "cordon": "cordon はノードを丸ごとスケジュール不可にするもので、キー・値・効果を指定して特定の Pod だけを許すことはできません。",
+            "annotate": "注釈はスケジューラの判断に使われません。"
+          },
+          "source": "https://kubernetes.io/ja/docs/concepts/scheduling-eviction/taint-and-toleration/"
+        },
+        {
+          "id": "w4-l4-q3",
+          "type": "fill",
+          "prompt": "ノード node1 を保守に入れる。この taint を許容しない Pod は新しく置かれないだけでなく、すでに動いているものも追い出したい。空欄に入る効果 (effect) は?",
+          "language": "bash",
+          "code": "kubectl taint nodes node1 maintenance=true:{{blank}}",
+          "answers": [
+            "NoExecute"
+          ],
+          "candidates": [
+            "NoExecute",
+            "NoSchedule",
+            "PreferNoSchedule",
+            "Evict"
+          ],
+          "output": "node/node1 tainted",
+          "explanation": "NoExecute は新しく置かないことに加えて、合う toleration を持たない動いている Pod をノードから追い出します。toleration に tolerationSeconds を書くと、追い出されるまでの猶予を決められます。",
+          "wrongNotes": {
+            "NoSchedule": "NoSchedule は新しく置かないだけで、すでに動いている Pod はそのまま残ります。",
+            "PreferNoSchedule": "PreferNoSchedule はできるだけ置かないようにする弱い効果で、追い出しもしません。",
+            "Evict": "taint の効果は NoSchedule・PreferNoSchedule・NoExecute の 3 つで、Evict はありません。"
+          },
+          "source": "https://kubernetes.io/ja/docs/concepts/scheduling-eviction/taint-and-toleration/"
+        },
+        {
+          "id": "w4-l4-q4",
+          "type": "fill",
+          "prompt": "キーが dedicated で効果が NoSchedule の taint なら、値が何であっても許容したい。value を書かないとき、空欄に入る operator は?",
+          "language": "yaml",
+          "code": "  tolerations:\n  - key: \"dedicated\"\n    operator: \"{{blank}}\"\n    effect: \"NoSchedule\"",
+          "answers": [
+            "Exists"
+          ],
+          "candidates": [
+            "Exists",
+            "Equal",
+            "In",
+            "DoesNotExist"
+          ],
+          "explanation": "Exists はキー (と効果) が合えば値を問わずに合致し、value は書きません。operator を省くと Equal になり、value まで同じときだけ合致します。",
+          "wrongNotes": {
+            "Equal": "Equal は value まで一致したときだけ合致するので、value を書かないこの形では値を問わずに許容できません。",
+            "In": "In は Node affinity などでラベルの値の一覧と比べるときの演算子です。",
+            "DoesNotExist": "DoesNotExist は Node affinity でラベルが無いことを条件にする演算子です。"
+          },
+          "source": "https://kubernetes.io/ja/docs/concepts/scheduling-eviction/taint-and-toleration/"
+        },
+        {
+          "id": "w4-l4-q5",
+          "type": "choice",
+          "prompt": "ノード node1 に taint dedicated=gpu:NoSchedule を付け、ある Pod に合う toleration を書いた。この Pod について正しいのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "node1 に置かれてもよくなるが、必ず node1 に置かれるとは限らない"
+            },
+            {
+              "id": "b",
+              "text": "必ず node1 に置かれる",
+              "why": "toleration は置くことを許すだけで、引き寄せはしません。node1 に寄せたいなら nodeSelector や Node affinity を合わせて使います。"
+            },
+            {
+              "id": "c",
+              "text": "node1 には置かれなくなる",
+              "why": "合う toleration があるので、その taint では退けられません。"
+            },
+            {
+              "id": "d",
+              "text": "taint の無いノードには置かれなくなる",
+              "why": "toleration は taint の無いノードへの配置を妨げません。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "toleration は合う taint の付いたノードへの配置を認めるだけで、そこへ必ず置くとは限りません。専用のノードにするには、taint で他を退け、nodeSelector や Node affinity でその Pod を引き寄せる組み合わせにします。",
+          "source": "https://kubernetes.io/ja/docs/concepts/scheduling-eviction/taint-and-toleration/"
+        },
+        {
+          "id": "w4-l4-q6",
+          "type": "choice",
+          "prompt": "taint の効果 PreferNoSchedule の意味として正しいのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "合う toleration の無い Pod をできるだけ置かないようにするが、必須の条件にはしない"
+            },
+            {
+              "id": "b",
+              "text": "合う toleration の無い Pod を決して置かない",
+              "why": "それは NoSchedule です。"
+            },
+            {
+              "id": "c",
+              "text": "合う toleration の無い動いている Pod を追い出す",
+              "why": "追い出すのは NoExecute です。"
+            },
+            {
+              "id": "d",
+              "text": "合う toleration を持つ Pod を優先してそのノードに置く",
+              "why": "taint は Pod を退けるもので、優先して置く働きはありません。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "PreferNoSchedule は NoSchedule の「ソフトな」版で、スケジューラは合わない Pod を置くのを避けようとしますが、他に置き場所が無ければ置くこともあります。",
+          "source": "https://kubernetes.io/ja/docs/concepts/scheduling-eviction/taint-and-toleration/"
+        }
+      ]
+    },
+    {
+      "id": "w4-lab",
+      "kind": "lab",
+      "title": "週末の実習: Pending の理由を読み、HPA を付ける",
+      "summary": "家のクラスタで手を動かす · 7 手順",
+      "domain": "Kubernetes Fundamentals",
+      "source": "https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale-walkthrough/",
+      "steps": [
+        {
+          "text": "どのノードにも収まらない大きな CPU の requests (100 個分) を持つ Pod を作る",
+          "command": "kubectl run big --image=nginx:1.27-alpine --overrides='{\"spec\":{\"containers\":[{\"name\":\"big\",\"image\":\"nginx:1.27-alpine\",\"resources\":{\"requests\":{\"cpu\":\"100\"}}}]}}'"
+        },
+        {
+          "text": "STATUS が Pending のままで、NODE が <none> (どこにも置かれていない) ことを確かめる",
+          "command": "kubectl get pod big -o wide"
+        },
+        {
+          "text": "Events の FailedScheduling に Insufficient cpu が出ていることを読む (フィルタリングで全ノードが外れた) (ほかの理由が並ぶこともある。フィルタリングで全ノードが外れた)",
+          "command": "kubectl describe pod big"
+        },
+        {
+          "text": "HPA の対象にする Deployment を作り、CPU の requests を付ける (HPA の使用率は requests に対する割合なので要る)",
+          "command": "kubectl create deployment web --image=nginx:1.27-alpine && kubectl set resources deployment web --requests=cpu=100m"
+        },
+        {
+          "text": "CPU の使用率 50% を目標に、1〜3 個で増減させる HPA を付ける (k3s は metrics-server を同梱しているので、そのまま使える。kubectl 1.33 以前 では --cpu の代わりに --cpu-percent=50)",
+          "command": "kubectl autoscale deployment web --min=1 --max=3 --cpu=50%"
+        },
+        {
+          "text": "1〜2 分待って、TARGETS に今の使用率と目標 (例: cpu: 0%/50%) が出ることを確かめる (<unknown> のままならメトリクスが取れていない)",
+          "command": "kubectl get hpa web"
+        },
+        {
+          "text": "片付ける",
+          "command": "kubectl delete pod/big hpa/web deployment/web"
+        }
+      ]
+    }
+  ]
+}
