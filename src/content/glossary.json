@@ -1,0 +1,1538 @@
+{
+  "terms": [
+    {
+      "id": "container-image",
+      "term": "コンテナイメージ",
+      "aliases": [
+        "イメージ",
+        "container image"
+      ],
+      "description": "アプリとそのすべての依存関係をまとめた、単独で実行できるバイナリのデータです。ふつうはレジストリに置き、Pod から名前とタグかダイジェストで参照します。",
+      "source": "https://kubernetes.io/ja/docs/concepts/containers/images/",
+      "lessons": [
+        "w1-l1",
+        "w1-l2",
+        "w1-l3",
+        "w1-l4",
+        "w1-lab",
+        "w2-l1",
+        "w2-l2",
+        "w3-l1",
+        "w3-l2",
+        "w3-l3",
+        "w3-l4",
+        "w3-lab",
+        "w4-l1",
+        "w4-l2",
+        "w4-l3",
+        "w5-l1",
+        "w5-l4",
+        "w6-l3",
+        "w6-l4",
+        "w6-lab",
+        "w7-l1",
+        "w7-l3",
+        "w7-l4",
+        "w8-l1",
+        "w8-l4",
+        "w8-lab"
+      ]
+    },
+    {
+      "id": "oci",
+      "term": "OCI",
+      "aliases": [
+        "Open Container Initiative",
+        "オーシーアイ"
+      ],
+      "description": "Open Container Initiative の略で、コンテナのランタイム・イメージ・配布の 3 つの仕様を決める集まりです。2015 年に始まりました。",
+      "source": "https://opencontainers.org/about/overview/",
+      "lessons": [
+        "w1-l3",
+        "w5-l4",
+        "w8-l4"
+      ]
+    },
+    {
+      "id": "cri",
+      "term": "CRI",
+      "aliases": [
+        "Container Runtime Interface",
+        "コンテナランタイムインターフェース"
+      ],
+      "description": "Container Runtime Interface の略で、kubelet とコンテナランタイムの間の通信に使う、主な gRPC のプロトコルを決めたものです。",
+      "source": "https://kubernetes.io/ja/docs/concepts/architecture/cri/",
+      "lessons": [
+        "w1-l3",
+        "w1-l4",
+        "w1-lab",
+        "w2-l2",
+        "w5-l4",
+        "w6-l3",
+        "w8-l4"
+      ]
+    },
+    {
+      "id": "containerd",
+      "term": "containerd",
+      "aliases": [
+        "コンテナディー"
+      ],
+      "description": "シンプルさ・堅牢さ・移植性を重んじる、業界標準のコンテナランタイムです。2019 年に CNCF の Graduated プロジェクトになりました。",
+      "source": "https://containerd.io/",
+      "lessons": [
+        "w1-l3",
+        "w1-l4",
+        "w1-lab",
+        "w2-l4",
+        "w2-lab",
+        "w8-l4",
+        "w8-lab"
+      ]
+    },
+    {
+      "id": "crictl",
+      "term": "crictl",
+      "aliases": [
+        "クリクトル"
+      ],
+      "description": "CRI に対応したコンテナランタイムを調べてデバッグするための、ノードの上で使うコマンドです。出力の形は Docker の CLI に似ています。",
+      "source": "https://kubernetes.io/ja/docs/tasks/debug/debug-cluster/crictl/",
+      "lessons": [
+        "w1-l4",
+        "w1-lab"
+      ]
+    },
+    {
+      "id": "k3s",
+      "term": "k3s",
+      "aliases": [
+        "ケースリーエス",
+        "K3s"
+      ],
+      "description": "コントロールプレーンの部品を 1 つのバイナリとプロセスにまとめた軽量な Kubernetes です。containerd・Flannel・CoreDNS・Traefik などを同梱し、既定のデータの置き場は sqlite3 です。",
+      "source": "https://docs.k3s.io/",
+      "lessons": [
+        "w1-l3",
+        "w1-l4",
+        "w1-lab",
+        "w2-l2",
+        "w2-l3",
+        "w2-l4",
+        "w2-lab",
+        "w4-lab",
+        "w5-l1",
+        "w5-l3",
+        "w5-l4",
+        "w5-lab",
+        "w6-l3",
+        "w6-lab",
+        "w8-l4",
+        "w8-lab"
+      ]
+    },
+    {
+      "id": "control-plane",
+      "term": "コントロールプレーン",
+      "aliases": [
+        "control plane",
+        "control-plane"
+      ],
+      "description": "クラスタ全体の状態を管理する部品の集まりです。kube-apiserver・etcd・kube-scheduler・kube-controller-manager などから成ります。",
+      "source": "https://kubernetes.io/ja/docs/concepts/overview/components/",
+      "lessons": [
+        "w1-l3",
+        "w1-l4",
+        "w2-l1",
+        "w2-l2",
+        "w2-l3",
+        "w2-l4",
+        "w2-lab",
+        "w3-l1"
+      ]
+    },
+    {
+      "id": "kube-apiserver",
+      "term": "kube-apiserver",
+      "aliases": [
+        "API サーバー",
+        "APIサーバー"
+      ],
+      "description": "Kubernetes の HTTP API を公開する、コントロールプレーンの中心の部品です。API サーバーのデータはすべて etcd に保存されます。",
+      "source": "https://kubernetes.io/ja/docs/concepts/overview/components/",
+      "lessons": [
+        "w2-l1",
+        "w2-l2",
+        "w2-l3",
+        "w2-l4",
+        "w2-lab",
+        "w5-l1",
+        "w5-l4",
+        "w6-l1",
+        "w6-l2",
+        "w8-l2",
+        "w8-l3"
+      ]
+    },
+    {
+      "id": "etcd",
+      "term": "etcd",
+      "aliases": [
+        "エトセディー",
+        "エトシーディー"
+      ],
+      "description": "API サーバーのすべてのデータを保存する、一貫性と高可用性を持つキーバリューストアです。アプリのログやメトリクスの置き場ではありません。",
+      "source": "https://kubernetes.io/ja/docs/concepts/overview/components/",
+      "lessons": [
+        "w2-l1",
+        "w2-l2",
+        "w2-l3",
+        "w2-l4",
+        "w2-lab",
+        "w6-l2",
+        "w8-l1",
+        "w8-l2",
+        "w8-l3",
+        "w8-l4"
+      ]
+    },
+    {
+      "id": "kube-scheduler",
+      "term": "kube-scheduler",
+      "aliases": [
+        "スケジューラー",
+        "スケジューラ"
+      ],
+      "description": "ノードに割り当てられていない Pod を見つけ、条件に合うノードを絞り込み (フィルタリング)、点数を付けて (スコアリング) 動かすノードを選ぶ部品です。",
+      "source": "https://kubernetes.io/ja/docs/concepts/scheduling-eviction/kube-scheduler/",
+      "lessons": [
+        "w2-l1",
+        "w2-l2",
+        "w2-l3",
+        "w2-l4",
+        "w3-l1",
+        "w4-l1",
+        "w4-l2",
+        "w4-l3",
+        "w4-l4",
+        "w5-l2",
+        "w6-l4",
+        "w8-l3"
+      ]
+    },
+    {
+      "id": "kube-controller-manager",
+      "term": "kube-controller-manager",
+      "aliases": [
+        "コントローラーマネージャー"
+      ],
+      "description": "コントロールプレーンの部品で、Deployment コントローラーや Job コントローラーなどの組み込みのコントローラーがこの中で動きます。",
+      "source": "https://kubernetes.io/ja/docs/concepts/architecture/controller/",
+      "lessons": [
+        "w2-l1",
+        "w2-l4",
+        "w5-l3"
+      ]
+    },
+    {
+      "id": "kubelet",
+      "term": "kubelet",
+      "aliases": [
+        "キューブレット"
+      ],
+      "description": "各ノードで動き、Pod の中のコンテナが動いていることを保証する部品です。kube-proxy・コンテナランタイムと並ぶノードの部品です。",
+      "source": "https://kubernetes.io/ja/docs/concepts/overview/components/",
+      "lessons": [
+        "w1-l3",
+        "w1-l4",
+        "w2-l1",
+        "w2-l2",
+        "w2-l3",
+        "w2-l4",
+        "w2-lab",
+        "w4-l2",
+        "w5-l2",
+        "w5-l4",
+        "w6-l3",
+        "w6-l4",
+        "w8-l3",
+        "w8-l4"
+      ]
+    },
+    {
+      "id": "kube-proxy",
+      "term": "kube-proxy",
+      "aliases": [
+        "キューブプロキシ"
+      ],
+      "description": "各ノードで動き、ノードのネットワークのルールを保って Service を実装する部品です。省くこともできる (オプションの) 部品です。",
+      "source": "https://kubernetes.io/ja/docs/concepts/overview/components/",
+      "lessons": [
+        "w2-l1",
+        "w2-l2",
+        "w5-l2",
+        "w5-l4"
+      ]
+    },
+    {
+      "id": "node",
+      "term": "Node",
+      "aliases": [
+        "ノード"
+      ],
+      "description": "Pod を動かす、1 つの VM または物理的なマシンです。ノードの部品には kubelet・コンテナランタイム・kube-proxy があります。",
+      "source": "https://kubernetes.io/ja/docs/concepts/architecture/nodes/",
+      "lessons": [
+        "w1-l1",
+        "w1-l2",
+        "w1-l3",
+        "w1-l4",
+        "w1-lab",
+        "w2-l1",
+        "w2-l2",
+        "w2-l3",
+        "w2-l4",
+        "w2-lab",
+        "w3-l1",
+        "w3-l2",
+        "w3-l3",
+        "w4-l1",
+        "w4-l2",
+        "w4-l3",
+        "w4-l4",
+        "w4-lab",
+        "w5-l1",
+        "w5-l2",
+        "w5-l4",
+        "w5-lab",
+        "w6-l1",
+        "w6-l2",
+        "w6-l3",
+        "w6-l4",
+        "w7-l1",
+        "w7-l4",
+        "w8-l1",
+        "w8-l2",
+        "w8-l3",
+        "w8-l4",
+        "w8-lab"
+      ]
+    },
+    {
+      "id": "controller",
+      "term": "コントローラー",
+      "aliases": [
+        "制御ループ",
+        "controller",
+        "reconcile",
+        "望ましい状態"
+      ],
+      "description": "クラスタの状態を見張り、今の状態を望ましい状態 (spec) に近づける制御ループです。Deployment や Job などのリソースごとに受け持ちのコントローラーがあります。",
+      "source": "https://kubernetes.io/ja/docs/concepts/architecture/controller/",
+      "lessons": [
+        "w2-l3",
+        "w2-lab",
+        "w3-l1",
+        "w6-l1",
+        "w7-l1"
+      ]
+    },
+    {
+      "id": "pod",
+      "term": "Pod",
+      "aliases": [
+        "ポッド"
+      ],
+      "description": "Kubernetes で作って管理できる、デプロイの最小の単位です。1 つ以上のコンテナがネットワークとストレージを共有し、ふつうは Deployment などのワークロードを通して作ります。",
+      "source": "https://kubernetes.io/ja/docs/concepts/workloads/pods/",
+      "lessons": [
+        "w1-l1",
+        "w1-l2",
+        "w1-l3",
+        "w1-l4",
+        "w1-lab",
+        "w2-l1",
+        "w2-l2",
+        "w2-l3",
+        "w2-l4",
+        "w2-lab",
+        "w3-l1",
+        "w3-l2",
+        "w3-l3",
+        "w3-l4",
+        "w3-lab",
+        "w4-l1",
+        "w4-l2",
+        "w4-l3",
+        "w4-l4",
+        "w4-lab",
+        "w5-l1",
+        "w5-l2",
+        "w5-l3",
+        "w5-l4",
+        "w5-lab",
+        "w6-l1",
+        "w6-l2",
+        "w6-l3",
+        "w6-l4",
+        "w6-lab",
+        "w7-l1",
+        "w7-l4",
+        "w7-lab",
+        "w8-l1",
+        "w8-l2",
+        "w8-l3",
+        "w8-l4",
+        "w8-lab"
+      ]
+    },
+    {
+      "id": "manifest",
+      "term": "マニフェスト",
+      "aliases": [
+        "manifest",
+        "YAML"
+      ],
+      "description": "JSON か YAML で書いた Kubernetes の API のオブジェクトの仕様です。適用すると、Kubernetes が保つ望ましい状態になります。YAML なら 1 つのファイルに複数を書けます。",
+      "source": "https://kubernetes.io/ja/docs/reference/glossary/?all=true",
+      "lessons": [
+        "w2-l3",
+        "w2-l4",
+        "w3-l1",
+        "w3-l2",
+        "w5-l1",
+        "w5-l3",
+        "w6-l1",
+        "w6-l2",
+        "w6-l3",
+        "w7-l3"
+      ]
+    },
+    {
+      "id": "replicaset",
+      "term": "ReplicaSet",
+      "aliases": [
+        "レプリカセット"
+      ],
+      "description": "指定した数の同じ Pod が動き続けるように保つリソースです。ローリングアップデートを持たないので、ふつうは直接使わず Deployment に管理させます。",
+      "source": "https://kubernetes.io/ja/docs/concepts/workloads/controllers/replicaset/",
+      "lessons": [
+        "w3-l1",
+        "w3-l2",
+        "w3-l3",
+        "w3-l4",
+        "w3-lab",
+        "w8-l3"
+      ]
+    },
+    {
+      "id": "deployment",
+      "term": "Deployment",
+      "aliases": [
+        "デプロイメント"
+      ],
+      "description": "Pod と ReplicaSet を宣言的に更新するリソースです。新しい ReplicaSet へ段階的に移すローリングアップデートや、前の版への巻き戻し (rollout undo) ができます。",
+      "source": "https://kubernetes.io/ja/docs/concepts/workloads/controllers/deployment/",
+      "lessons": [
+        "w1-l1",
+        "w1-l3",
+        "w2-l1",
+        "w2-l3",
+        "w2-lab",
+        "w3-l1",
+        "w3-l2",
+        "w3-l3",
+        "w3-l4",
+        "w3-lab",
+        "w4-l1",
+        "w4-l2",
+        "w4-lab",
+        "w5-l1",
+        "w6-l4",
+        "w6-lab",
+        "w7-l1",
+        "w7-l3",
+        "w7-l4",
+        "w8-l3",
+        "w8-l4"
+      ]
+    },
+    {
+      "id": "rolling-update",
+      "term": "ローリングアップデート",
+      "aliases": [
+        "RollingUpdate",
+        "rolling update"
+      ],
+      "description": "Pod を少しずつ新しい版に置き換えて、止めずに更新する Deployment の既定の戦略です。もう 1 つの Recreate は古い Pod を全部止めてから新しい Pod を作ります。",
+      "source": "https://kubernetes.io/ja/docs/concepts/workloads/controllers/deployment/",
+      "lessons": [
+        "w3-l2",
+        "w3-lab",
+        "w7-l4"
+      ]
+    },
+    {
+      "id": "statefulset",
+      "term": "StatefulSet",
+      "aliases": [
+        "ステートフルセット"
+      ],
+      "description": "各 Pod に変わらない名前 (web-0、web-1 など) と、Pod ごとの PersistentVolumeClaim による安定したストレージを持たせるワークロードです。",
+      "source": "https://kubernetes.io/ja/docs/concepts/workloads/controllers/statefulset/",
+      "lessons": [
+        "w3-l1",
+        "w3-l2",
+        "w3-l3"
+      ]
+    },
+    {
+      "id": "daemonset",
+      "term": "DaemonSet",
+      "aliases": [
+        "デーモンセット"
+      ],
+      "description": "すべて (または選んだ) ノードで、Pod を 1 つずつ動かすワークロードです。ログの集計やノードの監視のデーモンに使います。",
+      "source": "https://kubernetes.io/ja/docs/concepts/workloads/controllers/daemonset/",
+      "lessons": [
+        "w3-l1",
+        "w3-l2",
+        "w3-l3"
+      ]
+    },
+    {
+      "id": "job",
+      "term": "Job",
+      "aliases": [
+        "ジョブ"
+      ],
+      "description": "終わることを前提にした Pod (バッチの処理など) を管理するワークロードです。失敗した Pod は backoffLimit まで再試行します。動かし続けるものとは使い分けます。",
+      "source": "https://kubernetes.io/ja/docs/concepts/workloads/controllers/job/",
+      "lessons": [
+        "w2-l1",
+        "w3-l1",
+        "w3-l2",
+        "w3-l3",
+        "w3-lab",
+        "w8-l4"
+      ]
+    },
+    {
+      "id": "cronjob",
+      "term": "CronJob",
+      "aliases": [
+        "クーロンジョブ",
+        "クロンジョブ"
+      ],
+      "description": "cron の書式の予定に従って、Job を繰り返し作るリソースです。バックアップやレポートの作成のような、決まった時刻の処理に使います。",
+      "source": "https://kubernetes.io/ja/docs/concepts/workloads/controllers/cron-jobs/",
+      "lessons": [
+        "w3-l1",
+        "w3-l2",
+        "w3-l3",
+        "w3-lab",
+        "w8-l4"
+      ]
+    },
+    {
+      "id": "namespace",
+      "term": "Namespace",
+      "aliases": [
+        "ネームスペース",
+        "名前空間"
+      ],
+      "description": "1 つのクラスタの中でリソースを分ける仕組みです。Node や PersistentVolume のような低いレベルのリソースは、どの Namespace にも属しません。",
+      "source": "https://kubernetes.io/ja/docs/concepts/overview/working-with-objects/namespaces/",
+      "lessons": [
+        "w1-l1",
+        "w1-l3",
+        "w2-l1",
+        "w2-l2",
+        "w2-l3",
+        "w2-l4",
+        "w3-l1",
+        "w3-l2",
+        "w3-l3",
+        "w3-l4",
+        "w4-l1",
+        "w5-l2",
+        "w5-l4",
+        "w5-lab",
+        "w6-l1",
+        "w6-l2",
+        "w6-l3",
+        "w6-l4",
+        "w6-lab",
+        "w7-l1",
+        "w7-l3",
+        "w7-lab",
+        "w8-l2",
+        "w8-l3",
+        "w8-lab"
+      ]
+    },
+    {
+      "id": "label-selector",
+      "term": "ラベルとセレクター",
+      "aliases": [
+        "label",
+        "selector",
+        "ラベル",
+        "セレクター"
+      ],
+      "description": "ラベルはオブジェクトに付けるキーと値の組で、セレクターはラベルでオブジェクトの集まりを選ぶ条件です。Service や Deployment はセレクターで対象の Pod を選びます。",
+      "source": "https://kubernetes.io/ja/docs/concepts/overview/working-with-objects/labels/",
+      "lessons": [
+        "w2-l3",
+        "w3-l1",
+        "w3-l2",
+        "w3-l3",
+        "w3-l4",
+        "w3-lab",
+        "w4-l3",
+        "w4-l4",
+        "w5-l1",
+        "w5-l2",
+        "w5-l4",
+        "w5-lab",
+        "w6-l2",
+        "w7-l3",
+        "w7-l4",
+        "w8-l2"
+      ]
+    },
+    {
+      "id": "configmap",
+      "term": "ConfigMap",
+      "aliases": [
+        "コンフィグマップ"
+      ],
+      "description": "機密でない設定をキーと値で持つリソースで、設定をコンテナイメージから切り離せます。機密性や暗号化は無いので、機密の値には Secret を使います。",
+      "source": "https://kubernetes.io/ja/docs/concepts/configuration/configmap/",
+      "lessons": [
+        "w2-l3",
+        "w3-l1",
+        "w3-l2",
+        "w3-l4",
+        "w7-l1"
+      ]
+    },
+    {
+      "id": "secret",
+      "term": "Secret",
+      "aliases": [
+        "シークレット"
+      ],
+      "description": "パスワードやトークンなどの機密の値を持つリソースです。値は base64 で書きますが base64 は暗号化ではないので、保存データの暗号化や etcd へのアクセスの制限と合わせて使います。",
+      "source": "https://kubernetes.io/ja/docs/concepts/configuration/secret/",
+      "lessons": [
+        "w2-l3",
+        "w3-l4",
+        "w6-l2"
+      ]
+    },
+    {
+      "id": "kubectl",
+      "term": "kubectl",
+      "aliases": [
+        "キューブコントロール",
+        "キューブシーティーエル"
+      ],
+      "description": "Kubernetes の API を使ってクラスタを操作するコマンドラインのツールです。接続先や認証の情報は kubeconfig のファイルから読みます。",
+      "source": "https://kubernetes.io/ja/docs/reference/kubectl/",
+      "lessons": [
+        "w1-l3",
+        "w1-l4",
+        "w1-lab",
+        "w2-l1",
+        "w2-l2",
+        "w2-l3",
+        "w2-l4",
+        "w2-lab",
+        "w3-l1",
+        "w3-l2",
+        "w3-l3",
+        "w3-l4",
+        "w3-lab",
+        "w4-l1",
+        "w4-l2",
+        "w4-l3",
+        "w4-l4",
+        "w4-lab",
+        "w5-l1",
+        "w5-l2",
+        "w5-lab",
+        "w6-l1",
+        "w6-l2",
+        "w6-l3",
+        "w6-l4",
+        "w6-lab",
+        "w7-l1",
+        "w7-l3",
+        "w7-l4",
+        "w7-lab",
+        "w8-l1",
+        "w8-l2",
+        "w8-l3",
+        "w8-l4",
+        "w8-lab"
+      ]
+    },
+    {
+      "id": "kubeconfig",
+      "term": "kubeconfig",
+      "aliases": [
+        "キューブコンフィグ",
+        "コンテキスト"
+      ],
+      "description": "クラスタ・ユーザー・Namespace の組 (コンテキスト) など、クラスタへの接続の情報をまとめたファイルです。既定は $HOME/.kube/config で、KUBECONFIG の環境変数で変えられます。",
+      "source": "https://kubernetes.io/ja/docs/concepts/configuration/organize-cluster-access-kubeconfig/",
+      "lessons": [
+        "w2-l1",
+        "w4-l1",
+        "w6-lab"
+      ]
+    },
+    {
+      "id": "requests-limits",
+      "term": "requests と limits",
+      "aliases": [
+        "リクエスト",
+        "リミット",
+        "resource requests",
+        "resource limits"
+      ],
+      "description": "requests はコンテナに確保する CPU とメモリの量で、スケジューラがノードを選ぶ目安になります。limits は使える上限で、メモリを超えると OOM で終了させられることがあります。",
+      "source": "https://kubernetes.io/ja/docs/concepts/configuration/manage-resources-containers/",
+      "lessons": [
+        "w4-l1",
+        "w4-l2",
+        "w4-l3",
+        "w4-lab",
+        "w6-l3",
+        "w6-lab",
+        "w8-l2",
+        "w8-l3"
+      ]
+    },
+    {
+      "id": "hpa",
+      "term": "HorizontalPodAutoscaler",
+      "aliases": [
+        "HPA",
+        "水平オートスケール"
+      ],
+      "description": "CPU の使用率などのメトリクスに合わせて、Deployment などの Pod の数を自動で増減するリソースです。Pod の数を変える横方向のスケールで、使用量は metrics-server から読みます。",
+      "source": "https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/",
+      "lessons": [
+        "w4-l1",
+        "w4-l2",
+        "w4-lab",
+        "w7-l1",
+        "w8-l2",
+        "w8-l3",
+        "w8-l4"
+      ]
+    },
+    {
+      "id": "node-affinity",
+      "term": "Node affinity",
+      "aliases": [
+        "ノードアフィニティ",
+        "affinity"
+      ],
+      "description": "ノードのラベルで Pod を置けるノードを決める仕組みで、必須の条件 (required) と、できれば守る条件 (preferred) を書けます。nodeSelector より表現が豊かです。",
+      "source": "https://kubernetes.io/ja/docs/concepts/scheduling-eviction/assign-pod-node/",
+      "lessons": [
+        "w4-l3",
+        "w4-l4"
+      ]
+    },
+    {
+      "id": "nodeselector",
+      "term": "nodeSelector",
+      "aliases": [
+        "ノードセレクター"
+      ],
+      "description": "Pod の spec に書く、ノードのラベルの条件です。指定したラベルをすべて持つノードにだけ Pod を置きます。ノードを選ぶいちばん簡単な方法です。",
+      "source": "https://kubernetes.io/ja/docs/concepts/scheduling-eviction/assign-pod-node/",
+      "lessons": [
+        "w2-l2",
+        "w3-l2",
+        "w4-l3",
+        "w4-l4",
+        "w5-l4"
+      ]
+    },
+    {
+      "id": "taint",
+      "term": "taint",
+      "aliases": [
+        "テイント"
+      ],
+      "description": "ノードに付けて、合う toleration を持たない Pod を寄せ付けない印です。効果には NoSchedule・PreferNoSchedule・NoExecute があります。",
+      "source": "https://kubernetes.io/ja/docs/concepts/scheduling-eviction/taint-and-toleration/",
+      "lessons": [
+        "w4-l3",
+        "w4-l4"
+      ]
+    },
+    {
+      "id": "toleration",
+      "term": "toleration",
+      "aliases": [
+        "トレレーション",
+        "容認"
+      ],
+      "description": "Pod に付けて、合う taint のあるノードにも置けるようにする設定です。tolerationSeconds で、NoExecute の taint が付いたノードに残る時間を決められます。",
+      "source": "https://kubernetes.io/ja/docs/concepts/scheduling-eviction/taint-and-toleration/",
+      "lessons": [
+        "w4-l4"
+      ]
+    },
+    {
+      "id": "preemption",
+      "term": "プリエンプション",
+      "aliases": [
+        "preemption",
+        "優先度"
+      ],
+      "description": "優先度の高い Pod を置けるノードが無いとき、スケジューラが優先度の低い Pod を追い出して場所を空けることです。優先度は PriorityClass で決めます。",
+      "source": "https://kubernetes.io/ja/docs/concepts/scheduling-eviction/pod-priority-preemption/",
+      "lessons": [
+        "w4-l3",
+        "w6-l4"
+      ]
+    },
+    {
+      "id": "service",
+      "term": "Service",
+      "aliases": [
+        "サービス"
+      ],
+      "description": "セレクターで選んだ Pod の集まりに、変わらない名前と仮想の IP で届けるための抽象です。Pod が入れ替わって IP が変わっても、同じ宛先で繋げます。",
+      "source": "https://kubernetes.io/ja/docs/concepts/services-networking/service/",
+      "lessons": [
+        "w1-l3",
+        "w2-l1",
+        "w2-l2",
+        "w2-l4",
+        "w3-l1",
+        "w3-l2",
+        "w3-l4",
+        "w5-l1",
+        "w5-l2",
+        "w5-l3",
+        "w5-l4",
+        "w5-lab",
+        "w6-l4",
+        "w7-l1",
+        "w7-l3",
+        "w7-l4",
+        "w8-l2"
+      ]
+    },
+    {
+      "id": "clusterip",
+      "term": "ClusterIP",
+      "aliases": [
+        "クラスターIP"
+      ],
+      "description": "Service の既定の種類で、クラスタの中だけから届く仮想の IP を割り当てます。クラスタの外へ出すには NodePort・LoadBalancer・Ingress などを使います。",
+      "source": "https://kubernetes.io/ja/docs/concepts/services-networking/service/",
+      "lessons": [
+        "w5-l1",
+        "w5-l2",
+        "w5-l4",
+        "w5-lab"
+      ]
+    },
+    {
+      "id": "nodeport",
+      "term": "NodePort",
+      "aliases": [
+        "ノードポート"
+      ],
+      "description": "各ノードの IP の決まったポート (既定は 30000〜32767) で Service を外に出す種類です。ClusterIP も合わせて作られます。",
+      "source": "https://kubernetes.io/ja/docs/concepts/services-networking/service/",
+      "lessons": [
+        "w5-l1",
+        "w5-l3"
+      ]
+    },
+    {
+      "id": "loadbalancer",
+      "term": "LoadBalancer",
+      "aliases": [
+        "ロードバランサー"
+      ],
+      "description": "クラウドなどの外部のロードバランサーを使って、Service をクラスタの外に出す種類です。NodePort も合わせて割り当てられます (無効にもできます)。",
+      "source": "https://kubernetes.io/ja/docs/concepts/services-networking/service/",
+      "lessons": [
+        "w2-l4",
+        "w5-l1",
+        "w5-l3",
+        "w5-lab"
+      ]
+    },
+    {
+      "id": "headless-service",
+      "term": "ヘッドレス Service",
+      "aliases": [
+        "headless service",
+        "clusterIP: None"
+      ],
+      "description": ".spec.clusterIP を None にした、IP アドレスを割り当てない Service です。kube-proxy は扱わず、DNS が後ろの Pod の IP を直接返します。",
+      "source": "https://kubernetes.io/ja/docs/concepts/services-networking/service/",
+      "lessons": [
+        "w5-l2"
+      ]
+    },
+    {
+      "id": "endpointslice",
+      "term": "EndpointSlice",
+      "aliases": [
+        "エンドポイントスライス"
+      ],
+      "description": "Service の後ろにいるネットワークのエンドポイント (Pod の IP とポート) を持つリソースです。旧来の Endpoints の API を置き換えるもので、1 つの Service に複数のスライスが付きます。",
+      "source": "https://kubernetes.io/ja/docs/concepts/services-networking/endpoint-slices/",
+      "lessons": [
+        "w5-l2",
+        "w5-lab"
+      ]
+    },
+    {
+      "id": "coredns",
+      "term": "CoreDNS",
+      "aliases": [
+        "コアディーエヌエス",
+        "クラスタ DNS"
+      ],
+      "description": "Kubernetes のクラスタ DNS として動かせる、柔軟で拡張できる DNS サーバーです。kube-dns の代わりに使われ、Kubernetes と同じく CNCF がホストしています。",
+      "source": "https://kubernetes.io/ja/docs/tasks/administer-cluster/coredns/",
+      "lessons": [
+        "w1-l3",
+        "w1-l4",
+        "w2-l1",
+        "w2-l2",
+        "w2-l4",
+        "w2-lab",
+        "w3-l4",
+        "w5-l2",
+        "w8-l3",
+        "w8-l4",
+        "w8-lab"
+      ]
+    },
+    {
+      "id": "ingress",
+      "term": "Ingress",
+      "aliases": [
+        "イングレス"
+      ],
+      "description": "クラスタの外からの HTTP と HTTPS の通信を、ホスト名やパスのルールで Service へ振り分けるリソースです。ルールを読んで動かすには Ingress コントローラーが要ります。",
+      "source": "https://kubernetes.io/ja/docs/concepts/services-networking/ingress/",
+      "lessons": [
+        "w2-l4",
+        "w3-l1",
+        "w3-l2",
+        "w5-l1",
+        "w5-l2",
+        "w5-l3",
+        "w5-l4",
+        "w5-lab",
+        "w7-l1"
+      ]
+    },
+    {
+      "id": "gateway-api",
+      "term": "Gateway API",
+      "aliases": [
+        "ゲートウェイ API",
+        "HTTPRoute",
+        "GatewayClass"
+      ],
+      "description": "GatewayClass・Gateway・HTTPRoute などの役割ごとのリソースで、通信の入口と経路を表す API の集まりです。Ingress の後継として、より多くの機能と役割の分担を持ちます。",
+      "source": "https://kubernetes.io/ja/docs/concepts/services-networking/gateway/",
+      "lessons": [
+        "w5-l3",
+        "w5-l4"
+      ]
+    },
+    {
+      "id": "cni",
+      "term": "CNI",
+      "aliases": [
+        "Container Network Interface",
+        "ネットワークプラグイン"
+      ],
+      "description": "Container Network Interface の略で、クラスタのネットワークをつなぐネットワークプラグインの仕様です。Pod に IP を振り、ノードをまたいだ通信を受け持つプラグインはこれに従います。",
+      "source": "https://kubernetes.io/ja/docs/concepts/extend-kubernetes/compute-storage-net/network-plugins/",
+      "lessons": [
+        "w1-l3",
+        "w2-l2",
+        "w2-l4",
+        "w5-l3",
+        "w5-l4",
+        "w6-l3",
+        "w8-l4"
+      ]
+    },
+    {
+      "id": "networkpolicy",
+      "term": "NetworkPolicy",
+      "aliases": [
+        "ネットワークポリシー"
+      ],
+      "description": "Pod が送受信できる通信を、ラベルや Namespace や IP で絞るリソースです。効かせるには、対応したネットワークプラグインが要ります。",
+      "source": "https://kubernetes.io/ja/docs/concepts/services-networking/network-policies/",
+      "lessons": [
+        "w3-l1",
+        "w5-l3",
+        "w5-l4",
+        "w5-lab"
+      ]
+    },
+    {
+      "id": "service-mesh",
+      "term": "サービスメッシュ",
+      "aliases": [
+        "service mesh"
+      ],
+      "description": "サービスどうしの通信を受け持つ基盤で、信頼性・可観測性・暗号化などを、アプリのコードを変えずに足します。各サービスの横にプロキシを置く形が代表的です。",
+      "source": "https://glossary.cncf.io/ja/service-mesh/",
+      "lessons": [
+        "w5-l4"
+      ]
+    },
+    {
+      "id": "rbac",
+      "term": "RBAC",
+      "aliases": [
+        "ロールベースアクセス制御",
+        "Role-Based Access Control"
+      ],
+      "description": "利用者の役割 (ロール) によって、どのリソースにどの操作 (verb) を許すかを決める認可の仕組みです。権限は足していく方式で、拒否 (deny) のルールはありません。",
+      "source": "https://kubernetes.io/ja/docs/reference/access-authn-authz/rbac/",
+      "lessons": [
+        "w6-l1",
+        "w6-l2"
+      ]
+    },
+    {
+      "id": "role",
+      "term": "Role",
+      "aliases": [
+        "ロール"
+      ],
+      "description": "ある Namespace の中で、どのリソースにどの操作を許すかを並べた RBAC のリソースです。クラスタ全体に効かせるには ClusterRole を使います。",
+      "source": "https://kubernetes.io/ja/docs/reference/access-authn-authz/rbac/",
+      "lessons": [
+        "w6-l1"
+      ]
+    },
+    {
+      "id": "clusterrole",
+      "term": "ClusterRole",
+      "aliases": [
+        "クラスターロール"
+      ],
+      "description": "クラスタ全体に効く RBAC の権限の集まりです。Node のような Namespace に属さないリソースや、全 Namespace にまたがる権限を書けます。",
+      "source": "https://kubernetes.io/ja/docs/reference/access-authn-authz/rbac/",
+      "lessons": [
+        "w6-l1",
+        "w6-lab"
+      ]
+    },
+    {
+      "id": "rolebinding",
+      "term": "RoleBinding",
+      "aliases": [
+        "ロールバインディング",
+        "ClusterRoleBinding"
+      ],
+      "description": "Role や ClusterRole の権限を、ユーザー・グループ・ServiceAccount に与えるリソースで、その Namespace の中だけで効きます。クラスタ全体に与えるのは ClusterRoleBinding です。",
+      "source": "https://kubernetes.io/ja/docs/reference/access-authn-authz/rbac/",
+      "lessons": [
+        "w6-l1",
+        "w6-lab"
+      ]
+    },
+    {
+      "id": "serviceaccount",
+      "term": "ServiceAccount",
+      "aliases": [
+        "サービスアカウント"
+      ],
+      "description": "Pod の中のプロセスなど、人ではないものが API サーバーに認証するためのアカウントです。Namespace ごとに default が自動で作られ、指定しなければそれが使われます。",
+      "source": "https://kubernetes.io/ja/docs/concepts/security/service-accounts/",
+      "lessons": [
+        "w6-l1",
+        "w6-l4",
+        "w6-lab"
+      ]
+    },
+    {
+      "id": "pod-security-standards",
+      "term": "Pod Security Standards",
+      "aliases": [
+        "Pod セキュリティ標準",
+        "Pod Security Admission",
+        "PSS"
+      ],
+      "description": "Pod のセキュリティの設定を、緩いほうから Privileged (特権)・Baseline (ベースライン)・Restricted (制限) の 3 段階のポリシーで決めた標準です。",
+      "source": "https://kubernetes.io/ja/docs/concepts/security/pod-security-standards/",
+      "lessons": [
+        "w6-l2"
+      ]
+    },
+    {
+      "id": "pv",
+      "term": "PersistentVolume",
+      "aliases": [
+        "PV",
+        "永続ボリューム"
+      ],
+      "description": "管理者が用意するか StorageClass で動的に作られる、クラスタのストレージの一片です。Node と同じクラスタのリソースで、使う Pod とは別のライフサイクルを持ちます。",
+      "source": "https://kubernetes.io/ja/docs/concepts/storage/persistent-volumes/",
+      "lessons": [
+        "w3-l4",
+        "w6-l3",
+        "w6-lab"
+      ]
+    },
+    {
+      "id": "pvc",
+      "term": "PersistentVolumeClaim",
+      "aliases": [
+        "PVC",
+        "永続ボリューム要求"
+      ],
+      "description": "利用者がストレージの大きさやアクセスモード (ReadWriteOnce など) を求めるリソースです。条件に合う PV と結び付き (Bound)、Pod からボリュームとして使います。",
+      "source": "https://kubernetes.io/ja/docs/concepts/storage/persistent-volumes/",
+      "lessons": [
+        "w6-l3",
+        "w6-l4",
+        "w6-lab"
+      ]
+    },
+    {
+      "id": "storageclass",
+      "term": "StorageClass",
+      "aliases": [
+        "ストレージクラス"
+      ],
+      "description": "ストレージの種類 (クラス) を表し、PVC に応じて PV を動的に作るためのプロビジョナーなどの設定を持つリソースです。",
+      "source": "https://kubernetes.io/ja/docs/concepts/storage/storage-classes/",
+      "lessons": [
+        "w6-l3",
+        "w6-lab"
+      ]
+    },
+    {
+      "id": "csi",
+      "term": "CSI",
+      "aliases": [
+        "Container Storage Interface"
+      ],
+      "description": "Container Storage Interface の略で、外部のストレージを Kubernetes とつなぐための標準の仕様です。ツリー外の CSI ドライバーを使うのが推奨の方法です。",
+      "source": "https://kubernetes.io/ja/docs/concepts/storage/volumes/",
+      "lessons": [
+        "w1-l3",
+        "w6-l3",
+        "w8-l4"
+      ]
+    },
+    {
+      "id": "crashloopbackoff",
+      "term": "CrashLoopBackOff",
+      "aliases": [
+        "クラッシュループバックオフ"
+      ],
+      "description": "コンテナが起動しては終了を繰り返し、kubelet が再起動までの待ち時間 (既定は 10 秒から最大 300 秒) を延ばしている状態です。",
+      "source": "https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/",
+      "lessons": [
+        "w6-l4",
+        "w7-l1",
+        "w7-l4"
+      ]
+    },
+    {
+      "id": "imagepullbackoff",
+      "term": "ImagePullBackOff",
+      "aliases": [
+        "ErrImagePull",
+        "イメージプルバックオフ"
+      ],
+      "description": "イメージを取得できずにコンテナを始められず、遅延を延ばしながら (最大 300 秒) 取得を続けている状態です。イメージ名の誤りや、プライベートレジストリの認証の不足が原因です。",
+      "source": "https://kubernetes.io/ja/docs/concepts/containers/images/",
+      "lessons": [
+        "w4-l2",
+        "w4-l3",
+        "w6-l4",
+        "w6-lab",
+        "w7-l4"
+      ]
+    },
+    {
+      "id": "ci-cd",
+      "term": "CI/CD",
+      "aliases": [
+        "継続的インテグレーション",
+        "継続的デリバリー",
+        "CI",
+        "CD"
+      ],
+      "description": "CI はコードの変更をうまく統合する、CD への最初の段階です。CD は変更を自動で受け入れの環境へ届ける実践で、本番まで自動で届けるものは継続的デプロイメントと呼びます。",
+      "source": "https://glossary.cncf.io/ja/continuous-delivery/",
+      "lessons": [
+        "w7-l1"
+      ]
+    },
+    {
+      "id": "gitops",
+      "term": "GitOps",
+      "aliases": [
+        "ギットオプス"
+      ],
+      "description": "望ましい状態を宣言したファイルを Git などのバージョン管理に置いて正本にし、エージェントが自動で取り込んで実際の状態を合わせ続ける運用の方法です。",
+      "source": "https://opengitops.dev/",
+      "lessons": [
+        "w7-l1"
+      ]
+    },
+    {
+      "id": "argo-cd",
+      "term": "Argo CD",
+      "aliases": [
+        "アルゴシーディー",
+        "Argo"
+      ],
+      "description": "Git を正本にする Kubernetes 向けの宣言的な GitOps の継続的デリバリーのツールです。動いている状態が Git とずれると OutOfSync と表示し、同期で戻せます。",
+      "source": "https://argo-cd.readthedocs.io/en/stable/",
+      "lessons": [
+        "w7-l1"
+      ]
+    },
+    {
+      "id": "flux",
+      "term": "Flux",
+      "aliases": [
+        "フラックス",
+        "Flux CD"
+      ],
+      "description": "Git のリポジトリなどの設定の正本とクラスタを同期し続け、更新を自動で取り込む Kubernetes 向けの GitOps のツールです。CNCF の Graduated プロジェクトです。",
+      "source": "https://fluxcd.io/flux/",
+      "lessons": [
+        "w7-l1"
+      ]
+    },
+    {
+      "id": "helm",
+      "term": "Helm",
+      "aliases": [
+        "ヘルム"
+      ],
+      "description": "Kubernetes のパッケージマネージャーです。チャートを helm install でクラスタに入れ、入れたものはリリースとして版を持ち、upgrade や rollback ができます。",
+      "source": "https://helm.sh/ja/docs/intro/using_helm/",
+      "lessons": [
+        "w2-l4",
+        "w7-l1",
+        "w7-l2",
+        "w7-l3",
+        "w7-l4",
+        "w7-lab"
+      ]
+    },
+    {
+      "id": "helm-chart",
+      "term": "チャート (Helm)",
+      "aliases": [
+        "chart",
+        "Chart.yaml",
+        "values.yaml"
+      ],
+      "description": "Helm のパッケージの形式で、Chart.yaml・テンプレート・既定の値の values.yaml などをまとめたディレクトリです。値を変えて同じチャートを何度も入れられます。",
+      "source": "https://helm.sh/ja/docs/topics/charts/",
+      "lessons": [
+        "w7-l2",
+        "w7-l3",
+        "w7-lab"
+      ]
+    },
+    {
+      "id": "kustomize",
+      "term": "Kustomize",
+      "aliases": [
+        "カスタマイズ",
+        "kustomization.yaml"
+      ],
+      "description": "kustomization ファイルで Kubernetes のオブジェクトをカスタマイズするツールです。1.14 から kubectl に組み込まれ、kubectl apply -k で使えます。",
+      "source": "https://kubernetes.io/ja/docs/tasks/manage-kubernetes-objects/kustomization/",
+      "lessons": [
+        "w7-l3",
+        "w7-lab"
+      ]
+    },
+    {
+      "id": "kustomize-overlay",
+      "term": "base と overlay (Kustomize)",
+      "aliases": [
+        "オーバーレイ",
+        "ベース",
+        "overlay",
+        "base"
+      ],
+      "description": "Kustomize で、共通のマニフェストを base (ベース) に置き、環境ごとの差分を overlay (オーバーレイ) に書いて重ねる構成です。1 つの base を複数の overlay で使い回せます。",
+      "source": "https://kubernetes.io/ja/docs/tasks/manage-kubernetes-objects/kustomization/",
+      "lessons": [
+        "w7-l3",
+        "w7-lab"
+      ]
+    },
+    {
+      "id": "canary",
+      "term": "カナリアデプロイ",
+      "aliases": [
+        "canary deployment",
+        "カナリアリリース"
+      ],
+      "description": "新しい版に大量の通信を移す前に、通信を少しずつ新しい版へ移して実際の振る舞いを確かめる出し方です。問題があればすぐ戻せます。",
+      "source": "https://glossary.cncf.io/ja/canary-deployment/",
+      "lessons": [
+        "w7-l4"
+      ]
+    },
+    {
+      "id": "blue-green",
+      "term": "ブルーグリーンデプロイ",
+      "aliases": [
+        "blue-green deployment",
+        "Blue/Green"
+      ],
+      "description": "今の版 (ブルー) と新しい版 (グリーン) の 2 つの環境を用意し、グリーンを試し終えたら本番の通信をまとめて切り替える出し方です。",
+      "source": "https://glossary.cncf.io/ja/blue-green-deployment/",
+      "lessons": [
+        "w3-l2",
+        "w7-l4"
+      ]
+    },
+    {
+      "id": "metrics",
+      "term": "メトリクス",
+      "aliases": [
+        "metrics",
+        "指標"
+      ],
+      "description": "実行時に測った数値を、時刻とともに集めたものです。平均や割合など全体の傾向を見るのに向き、1 件のリクエストの道筋を追うのはトレースです。",
+      "source": "https://opentelemetry.io/ja/docs/concepts/signals/metrics/",
+      "lessons": [
+        "w4-l2",
+        "w4-lab",
+        "w8-l1",
+        "w8-l2",
+        "w8-l3",
+        "w8-l4"
+      ]
+    },
+    {
+      "id": "trace",
+      "term": "トレース",
+      "aliases": [
+        "trace",
+        "スパン",
+        "span",
+        "分散トレーシング"
+      ],
+      "description": "1 つのリクエストがアプリやサービスの中を通った道筋の記録です。処理ごとのスパンに分かれ、それぞれが開始と終了の時刻を持つので、どこで時間を使ったかが分かります。",
+      "source": "https://opentelemetry.io/ja/docs/concepts/signals/traces/",
+      "lessons": [
+        "w8-l1",
+        "w8-l2"
+      ]
+    },
+    {
+      "id": "prometheus",
+      "term": "Prometheus",
+      "aliases": [
+        "プロメテウス",
+        "PromQL"
+      ],
+      "description": "メトリクスを時系列のデータとして集めて保存する監視とアラートの仕組みです。HTTP で取りに行く (pull) 形で集め、PromQL で問い合わせます。2016 年に CNCF の 2 つ目のプロジェクトになりました。",
+      "source": "https://prometheus.io/docs/introduction/overview/",
+      "lessons": [
+        "w8-l1",
+        "w8-l2",
+        "w8-l3",
+        "w8-l4"
+      ]
+    },
+    {
+      "id": "grafana",
+      "term": "Grafana",
+      "aliases": [
+        "グラファナ"
+      ],
+      "description": "メトリクス・ログ・トレースを問い合わせて、ダッシュボードで見せるオープンソースのツールです。データを集めて保存するのは Prometheus などの側です。",
+      "source": "https://grafana.com/docs/grafana/latest/introduction/",
+      "lessons": [
+        "w8-l2"
+      ]
+    },
+    {
+      "id": "opentelemetry",
+      "term": "OpenTelemetry",
+      "aliases": [
+        "オープンテレメトリー",
+        "OTel",
+        "OTLP"
+      ],
+      "description": "トレース・メトリクス・ログを作って集め、送り出すための、業者やツールに依らない枠組みとツールキットです。保存や表示のバックエンドではありません。",
+      "source": "https://opentelemetry.io/ja/docs/what-is-opentelemetry/",
+      "lessons": [
+        "w8-l1",
+        "w8-l2",
+        "w8-l4"
+      ]
+    },
+    {
+      "id": "slo",
+      "term": "SLO",
+      "aliases": [
+        "サービスレベル目標",
+        "Service Level Objective"
+      ],
+      "description": "Service Level Objective の略で、SLI で測るサービスの水準の目標値です。守れなかったときの約束を含む SLA (契約) とは別物です。",
+      "source": "https://sre.google/sre-book/service-level-objectives/",
+      "lessons": [
+        "w8-l2"
+      ]
+    },
+    {
+      "id": "sli",
+      "term": "SLI",
+      "aliases": [
+        "サービスレベル指標",
+        "Service Level Indicator"
+      ],
+      "description": "Service Level Indicator の略で、要求の遅延やエラーの割合など、提供しているサービスの水準を測る、注意して決めた量の指標です。",
+      "source": "https://sre.google/sre-book/service-level-objectives/",
+      "lessons": [
+        "w8-l2"
+      ]
+    },
+    {
+      "id": "error-budget",
+      "term": "エラーバジェット",
+      "aliases": [
+        "error budget"
+      ],
+      "description": "1 から SLO を引いた、許される失敗の量です (99.9% の SLO なら 0.1%)。使い切ったら、信頼性の修正のほかは変更やリリースを止める、といった判断に使います。",
+      "source": "https://sre.google/workbook/error-budget-policy/",
+      "lessons": [
+        "w8-l2"
+      ]
+    },
+    {
+      "id": "metrics-server",
+      "term": "metrics-server",
+      "aliases": [
+        "Metrics Server",
+        "メトリクスサーバー"
+      ],
+      "description": "各ノードの kubelet から CPU とメモリの使用量を集め、Metrics API として出す部品です。HPA・VPA の組み込みのオートスケールと kubectl top が使います。",
+      "source": "https://github.com/kubernetes-sigs/metrics-server",
+      "lessons": [
+        "w2-l1",
+        "w2-l4",
+        "w4-lab",
+        "w8-l3",
+        "w8-lab"
+      ]
+    },
+    {
+      "id": "vpa",
+      "term": "VerticalPodAutoscaler",
+      "aliases": [
+        "VPA",
+        "垂直オートスケール"
+      ],
+      "description": "実際の使用量に合わせて、Pod の CPU とメモリの requests と limits を直す縦方向のスケールの仕組みです。Pod の数を変える HPA とは向きが違います。",
+      "source": "https://kubernetes.io/docs/concepts/workloads/autoscaling/vertical-pod-autoscale/",
+      "lessons": [
+        "w8-l3"
+      ]
+    },
+    {
+      "id": "cluster-autoscaler",
+      "term": "Cluster Autoscaler",
+      "aliases": [
+        "クラスターオートスケーラー",
+        "ノードのオートスケール"
+      ],
+      "description": "置けない (Pending の) Pod のためにノードを足し、使われていないノードを減らすノードのオートスケーラーです。Karpenter も同じ役目の実装です。",
+      "source": "https://kubernetes.io/docs/concepts/cluster-administration/node-autoscaling/",
+      "lessons": [
+        "w8-l3"
+      ]
+    },
+    {
+      "id": "serverless",
+      "term": "サーバーレス",
+      "aliases": [
+        "serverless",
+        "FaaS"
+      ],
+      "description": "利用者がサーバーの用意や管理をせずにアプリを動かせる形です。コードを動かすときだけ資源が割り当てられ、終われば支払いも止まります。",
+      "source": "https://glossary.cncf.io/ja/serverless/",
+      "lessons": [
+        "w8-l4"
+      ]
+    },
+    {
+      "id": "knative",
+      "term": "Knative",
+      "aliases": [
+        "ケイネイティブ",
+        "Knative Serving",
+        "Knative Eventing"
+      ],
+      "description": "Kubernetes の上でサーバーレスのアプリを動かす仕組みです。0 までの自動のスケールを受け持つ Serving と、イベントを届ける Eventing から成ります。",
+      "source": "https://knative.dev/docs/",
+      "lessons": [
+        "w8-l4"
+      ]
+    },
+    {
+      "id": "cncf",
+      "term": "CNCF",
+      "aliases": [
+        "Cloud Native Computing Foundation",
+        "クラウドネイティブコンピューティング財団"
+      ],
+      "description": "Cloud Native Computing Foundation の略で、Kubernetes・Prometheus・Envoy などのクラウドネイティブのオープンソースのプロジェクトを抱える団体です。",
+      "source": "https://www.cncf.io/about/who-we-are/",
+      "lessons": [
+        "w5-l4",
+        "w8-l4",
+        "w8-lab"
+      ]
+    },
+    {
+      "id": "cncf-maturity",
+      "term": "CNCF のプロジェクトの段階",
+      "aliases": [
+        "Sandbox",
+        "Incubating",
+        "Graduated",
+        "成熟度"
+      ],
+      "description": "CNCF のプロジェクトの成熟の度合いで、低いほうから Sandbox (試しの段階)・Incubating・Graduated (安定して広く本番で使われる段階) です。",
+      "source": "https://www.cncf.io/projects/",
+      "lessons": [
+        "w8-l4",
+        "w8-lab"
+      ]
+    }
+  ]
+}
