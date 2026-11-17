@@ -411,3 +411,45 @@ body {
   text-align: center;
   box-sizing: border-box;
 }
+
+/* 進捗の画面 */
+.stats--card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-container);
+  overflow: hidden;
+}
+
+.text-warning {
+  color: var(--color-text-warning);
+}
+
+.xp-chart {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--spacing-2);
+  height: 112px;
+}
+
+.xp-chart__col {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: stretch;
+  gap: var(--spacing-1);
+}
+
+.xp-chart__bar {
+  min-height: 2px;
+  border-radius: var(--radius-inner) var(--radius-inner) 0 0;
+  background: var(--color-accent-muted);
+}
+
+.xp-chart__bar--today {
+  background: var(--color-accent);
+}
+
+.xp-chart__label {
+  text-align: center;
+  font-size: var(--text-supporting-size);
+  color: var(--color-text-secondary);
+}

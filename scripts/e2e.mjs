@@ -234,6 +234,13 @@ async function run(browser, name, width, height) {
   await page.getByRole('heading', { name: '今日の復習 0 問' }).waitFor();
   check(await page.getByText(/今日の復習はありません。次は/).isVisible(), `${tag} 終えると今日の復習は 0 で、次の予定が出る`);
 
+  // 9c. 進捗の画面
+  await page.goto(`${BASE}#/progress`);
+  await page.getByRole('heading', { name: '進捗' }).waitFor();
+  check(await page.getByText('分野ごとの正答率').isVisible() && await page.getByText('この 7 日の XP').isVisible(), `${tag} 進捗の画面に正答率と 7 日の XP が出る`);
+  check((await page.getByRole('link', { name: /第 1 週 コンテナの基礎/ }).count()) === 1, `${tag} 進捗の画面に週ごとの進み具合が出る`);
+  await noHorizontalOverflow(page, width, `${tag} 進捗`);
+
   // 10. 設定: 目標を変える・書き出す・読み込む・記録を消す
   await page.goto(`${BASE}#/settings`);
   await page.getByRole('heading', { name: '設定' }).waitFor();

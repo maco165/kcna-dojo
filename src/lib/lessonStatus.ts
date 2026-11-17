@@ -1,6 +1,6 @@
 import { WEEKS } from '../content/curriculum';
 import type { Domain, Lesson } from '../content/types';
-import type { Progress } from './progress';
+import { dayKey, type Progress } from './progress';
 
 export type LessonStatus = 'done' | 'next' | 'pending';
 
@@ -69,4 +69,34 @@ export function domainAccuracy(progress: Progress): Record<Domain, number | null
     out[d.name] = s && s.total > 0 ? s.right / s.total : null;
   }
   return out;
+}
+
+/** この 7 日 (今日を含む) の日ごとの XP。古い順 */
+export function weeklyXp(progress: Progress, now: Date): { day: string; xp: number }[] {
+  const out: { day: string; xp: number }[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const day = dayKey(new Date(now.getFullYear(), now.getMonth(), now.getDate() - i));
+    out.push({ day, xp: progress.xp.byDay[day] ?? 0 });
+  }
+  return out;
+}
+
+/**
+ * 計画との差。終わっているはずの週 (週の終わりの日曜が昨日まで) のレッスンの数と、そのうち終えた数。
+ * expected が 0 なら、まだ計画の週が終わっていない
+ */
+export function planStatus(progress: Progress, now: Date): { expected: number; done: number } {
+  const today = dayKey(now);
+  let expected = 0;
+  let done = 0;
+  for (const w of WEEKS) {
+    const [y, m, d] = w.start.split('-').map(Number);
+    const end = dayKey(new Date(y, m - 1, d + 6));
+    if (end >= today) continue;
+    for (const l of w.content?.lessons ?? []) {
+      expected++;
+      if (progress.lessons[l.id]?.done) done++;
+    }
+  }
+  return { expected, done };
 }

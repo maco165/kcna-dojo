@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Lesson } from '../src/content/types';
 import { WEEKS } from '../src/content/curriculum';
-import { domainAccuracy, lessonCaption, lessonCorrect, lessonStatuses } from '../src/lib/lessonStatus';
+import { domainAccuracy, lessonCaption, lessonCorrect, lessonStatuses, planStatus, weeklyXp } from '../src/lib/lessonStatus';
 import { emptyProgress, type Progress } from '../src/lib/progress';
 
 const lessons = WEEKS[0].content!.lessons as Lesson[];
@@ -60,5 +60,23 @@ describe('domainAccuracy', () => {
 describe('lessonCaption', () => {
   it('週の番号を除いた id と summary を並べる', () => {
     expect(lessonCaption(quiz)).toBe(`l1 · ${quiz.summary}`);
+  });
+});
+
+describe('進捗の画面の数字', () => {
+  const at = (day: string) => new Date(`${day}T09:00:00`);
+
+  it('この 7 日の XP を古い順に、無い日は 0 で並べる', () => {
+    const p = emptyProgress();
+    p.xp.byDay = { '2026-11-24': 9, '2026-11-30': 12, '2026-11-20': 99 };
+    const days = weeklyXp(p, at('2026-11-30'));
+    expect(days.map((d) => d.day)).toEqual(['2026-11-24', '2026-11-25', '2026-11-26', '2026-11-27', '2026-11-28', '2026-11-29', '2026-11-30']);
+    expect(days.map((d) => d.xp)).toEqual([9, 0, 0, 0, 0, 0, 12]);
+  });
+
+  it('計画: 週の終わり (日曜) を過ぎた週のレッスンだけを、終わっているはずの数に入れる', () => {
+    const week1Count = lessons.length;
+    expect(planStatus(emptyProgress(), at('2026-11-29'))).toEqual({ expected: 0, done: 0 });
+    expect(planStatus(withDone(['w1-l1', 'w1-l2']), at('2026-11-30'))).toEqual({ expected: week1Count, done: 2 });
   });
 });

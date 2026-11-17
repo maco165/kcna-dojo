@@ -15,11 +15,11 @@ import type { Progress } from '../lib/progress';
 import { dueQuestions } from '../content';
 import { REPO_URL } from '../lib/links';
 import { SITE_NAME, SITE_TAGLINE } from '../lib/site';
-import { aboutHref, reviewHref, settingsHref, weekHref } from '../lib/route';
+import { aboutHref, progressHref, reviewHref, settingsHref, weekHref } from '../lib/route';
 import { GitHubMark } from './RepoLink';
 
 /** PC の左の一覧。学習と週のほかは、まだ機能が無いので「準備中」として押せない */
-export default function AppSideNav({ current, week, progress }: { current: 'learn' | 'about' | 'settings' | 'review'; week?: number; progress: Progress }) {
+export default function AppSideNav({ current, week, progress }: { current: 'learn' | 'about' | 'settings' | 'review' | 'progress'; week?: number; progress: Progress }) {
   const soon = <Text type="supporting">準備中</Text>;
   const reviewCount = dueQuestions(progress, new Date()).length;
   return (
@@ -41,7 +41,7 @@ export default function AppSideNav({ current, week, progress }: { current: 'lear
           isSelected={current === 'review'}
           endContent={reviewCount > 0 ? <Badge label={reviewCount} variant="info" /> : undefined}
         />
-        <SideNavItem label="進捗" icon={ChartBarIcon} isDisabled endContent={soon} />
+        <SideNavItem label="進捗" icon={ChartBarIcon} href={progressHref} isSelected={current === 'progress'} />
         <SideNavItem label="用語集" icon={BookOpenIcon} isDisabled endContent={soon} />
         <SideNavItem label="設定" icon={AdjustmentsHorizontalIcon} href={settingsHref} isSelected={current === 'settings'} />
       </SideNavSection>
