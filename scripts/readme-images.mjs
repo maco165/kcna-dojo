@@ -15,29 +15,29 @@ const PORT = 4319;
 const BASE = `http://localhost:${PORT}/kcna-dojo/`;
 mkdirSync(OUT, { recursive: true });
 
-// kcna.css の light-dark() の値の写し (theme-neutral + 強調の青)
+// Astryx の core の既定のトークンの写し (npm run astryx -- docs tokens/tokens-color の light / dark)
 const TOKENS = {
-  light: { body: '#f1f1f1', surface: '#ffffff', text: '#000000', sub: '#474747', border: '#00000014', strong: '#d4d4d4', accent: '#0064E0', success: '#2f7d33', successMuted: '#bce0bb' },
-  dark: { body: '#1b1b1b', surface: '#262626', text: '#ffffff', sub: '#9e9e9e', border: '#ffffff1A', strong: '#525252', accent: '#0171E3', success: '#90ca90', successMuted: '#90ca903D' },
+  light: { body: '#F1F4F7', surface: '#FFFFFF', text: '#0A1317', sub: '#4E606F', border: '#05365919', strong: '#CCD3DB', accent: '#0064E0', success: '#0D8626', successText: '#09441F', successMuted: '#0B991F33' },
+  dark: { body: '#111112', surface: '#1F1F22', text: '#DFE2E5', sub: '#AAAFB5', border: '#F2F4F619', strong: '#494D53', accent: '#0171E3', success: '#0D8626', successText: '#A5F690', successMuted: '#0B991F3F' },
 };
 
 function bannerHtml(t) {
   return `<!doctype html><html lang="ja"><head><meta charset="utf-8">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600&display=swap">
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; width: 1280px; height: 360px; background: ${t.body}; color: ${t.text};
-    font-family: Figtree, -apple-system, "Segoe UI", Roboto, "Noto Sans CJK JP", "Noto Sans JP", sans-serif; }
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Sans", "Noto Sans JP", "Noto Sans CJK JP", sans-serif; }
   .wrap { display: flex; gap: 56px; align-items: center; height: 100%; padding: 0 72px; }
   .lead { flex: 1 1 0; display: flex; flex-direction: column; gap: 12px; }
   .eyebrow { font-size: 17px; color: ${t.sub}; }
   h1 { margin: 0; font-size: 56px; font-weight: 600; letter-spacing: -0.01em; }
+  .brand { display: flex; align-items: center; gap: 16px; }
   p { margin: 0; font-size: 20px; line-height: 1.6; color: ${t.sub}; }
   .card { flex: 0 0 520px; background: ${t.surface}; border: 1px solid ${t.border}; border-radius: 12px; overflow: hidden; }
   .bar { padding: 8px 16px; border-bottom: 1px solid ${t.border}; font-size: 13px; color: ${t.sub}; }
-  .code { padding: 20px 16px; font-family: ui-monospace, "SF Mono", Consolas, monospace; font-size: 17px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .code { padding: 20px 16px; font-family: "SF Mono", Monaco, Consolas, monospace; font-size: 17px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .blank { border: 1px solid ${t.success}; border-radius: 4px; padding: 2px 10px; }
-  .ok { margin: 0 16px 16px; padding: 12px 14px; border-radius: 12px; background: ${t.successMuted}; color: ${t.success}; font-size: 15px; font-weight: 600; }
+  .ok { margin: 0 16px 16px; padding: 12px 14px; border-radius: 12px; background: ${t.successMuted}; color: ${t.successText}; font-size: 15px; font-weight: 600; }
   .rows { border-top: 1px solid ${t.border}; }
   .row { display: flex; align-items: center; gap: 12px; padding: 10px 16px; font-size: 15px; border-bottom: 1px solid ${t.border}; }
   .row:last-child { border-bottom: 0; }
@@ -46,7 +46,7 @@ function bannerHtml(t) {
 </style></head><body><div class="wrap">
   <div class="lead">
     <div class="eyebrow">KCNA-JP の学習サイト</div>
-    <h1>kcna-dojo</h1>
+    <div class="brand"><svg width="56" height="56" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="${t.accent}"/><path d="M17 20l12 12-12 12" fill="none" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/><path d="M34 44h13" fill="none" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round"/></svg><h1>kcna-dojo</h1></div>
     <p>コマンドと YAML の穴埋め・4 択を、週ごとのレッスンで。<br>進捗はブラウザの中だけに残ります。</p>
   </div>
   <div class="card">
@@ -54,7 +54,7 @@ function bannerHtml(t) {
     <div class="code"><span style="color:${t.sub}">$</span> kubectl <span class="blank">get</span> pods -n kube-system -o wide</div>
     <div class="ok">正解</div>
     <div class="rows">
-      <div class="row"><span class="dot" style="background:${t.success}"></span>コンテナと VM<span>完了 · 最高 80%</span></div>
+      <div class="row"><span class="dot" style="background:${t.success}"></span>コンテナと VM<span>完了</span></div>
       <div class="row"><span class="dot" style="background:${t.accent}"></span>OCI と CRI<span>次</span></div>
     </div>
   </div>

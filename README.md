@@ -8,7 +8,7 @@ KCNA-JP (Kubernetes and Cloud Native Associate 日本語版) の学習サイト�
 | | |
 |---|---|
 | サイト | https://maco165.github.io/kcna-dojo/ |
-| 見た目 | Meta の [Astryx](https://github.com/meta/astryx) (`@astryxdesign/core` と `theme-neutral`。強調の色だけ core の既定の青) |
+| 見た目 | Meta の [Astryx](https://github.com/meta/astryx) (`@astryxdesign/core` の既定のトークンとシステムの字体)。デザイン案 https://claude.ai/artifact/TbAxSiWzdcuoxPPD155A6T に合わせる |
 | 管理 | [AI-Repository](https://github.com/maco165/AI-Repository) の PJ-028 (要件と backlog は `projects/PJ-028-kcna-dojo/design/`) |
 
 この README は設計書を兼ねる。作りを変えたら、同じ PR でここと図と画像を直す (画像は `npm run readme:images`)。
@@ -33,7 +33,7 @@ KCNA-JP (Kubernetes and Cloud Native Associate 日本語版) の学習サイト�
 ## 全体の作り
 
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': {'fontFamily': 'Figtree, -apple-system, Segoe UI, sans-serif', 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#d4d4d4', 'lineColor': '#474747', 'clusterBkg': '#f1f1f1', 'clusterBorder': '#d4d4d4', 'tertiaryColor': '#f1f1f1'}}}%%
+%%{init: {'theme': 'base', 'themeVariables': {'fontFamily': '-apple-system, Segoe UI, Roboto, sans-serif', 'primaryColor': '#FFFFFF', 'primaryTextColor': '#0A1317', 'primaryBorderColor': '#CCD3DB', 'lineColor': '#4E606F', 'clusterBkg': '#F1F4F7', 'clusterBorder': '#CCD3DB', 'tertiaryColor': '#F1F4F7'}}}%%
 flowchart LR
   subgraph repo[このリポジトリ]
     json[src/content/week*.json<br/>問題データ]
@@ -51,7 +51,7 @@ flowchart LR
   class app,browser accent;
 ```
 
-- 画面は 2 つ。ホーム (`#/week/<n>`) とレッスン (`#/lesson/<id>`)。GitHub Pages ではサーバーで経路を振り分けられないので、URL の `#` の後ろで決める (`src/lib/route.ts`)
+- 画面は 3 つ。ホーム (`#/week/<n>`)、レッスン (`#/lesson/<id>`)、このサイトについて (`#/about`。GitHub のリポジトリと Issue へのリンク)。スマホ (768px 未満) は上の帯と下のタブ、PC は左の一覧と右の欄にする。復習・進捗・設定・用語集・模擬試験・書き出しは「準備中」と出して押せない。GitHub Pages ではサーバーで経路を振り分けられないので、URL の `#` の後ろで決める (`src/lib/route.ts`)
 - 問題データは JSON で同梱する。足すたびに `npm run check:content` で形を検査する
 - 進捗は `src/lib/progress.ts` の関数が読み書きする。関数は保存先と時刻を引数で受け取るので、テストで差し替えられる
 - AI に聞くリンクは、問題文を入れた Claude / ChatGPT を新しいタブで開くだけで、サイトからは何も送らない
@@ -59,7 +59,7 @@ flowchart LR
 ## 学習の流れ
 
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': {'fontFamily': 'Figtree, -apple-system, Segoe UI, sans-serif', 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#d4d4d4', 'lineColor': '#474747', 'tertiaryColor': '#f1f1f1'}}}%%
+%%{init: {'theme': 'base', 'themeVariables': {'fontFamily': '-apple-system, Segoe UI, Roboto, sans-serif', 'primaryColor': '#FFFFFF', 'primaryTextColor': '#0A1317', 'primaryBorderColor': '#CCD3DB', 'lineColor': '#4E606F', 'tertiaryColor': '#F1F4F7'}}}%%
 flowchart TD
   home[ホーム: 週のレッスンの一覧] -->|開始| q[問題を 1 問ずつ解く]
   q -->|確かめる| fb{正解?}
@@ -72,8 +72,8 @@ flowchart TD
   done -->|一覧へ戻る| home
   home -->|実習| lab[手順を確かめて印を付ける] -->|完了にする| done
   q -.->|AI にヒントを聞く| ai[Claude / ChatGPT]
-  classDef success fill:#bce0bb,stroke:#2f7d33,color:#000000;
-  classDef error fill:#ffd9d9,stroke:#d31130,color:#000000;
+  classDef success fill:#D6EDD9,stroke:#0D8626,color:#09441F;
+  classDef error fill:#F9D3D8,stroke:#D31130,color:#7B0210;
   classDef accent stroke:#0064E0,stroke-width:2px;
   class ok success;
   class ng error;
@@ -127,13 +127,13 @@ flowchart TD
 npm ci
 npm run dev            # 手元で開く
 npm run check:content  # 問題データの検査
-npm test               # 採点・進捗・AI のリンク・データ検査のテスト (vitest)
+npm test               # 採点・進捗・AI のリンク・データ検査・ファビコンのテスト (vitest)
 npm run e2e            # 組み立ててブラウザで通しの検査 (Playwright。390 幅と 1280 幅)
 npm run build          # 型検査と本番の組み立て
 npm run readme:images  # README の見出しと画面の画像を作り直す
 ```
 
-- テーマを変えるときは `src/themes/kcna/kcnaTheme.ts` を直し、`npm run astryx -- theme build src/themes/kcna/kcnaTheme.ts` の出力も一緒にコミットする。README の見出しの色 (`scripts/readme-images.mjs` の `TOKENS`) と図の色 (上の `%%{init}%%`) も同じ値に合わせる
+- テーマ (`src/themes/kcna/kcnaTheme.ts`) はほかのテーマを受け継がず、Astryx の core の既定のトークンをそのまま使い、字体だけシステムの字体にしている (デザイン案が core の既定で描かれているため)。変えたら `npm run astryx -- theme build src/themes/kcna/kcnaTheme.ts` の出力も一緒にコミットし、README の見出しの色 (`scripts/readme-images.mjs` の `TOKENS`) と図の色 (上の `%%{init}%%`) も同じ値に合わせる
 - ファビコンの正本は `public/favicon.svg` (強調色の青の角丸の四角に `>_`)。直したら `node scripts/favicons.mjs` で PNG (32px と apple-touch-icon の 180px) を作り直し、一緒にコミットする
 - Astryx の部品の使い方は `npm run astryx -- component <名前>` で、入っている版の文書を読む
 - main へのマージで GitHub Actions が検査・テスト・組み立てを通し、Pages に配る。PR では配らずに検査だけ走る。e2e と画像の作り直しはブラウザが要るので手元で走らせる

@@ -3,6 +3,7 @@ import { kcnaTheme } from './themes/kcna/kcna.js';
 import { findLesson } from './content';
 import { useRoute } from './lib/route';
 import { useProgress } from './lib/useProgress';
+import About from './screens/About';
 import Home from './screens/Home';
 import LessonScreen from './screens/LessonScreen';
 
@@ -13,7 +14,9 @@ export default function App() {
 
   return (
     <Theme theme={kcnaTheme} mode="system">
-      {found ? (
+      {route.name === 'about' ? (
+        <About progress={progress} />
+      ) : found ? (
         <LessonScreen key={found.lesson.id} lesson={found.lesson} week={found.week} progress={progress} updateProgress={updateProgress} />
       ) : (
         <Home week={route.name === 'home' ? route.week : 1} progress={progress} />

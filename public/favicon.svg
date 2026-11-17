@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <!-- kcna-dojo のファビコン。Astryx の強調色 (--color-accent の light の値) の角丸の四角に、ターミナルのプロンプト >_ -->
+  <!-- kcna-dojo のファビコン。Astryx の強調色 (color-accent の明るい側の値) の角丸の四角に、ターミナルのプロンプト (大なり記号と下線) -->
   <rect width="64" height="64" rx="14" fill="#0064E0"/>
   <path d="M17 20l12 12-12 12" fill="none" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
   <path d="M34 44h13" fill="none" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round"/>
