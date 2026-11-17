@@ -5,6 +5,7 @@
 // - docs/images/*.png: 組み立てた dist を vite preview で配り、見本の進捗を入れた状態で撮った画面
 // 画面を変えたら走らせ直し、画像も同じ PR でコミットする。
 import { spawn } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { mkdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 
@@ -82,8 +83,14 @@ function seedProgress() {
 
 async function waitForServer() {
   for (let i = 0; i < 50; i++) {
+    if (serverExited) throw new Error(`vite preview が ${PORT} 番で立ちませんでした (番号が埋まっていないか確かめる)`);
     try {
-      if ((await fetch(BASE)).ok) return;
+      const res = await fetch(BASE);
+      // 残っている別のサーバー (古い build) ではなく、いま組み立てた dist を配っていることを確かめる
+      if (res.ok) {
+        if ((await res.text()) === readFileSync(new URL('../dist/index.html', import.meta.url), 'utf8')) return;
+        throw new Error(`${BASE} が今の dist と違う中身を返します (古い vite preview が残っていないか確かめる)`);
+      }
     } catch {
       // 立ち上がるまで待つ
     }
@@ -94,6 +101,9 @@ async function waitForServer() {
 
 const browser = await chromium.launch();
 const server = spawn('npx', ['vite', 'preview', '--port', String(PORT), '--strictPort'], { stdio: 'ignore' });
+// 自分のサーバーが立たなかったとき (番号が埋まっているなど)、残っている別のサーバーにつないで偽の結果を出さないよう止める
+let serverExited = false;
+server.on('exit', () => (serverExited = true));
 try {
   for (const mode of ['light', 'dark']) {
     const page = await browser.newPage({ viewport: { width: 1280, height: 360 }, deviceScaleFactor: 2 });

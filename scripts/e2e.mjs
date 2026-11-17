@@ -33,9 +33,14 @@ function check(cond, label) {
 
 async function waitForServer() {
   for (let i = 0; i < 50; i++) {
+    if (serverExited) throw new Error(`vite preview が ${PORT} 番で立ちませんでした (番号が埋まっていないか確かめる)`);
     try {
       const res = await fetch(BASE);
-      if (res.ok) return;
+      // 残っている別のサーバー (古い build) ではなく、いま組み立てた dist を配っていることを確かめる
+      if (res.ok) {
+        if ((await res.text()) === readFileSync(new URL('../dist/index.html', import.meta.url), 'utf8')) return;
+        throw new Error(`${BASE} が今の dist と違う中身を返します (古い vite preview が残っていないか確かめる)`);
+      }
     } catch {
       // 立ち上がるまで待つ
     }
@@ -229,6 +234,9 @@ async function run(browser, name, width, height) {
 }
 
 const server = spawn('npx', ['vite', 'preview', '--port', String(PORT), '--strictPort'], { stdio: 'ignore' });
+// 自分のサーバーが立たなかったとき (番号が埋まっているなど)、残っている別のサーバーにつないで偽の結果を出さないよう止める
+let serverExited = false;
+server.on('exit', () => (serverExited = true));
 let browser;
 try {
   await waitForServer();
