@@ -22,9 +22,14 @@ export const GOAL_CHOICES = [10, 20, 30, 50] as const;
 /** 受験日の既定 (学習計画の「2027-03 上旬」) */
 export const DEFAULT_EXAM_DATE = '2027-03-06';
 
+/** 模擬試験の結果 (新しい順に最大 20 件) */
+export type ExamRecord = { at: string; correct: number; total: number };
+export const MAX_EXAM_RECORDS = 20;
+
 export type Progress = {
   v: 1;
   profile?: Profile;
+  exams?: ExamRecord[];
   streak: { count: number; lastDay: string | null };
   xp: { total: number; byDay: Record<string, number> };
   lessons: Record<string, LessonRecord>;
@@ -115,6 +120,12 @@ export function normalizeProgress(raw: unknown): Progress | null {
       return a;
     }),
   };
+  if (Array.isArray(raw.exams)) {
+    out.exams = raw.exams
+      .filter((e): e is Record<string, unknown> => isObject(e) && typeof e.at === 'string' && !Number.isNaN(Date.parse(e.at)) && isCount(e.correct) && isCount(e.total) && (e.total as number) > 0 && (e.correct as number) <= (e.total as number))
+      .slice(0, MAX_EXAM_RECORDS)
+      .map((e) => ({ at: e.at as string, correct: e.correct as number, total: e.total as number }));
+  }
   if (profile) {
     out.profile = {
       dailyGoalXp: (GOAL_CHOICES as readonly number[]).includes(profile.dailyGoalXp as number) ? (profile.dailyGoalXp as number) : DEFAULT_GOAL_XP,
@@ -280,4 +291,9 @@ export function resetProgress(p: Progress): Progress {
 /** 書き出すファイルの名前 (kcna-progress-YYYY-MM-DD.json) */
 export function exportFileName(now: Date): string {
   return `kcna-progress-${dayKey(now)}.json`;
+}
+
+/** 模擬試験の結果を残す (新しいものを先頭に、最大 20 件) */
+export function addExamRecord(p: Progress, record: ExamRecord): Progress {
+  return { ...p, exams: [record, ...(p.exams ?? [])].slice(0, MAX_EXAM_RECORDS) };
 }

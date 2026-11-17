@@ -15,11 +15,11 @@ import type { Progress } from '../lib/progress';
 import { dueQuestions } from '../content';
 import { REPO_URL } from '../lib/links';
 import { SITE_NAME, SITE_TAGLINE } from '../lib/site';
-import { aboutHref, progressHref, reviewHref, settingsHref, weekHref } from '../lib/route';
+import { aboutHref, examHref, progressHref, reviewHref, settingsHref, weekHref } from '../lib/route';
 import { GitHubMark } from './RepoLink';
 
-/** PC の左の一覧。まだ機能が無いもの (用語集・模擬試験) は「準備中」として押せない */
-export default function AppSideNav({ current, week, progress }: { current: 'learn' | 'about' | 'settings' | 'review' | 'progress'; week?: number; progress: Progress }) {
+/** PC の左の一覧。まだ機能が無いもの (用語集) は「準備中」として押せない */
+export default function AppSideNav({ current, week, progress }: { current: 'learn' | 'about' | 'settings' | 'review' | 'progress' | 'exam'; week?: number; progress: Progress }) {
   const soon = <Text type="supporting">準備中</Text>;
   const reviewCount = dueQuestions(progress, new Date()).length;
   return (
@@ -59,7 +59,7 @@ export default function AppSideNav({ current, week, progress }: { current: 'lear
             />
           );
         })}
-        <SideNavItem label="模擬試験" isDisabled endContent={soon} />
+        <SideNavItem label="模擬試験" href={examHref} isSelected={current === 'exam'} />
       </SideNavSection>
     </SideNav>
   );
