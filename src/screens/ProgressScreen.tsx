@@ -13,7 +13,7 @@ import { dueQuestions } from '../content';
 import { WEEKS } from '../content/curriculum';
 import { DOMAINS, domainAccuracy, planStatus, weeklyXp } from '../lib/lessonStatus';
 import { currentStreak, dayKey, daysBetween, examDate, type Progress } from '../lib/progress';
-import { reviewHref, weekHref } from '../lib/route';
+import { examHref, reviewHref, weekHref } from '../lib/route';
 import { SITE_NAME } from '../lib/site';
 import { WIDE_QUERY, useMediaQuery } from '../lib/useMediaQuery';
 
@@ -108,6 +108,20 @@ function Body({ progress }: { progress: Progress }) {
             <Text type="supporting">間違えた問題を 1・3・7 日後に出します</Text>
           </VStack>
           <Button variant={due > 0 ? 'primary' : 'secondary'} label={due > 0 ? '始める' : '見る'} href={reviewHref} />
+        </HStack>
+      </Card>
+
+      <Card padding={4}>
+        <HStack justify="between" vAlign="center" wrap="wrap" gap={2}>
+          <VStack gap={0.5}>
+            <h2 className="h-sm">模擬試験</h2>
+            <Text type="supporting">
+              {progress.exams?.[0]
+                ? `前回 ${progress.exams[0].correct} / ${progress.exams[0].total} 問 (${Math.round((progress.exams[0].correct / progress.exams[0].total) * 100)}%) · ${progress.exams.length} 回受けた`
+                : 'まだ受けていません · 60 問・90 分'}
+            </Text>
+          </VStack>
+          <Button label="模擬試験へ" href={examHref} />
         </HStack>
       </Card>
 

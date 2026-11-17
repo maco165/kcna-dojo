@@ -32,3 +32,15 @@ export function dueQuestions(p: Progress, now: Date): QuestionRef[] {
 }
 
 export const isKnownQuestion = (id: string): boolean => findQuestion(id) !== undefined;
+
+/** 模擬試験の問題の束: すべての週の 4 択と穴埋め (分野つき) */
+export function questionBank(): { question: Question; domain: Lesson['domain'] }[] {
+  const out: { question: Question; domain: Lesson['domain'] }[] = [];
+  for (const w of WEEKS) {
+    for (const lesson of w.content?.lessons ?? []) {
+      if (lesson.kind !== 'quiz') continue;
+      for (const question of lesson.questions) out.push({ question, domain: lesson.domain });
+    }
+  }
+  return out;
+}

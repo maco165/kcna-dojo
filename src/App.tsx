@@ -7,6 +7,7 @@ import { useRoute } from './lib/route';
 import { useProgress } from './lib/useProgress';
 import About from './screens/About';
 import Home from './screens/Home';
+import ExamScreen from './screens/ExamScreen';
 import Glossary from './screens/Glossary';
 import ProgressScreen from './screens/ProgressScreen';
 import Review from './screens/Review';
@@ -21,7 +22,9 @@ export default function App() {
   return (
     <InternationalizationProvider locale="ja-JP" messages={{ 'ja-JP': jaJP }}>
     <Theme theme={kcnaTheme} mode="system">
-      {route.name === 'glossary' ? (
+      {route.name === 'exam' ? (
+        <ExamScreen progress={progress} updateProgress={updateProgress} />
+      ) : route.name === 'glossary' ? (
         <Glossary progress={progress} />
       ) : route.name === 'progress' ? (
         <ProgressScreen progress={progress} />

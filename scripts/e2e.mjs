@@ -266,6 +266,58 @@ async function run(browser, name, width, height) {
   check(await page.getByText(/ \/ 10 XP/).first().isVisible(), `${tag} ホームの今日の目標が 10 XP になる`);
   await noHorizontalOverflow(page, width, `${tag} 設定`);
 
+  // 11. 模擬試験: 60 問・90 分。1 問だけ答えて採点し、結果と記録と復習を見る
+  await page.goto(`${BASE}#/exam`);
+  await page.getByRole('heading', { name: '模擬試験' }).waitFor();
+  const answersBefore = await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('kcna.v1') ?? '{}').answers ?? {}).length);
+  await page.getByRole('button', { name: '模擬試験を始める' }).click();
+  check(await page.getByText(/模擬試験 · 1 \/ 60 問/).isVisible(), `${tag} 模擬試験は 60 問`);
+  check(await page.getByText(/残り (90:00|89:5\d)/).isVisible(), `${tag} 残り時間が 90 分から始まる`);
+  const firstRadio = page.getByRole('radio').first();
+  if (await firstRadio.count()) await firstRadio.check();
+  else await page.getByRole('textbox', { name: '空欄' }).fill('x');
+  await page.getByRole('button', { name: '次へ' }).click();
+  check(await page.getByText(/模擬試験 · 2 \/ 60 問 · 答えた 1/).isVisible(), `${tag} 次へで 2 問目に進み、答えた数が数えられる`);
+  await page.getByRole('button', { name: '採点する' }).first().click();
+  check(await page.getByText(/まだ答えていない問題が 59 問あります/).isVisible(), `${tag} 採点の前に答えていない数を知らせる`);
+  await page.getByRole('button', { name: '採点する' }).last().click();
+  await page.getByRole('heading', { name: '結果' }).waitFor();
+  const afterExam = await page.evaluate(() => JSON.parse(localStorage.getItem('kcna.v1') ?? 'null'));
+  check(afterExam?.exams?.length === 1 && afterExam.exams[0].total === 60, `${tag} 模擬試験の結果が記録に残る`);
+  const answersAdded = Object.keys(afterExam?.answers ?? {}).length - answersBefore;
+  check(answersAdded <= 1, `${tag} 答えなしの問題は記録しない (増えた記録 ${answersAdded})`);
+  await noHorizontalOverflow(page, width, `${tag} 模擬試験の結果`);
+  await page.getByRole('button', { name: '模擬試験の最初へ戻る' }).click();
+  // やめるときは確かめる
+  await page.getByRole('button', { name: '模擬試験を始める' }).click();
+  await page.getByRole('button', { name: '模擬試験をやめる' }).click();
+  check(await page.getByText('ここまでの答えは残らず').isVisible(), `${tag} 模擬試験をやめる前に確かめる`);
+  await page.getByRole('button', { name: '続ける' }).click();
+  check(await page.getByText(/模擬試験 · 1 \/ 60 問/).isVisible(), `${tag} 続けるを選ぶと試験に戻る`);
+  await page.getByRole('button', { name: '模擬試験をやめる' }).click();
+  await page.getByRole('button', { name: 'やめる', exact: true }).click();
+  await page.getByRole('button', { name: '模擬試験を始める' }).waitFor();
+  check(await page.getByText(/ \/ 60 \(\d+%\)/).first().isVisible(), `${tag} 模擬試験の画面にこれまでの結果が出る`);
+  await page.goto(`${BASE}#/progress`);
+  await page.getByRole('heading', { name: '進捗' }).waitFor();
+  check(await page.getByText(/前回 \d+ \/ 60 問/).isVisible(), `${tag} 進捗の画面に模擬試験の前回の結果が出る`);
+
+  // 13. 模擬試験の時間切れ: 時計を 90 分進めると自動で採点する
+  {
+    const tp = await context.newPage();
+    tp.on('pageerror', (e) => errors.push(e.message));
+    await tp.clock.install();
+    await tp.goto(`${BASE}#/exam`);
+    const before = await tp.evaluate(() => JSON.parse(localStorage.getItem('kcna.v1') ?? '{}').exams?.length ?? 0);
+    await tp.getByRole('button', { name: '模擬試験を始める' }).click();
+    await tp.clock.fastForward('01:30:02');
+    await tp.getByRole('heading', { name: '結果' }).waitFor();
+    await tp.clock.fastForward('00:00:10');
+    const after = await tp.evaluate(() => JSON.parse(localStorage.getItem('kcna.v1') ?? '{}').exams?.length ?? 0);
+    check(after === before + 1, `${tag} 時間切れで 1 回だけ自動で採点する (${before} → ${after})`);
+    await tp.close();
+  }
+
   // 12. 用語集: 検索とレッスンへのリンク
   await page.goto(`${BASE}#/glossary`);
   await page.getByRole('heading', { name: '用語集', level: 1 }).waitFor();
