@@ -12,7 +12,7 @@ import { XMarkIcon } from '@heroicons/react/24/outline';
 import ChoiceQuestionView from '../components/ChoiceQuestionView';
 import FillQuestionView from '../components/FillQuestionView';
 import { ActionArea, PrimaryAction, QuestionHead } from '../components/QuestionFrame';
-import type { LabLesson, Lesson, QuizLesson } from '../content/types';
+import type { LabLesson, Lesson, Question, QuizLesson } from '../content/types';
 import { XP_PER_CORRECT, XP_PER_LAB } from '../lib/grade';
 import { completeLesson, currentStreak, goalXp, recordAnswer, todayXp, type Progress } from '../lib/progress';
 import { shuffleChoices } from '../lib/shuffle';
@@ -27,10 +27,10 @@ type Props = {
 };
 
 /** 上の帯: 閉じる・レッスン名と何問目か・進み具合 */
-function LessonBar({ title, week, current, total, unit }: { title: string; week: number; current: number; total: number; unit: string }) {
+function LessonBar({ title, closeHref, current, total, unit }: { title: string; closeHref: string; current: number; total: number; unit: string }) {
   return (
     <header className="lesson-bar">
-      <Button variant="ghost" label="レッスンを閉じる" isIconOnly icon={<XMarkIcon width={20} height={20} />} href={weekHref(week)} />
+      <Button variant="ghost" label="レッスンを閉じる" isIconOnly icon={<XMarkIcon width={20} height={20} />} href={closeHref} />
       <div className="lesson-bar__progress">
         <Text type="supporting">
           {title} · {current} / {total} {unit}
@@ -51,6 +51,50 @@ export default function LessonScreen(props: Props) {
 }
 
 function QuizRun({ lesson, week, progress, updateProgress }: Props & { lesson: QuizLesson }) {
+  return (
+    <QuestionRun
+      title={lesson.title}
+      resultLabel={`第 ${week} 週 · ${lesson.id.replace(/^w\d+-/, '')} ${lesson.title}`}
+      questions={lesson.questions}
+      domainOf={() => lesson.domain}
+      closeHref={weekHref(week)}
+      backHref={weekHref(week)}
+      progress={progress}
+      updateProgress={updateProgress}
+      canRetry
+      onFinish={(p, correct, total) => completeLesson(p, lesson.id, { correct, total }, correct * XP_PER_CORRECT, new Date())}
+    />
+  );
+}
+
+/** 問題を 1 問ずつ解いて、最後に結果を出す流れ。レッスンと復習で共通 */
+export function QuestionRun({
+  title,
+  resultLabel,
+  questions: source,
+  domainOf,
+  closeHref,
+  backHref,
+  progress,
+  updateProgress,
+  canRetry,
+  onBack,
+  onFinish,
+}: {
+  title: string;
+  resultLabel: string;
+  questions: Question[];
+  domainOf: (q: Question) => string;
+  closeHref: string;
+  backHref: string;
+  progress: Progress;
+  updateProgress: (fn: (p: Progress) => Progress) => void;
+  canRetry?: boolean;
+  /** 結果の画面の「一覧へ戻る」で、URL を変えずに戻すとき (同じ URL の画面から始めた復習など) */
+  onBack?: () => void;
+  /** 最後の問題のあと、進捗に反映する (XP・完了など) */
+  onFinish: (p: Progress, correct: number, total: number) => Progress;
+}) {
   const [index, setIndex] = useState(0);
   const [results, setResults] = useState<boolean[]>([]);
   const [finished, setFinished] = useState(false);
@@ -58,7 +102,7 @@ function QuizRun({ lesson, week, progress, updateProgress }: Props & { lesson: Q
   const [startedAt, setStartedAt] = useState(() => Date.now());
   const [elapsed, setElapsed] = useState(0);
   // 4 択の選択肢は、開いたときと「もう一度解く」のたびに混ぜ直す (attempt が変わるたび)
-  const questions = useMemo(() => lesson.questions.map((question) => shuffleChoices(question)), [lesson, attempt]);
+  const questions = useMemo(() => source.map((question) => shuffleChoices(question)), [source, attempt]);
   const total = questions.length;
   const q = questions[index];
   const isLast = index === total - 1;
@@ -75,11 +119,11 @@ function QuizRun({ lesson, week, progress, updateProgress }: Props & { lesson: Q
       return;
     }
     const correct = results.filter(Boolean).length;
-    updateProgress((p) => completeLesson(p, lesson.id, { correct, total }, correct * XP_PER_CORRECT, new Date()));
+    updateProgress((p) => onFinish(p, correct, total));
     setElapsed(Date.now() - startedAt);
     setFinished(true);
     window.scrollTo(0, 0);
-  }, [isLast, results, updateProgress, lesson.id, total, startedAt]);
+  }, [isLast, results, updateProgress, onFinish, total, startedAt]);
 
   const restart = () => {
     setIndex(0);
@@ -94,8 +138,9 @@ function QuizRun({ lesson, week, progress, updateProgress }: Props & { lesson: Q
     const correct = results.filter(Boolean).length;
     return (
       <ResultView
-        week={week}
-        lessonLabel={`第 ${week} 週 · ${lesson.id.replace(/^w\d+-/, '')} ${lesson.title}`}
+        backHref={backHref}
+        onBack={onBack}
+        lessonLabel={resultLabel}
         stats={[
           { label: '正答', value: `${correct} / ${total}` },
           { label: '獲得', value: `+${correct * XP_PER_CORRECT} XP` },
@@ -103,7 +148,7 @@ function QuizRun({ lesson, week, progress, updateProgress }: Props & { lesson: Q
         ]}
         progress={progress}
         rows={questions.map((question, i) => ({ id: question.id, label: question.prompt, correct: results[i] }))}
-        onRetry={restart}
+        onRetry={canRetry ? restart : undefined}
       />
     );
   }
@@ -111,12 +156,12 @@ function QuizRun({ lesson, week, progress, updateProgress }: Props & { lesson: Q
   const nextLabel = isLast ? '結果を見る' : '次へ';
   return (
     <div className="lesson">
-      <LessonBar title={lesson.title} week={week} current={index + 1} total={total} unit="問" />
+      <LessonBar title={title} closeHref={closeHref} current={index + 1} total={total} unit="問" />
       <main className="lesson__main">
         {q.type === 'fill' ? (
-          <FillQuestionView key={`${attempt}-${q.id}`} question={q} domain={lesson.domain} onChecked={onChecked} nextLabel={nextLabel} onNext={onNext} />
+          <FillQuestionView key={`${attempt}-${q.id}`} question={q} domain={domainOf(q)} onChecked={onChecked} nextLabel={nextLabel} onNext={onNext} />
         ) : (
-          <ChoiceQuestionView key={`${attempt}-${q.id}`} question={q} domain={lesson.domain} onChecked={onChecked} nextLabel={nextLabel} onNext={onNext} />
+          <ChoiceQuestionView key={`${attempt}-${q.id}`} question={q} domain={domainOf(q)} onChecked={onChecked} nextLabel={nextLabel} onNext={onNext} />
         )}
       </main>
     </div>
@@ -138,7 +183,7 @@ function LabRun({ lesson, week, progress, updateProgress }: Props & { lesson: La
   if (finished) {
     return (
       <ResultView
-        week={week}
+        backHref={weekHref(week)}
         lessonLabel={`第 ${week} 週 · ${lesson.title}`}
         stats={[
           { label: '手順', value: `${total} / ${total}` },
@@ -153,7 +198,7 @@ function LabRun({ lesson, week, progress, updateProgress }: Props & { lesson: La
 
   return (
     <div className="lesson">
-      <LessonBar title={lesson.title} week={week} current={checked.length} total={total} unit="手順" />
+      <LessonBar title={lesson.title} closeHref={weekHref(week)} current={checked.length} total={total} unit="手順" />
       <main className="lesson__main">
         <VStack gap={5}>
           <QuestionHead kind="実習 · 家のクラスタ (k3s) で動かす" domain={lesson.domain} prompt={lesson.title} />
@@ -178,14 +223,16 @@ function LabRun({ lesson, week, progress, updateProgress }: Props & { lesson: La
 }
 
 function ResultView({
-  week,
+  backHref,
+  onBack,
   lessonLabel,
   stats,
   progress,
   rows,
   onRetry,
 }: {
-  week: number;
+  backHref: string;
+  onBack?: () => void;
   lessonLabel: string;
   stats: { label: string; value: string }[];
   progress: Progress;
@@ -249,7 +296,8 @@ function ResultView({
           <Button
             variant="primary"
             label="一覧へ戻る"
-            href={weekHref(week)}
+            href={onBack ? undefined : backHref}
+            onClick={onBack}
             width={isWide ? undefined : '100%'}
             size={isWide ? 'md' : 'lg'}
           />

@@ -11,7 +11,7 @@ import BottomTabs from '../components/BottomTabs';
 import RepoLink, { GitHubMark } from '../components/RepoLink';
 import SiteLogo from '../components/SiteLogo';
 import { NEW_ISSUE_URL, REPO_URL } from '../lib/links';
-import type { Progress } from '../lib/progress';
+import { dueReviewIds, type Progress } from '../lib/progress';
 import { SITE_NAME, SITE_TAGLINE } from '../lib/site';
 import { WIDE_QUERY, useMediaQuery } from '../lib/useMediaQuery';
 
@@ -108,7 +108,7 @@ export default function About({ progress }: { progress: Progress }) {
       <main className="page__section">
         <Body />
       </main>
-      <BottomTabs current="about" />
+      <BottomTabs current="about" reviewCount={dueReviewIds(progress, new Date()).length} />
     </div>
   );
 }

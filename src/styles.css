@@ -398,3 +398,16 @@ body {
   gap: var(--spacing-1);
   min-width: 0;
 }
+
+.tabs__badge {
+  display: inline-block;
+  min-width: 16px;
+  margin-left: 3px;
+  padding: 0 4px;
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-weight: var(--font-weight-semibold, 600);
+  text-align: center;
+  box-sizing: border-box;
+}

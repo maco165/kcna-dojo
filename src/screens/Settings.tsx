@@ -16,6 +16,7 @@ import SiteLogo from '../components/SiteLogo';
 import { downloadProgress } from '../lib/download';
 import {
   GOAL_CHOICES,
+  dueReviewIds,
   examDate,
   goalXp,
   parseProgressText,
@@ -173,7 +174,7 @@ export default function Settings(props: Props) {
       <main className="page__section">
         <Body {...props} />
       </main>
-      <BottomTabs current="config" />
+      <BottomTabs current="config" reviewCount={dueReviewIds(props.progress, new Date()).length} />
     </div>
   );
 }

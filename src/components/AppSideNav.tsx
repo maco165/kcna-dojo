@@ -1,3 +1,4 @@
+import { Badge } from '@astryxdesign/core/Badge';
 import { SideNav, SideNavHeading, SideNavItem, SideNavSection } from '@astryxdesign/core/SideNav';
 import { Text } from '@astryxdesign/core/Text';
 import {
@@ -13,12 +14,14 @@ import SiteLogo from './SiteLogo';
 import type { Progress } from '../lib/progress';
 import { REPO_URL } from '../lib/links';
 import { SITE_NAME, SITE_TAGLINE } from '../lib/site';
-import { aboutHref, settingsHref, weekHref } from '../lib/route';
+import { dueReviewIds } from '../lib/progress';
+import { aboutHref, reviewHref, settingsHref, weekHref } from '../lib/route';
 import { GitHubMark } from './RepoLink';
 
 /** PC の左の一覧。学習と週のほかは、まだ機能が無いので「準備中」として押せない */
-export default function AppSideNav({ current, week, progress }: { current: 'learn' | 'about' | 'settings'; week?: number; progress: Progress }) {
+export default function AppSideNav({ current, week, progress }: { current: 'learn' | 'about' | 'settings' | 'review'; week?: number; progress: Progress }) {
   const soon = <Text type="supporting">準備中</Text>;
+  const reviewCount = dueReviewIds(progress, new Date()).length;
   return (
     <SideNav
       header={<SideNavHeading heading={SITE_NAME} subheading={SITE_TAGLINE} icon={<SiteLogo />} headingHref={weekHref(1)} />}
@@ -31,7 +34,13 @@ export default function AppSideNav({ current, week, progress }: { current: 'lear
     >
       <SideNavSection title="メニュー" isHeaderHidden>
         <SideNavItem label="学習" icon={QueueListIcon} href={weekHref(week ?? 1)} isSelected={current === 'learn'} />
-        <SideNavItem label="復習" icon={ArrowPathIcon} isDisabled endContent={soon} />
+        <SideNavItem
+          label="復習"
+          icon={ArrowPathIcon}
+          href={reviewHref}
+          isSelected={current === 'review'}
+          endContent={reviewCount > 0 ? <Badge label={reviewCount} variant="info" /> : undefined}
+        />
         <SideNavItem label="進捗" icon={ChartBarIcon} isDisabled endContent={soon} />
         <SideNavItem label="用語集" icon={BookOpenIcon} isDisabled endContent={soon} />
         <SideNavItem label="設定" icon={AdjustmentsHorizontalIcon} href={settingsHref} isSelected={current === 'settings'} />
