@@ -2,10 +2,10 @@ import { useMemo, useState } from 'react';
 import { AppShell } from '@astryxdesign/core/AppShell';
 import { Button } from '@astryxdesign/core/Button';
 import { Link } from '@astryxdesign/core/Link';
-import { HStack, VStack } from '@astryxdesign/core/Stack';
+import { VStack } from '@astryxdesign/core/Stack';
 import { Text } from '@astryxdesign/core/Text';
 import { TextInput } from '@astryxdesign/core/TextInput';
-import { ArrowTopRightOnSquareIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import AppSideNav from '../components/AppSideNav';
 import BottomTabs from '../components/BottomTabs';
 import RepoLink from '../components/RepoLink';
@@ -42,13 +42,12 @@ function Entry({ t }: { t: GlossaryTerm }) {
           {t.aliases && t.aliases.length > 0 && <Text type="supporting">{t.aliases.join(' · ')}</Text>}
         </VStack>
         <Text>{t.description}</Text>
-        <HStack gap={1} vAlign="center">
-          <Text type="supporting">出典:</Text>
-          <Link href={t.source} target="_blank" rel="noopener noreferrer">
+        <Text type="supporting">
+          出典:{' '}
+          <Link href={t.source} isExternalLink newTabLabel="(新しいタブで開きます)">
             {hostOf(t.source)}
           </Link>
-          <ArrowTopRightOnSquareIcon width={14} height={14} aria-hidden="true" />
-        </HStack>
+        </Text>
         {lessons.length > 0 && (
           <VStack gap={1}>
             <Text type="supporting">出てくるレッスン ({lessons.length})</Text>
@@ -97,11 +96,13 @@ function Body() {
       <Text type="supporting" aria-live="polite">
         {query.trim() ? `${hits.length} 語が見つかりました` : `${TERMS.length} 語`}
       </Text>
-      <div className="gloss-list">
-        {hits.map((t) => (
-          <Entry key={t.id} t={t} />
-        ))}
-      </div>
+      {hits.length > 0 && (
+        <div className="gloss-list">
+          {hits.map((t) => (
+            <Entry key={t.id} t={t} />
+          ))}
+        </div>
+      )}
       {hits.length === 0 && <Text type="supporting">見つかりませんでした。別の言い方 (英語・略語) でも探せます。</Text>}
     </VStack>
   );

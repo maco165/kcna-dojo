@@ -27,6 +27,10 @@ describe('validateGlossary', () => {
     expect(check([{ ...ok, description: '' }])[0]).toMatch(/description/);
     expect(check([ok, { ...ok, id: 'pod2', term: 'ポッド', aliases: ['pod'] }])[0]).toMatch(/重なって/);
     expect(validateGlossary({}, new Set())).toEqual(['terms の配列がありません']);
+    expect(check([{ ...ok, aliases: 5 }])[0]).toMatch(/aliases/);
+    expect(check([{ ...ok, alias: ['ポッド'] }])[0]).toMatch(/alias という欄/);
+    expect(check([{ ...ok, lessons: ['w1-l1', 'w1-l1'] }])[0]).toMatch(/重なって/);
+    expect(check([null])[0]).toMatch(/オブジェクト/);
   });
 });
 
@@ -38,6 +42,13 @@ describe('searchTerms', () => {
     expect(searchTerms(list, 'ｐｏｄ').map((x) => x.id)).toEqual(['pod', 'svc']);
   });
   it('別名でも探せる', () => expect(searchTerms(list, 'pv').map((x) => x.id)).toEqual(['pv']));
+  it('ひらがなでも、ハイフンを抜いても探せる', () => {
+    expect(searchTerms(list, 'ぽっど').map((x) => x.id)).toEqual(['pod']);
+    expect(searchTerms([t('kp', 'kube-proxy', 'ノードの通信')], 'kubeproxy').map((x) => x.id)).toEqual(['kp']);
+  });
+  it('完全一致の語を先に出す (実データ: pod で Pod が先頭)', () => {
+    expect(searchTerms(sortTerms(terms), 'pod')[0].id).toBe('pod');
+  });
   it('空白で区切った語はすべて含むものだけ', () => expect(searchTerms(list, 'pod 入口').map((x) => x.id)).toEqual(['svc']));
   it('読みの順に並べる', () => expect(sortTerms(list).map((x) => x.id)).toEqual(['pv', 'pod', 'svc']));
 });
