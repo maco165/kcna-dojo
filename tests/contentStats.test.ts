@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { WEEKS } from '../src/content/curriculum';
-import { EXAM_FACTS, SAMPLE_QUESTION_ID, SOURCES } from '../src/content/guide';
+import { CURRICULUM, EXAM_FACTS, SAMPLE_QUESTION_ID, SOURCES, SOURCE_SITES, STUDY_MATERIALS } from '../src/content/guide';
+import { EXAM_WEIGHTS } from '../src/lib/exam';
 import { findQuestion } from '../src/content';
 import type { WeekContent } from '../src/content/types';
 import { contentStats } from '../src/lib/contentStats';
@@ -40,5 +41,23 @@ describe('説明のページの事実', () => {
   it('事実と出典はすべて https', () => {
     for (const s of Object.values(SOURCES)) expect(new URL(s.url).protocol).toBe('https:');
     for (const f of EXAM_FACTS) expect(new URL(f.source.url).protocol).toBe('https:');
+  });
+});
+
+describe('学習要領と情報源', () => {
+  it('学習要領の分野は配点の 4 分野と同じで、細目の週はすべて実在する', () => {
+    expect(CURRICULUM.map((c) => c.domain).sort()).toEqual(Object.keys(EXAM_WEIGHTS).sort());
+    const weeks = new Set(WEEKS.map((w) => w.week));
+    for (const c of CURRICULUM) for (const x of c.competencies) for (const w of x.weeks) expect(weeks.has(w)).toBe(true);
+  });
+  it('問題の出典のサイトには、すべて名前と入口の URL がある (名前の無いホストを出さない)', () => {
+    const s = contentStats(
+      WEEKS.map((w) => w.content),
+      0,
+    );
+    for (const x of s.sources) expect(SOURCE_SITES[x.host], x.host).toBeDefined();
+  });
+  it('情報源と学習素材の URL は https', () => {
+    for (const x of [...Object.values(SOURCE_SITES), ...STUDY_MATERIALS]) expect(new URL(x.url).protocol).toBe('https:');
   });
 });

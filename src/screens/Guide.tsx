@@ -1,14 +1,14 @@
-import { useState } from "react";
-import { AppShell } from "@astryxdesign/core/AppShell";
-import { Link } from "@astryxdesign/core/Link";
-import { Text } from "@astryxdesign/core/Text";
-import AppSideNav from "../components/AppSideNav";
-import BottomTabs from "../components/BottomTabs";
-import RepoLink from "../components/RepoLink";
-import SiteLogo from "../components/SiteLogo";
-import { dueQuestions, findQuestion } from "../content";
-import { WEEKS } from "../content/curriculum";
-import glossary from "../content/glossary.json";
+import { useState } from 'react';
+import { AppShell } from '@astryxdesign/core/AppShell';
+import { Link } from '@astryxdesign/core/Link';
+import { Text } from '@astryxdesign/core/Text';
+import AppSideNav from '../components/AppSideNav';
+import BottomTabs from '../components/BottomTabs';
+import RepoLink from '../components/RepoLink';
+import SiteLogo from '../components/SiteLogo';
+import { dueQuestions, findQuestion } from '../content';
+import { WEEKS } from '../content/curriculum';
+import glossary from '../content/glossary.json';
 import {
   CHECKED_AT,
   CURRICULUM,
@@ -20,22 +20,31 @@ import {
   PROVIDES,
   SAMPLE_QUESTION_ID,
   SOURCES,
+  SOURCE_SITES,
+  STUDY_MATERIALS,
   type Source,
-} from "../content/guide";
-import type { FillQuestion } from "../content/types";
-import { contentStats } from "../lib/contentStats";
-import { EXAM_WEIGHTS } from "../lib/exam";
-import { gradeFill } from "../lib/grade";
-import { NEW_ISSUE_URL } from "../lib/links";
-import type { Progress } from "../lib/progress";
-import { aboutHref, glossaryHref, lessonHref, weekHref } from "../lib/route";
-import { SITE_NAME } from "../lib/site";
-import { WIDE_QUERY, useMediaQuery } from "../lib/useMediaQuery";
+} from '../content/guide';
+import type { FillQuestion } from '../content/types';
+import { contentStats } from '../lib/contentStats';
+import { EXAM_WEIGHTS } from '../lib/exam';
+import { gradeFill } from '../lib/grade';
+import { NEW_ISSUE_URL } from '../lib/links';
+import type { Progress } from '../lib/progress';
+import { aboutHref, glossaryHref, lessonHref, weekHref } from '../lib/route';
+import { SITE_NAME } from '../lib/site';
+import { WIDE_QUERY, useMediaQuery } from '../lib/useMediaQuery';
 
 const STATS = contentStats(
   WEEKS.map((w) => w.content),
   (glossary as { terms: unknown[] }).terms.length,
 );
+/** 週の番号の並びを「第 1〜4 週」「第 7 週」の形にする */
+function weeksLabel(weeks: number[]): string {
+  const lo = Math.min(...weeks);
+  const hi = Math.max(...weeks);
+  return lo === hi ? `第 ${lo} 週` : `第 ${lo}〜${hi} 週`;
+}
+
 /** 出典の内訳の帯に色を分けて出すホストの数 (残りは「そのほか」) */
 const TOP_SOURCES = 3;
 
@@ -49,14 +58,14 @@ function Ext({ s }: { s: Source }) {
 
 function Sources({ list, dark }: { list: Source[]; dark?: boolean }) {
   return (
-    <p className={dark ? "guide-src guide-src--dark" : "guide-src"}>
-      出典:{" "}
+    <p className={dark ? 'guide-src guide-src--dark' : 'guide-src'}>
+      出典:{' '}
       {list.map((s, i) => (
         <span key={s.url}>
-          {i > 0 && " · "}
+          {i > 0 && ' · '}
           <Ext s={s} />
         </span>
-      ))}{" "}
+      ))}{' '}
       ({CHECKED_AT} に確認)
     </p>
   );
@@ -66,27 +75,14 @@ function Sources({ list, dark }: { list: Source[]; dark?: boolean }) {
 function ClusterAnimation() {
   const pod = (x: number, cls: string) => (
     <g className={`guide-pod ${cls}`}>
-      <rect
-        x={x}
-        y="300"
-        width="68"
-        height="100"
-        rx="6"
-        fill="#102A47"
-        stroke="#3E9EFB"
-      />
+      <rect x={x} y="300" width="68" height="100" rx="6" fill="#102A47" stroke="#3E9EFB" />
       <rect x={x + 8} y="310" width="52" height="22" rx="3" fill="#0064E0" />
       <rect x={x + 8} y="338" width="52" height="22" rx="3" fill="#1B4E86" />
       <rect x={x + 8} y="366" width="52" height="22" rx="3" fill="#24384D" />
     </g>
   );
   return (
-    <svg
-      className="guide-hero__bg"
-      viewBox="0 240 390 270"
-      preserveAspectRatio="xMidYMax meet"
-      aria-hidden="true"
-    >
+    <svg className="guide-hero__bg" viewBox="0 240 390 270" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
       <g fill="none" stroke="#2A3540" strokeWidth="1.5">
         <rect x="14" y="250" width="112" height="190" rx="10" />
         <rect x="139" y="250" width="112" height="190" rx="10" />
@@ -97,11 +93,7 @@ function ClusterAnimation() {
         <rect x="147" y="412" width="96" height="18" rx="4" />
         <rect x="272" y="412" width="96" height="18" rx="4" />
       </g>
-      <g
-        fill="#6F747C"
-        fontFamily="SF Mono, Monaco, Consolas, monospace"
-        fontSize="9"
-      >
+      <g fill="#6F747C" fontFamily="SF Mono, Monaco, Consolas, monospace" fontSize="9">
         <text x="30" y="424">
           kernel
         </text>
@@ -121,10 +113,10 @@ function ClusterAnimation() {
           node-3
         </text>
       </g>
-      {pod(36, "guide-pod--1")}
-      {pod(161, "guide-pod--2")}
-      {pod(286, "guide-pod--3")}
-      {pod(286, "guide-pod--4")}
+      {pod(36, 'guide-pod--1')}
+      {pod(161, 'guide-pod--2')}
+      {pod(286, 'guide-pod--3')}
+      {pod(286, 'guide-pod--4')}
       <g className="guide-layers" fill="#AAAFB5" fontSize="9">
         <text x="108" y="324">
           アプリ
@@ -158,62 +150,29 @@ function ClusterAnimation() {
 function Sample() {
   const ref = findQuestion(SAMPLE_QUESTION_ID);
   const [picked, setPicked] = useState<string | null>(null);
-  if (!ref || ref.question.type !== "fill") return null;
+  if (!ref || ref.question.type !== 'fill') return null;
   const q = ref.question as FillQuestion;
-  const [before, after] = q.code.split("{{blank}}");
+  const [before, after] = q.code.split('{{blank}}');
   const ok = picked !== null && gradeFill(q, picked);
   return (
     <div className="guide-sample">
-      <span className="guide-sample__meta">
-        試しに 1 問 · コマンドの穴埋め · 第 {ref.week} 週
-      </span>
+      <span className="guide-sample__meta">試しに 1 問 · コマンドの穴埋め · 第 {ref.week} 週</span>
       <p className="guide-sample__prompt">{q.prompt}</p>
       <pre className="guide-sample__code">
         <span aria-hidden="true">$ </span>
         {before}
-        <span
-          className={
-            picked === null
-              ? "guide-blank"
-              : ok
-                ? "guide-blank guide-blank--ok"
-                : "guide-blank guide-blank--ng"
-          }
-        >
-          {picked ?? "____"}
-        </span>
+        <span className={picked === null ? 'guide-blank' : ok ? 'guide-blank guide-blank--ok' : 'guide-blank guide-blank--ng'}>{picked ?? '____'}</span>
         {after}
       </pre>
-      <div
-        role="group"
-        aria-label="空欄の候補"
-        className="guide-sample__choices"
-      >
+      <div role="group" aria-label="空欄の候補" className="guide-sample__choices">
         {(q.candidates ?? q.answers).map((c) => (
-          <button
-            key={c}
-            type="button"
-            className="guide-choice"
-            aria-pressed={picked === c}
-            onClick={() => setPicked(c)}
-          >
+          <button key={c} type="button" className="guide-choice" aria-pressed={picked === c} onClick={() => setPicked(c)}>
             {c}
           </button>
         ))}
       </div>
-      <p
-        role="status"
-        className={
-          ok
-            ? "guide-sample__fb guide-sample__fb--ok"
-            : "guide-sample__fb guide-sample__fb--ng"
-        }
-      >
-        {picked === null
-          ? ""
-          : ok
-            ? `正解。${q.explanation}`
-            : `${picked} は違います。もう一度選べます。`}
+      <p role="status" className={ok ? 'guide-sample__fb guide-sample__fb--ok' : 'guide-sample__fb guide-sample__fb--ng'}>
+        {picked === null ? '' : ok ? `正解。${q.explanation}` : `${picked} は違います。もう一度選べます。`}
       </p>
       {picked !== null && (
         <a className="guide-sample__more" href={lessonHref(ref.lesson.id)}>
@@ -228,19 +187,15 @@ function Body() {
   const top = STATS.sources.slice(0, TOP_SOURCES);
   const rest = STATS.sources.slice(TOP_SOURCES);
   const restCount = rest.reduce((s, x) => s + x.count, 0);
-  const share = (n: number) =>
-    `${((n / Math.max(1, STATS.questions)) * 100).toFixed(1)}%`;
-  const sourceLabel = [
-    ...top.map((s) => `${s.host} ${s.count} 問`),
-    `そのほか ${restCount} 問`,
-  ].join("、");
+  const share = (n: number) => `${((n / Math.max(1, STATS.questions)) * 100).toFixed(1)}%`;
+  const sourceLabel = [...top.map((s) => `${s.host} ${s.count} 問`), `そのほか ${restCount} 問`].join('、');
   return (
     <div className="guide">
       <section className="guide-hero" aria-labelledby="guide-title">
         <ClusterAnimation />
         <div className="guide-hero__fg">
           <ul className="guide-tags" aria-label="問題の種類">
-            {["問題を解く前に", "穴埋め・4 択・実習・模擬試験"].map((t) => (
+            {['問題を解く前に', '穴埋め・4 択・実習・模擬試験'].map((t) => (
               <li key={t}>{t}</li>
             ))}
           </ul>
@@ -254,10 +209,7 @@ function Body() {
             第 1 週から解き始める
           </a>
         </div>
-        <p className="guide-hero__caption">
-          背景: コンテナ (アプリ・ライブラリ・土台のレイヤー)
-          がノードに置かれ、1 つ落ちると新しいものに立て直される
-        </p>
+        <p className="guide-hero__caption">背景: コンテナ (アプリ・ライブラリ・土台のレイヤー) がノードに置かれ、1 つ落ちると新しいものに立て直される</p>
       </section>
 
       <dl className="guide-stats" aria-label="このサイトの中身">
@@ -280,16 +232,7 @@ function Body() {
       </dl>
 
       <section className="guide-origin" aria-labelledby="guide-origin">
-        <svg
-          width="40"
-          height="40"
-          viewBox="0 0 64 64"
-          fill="none"
-          stroke="#3E9EFB"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          aria-hidden="true"
-        >
+        <svg width="40" height="40" viewBox="0 0 64 64" fill="none" stroke="#3E9EFB" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
           <circle cx="32" cy="32" r="18" />
           <circle cx="32" cy="32" r="5" />
           <path d="M32 6v21M32 37v21M6 32h21M37 32h21M13.6 13.6l14.9 14.9M35.5 35.5l14.9 14.9M50.4 13.6 35.5 28.5M28.5 35.5 13.6 50.4" />
@@ -299,15 +242,13 @@ function Body() {
             Kubernetes という名前
           </h2>
           <p className="guide-origin__word">
-            <span lang="el">{ORIGIN.word}</span>{" "}
-            <span className="guide-origin__muted">{ORIGIN.meaning}</span>
+            <span lang="el">{ORIGIN.word}</span> <span className="guide-origin__muted">{ORIGIN.meaning}</span>
           </p>
           <p className="guide-origin__muted">
-            <span className="guide-mono guide-accent">K8s</span> は K と s
-            の間の 8 文字を数えた略語 ·{" "}
+            <span className="guide-mono guide-accent">K8s</span> は K と s の間の 8 文字を数えた略語 ·{' '}
             {ORIGIN.milestones.map((m, i) => (
               <span key={m.year}>
-                {i > 0 && " · "}
+                {i > 0 && ' · '}
                 <span className="guide-mono">{m.year}</span> {m.text}
               </span>
             ))}
@@ -322,9 +263,7 @@ function Body() {
             そもそも何をするものか
           </h2>
           <blockquote className="guide-quote">{DEFINITION}</blockquote>
-          <h3 className="guide-h3">
-            なぜ生まれたか: アプリの置き方の移り変わり
-          </h3>
+          <h3 className="guide-h3">なぜ生まれたか: アプリの置き方の移り変わり</h3>
           <ol className="guide-eras">
             <li>
               <span className="guide-eras__name">1. 物理サーバー</span>
@@ -340,9 +279,8 @@ function Body() {
             </li>
           </ol>
           <p>
-            数が増えたコンテナを、人の手で 1
-            つずつ見張るのは無理があります。止まったら立て直し、混んだら振り分ける。その仕組みを組み込んだのが
-            Kubernetes です。
+            数が増えたコンテナを、人の手で 1 つずつ見張るのは無理があります。止まったら立て直し、混んだら振り分ける。その仕組みを組み込んだのが Kubernetes
+            です。
           </p>
           <h3 className="guide-h3">いちばん大事な考え方</h3>
           <div className="guide-state">
@@ -350,16 +288,7 @@ function Body() {
               <span className="guide-muted">あるべき状態</span>
               <span className="guide-mono">replicas: 3</span>
             </span>
-            <svg
-              width="40"
-              height="20"
-              viewBox="0 0 40 20"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              aria-hidden="true"
-            >
+            <svg width="40" height="20" viewBox="0 0 40 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
               <path d="M2 10h34M30 4l6 6-6 6" />
             </svg>
             <span>
@@ -367,10 +296,7 @@ function Body() {
               <span className="guide-mono">2 → 3 に戻す</span>
             </span>
           </div>
-          <p>
-            やることを手順で命じるのではなく、「こうあってほしい」を書いて渡す。Kubernetes
-            はずれを見つけるたびに、実際の状態をそこへ近づけます。
-          </p>
+          <p>やることを手順で命じるのではなく、「こうあってほしい」を書いて渡す。Kubernetes はずれを見つけるたびに、実際の状態をそこへ近づけます。</p>
           <h3 className="guide-h3">Kubernetes がしてくれること</h3>
           <ul className="guide-rows">
             {PROVIDES.map((p) => (
@@ -387,15 +313,11 @@ function Body() {
           <h2 id="guide-path" className="guide-h2">
             学ぶ順番
           </h2>
-          <p className="guide-muted">
-            小さな部品から、大きな設計へ。{WEEKS.length} 週で一周します。
-          </p>
+          <p className="guide-muted">小さな部品から、大きな設計へ。{WEEKS.length} 週で一周します。</p>
           <ol className="guide-path">
             {WEEKS.map((w) => (
               <li key={w.week}>
-                <span className="guide-mono guide-accent">
-                  {String(w.week).padStart(2, "0")}
-                </span>
+                <span className="guide-mono guide-accent">{String(w.week).padStart(2, '0')}</span>
                 <a href={weekHref(w.week)}>{w.title}</a>
                 <span className="guide-muted">{w.goals[0]}</span>
               </li>
@@ -403,10 +325,61 @@ function Body() {
           </ol>
         </section>
 
-        <section
-          aria-labelledby="guide-exam"
-          className="guide-section guide-section--card"
-        >
+        <section aria-labelledby="guide-outline" className="guide-section guide-section--wide">
+          <h2 id="guide-outline" className="guide-h2">
+            学習要領と、このサイトで学ぶ場所
+          </h2>
+          <p className="guide-muted">
+            KCNA の公開カリキュラムが「合格者に期待する知識・技能」として挙げる細目です。試験を受けない人にも、Kubernetes
+            とクラウドネイティブの基礎の地図として使えます。
+          </p>
+          <div className="guide-outline">
+            {CURRICULUM.map((c) => (
+              <section key={c.domain} aria-label={c.domain} className="guide-outline__domain">
+                <h3 className="guide-outline__head">
+                  <span>{c.domain}</span>
+                  <span className="guide-muted">配点 {EXAM_WEIGHTS[c.domain]}%</span>
+                </h3>
+                <table className="guide-outline__table">
+                  <thead>
+                    <tr>
+                      <th scope="col">細目 (原文)</th>
+                      <th scope="col">日本語</th>
+                      <th scope="col">このサイト</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {c.competencies.map((x) => (
+                      <tr key={x.en}>
+                        <td lang="en">{x.en}</td>
+                        <td>{x.ja}</td>
+                        <td>
+                          {x.weeks.map((w, i) => (
+                            <span key={w}>
+                              {i > 0 && '・'}
+                              <a href={weekHref(w)}>第 {w} 週</a>
+                            </span>
+                          ))}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </section>
+            ))}
+          </div>
+          <Sources
+            list={[
+              {
+                ...SOURCES.curriculum,
+                label: `${SOURCES.curriculum.label} (${CURRICULUM_VERSION})`,
+              },
+              SOURCES.kcnaJp,
+            ]}
+          />
+        </section>
+
+        <section aria-labelledby="guide-exam" className="guide-section guide-section--card">
           <div className="guide-cols">
             <div className="guide-col">
               <p className="guide-kicker">KCNA-JP を受ける人へ</p>
@@ -420,21 +393,12 @@ function Body() {
                     <dt>{f.label}</dt>
                     <dd>
                       {f.value}
-                      {f.note && (
-                        <span className="guide-muted"> ({f.note})</span>
-                      )}
+                      {f.note && <span className="guide-muted"> ({f.note})</span>}
                     </dd>
                   </div>
                 ))}
               </dl>
-              <Sources
-                list={[
-                  SOURCES.kcnaJp,
-                  SOURCES.mcInstructions,
-                  SOURCES.mcFaq,
-                  SOURCES.language,
-                ]}
-              />
+              <Sources list={[SOURCES.kcnaJp, SOURCES.mcInstructions, SOURCES.mcFaq, SOURCES.language]} />
             </div>
             <div className="guide-col">
               <h3 className="guide-h3 guide-h3--top">出題範囲と配点</h3>
@@ -449,7 +413,7 @@ function Body() {
                       <span style={{ width: `${EXAM_WEIGHTS[c.domain]}%` }} />
                     </span>
                     <span className="guide-muted">
-                      {c.topics} → {c.weeks}
+                      {c.competencies.map((x) => x.ja).join('・')} → {weeksLabel(c.competencies.flatMap((x) => x.weeks))}
                     </span>
                   </li>
                 ))}
@@ -466,10 +430,7 @@ function Body() {
           </div>
         </section>
 
-        <section
-          aria-labelledby="guide-how"
-          className="guide-section guide-section--wide"
-        >
+        <section aria-labelledby="guide-how" className="guide-section guide-section--wide">
           <div className="guide-cols">
             <div className="guide-col">
               <h2 id="guide-how" className="guide-h2">
@@ -477,72 +438,72 @@ function Body() {
               </h2>
               <ol className="guide-steps">
                 <li>
-                  公開カリキュラムの細目を、{STATS.weeks} 週・{STATS.lessons}{" "}
-                  レッスンに割る
+                  公開カリキュラムの細目を、{STATS.weeks} 週・{STATS.lessons} レッスンに割る
                 </li>
-                <li>
-                  公式の文書を読んで問題を一から書き、各問に出典の URL を付ける
-                </li>
-                <li>
-                  書いた担当とは別の担当が、出典のページと 1 問ずつ照らして直す
-                </li>
+                <li>公式の文書を読んで問題を一から書き、各問に出典の URL を付ける</li>
+                <li>書いた担当とは別の担当が、出典のページと 1 問ずつ照らして直す</li>
                 <li>
                   公開後に誤りが見つかれば、
-                  <Link
-                    href={NEW_ISSUE_URL}
-                    isExternalLink
-                    newTabLabel="(新しいタブで開きます)"
-                  >
+                  <Link href={NEW_ISSUE_URL} isExternalLink newTabLabel="(新しいタブで開きます)">
                     Issue
-                  </Link>{" "}
+                  </Link>{' '}
                   で受けて直す
                 </li>
               </ol>
               <p className="guide-note">
-                実際の試験問題や、受験者の記憶から再現した問題は使っていません。試験の規約で、問題の公開・共有は禁じられています
-                (<Ext s={SOURCES.agreement} />
+                実際の試験問題や、受験者の記憶から再現した問題は使っていません。試験の規約で、問題の公開・共有は禁じられています (<Ext s={SOURCES.agreement} />
                 )。
               </p>
             </div>
             <div className="guide-col">
               <h3 className="guide-h3 guide-h3--top">
-                出典の内訳{" "}
-                <span className="guide-muted">{STATS.questions} 問</span>
+                主な情報源と出典の内訳 <span className="guide-muted">{STATS.questions} 問</span>
               </h3>
               <span className="guide-split" role="img" aria-label={sourceLabel}>
                 {top.map((s, i) => (
-                  <span
-                    key={s.host}
-                    className={`guide-split__${i}`}
-                    style={{ width: share(s.count) }}
-                  />
+                  <span key={s.host} className={`guide-split__${i}`} style={{ width: share(s.count) }} />
                 ))}
                 <span className="guide-split__rest" />
               </span>
               <ul className="guide-hosts">
-                {top.map((s) => (
-                  <li key={s.host}>
-                    <span>{s.host}</span>
-                    <span className="guide-muted">{s.count}</span>
+                {STATS.sources.map((x) => {
+                  const site = SOURCE_SITES[x.host];
+                  return (
+                    <li key={x.host}>
+                      <span>
+                        {site ? (
+                          <Link href={site.url} isExternalLink newTabLabel="(新しいタブで開きます)">
+                            {site.label}
+                          </Link>
+                        ) : (
+                          x.host
+                        )}
+                      </span>
+                      <span className="guide-muted">{x.count} 問</span>
+                    </li>
+                  );
+                })}
+              </ul>
+              <h3 className="guide-h3">公式の学習素材</h3>
+              <ul className="guide-hosts guide-hosts--one">
+                {STUDY_MATERIALS.map((m) => (
+                  <li key={m.url}>
+                    <span>
+                      <Ext s={m} />
+                    </span>
+                    <span className="guide-muted">{m.note}</span>
                   </li>
                 ))}
-                <li>
-                  <span>そのほか {rest.length} か所</span>
-                  <span className="guide-muted">{restCount}</span>
-                </li>
               </ul>
               <p className="guide-muted">
-                数は問題データから数えています。各問の解説の下にも出典があります。言葉の意味は{" "}
-                <a href={glossaryHref}>用語集</a> で引けます。
+                数は問題データから数えています。各問の解説の下にも出典があります。言葉の意味は <a href={glossaryHref}>用語集</a> で引けます。
               </p>
             </div>
           </div>
         </section>
 
         <p className="guide-foot guide-muted">
-          The Linux Foundation・CNCF
-          とは関係のない、個人の非公式サイトです。Kubernetes と KCNA は The
-          Linux Foundation の商標です。{" "}
+          The Linux Foundation・CNCF とは関係のない、個人の非公式サイトです。Kubernetes と KCNA は The Linux Foundation の商標です。{' '}
           <a href={aboutHref}>このサイトについて</a>
         </p>
       </div>
@@ -554,11 +515,7 @@ export default function Guide({ progress }: { progress: Progress }) {
   const isWide = useMediaQuery(WIDE_QUERY);
   if (isWide) {
     return (
-      <AppShell
-        contentPadding={0}
-        variant="section"
-        sideNav={<AppSideNav current="guide" progress={progress} />}
-      >
+      <AppShell contentPadding={0} variant="section" sideNav={<AppSideNav current="guide" progress={progress} />}>
         <div className="desk">
           <Body />
         </div>
@@ -577,10 +534,7 @@ export default function Guide({ progress }: { progress: Progress }) {
       <main>
         <Body />
       </main>
-      <BottomTabs
-        current="guide"
-        reviewCount={dueQuestions(progress, new Date()).length}
-      />
+      <BottomTabs current="guide" reviewCount={dueQuestions(progress, new Date()).length} />
     </div>
   );
 }

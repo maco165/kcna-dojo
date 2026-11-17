@@ -344,6 +344,8 @@ async function run(browser, name, width, height) {
   check(await page.getByText(/^正解。/).isVisible(), `${tag} 見本の問題で get を選ぶと正解と出る`);
   check(await page.getByLabel('このサイトの中身').getByText('228').isVisible(), `${tag} 説明のページの問題の数が問題データと合う`);
   check(await page.getByText('LF の多肢選択式試験に共通の記述').first().isVisible(), `${tag} 試験の数字に但し書きがある`);
+  check((await page.getByRole('table').count()) === 4 && (await page.getByRole('cell', { name: 'Cloud Native Community and Collaboration' }).count()) === 1, `${tag} 学習要領の 4 分野の表と細目が出る`);
+  check(await page.getByRole('link', { name: /Kubernetes の公式ドキュメント/ }).first().isVisible(), `${tag} 主な情報源に名前とリンクがある`);
   await noHorizontalOverflow(page, width, `${tag} 説明のページ`);
 
   check(errors.length === 0, `${tag} ページのエラーが無い ${errors.length ? errors.join(' / ') : ''}`);
