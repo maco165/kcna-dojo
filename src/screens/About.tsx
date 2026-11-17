@@ -11,6 +11,7 @@ import BottomTabs from '../components/BottomTabs';
 import RepoLink, { GitHubMark } from '../components/RepoLink';
 import SiteLogo from '../components/SiteLogo';
 import { NEW_ISSUE_URL, REPO_URL } from '../lib/links';
+import { guideHref } from '../lib/route';
 import type { Progress } from '../lib/progress';
 import { dueQuestions } from '../content';
 import { SITE_NAME, SITE_TAGLINE } from '../lib/site';
@@ -66,7 +67,14 @@ function Body() {
       <List hasDividers header={<h2 className="h-sm">知っておくこと</h2>}>
         <ListItem label="記録の置き場所" description="進み具合はこのブラウザの localStorage (キー kcna.v1) にだけ残り、サーバーには送りません。" />
         <ListItem label="AI に聞く" description="問題文を入れた Claude / ChatGPT を新しいタブで開くだけで、送るかどうかは開いた先で決めます。" />
-        <ListItem label="問題について" description="実際の試験問題は写していません。各問の解説の下に出典を付けています。" />
+        <ListItem
+          label="問題について"
+          description={
+            <Text type="supporting">
+              実際の試験問題は写していません。各問の解説の下に出典を付けています。作り方と出典の内訳は <Link href={guideHref}>Kubernetes とこのサイト</Link> に。
+            </Text>
+          }
+        />
         <ListItem
           label="ライセンス"
           description={

@@ -1,31 +1,25 @@
 import { Badge } from '@astryxdesign/core/Badge';
 import { SideNav, SideNavHeading, SideNavItem, SideNavSection } from '@astryxdesign/core/SideNav';
 import { Text } from '@astryxdesign/core/Text';
-import {
-  AdjustmentsHorizontalIcon,
-  ArrowPathIcon,
-  BookOpenIcon,
-  ChartBarIcon,
-  InformationCircleIcon,
-  QueueListIcon,
-} from '@heroicons/react/24/outline';
+import { AcademicCapIcon, AdjustmentsHorizontalIcon, ArrowPathIcon, BookOpenIcon, ChartBarIcon, InformationCircleIcon, QueueListIcon } from '@heroicons/react/24/outline';
 import { WEEKS } from '../content/curriculum';
 import SiteLogo from './SiteLogo';
 import type { Progress } from '../lib/progress';
 import { dueQuestions } from '../content';
 import { REPO_URL } from '../lib/links';
 import { SITE_NAME, SITE_TAGLINE } from '../lib/site';
-import { aboutHref, examHref, glossaryHref, progressHref, reviewHref, settingsHref, weekHref } from '../lib/route';
+import { aboutHref, examHref, glossaryHref, guideHref, progressHref, reviewHref, settingsHref, weekHref } from '../lib/route';
 import { GitHubMark } from './RepoLink';
 
 /** PC の左の一覧 */
-export default function AppSideNav({ current, week, progress }: { current: 'learn' | 'about' | 'settings' | 'review' | 'progress' | 'exam' | 'glossary'; week?: number; progress: Progress }) {
+export default function AppSideNav({ current, week, progress }: { current: 'learn' | 'about' | 'settings' | 'review' | 'progress' | 'exam' | 'glossary' | 'guide'; week?: number; progress: Progress }) {
   const reviewCount = dueQuestions(progress, new Date()).length;
   return (
     <SideNav
       header={<SideNavHeading heading={SITE_NAME} subheading={SITE_TAGLINE} icon={<SiteLogo />} headingHref={weekHref(1)} />}
       footer={
         <SideNavSection title="このサイト" isHeaderHidden>
+          <SideNavItem label="Kubernetes とこのサイト" icon={AcademicCapIcon} href={guideHref} isSelected={current === 'guide'} />
           <SideNavItem label="このサイトについて" icon={InformationCircleIcon} href={aboutHref} isSelected={current === 'about'} />
           <SideNavItem label="GitHub のリポジトリ" icon={() => <GitHubMark size={20} />} href={REPO_URL} />
         </SideNavSection>
