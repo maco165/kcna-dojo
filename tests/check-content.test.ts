@@ -26,7 +26,8 @@ function mutate(name: string, fn: (d: any) => void): string {
   return file;
 }
 
-describe('check-content', () => {
+// node を何度も起こすので、重い機械や CI でも落ちないよう 1 件 30 秒まで待つ
+describe('check-content', { timeout: 30_000 }, () => {
   it('本物のデータは OK', () => {
     const r = run();
     expect(r.code).toBe(0);

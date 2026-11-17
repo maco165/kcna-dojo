@@ -9,6 +9,7 @@
 //   6. 実習は全部の手順に印を付けると完了にできる
 //   7. AI に聞くリンクに問題文が入っている (答える前は正解を入れない)
 //   8. どの画面も横にはみ出さない
+//   9. リポジトリへのリンク、このサイトについての画面、サイト名の横の印
 import { spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -93,9 +94,10 @@ async function run(browser, name, width, height) {
 
   // 3. ホームへ戻る
   await page.getByRole('link', { name: '一覧へ戻る' }).click();
-  await page.getByRole('heading', { name: 'レッスン' }).waitFor();
+  await page.getByRole('heading', { name: 'コンテナの基礎' }).waitFor();
   const xp = (total - 1) * 3;
-  check(await page.getByText(`完了 · 最高 ${Math.round(((total - 1) / total) * 100)}%`).isVisible(), `${tag} 1 つ目が完了になる`);
+  const doneText = width >= 768 ? `${total - 1} / ${total}` : '完了';
+  check(await page.getByText(doneText, { exact: true }).first().isVisible(), `${tag} 1 つ目が完了になる (${doneText})`);
   check(
     (await page.getByRole('link', { name: '開始' }).first().getAttribute('href')) === `#/lesson/${l2.id}`,
     `${tag} 「開始」が 2 つ目に移る`,
@@ -147,8 +149,8 @@ async function run(browser, name, width, height) {
     await page.getByRole('button', { name: '確かめる' }).click();
     await page.getByRole('button', { name: i === l1.questions.length - 1 ? '結果を見る' : '次へ' }).click();
   }
-  await page.getByRole('button', { name: 'もう一度解く' }).click();
-  check(await page.getByText(`${l1.title} · 1 / ${l1.questions.length}`).isVisible(), `${tag} もう一度解くと 1 問目から始まる`);
+  await page.getByRole('button', { name: '間違いをやり直す' }).click();
+  check(await page.getByText(`${l1.title} · 1 / ${l1.questions.length} 問`).isVisible(), `${tag} やり直すと 1 問目から始まる`);
 
   // 6. 実習
   await page.goto(`${BASE}#/lesson/${lab.id}`);
@@ -160,6 +162,19 @@ async function run(browser, name, width, height) {
   const labStored = await page.evaluate((id) => JSON.parse(localStorage.getItem('kcna.v1') ?? 'null')?.lessons?.[id]?.done, lab.id);
   check(labStored === true, `${tag} 実習を全部の印で完了にすると記録が残る`);
   await noHorizontalOverflow(page, width, `${tag} 実習の完了`);
+
+  // 9. このサイトについて と リポジトリへのリンク
+  await page.goto(BASE);
+  const repoLinks = page.locator('a[href="https://github.com/maco165/kcna-dojo"]');
+  check((await repoLinks.count()) >= 1, `${tag} ホームにリポジトリへのリンクがある`);
+  await page.goto(`${BASE}#/about`);
+  await page.getByRole('heading', { name: 'このサイトについて' }).waitFor();
+  const repoButton = page.getByRole('link', { name: /GitHub のリポジトリを開く/ }).first();
+  check((await repoButton.getAttribute('href')) === 'https://github.com/maco165/kcna-dojo', `${tag} このサイトについてにリポジトリへのボタンがある`);
+  check((await page.getByRole('link', { name: /Issue を書く/ }).getAttribute('href')) === 'https://github.com/maco165/kcna-dojo/issues/new', `${tag} Issue を書くリンクがある`);
+  const logoOk = await page.evaluate(() => [...document.querySelectorAll('img.site-logo')].every((i) => i.complete && i.naturalWidth > 0));
+  check(logoOk, `${tag} サイト名の横の印が読み込める`);
+  await noHorizontalOverflow(page, width, `${tag} このサイトについて`);
 
   check(errors.length === 0, `${tag} ページのエラーが無い ${errors.length ? errors.join(' / ') : ''}`);
   await context.close();
