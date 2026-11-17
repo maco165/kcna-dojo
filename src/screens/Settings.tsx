@@ -16,7 +16,10 @@ import SiteLogo from '../components/SiteLogo';
 import { dueQuestions } from '../content';
 import { downloadProgress } from '../lib/download';
 import {
+  COLOR_MODES,
   GOAL_CHOICES,
+  colorMode,
+  type ColorMode,
   examDate,
   goalXp,
   parseProgressText,
@@ -27,6 +30,8 @@ import {
 } from '../lib/progress';
 import { SITE_NAME } from '../lib/site';
 import { WIDE_QUERY, useMediaQuery } from '../lib/useMediaQuery';
+
+const COLOR_MODE_LABEL: Record<ColorMode, string> = { system: '端末に合わせる', light: 'ライト', dark: 'ダーク' };
 
 /** 読み込むファイルの大きさの上限 */
 const MAX_IMPORT_BYTES = 1024 * 1024;
@@ -103,6 +108,18 @@ function Body({ progress, updateProgress }: Props) {
             format="date"
             width={240}
           />
+        </VStack>
+      </Card>
+
+      <Card padding={4}>
+        <VStack gap={1.5}>
+          <h2 className="h-sm">画面の色</h2>
+          <SegmentedControl label="画面の色" value={colorMode(progress)} onChange={(v) => updateProgress((p) => setProfile(p, { colorMode: v as ColorMode }))}>
+            {COLOR_MODES.map((m) => (
+              <SegmentedControlItem key={m} value={m} label={COLOR_MODE_LABEL[m]} />
+            ))}
+          </SegmentedControl>
+          <Text type="supporting">このブラウザの記録に残ります。端末に合わせると、OS のライト・ダークの設定に従います。</Text>
         </VStack>
       </Card>
 

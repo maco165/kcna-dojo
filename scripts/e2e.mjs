@@ -333,6 +333,25 @@ async function run(browser, name, width, height) {
   await page.goto(`${BASE}#/glossary`);
   await noHorizontalOverflow(page, width, `${tag} 用語集`);
 
+  // 14. 画面の色: 設定で選ぶと、端末の設定に関わらずその色になり、記録に残る
+  await page.goto(`${BASE}#/settings`);
+  await page.getByRole('heading', { name: '設定' }).waitFor();
+  const bodyBg = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  const bgBefore = await bodyBg();
+  await page.getByRole('radio', { name: 'ダーク' }).click();
+  await page.waitForTimeout(200);
+  const darkBg = await bodyBg();
+  check(darkBg !== bgBefore && darkBg === 'rgb(17, 17, 18)', `${tag} ダークを選ぶと地が暗くなる (${bgBefore} → ${darkBg})`);
+  await page.reload();
+  await page.getByRole('heading', { name: '設定' }).waitFor();
+  check((await bodyBg()) === 'rgb(17, 17, 18)', `${tag} 読み込み直してもダークのまま`);
+  await page.getByRole('radio', { name: 'ライト' }).click();
+  await page.waitForTimeout(200);
+  check((await bodyBg()) === 'rgb(241, 244, 247)', `${tag} ライトを選ぶと地が明るくなる`);
+  await page.getByRole('radio', { name: '端末に合わせる' }).click();
+  const savedMode = await page.evaluate(() => JSON.parse(localStorage.getItem('kcna.v1') ?? '{}').profile?.colorMode);
+  check(savedMode === undefined, `${tag} 端末に合わせるに戻すと記録から消える`);
+
   check(errors.length === 0, `${tag} ページのエラーが無い ${errors.length ? errors.join(' / ') : ''}`);
   await context.close();
 }

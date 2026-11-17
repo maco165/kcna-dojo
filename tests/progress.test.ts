@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  colorMode,
+  normalizeProgress,
   DEFAULT_EXAM_DATE,
   DEFAULT_GOAL_XP,
   STORAGE_KEY,
@@ -270,3 +272,26 @@ describe('壊れた・悪意のある記録を読み込んでも落ちない', (
   });
 });
 
+
+describe('画面の色', () => {
+  it('既定は端末に合わせる', () => {
+    expect(colorMode(emptyProgress())).toBe('system');
+  });
+  it('ライト・ダークは残し、端末に合わせるは持たない', () => {
+    const dark = setProfile(emptyProgress(), { colorMode: 'dark' });
+    expect(colorMode(dark)).toBe('dark');
+    expect(dark.profile?.colorMode).toBe('dark');
+    const back = setProfile(dark, { colorMode: 'system' });
+    expect(colorMode(back)).toBe('system');
+    expect(back.profile && 'colorMode' in back.profile).toBe(false);
+  });
+  it('目標を変えても画面の色は残る', () => {
+    const p = setProfile(setProfile(emptyProgress(), { colorMode: 'light' }), { dailyGoalXp: 10 });
+    expect(colorMode(p)).toBe('light');
+  });
+  it('読み込みで知らない値は捨てる', () => {
+    const base = { ...emptyProgress(), profile: { dailyGoalXp: 30, examDate: '2027-03-06' } };
+    expect(normalizeProgress({ ...base, profile: { ...base.profile, colorMode: 'dark' } })?.profile?.colorMode).toBe('dark');
+    expect(normalizeProgress({ ...base, profile: { ...base.profile, colorMode: 'pink' } })?.profile?.colorMode).toBeUndefined();
+  });
+});

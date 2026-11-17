@@ -4,6 +4,7 @@ import jaJP from '@astryxdesign/core/locales/ja-JP.generated.js';
 import { kcnaTheme } from './themes/kcna/kcna.js';
 import { findLesson } from './content';
 import { useRoute } from './lib/route';
+import { colorMode } from './lib/progress';
 import { useProgress } from './lib/useProgress';
 import About from './screens/About';
 import Home from './screens/Home';
@@ -21,7 +22,7 @@ export default function App() {
 
   return (
     <InternationalizationProvider locale="ja-JP" messages={{ 'ja-JP': jaJP }}>
-    <Theme theme={kcnaTheme} mode="system">
+    <Theme theme={kcnaTheme} mode={colorMode(progress)}>
       {route.name === 'exam' ? (
         <ExamScreen progress={progress} updateProgress={updateProgress} />
       ) : route.name === 'glossary' ? (
