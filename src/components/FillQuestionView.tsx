@@ -53,7 +53,10 @@ export default function FillQuestionView({
   useEffect(() => {
     if (!checked) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Enter' && !e.isComposing) onNext();
+      if (e.key !== 'Enter' || e.isComposing || e.repeat || e.defaultPrevented) return;
+      // リンクやボタン (AI に聞く・次へ) の上の Enter は、それ自身の動きに任せる
+      if (e.target instanceof Element && e.target.closest('a, button')) return;
+      onNext();
     };
     const id = window.setTimeout(() => window.addEventListener('keydown', onKey), 0);
     return () => {
