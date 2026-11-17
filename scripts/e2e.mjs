@@ -4,8 +4,11 @@
 //   1. ホームで最初のレッスンだけが「開始」になっている。今日の目標は 0 XP
 //   2. 4 択のレッスンを、1 問目は不正解、残りは正解で解き、解説と完了画面の正答数が出る
 //   3. ホームへ戻ると 1 つ目が完了、2 つ目が「開始」になり、今日の目標の XP が増えている
-//   4. コマンドの穴埋めに打ち込んで Enter で確かめると、正解と実行結果の例が出る
-//   5. どの画面も横にはみ出さない
+//   4. コマンドの穴埋めに打ち込んで Enter で確かめると、正解と実行結果の例が出る。候補を押して不正解なら、なぜ違うかが出る
+//   5. 「もう一度解く」で 1 問目から数え直す
+//   6. 実習は全部の手順に印を付けると完了にできる
+//   7. AI に聞くリンクに問題文が入っている (答える前は正解を入れない)
+//   8. どの画面も横にはみ出さない
 import { spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -18,6 +21,8 @@ const BASE = `http://localhost:${PORT}/kcna-dojo/`;
 const week1 = JSON.parse(readFileSync(new URL('../src/content/week1.json', import.meta.url), 'utf8'));
 const l1 = week1.lessons[0];
 const l2 = week1.lessons[1];
+const l3 = week1.lessons[2];
+const lab = week1.lessons.find((l) => l.kind === 'lab');
 
 let failures = 0;
 function check(cond, label) {
@@ -76,7 +81,7 @@ async function run(browser, name, width, height) {
       check(await page.getByText(q.explanation).isVisible(), `${tag} 不正解のとき解説が出る`);
       await noHorizontalOverflow(page, width, `${tag} 4 択の解説`);
     } else {
-      check(await page.getByText('正解 +3 XP').isVisible(), `${tag} ${q.id} 正解の知らせ`);
+      check(await page.getByText('正解', { exact: true }).isVisible(), `${tag} ${q.id} 正解の知らせ`);
     }
     const isLast = i === l1.questions.length - 1;
     await page.getByRole('button', { name: isLast ? '結果を見る' : '次へ' }).click();
@@ -104,9 +109,57 @@ async function run(browser, name, width, height) {
   const input = page.getByRole('textbox', { name: '空欄' });
   await input.fill('get');
   await input.press('Enter');
-  check(await page.getByText('正解 +3 XP').isVisible(), `${tag} 穴埋めを Enter で確かめると正解`);
+  check(await page.getByText('正解', { exact: true }).isVisible(), `${tag} 穴埋めを Enter で確かめると正解`);
   check(await page.getByText('実行結果の例').isVisible(), `${tag} 正解のあと実行結果の例が出る`);
   await noHorizontalOverflow(page, width, `${tag} 穴埋め`);
+
+  // 4b. 候補を押して不正解なら、なぜ違うかが出る (2 問目は describe が正解なので get を押す)
+  await page.getByRole('button', { name: '次へ' }).click();
+  const q2 = l3.questions[1];
+  if (q2.type === 'choice') {
+    // l3 の 2 問目は 4 択なので飛ばし、3 問目以降の穴埋めへ進む
+    await page.getByRole('radio').first().check();
+    await page.getByRole('button', { name: '確かめる' }).click();
+    await page.getByRole('button', { name: '次へ' }).click();
+    await page.getByRole('radio').first().check();
+    await page.getByRole('button', { name: '確かめる' }).click();
+    await page.getByRole('button', { name: '次へ' }).click();
+  }
+  const q4 = l3.questions[3];
+  await page.getByRole('button', { name: 'get', exact: true }).click();
+  await page.getByRole('button', { name: '確かめる' }).click();
+  check(await page.getByText(q4.wrongNotes.get).isVisible(), `${tag} 穴埋めの不正解で、選んだ候補がなぜ違うかが出る`);
+
+  // 7. AI に聞くリンク
+  const claudeHref = await page.getByRole('link', { name: 'Claude' }).getAttribute('href');
+  const chatgptHref = await page.getByRole('link', { name: 'ChatGPT' }).getAttribute('href');
+  const asked = new URL(claudeHref).searchParams.get('q') ?? '';
+  check(claudeHref.startsWith('https://claude.ai/new?q=') && asked.includes(q4.prompt), `${tag} Claude のリンクに問題文が入る`);
+  check(asked.includes('私の答えは get で不正解'), `${tag} 答えたあとのリンクには自分の答えが入る`);
+  check(chatgptHref.startsWith('https://chatgpt.com/?q='), `${tag} ChatGPT のリンクがある`);
+  await page.goto(`${BASE}#/lesson/w1-l1`);
+  const before = new URL(await page.getByRole('link', { name: 'Claude' }).getAttribute('href')).searchParams.get('q') ?? '';
+  check(before.includes(l1.questions[0].prompt) && !before.includes('正解は'), `${tag} 答える前のリンクには正解を入れない`);
+
+  // 5. もう一度解く (全問を最初の選択肢で答え、数え直しを確かめる)
+  for (const [i] of l1.questions.entries()) {
+    await page.getByRole('radio').first().check();
+    await page.getByRole('button', { name: '確かめる' }).click();
+    await page.getByRole('button', { name: i === l1.questions.length - 1 ? '結果を見る' : '次へ' }).click();
+  }
+  await page.getByRole('button', { name: 'もう一度解く' }).click();
+  check(await page.getByText(`${l1.title} · 1 / ${l1.questions.length}`).isVisible(), `${tag} もう一度解くと 1 問目から始まる`);
+
+  // 6. 実習
+  await page.goto(`${BASE}#/lesson/${lab.id}`);
+  const finish = page.getByRole('button', { name: '完了にする' });
+  check(await finish.isDisabled(), `${tag} 実習は印を付けるまで完了にできない`);
+  for (const box of await page.getByRole('checkbox').all()) await box.check();
+  await finish.click();
+  await page.getByRole('heading', { name: 'レッスン完了' }).waitFor();
+  const labStored = await page.evaluate((id) => JSON.parse(localStorage.getItem('kcna.v1') ?? 'null')?.lessons?.[id]?.done, lab.id);
+  check(labStored === true, `${tag} 実習を全部の印で完了にすると記録が残る`);
+  await noHorizontalOverflow(page, width, `${tag} 実習の完了`);
 
   check(errors.length === 0, `${tag} ページのエラーが無い ${errors.length ? errors.join(' / ') : ''}`);
   await context.close();

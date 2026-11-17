@@ -7,6 +7,7 @@ import { Text } from '@astryxdesign/core/Text';
 import { TextInput } from '@astryxdesign/core/TextInput';
 import type { FillQuestion } from '../content/types';
 import { gradeFill, normalizeAnswer } from '../lib/grade';
+import AskAi from './AskAi';
 import Feedback from './Feedback';
 
 const LANGUAGE_LABEL: Record<FillQuestion['language'], string> = {
@@ -88,7 +89,8 @@ export default function FillQuestionView({
       )}
 
       {!checked ? (
-        <HStack justify="end">
+        <HStack gap={3} justify="between" wrap="wrap" vAlign="center">
+          <AskAi question={question} />
           <Button variant="primary" label="確かめる" isDisabled={typed === ''} onClick={check} />
         </HStack>
       ) : (
@@ -101,9 +103,10 @@ export default function FillQuestionView({
             source={question.source}
           />
           {result && question.output && (
-            <CodeBlock code={question.output} title="実行結果の例" width="100%" size="sm" hasCopyButton={false} />
+            <CodeBlock code={question.output} title="実行結果の例 (列の一部)" width="100%" size="sm" hasCopyButton={false} />
           )}
-          <HStack justify="end">
+          <HStack gap={3} justify="between" wrap="wrap" vAlign="center">
+            <AskAi question={question} answered={{ picked: typed, correct: result }} />
             <Button variant="primary" label={nextLabel} onClick={onNext} />
           </HStack>
         </VStack>

@@ -7,6 +7,7 @@ import { HStack, VStack } from '@astryxdesign/core/Stack';
 import { Text } from '@astryxdesign/core/Text';
 import type { ChoiceQuestion } from '../content/types';
 import { gradeChoice } from '../lib/grade';
+import AskAi from './AskAi';
 import Feedback from './Feedback';
 
 export default function ChoiceQuestionView({
@@ -52,7 +53,8 @@ export default function ChoiceQuestionView({
       </RadioList>
 
       {!checked ? (
-        <HStack justify="end">
+        <HStack gap={3} justify="between" wrap="wrap" vAlign="center">
+          <AskAi question={question} />
           <Button variant="primary" label="確かめる" isDisabled={value === ''} onClick={check} />
         </HStack>
       ) : (
@@ -64,7 +66,8 @@ export default function ChoiceQuestionView({
             note={result ? undefined : picked?.why}
             source={question.source}
           />
-          <HStack justify="end">
+          <HStack gap={3} justify="between" wrap="wrap" vAlign="center">
+            <AskAi question={question} answered={{ picked: value, correct: result }} />
             <Button variant="primary" label={nextLabel} onClick={onNext} />
           </HStack>
         </VStack>
