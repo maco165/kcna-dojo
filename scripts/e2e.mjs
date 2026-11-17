@@ -318,6 +318,21 @@ async function run(browser, name, width, height) {
     await tp.close();
   }
 
+  // 12. 用語集: 検索とレッスンへのリンク
+  await page.goto(`${BASE}#/glossary`);
+  await page.getByRole('heading', { name: '用語集', level: 1 }).waitFor();
+  check((await page.locator('article.gloss').count()) >= 70, `${tag} 用語集に 70 語以上ある`);
+  await page.getByRole('searchbox', { name: '用語を探す' }).fill('ｋｕｂｅｌｅｔ');
+  check(await page.getByRole('heading', { name: 'kubelet', level: 2 }).isVisible(), `${tag} 全角で探しても kubelet が見つかる`);
+  await page.getByRole('searchbox', { name: '用語を探す' }).fill('存在しない語ですzzz');
+  check(await page.getByText('見つかりませんでした').isVisible(), `${tag} 見つからないときに知らせる`);
+  await page.getByRole('searchbox', { name: '用語を探す' }).fill('etcd');
+  await page.locator('article.gloss').first().getByRole('link', { name: /^第 \d+ 週/ }).first().click();
+  await page.waitForURL(/#\/lesson\//);
+  check(page.url().includes('#/lesson/'), `${tag} 用語集からレッスンへ飛べる`);
+  await page.goto(`${BASE}#/glossary`);
+  await noHorizontalOverflow(page, width, `${tag} 用語集`);
+
   check(errors.length === 0, `${tag} ページのエラーが無い ${errors.length ? errors.join(' / ') : ''}`);
   await context.close();
 }
