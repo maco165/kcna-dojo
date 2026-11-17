@@ -441,7 +441,8 @@ body {
 .xp-chart__bar {
   min-height: 2px;
   border-radius: var(--radius-inner) var(--radius-inner) 0 0;
-  background: var(--color-accent-muted);
+  /* 地との差を 3:1 以上にする (WCAG 1.4.11)。今日だけアクセントの色 */
+  background: var(--color-icon-secondary);
 }
 
 .xp-chart__bar--today {
@@ -452,4 +453,9 @@ body {
   text-align: center;
   font-size: var(--text-supporting-size);
   color: var(--color-text-secondary);
+}
+
+.xp-chart__label--today {
+  color: var(--color-text-primary);
+  font-weight: 600;
 }

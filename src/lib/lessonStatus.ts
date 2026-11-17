@@ -82,21 +82,28 @@ export function weeklyXp(progress: Progress, now: Date): { day: string; xp: numb
 }
 
 /**
- * 計画との差。終わっているはずの週 (週の終わりの日曜が昨日まで) のレッスンの数と、そのうち終えた数。
+ * 計画との差。終わっているはずの週 (週の終わりの日曜が昨日まで) の問題のレッスンの数と、そのうち終えた数。
+ * 実習はクラスタが無いと進められないので、遅れには数えず labsLeft (残っている実習の数) に分ける。
  * expected が 0 なら、まだ計画の週が終わっていない
  */
-export function planStatus(progress: Progress, now: Date): { expected: number; done: number } {
+export function planStatus(progress: Progress, now: Date): { expected: number; done: number; labsLeft: number } {
   const today = dayKey(now);
   let expected = 0;
   let done = 0;
+  let labsLeft = 0;
   for (const w of WEEKS) {
     const [y, m, d] = w.start.split('-').map(Number);
     const end = dayKey(new Date(y, m - 1, d + 6));
     if (end >= today) continue;
     for (const l of w.content?.lessons ?? []) {
+      const isDone = progress.lessons[l.id]?.done === true;
+      if (l.kind === 'lab') {
+        if (!isDone) labsLeft++;
+        continue;
+      }
       expected++;
-      if (progress.lessons[l.id]?.done) done++;
+      if (isDone) done++;
     }
   }
-  return { expected, done };
+  return { expected, done, labsLeft };
 }

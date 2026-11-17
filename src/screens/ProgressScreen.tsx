@@ -27,8 +27,14 @@ function Body({ progress }: { progress: Progress }) {
   const days = weeklyXp(progress, now);
   const maxXp = Math.max(1, ...days.map((d) => d.xp));
   const due = dueQuestions(progress, now).length;
+  const labsNote = plan.labsLeft > 0 ? ` (実習 ${plan.labsLeft} つ残り)` : '';
   const planText =
-    plan.expected === 0 ? 'これから' : plan.done >= plan.expected ? '予定どおり' : `${plan.expected - plan.done} レッスン遅れ`;
+    plan.expected === 0 ? 'これから' : plan.done >= plan.expected ? `予定どおり${labsNote}` : `${plan.expected - plan.done} レッスン遅れ${labsNote}`;
+  const dayName = (day: string, isToday: boolean) => {
+    if (isToday) return '今日';
+    const d = new Date(day + 'T00:00:00');
+    return `${d.getMonth() + 1}月${d.getDate()}日(${WEEKDAYS[d.getDay()]})`;
+  };
 
   return (
     <VStack gap={6}>
@@ -82,11 +88,13 @@ function Body({ progress }: { progress: Progress }) {
             <h2 className="h-sm">この 7 日の XP</h2>
             <Text type="supporting">計 {days.reduce((s, d) => s + d.xp, 0)} XP</Text>
           </HStack>
-          <div className="xp-chart" role="img" aria-label={days.map((d) => `${d.day} ${d.xp} XP`).join('、')}>
+          <div className="xp-chart" role="img" aria-label={days.map((d, i) => `${dayName(d.day, i === days.length - 1)} ${d.xp} XP`).join('、')}>
             {days.map((d, i) => (
               <div key={d.day} className="xp-chart__col">
                 <div className={`xp-chart__bar${i === days.length - 1 ? ' xp-chart__bar--today' : ''}`} style={{ height: `${(d.xp / maxXp) * 100}%` }} />
-                <span className="xp-chart__label">{WEEKDAYS[new Date(d.day + 'T00:00:00').getDay()]}</span>
+                <span className={`xp-chart__label${i === days.length - 1 ? ' xp-chart__label--today' : ''}`}>
+                  {i === days.length - 1 ? '今日' : WEEKDAYS[new Date(d.day + 'T00:00:00').getDay()]}
+                </span>
               </div>
             ))}
           </div>

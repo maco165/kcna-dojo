@@ -18,7 +18,7 @@ import { SITE_NAME, SITE_TAGLINE } from '../lib/site';
 import { aboutHref, progressHref, reviewHref, settingsHref, weekHref } from '../lib/route';
 import { GitHubMark } from './RepoLink';
 
-/** PC の左の一覧。学習と週のほかは、まだ機能が無いので「準備中」として押せない */
+/** PC の左の一覧。まだ機能が無いもの (用語集・模擬試験) は「準備中」として押せない */
 export default function AppSideNav({ current, week, progress }: { current: 'learn' | 'about' | 'settings' | 'review' | 'progress'; week?: number; progress: Progress }) {
   const soon = <Text type="supporting">準備中</Text>;
   const reviewCount = dueQuestions(progress, new Date()).length;

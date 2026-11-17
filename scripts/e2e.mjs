@@ -17,7 +17,7 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
 
-const PORT = 4318;
+const PORT = Number(process.env.E2E_PORT ?? 4318);
 const BASE = `http://localhost:${PORT}/kcna-dojo/`;
 const week1 = JSON.parse(readFileSync(new URL('../src/content/week1.json', import.meta.url), 'utf8'));
 const l1 = week1.lessons[0];
@@ -239,6 +239,8 @@ async function run(browser, name, width, height) {
   await page.getByRole('heading', { name: '進捗' }).waitFor();
   check(await page.getByText('分野ごとの正答率').isVisible() && await page.getByText('この 7 日の XP').isVisible(), `${tag} 進捗の画面に正答率と 7 日の XP が出る`);
   check((await page.getByRole('link', { name: /第 1 週 コンテナの基礎/ }).count()) === 1, `${tag} 進捗の画面に週ごとの進み具合が出る`);
+  check(await page.getByRole('img', { name: /今日 \d+ XP$/ }).isVisible(), `${tag} 7 日の XP の名前の最後が今日`);
+  check(await page.getByText(/^(これから|予定どおり|\d+ レッスン遅れ)/).first().isVisible(), `${tag} 計画との差が出る`);
   await noHorizontalOverflow(page, width, `${tag} 進捗`);
 
   // 10. 設定: 目標を変える・書き出す・読み込む・記録を消す
@@ -268,7 +270,8 @@ async function run(browser, name, width, height) {
   await context.close();
 }
 
-const server = spawn('npx', ['vite', 'preview', '--port', String(PORT), '--strictPort'], { stdio: 'ignore' });
+// npx の子の vite まで止められるよう、別のプロセスグループで立てる
+const server = spawn('npx', ['vite', 'preview', '--port', String(PORT), '--strictPort'], { stdio: 'ignore', detached: true });
 // 自分のサーバーが立たなかったとき (番号が埋まっているなど)、残っている別のサーバーにつないで偽の結果を出さないよう止める
 let serverExited = false;
 server.on('exit', () => (serverExited = true));
@@ -283,7 +286,11 @@ try {
   failures++;
 } finally {
   await browser?.close();
-  server.kill();
+  try {
+    process.kill(-server.pid);
+  } catch {
+    server.kill();
+  }
 }
 console.log(failures === 0 ? 'e2e OK' : `e2e NG (${failures} 件)`);
 process.exit(failures === 0 ? 0 : 1);
