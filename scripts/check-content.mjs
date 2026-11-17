@@ -15,6 +15,8 @@ const DOMAINS = [
 ];
 const LANGUAGES = ['bash', 'yaml', 'dockerfile'];
 const BLANK = '{{blank}}';
+/** 1 レッスン (quiz) に要る問題の数 (PJ-028 の R-6) */
+const MIN_QUESTIONS = 5;
 
 const args = process.argv.slice(2);
 const files = args.length
@@ -84,7 +86,9 @@ for (const file of files) {
       ng(lid, `kind は quiz か lab にします (${lesson?.kind})`);
       continue;
     }
-    if (!Array.isArray(lesson.questions) || lesson.questions.length === 0) ng(lid, 'questions がありません');
+    if (!Array.isArray(lesson.questions) || lesson.questions.length < MIN_QUESTIONS) {
+      ng(lid, `questions は ${MIN_QUESTIONS} 問以上要ります (${lesson.questions?.length ?? 0} 問)`);
+    }
 
     for (const [qi, q] of (lesson.questions ?? []).entries()) {
       const qid = q?.id ?? `${lid}.questions[${qi}]`;
@@ -101,10 +105,19 @@ for (const file of files) {
         }
         if (q.candidates !== undefined) {
           if (!Array.isArray(q.candidates) || !q.candidates.every(isNonEmptyString)) ng(qid, 'candidates は文字列の配列にします');
+          else if (new Set(q.candidates).size !== q.candidates.length) ng(qid, 'candidates に同じものがあります');
           else if (!q.candidates.some((c) => q.answers?.includes(c))) ng(qid, '候補に正解が 1 つもありません');
         }
-        for (const key of Object.keys(q.wrongNotes ?? {})) {
-          if (q.answers?.includes(key)) ng(qid, `wrongNotes に正解 (${key}) の説明があります`);
+        if (q.output !== undefined && !isNonEmptyString(q.output)) ng(qid, 'output は空でない文字列にします');
+        if (q.wrongNotes !== undefined) {
+          if (typeof q.wrongNotes !== 'object' || q.wrongNotes === null || Array.isArray(q.wrongNotes)) {
+            ng(qid, 'wrongNotes は「候補: 説明」のオブジェクトにします');
+          } else {
+            for (const [key, note] of Object.entries(q.wrongNotes)) {
+              if (!isNonEmptyString(note)) ng(qid, `wrongNotes.${key} は空でない文字列にします`);
+              if (q.answers?.includes(key)) ng(qid, `wrongNotes に正解 (${key}) の説明があります`);
+            }
+          }
         }
       } else if (q?.type === 'choice') {
         if (!Array.isArray(q.choices) || q.choices.length < 2) ng(qid, 'choices は 2 つ以上要ります');
@@ -112,6 +125,7 @@ for (const file of files) {
         if (new Set(ids).size !== ids.length) ng(qid, '選択肢の id が重複しています');
         for (const [ci, c] of (q.choices ?? []).entries()) {
           if (!isNonEmptyString(c?.id) || !isNonEmptyString(c?.text)) ng(qid, `choices[${ci}] に id か text がありません`);
+          if (c?.why !== undefined && !isNonEmptyString(c.why)) ng(qid, `choices[${ci}].why は空でない文字列にします`);
         }
         if (!ids.includes(q.answer)) ng(qid, `正解 (${q.answer}) が選択肢にありません`);
         if (q.code !== undefined && (!isNonEmptyString(q.code?.text) || !isNonEmptyString(q.code?.language))) {

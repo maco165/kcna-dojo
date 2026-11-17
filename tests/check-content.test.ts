@@ -67,4 +67,25 @@ describe('check-content', () => {
     expect(r.code).toBe(1);
     expect(r.out).toContain('w1-l2-q1');
   });
+
+  it('任意の欄の型が違うと NG', () => {
+    const cases: [string, (d: any) => void, string][] = [
+      ['output-number', (d) => (d.lessons[1].questions[3].output = 1), 'w1-l2-q4'],
+      ['wrongnotes-string', (d) => (d.lessons[1].questions[0].wrongNotes = 'x'), 'w1-l2-q1'],
+      ['wrongnotes-value-number', (d) => (d.lessons[1].questions[0].wrongNotes.RUN = 1), 'w1-l2-q1'],
+      ['why-number', (d) => (d.lessons[0].questions[0].choices[1].why = 1), 'w1-l1-q1'],
+      ['dup-candidates', (d) => d.lessons[1].questions[0].candidates.push('COPY'), 'w1-l2-q1'],
+    ];
+    for (const [name, fn, id] of cases) {
+      const r = run(mutate(name, fn));
+      expect(r.code, name).toBe(1);
+      expect(r.out, name).toContain(id);
+    }
+  });
+
+  it('5 問に満たないレッスンは NG', () => {
+    const r = run(mutate('three-questions', (d) => (d.lessons[0].questions = d.lessons[0].questions.slice(0, 3))));
+    expect(r.code).toBe(1);
+    expect(r.out).toMatch(/w1-l1: questions は 5 問以上要ります \(3 問\)/);
+  });
 });
