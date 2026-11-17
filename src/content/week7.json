@@ -1,0 +1,912 @@
+{
+  "week": 7,
+  "lessons": [
+    {
+      "id": "w7-l1",
+      "kind": "quiz",
+      "title": "CI/CD と GitOps",
+      "summary": "4 択と YAML の穴埋め · 7 問",
+      "domain": "Cloud Native Application Delivery",
+      "questions": [
+        {
+          "id": "w7-l1-q1",
+          "type": "choice",
+          "prompt": "継続的インテグレーション (CI) の説明として正しいのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "コードの変更をできるだけこまめに統合し、確かめられた成果物を作る習慣"
+            },
+            {
+              "id": "b",
+              "text": "本番のクラスタの状態を、毎晩 Git に書き戻す習慣",
+              "why": "CI は動いている環境を記録する仕組みではなく、コードの変更を統合して確かめる流れです。"
+            },
+            {
+              "id": "c",
+              "text": "変更をためておき、年に数回まとめて統合する習慣",
+              "why": "まとめて統合するほど衝突が増えます。CI はその逆で、こまめに統合します。"
+            },
+            {
+              "id": "d",
+              "text": "Pod の数を負荷に合わせて自動で増減させる仕組み",
+              "why": "それはオートスケーリング (HorizontalPodAutoscaler など) の役目です。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "CI はコードの変更をこまめに統合する習慣です。変更がバージョン管理に入ると始まり、テストを通った成果物ができて CD に渡すところで終わります。",
+          "source": "https://glossary.cncf.io/continuous-integration/"
+        },
+        {
+          "id": "w7-l1-q2",
+          "type": "choice",
+          "prompt": "継続的デリバリー (CD) の説明として正しいのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "開発者がそれぞれの手元で、同じテストを手で繰り返すこと",
+              "why": "手で繰り返す手間をなくすのが CI/CD のねらいです。"
+            },
+            {
+              "id": "b",
+              "text": "コードの変更を自動で受け入れの環境へ届け、十分に確かめてから出し、必要なら戻せるようにする習慣"
+            },
+            {
+              "id": "c",
+              "text": "コンテナイメージを作らずに、ソースコードを直接ノードへ写すこと",
+              "why": "CD はイメージなどの成果物を使って届けます。届け方の自動化であって、イメージを省く話ではありません。"
+            },
+            {
+              "id": "d",
+              "text": "CI を通さずに、変更をそのまま本番へ出すこと",
+              "why": "CI は CD の前提です。変更がきれいに統合されてから、確かめて届けます。"
+            }
+          ],
+          "answer": "b",
+          "explanation": "CD は変更を自動で受け入れの環境へ届ける習慣で、本番まで自動で出すものは継続的デプロイと呼びます。出す前に十分に確かめることと、戻す道を持つことが含まれます。",
+          "source": "https://glossary.cncf.io/continuous-delivery/"
+        },
+        {
+          "id": "w7-l1-q3",
+          "type": "choice",
+          "prompt": "GitOps で正本 (source of truth) にするものはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "いまクラスタで動いているリソースの状態",
+              "why": "動いている状態は正本に合わせて直される側です。正本にすると、ずれ (ドリフト) を見つけられません。"
+            },
+            {
+              "id": "b",
+              "text": "運用者が打った kubectl のコマンドの履歴",
+              "why": "コマンドの履歴は手順の記録で、望ましい状態を宣言したものではありません。"
+            },
+            {
+              "id": "c",
+              "text": "Git などのバージョン管理に置いた、望ましい状態を宣言したファイル"
+            },
+            {
+              "id": "d",
+              "text": "CI サーバーの画面で設定したジョブの中身",
+              "why": "ジョブの設定は届ける手順で、システムの望ましい状態そのものではありません。"
+            }
+          ],
+          "answer": "c",
+          "explanation": "GitOps では、システムの望ましい状態をファイルで宣言し、ふつうは Git などのバージョン管理を正本にします。自動の仕組みが正本と動いている状態を比べ、動いている側を正本に合わせます。",
+          "source": "https://glossary.cncf.io/gitops/"
+        },
+        {
+          "id": "w7-l1-q4",
+          "type": "choice",
+          "prompt": "OpenGitOps の原則の 1 つ「Pulled Automatically (自動で取り込む)」の説明として正しいのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "ソフトウェアのエージェントが、望ましい状態の宣言を正本から自動で取りに行く"
+            },
+            {
+              "id": "b",
+              "text": "開発者が変更のたびに、手で kubectl apply を打つ",
+              "why": "手で当てるのでは自動になりません。原則はエージェントが自分で取りに行くことです。"
+            },
+            {
+              "id": "c",
+              "text": "クラスタで手で直した内容を、エージェントが Git へ書き戻す",
+              "why": "向きが逆です。正本は Git の側で、クラスタの側が正本に合わせられます。"
+            },
+            {
+              "id": "d",
+              "text": "イメージのレジストリから、最新のタグを毎回取ってくる",
+              "why": "原則が取り込むのは望ましい状態の宣言で、イメージの最新版のことではありません。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "OpenGitOps の 4 原則は、宣言的であること (Declarative)、版が残り変わらないこと (Versioned and Immutable)、自動で取り込むこと (Pulled Automatically)、絶えず合わせ続けること (Continuously Reconciled) です。取り込むのは、正本にある望ましい状態の宣言です。",
+          "source": "https://opengitops.dev/"
+        },
+        {
+          "id": "w7-l1-q5",
+          "type": "choice",
+          "prompt": "Argo CD でアプリが OutOfSync と出た。これが表すことはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "Argo CD が Git のリポジトリに接続できない",
+              "why": "OutOfSync は接続の失敗ではなく、比べた結果に差があるという状態です。"
+            },
+            {
+              "id": "b",
+              "text": "アプリの Pod が CrashLoopBackOff になっている",
+              "why": "Pod の具合は健康状態 (health) で見ます。同期の状態とは別の欄です。"
+            },
+            {
+              "id": "c",
+              "text": "クラスタで動いている状態が、Git に書いた望ましい状態からずれている"
+            },
+            {
+              "id": "d",
+              "text": "Argo CD 自身の版が古く、更新が要る",
+              "why": "Argo CD の版とは関係しません。アプリごとに、動いている状態と Git の状態を比べた結果です。"
+            }
+          ],
+          "answer": "c",
+          "explanation": "Argo CD は Git を正本にして、動いている状態 (live state) と望ましい状態 (target state) を比べます。ずれていると OutOfSync になり、差を見せたうえで、手か自動で同期して望ましい状態へ戻せます。",
+          "source": "https://argo-cd.readthedocs.io/en/stable/"
+        },
+        {
+          "id": "w7-l1-q6",
+          "type": "fill",
+          "prompt": "Argo CD の自動同期で、クラスタで手で変えられた分も Git の状態へ自動で戻させたい。空欄に入る欄は?",
+          "language": "yaml",
+          "code": "apiVersion: argoproj.io/v1alpha1\nkind: Application\nmetadata:\n  name: guestbook\n  namespace: argocd\nspec:\n  syncPolicy:\n    automated:\n      {{blank}}: true",
+          "answers": [
+            "selfHeal"
+          ],
+          "candidates": [
+            "selfHeal",
+            "prune",
+            "allowEmpty",
+            "enabled"
+          ],
+          "explanation": "既定では、クラスタの側で手で変えても自動同期は動きません。selfHeal を true にすると、動いている状態が Git からずれたときにも自動で同期して戻します。",
+          "wrongNotes": {
+            "prune": "prune は、Git から消したリソースをクラスタからも消す設定です。手で変えた分を戻す設定ではありません。",
+            "allowEmpty": "allowEmpty は、prune で対象のリソースがすべて消えて空になることを許す設定です。",
+            "enabled": "enabled は自動同期そのものを入れたり切ったりする欄で、手で変えた分まで戻すかは selfHeal で決めます。"
+          },
+          "source": "https://argo-cd.readthedocs.io/en/stable/user-guide/auto_sync/"
+        },
+        {
+          "id": "w7-l1-q7",
+          "type": "choice",
+          "prompt": "Flux で、望ましい状態を取ってくる先 (Source) を表すリソースはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "Deployment",
+              "why": "Deployment は届けられる側のアプリのリソースで、Flux の取得元ではありません。"
+            },
+            {
+              "id": "b",
+              "text": "GitRepository"
+            },
+            {
+              "id": "c",
+              "text": "ConfigMap",
+              "why": "ConfigMap はアプリに設定を渡す Kubernetes のリソースで、Flux の取得元ではありません。"
+            },
+            {
+              "id": "d",
+              "text": "Ingress",
+              "why": "Ingress はクラスタの外からの通信を Service へ振り分けるリソースです。"
+            }
+          ],
+          "answer": "b",
+          "explanation": "Flux の Source は、望ましい状態がどこにあるかを表すリソースで、GitRepository・OCIRepository・HelmRepository・Bucket などがあります。Flux はそこから取ってきた状態とクラスタの状態を合わせ続けます (Reconciliation)。",
+          "source": "https://fluxcd.io/flux/concepts/"
+        }
+      ]
+    },
+    {
+      "id": "w7-l2",
+      "kind": "quiz",
+      "title": "Helm のチャートとリリース",
+      "summary": "コマンドの穴埋めと 4 択 · 7 問",
+      "domain": "Cloud Native Application Delivery",
+      "questions": [
+        {
+          "id": "w7-l2-q1",
+          "type": "choice",
+          "prompt": "Helm のチャート (chart) とリリース (release) の関係として正しいのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "リリースはチャートを圧縮したファイルの名前で、クラスタとは関係しない",
+              "why": "圧縮したものはチャートアーカイブ (.tgz) と呼びます。リリースはクラスタに入れた 1 回分です。"
+            },
+            {
+              "id": "b",
+              "text": "1 つのチャートは、1 つのクラスタに 1 回しか入れられない",
+              "why": "リリースの名前を変えれば、同じチャートを同じクラスタに何度でも入れられます。"
+            },
+            {
+              "id": "c",
+              "text": "チャートはリソースを入れるための包みで、それをクラスタに入れるたびにリリースが 1 つできる"
+            },
+            {
+              "id": "d",
+              "text": "チャートとリリースは同じものの別の呼び名",
+              "why": "チャートは包み (入れる前のもの)、リリースはそれを入れた結果で、別のものです。"
+            }
+          ],
+          "answer": "c",
+          "explanation": "チャートは Kubernetes のリソース一式を入れるのに要る情報 (Chart.yaml・テンプレート・既定の values.yaml) をまとめた Helm の包みです。入れると、その 1 回を追うリリースができ、名前を変えれば同じチャートから別のリリースをいくつも作れます。",
+          "source": "https://helm.sh/docs/glossary/"
+        },
+        {
+          "id": "w7-l2-q2",
+          "type": "fill",
+          "prompt": "手元のフォルダ ./mychart のチャートを、web という名前のリリースとして初めてクラスタに入れたい。空欄に入るサブコマンドは?",
+          "language": "bash",
+          "code": "helm {{blank}} web ./mychart",
+          "answers": [
+            "install"
+          ],
+          "candidates": [
+            "install",
+            "upgrade",
+            "template",
+            "create"
+          ],
+          "output": "NAME: web\nLAST DEPLOYED: Mon Jan 11 10:27:17 2027\nNAMESPACE: default\nSTATUS: deployed\nREVISION: 1\nDESCRIPTION: Install complete\nTEST SUITE: None",
+          "explanation": "helm install は、リリースの名前とチャートを受け取ってクラスタに入れ、新しいリリースを作ります。チャートはリポジトリの名前のほか、手元のフォルダや .tgz のファイルでも指定できます。",
+          "wrongNotes": {
+            "upgrade": "upgrade は、すでにあるリリースを新しいチャートや値で更新するコマンドです (--install を付けないと、まだ無いリリースは作りません)。",
+            "template": "template はテンプレートを手元で描いて出すだけで、クラスタには入れません。",
+            "create": "create は新しいチャートのひな形のフォルダを作るコマンドです。"
+          },
+          "source": "https://helm.sh/docs/intro/using_helm/"
+        },
+        {
+          "id": "w7-l2-q3",
+          "type": "fill",
+          "prompt": "リリース web の設定を、上書き用のファイル values-prod.yaml で変えて更新したい。空欄に入るフラグは?",
+          "language": "bash",
+          "code": "helm upgrade web ./mychart {{blank}} values-prod.yaml",
+          "answers": [
+            "-f",
+            "--values"
+          ],
+          "candidates": [
+            "-f",
+            "--set",
+            "--reuse-values",
+            "--dry-run"
+          ],
+          "output": "Release \"web\" has been upgraded. Happy Helming!\nNAME: web\nLAST DEPLOYED: Mon Jan 11 10:41:02 2027\nNAMESPACE: default\nSTATUS: deployed\nREVISION: 2\nDESCRIPTION: Upgrade complete\nTEST SUITE: None",
+          "explanation": "-f (--values) は上書きする値を書いた YAML のファイルを渡すフラグで、install でも upgrade でも使えます。何度も付けられ、右にあるファイルほど優先されます。",
+          "wrongNotes": {
+            "--set": "--set はコマンド行で key=value の形で値を渡すフラグで、ファイルは読みません。",
+            "--reuse-values": "--reuse-values は前回の値を引き継ぐフラグで、ファイルの名前は取りません。",
+            "--dry-run": "--dry-run は入れずに試すフラグで、helm 4 では値を = で付けます (--dry-run=client など)。空白の後のファイル名は値にならず、引数が 3 つになって止まります。"
+          },
+          "source": "https://helm.sh/docs/intro/using_helm/"
+        },
+        {
+          "id": "w7-l2-q4",
+          "type": "choice",
+          "prompt": "チャートの values.yaml に replicaCount: 1、-f で渡したファイルに replicaCount: 2 と書き、さらに --set replicaCount=3 を付けて helm install した。使われる replicaCount はどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "1",
+              "why": "チャートの values.yaml は既定の値で、いちばん弱いものです。"
+            },
+            {
+              "id": "b",
+              "text": "2",
+              "why": "-f のファイルは values.yaml より強いですが、--set のほうがさらに強いです。"
+            },
+            {
+              "id": "c",
+              "text": "3"
+            },
+            {
+              "id": "d",
+              "text": "値がぶつかるので、エラーで止まる",
+              "why": "ぶつかってもエラーにはならず、決まった優先の順で上書きされます。"
+            }
+          ],
+          "answer": "c",
+          "explanation": "値は、チャートの values.yaml (既定) を、-f で渡したファイルが上書きし、それを --set がさらに上書きします。いちばん強い --set の 3 が使われます。",
+          "source": "https://helm.sh/docs/chart_template_guide/values_files/"
+        },
+        {
+          "id": "w7-l2-q5",
+          "type": "fill",
+          "prompt": "更新したリリース web の具合が悪いので、最初の版 (リビジョン 1) に戻したい。空欄に入るサブコマンドは?",
+          "language": "bash",
+          "code": "helm {{blank}} web 1",
+          "answers": [
+            "rollback"
+          ],
+          "candidates": [
+            "rollback",
+            "uninstall",
+            "history",
+            "upgrade"
+          ],
+          "output": "Rollback was a success! Happy Helming!",
+          "explanation": "helm rollback はリリースを前のリビジョンに戻します。リビジョンの番号を省くか 0 にすると、1 つ前に戻ります。番号は helm history で調べます。",
+          "wrongNotes": {
+            "uninstall": "uninstall はリリースをクラスタから消すコマンドで、前の版には戻りません。",
+            "history": "history はリビジョンの一覧を出すだけで、戻しはしません。",
+            "upgrade": "upgrade は新しいチャートや値で更新するコマンドで、リビジョンの番号は取りません。"
+          },
+          "source": "https://helm.sh/docs/helm/helm_rollback/"
+        },
+        {
+          "id": "w7-l2-q6",
+          "type": "choice",
+          "prompt": "リリースを helm install し、helm upgrade を 2 回したあと、helm rollback でリビジョン 1 に戻した。戻したあとのリリースの番号 (リビジョン) はどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "1",
+              "why": "中身はリビジョン 1 と同じ設定ですが、番号は戻らずに増えます。"
+            },
+            {
+              "id": "b",
+              "text": "3",
+              "why": "3 は 2 回目の upgrade の番号です。rollback でも番号が 1 増えます。"
+            },
+            {
+              "id": "c",
+              "text": "0",
+              "why": "最初の番号は 1 で、0 になることはありません。"
+            },
+            {
+              "id": "d",
+              "text": "4"
+            }
+          ],
+          "answer": "d",
+          "explanation": "install で 1、upgrade のたびに 2・3 と増え、rollback でも新しい番号の 4 になります。4 の中身はリビジョン 1 と同じ設定です。",
+          "source": "https://helm.sh/docs/glossary/"
+        },
+        {
+          "id": "w7-l2-q7",
+          "type": "fill",
+          "prompt": "リリース web の、これまでのリビジョンの一覧を見たい。空欄に入るサブコマンドは?",
+          "language": "bash",
+          "code": "helm {{blank}} web",
+          "answers": [
+            "history"
+          ],
+          "candidates": [
+            "history",
+            "status",
+            "list",
+            "get"
+          ],
+          "output": "REVISION  UPDATED                   STATUS      CHART          APP VERSION  DESCRIPTION\n1         Mon Jan 11 10:27:17 2027  superseded  mychart-0.1.0  1.16.0       Install complete\n2         Mon Jan 11 10:41:02 2027  superseded  mychart-0.1.0  1.16.0       Upgrade complete\n3         Mon Jan 11 10:55:40 2027  deployed    mychart-0.1.0  1.16.0       Rollback to 1",
+          "explanation": "helm history はリリースのリビジョンを番号順に出します。rollback で戻す先の番号を決めるときに使います。",
+          "wrongNotes": {
+            "status": "status はリリースの今の状態を出すだけで、これまでの一覧は出しません。",
+            "list": "list はリリースの一覧を出すコマンドで、1 つのリリースの履歴は出しません。",
+            "get": "get は get values や get manifest のように、何を出すかのサブコマンドが要ります。"
+          },
+          "source": "https://helm.sh/docs/helm/helm_history/"
+        }
+      ]
+    },
+    {
+      "id": "w7-l3",
+      "kind": "quiz",
+      "title": "Kustomize の base と overlay",
+      "summary": "kustomization.yaml とコマンドの穴埋め · 8 問",
+      "domain": "Cloud Native Application Delivery",
+      "questions": [
+        {
+          "id": "w7-l3-q1",
+          "type": "choice",
+          "prompt": "Helm と Kustomize の違いとして正しいのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "Helm はリソース一式をチャートという包みにして入れ、Kustomize は既にあるマニフェストに設定を足したり消したり変えたりする"
+            },
+            {
+              "id": "b",
+              "text": "Kustomize を使うには、Helm を先に入れておく必要がある",
+              "why": "Kustomize は単体の道具としても、kubectl に組み込まれた機能としても使えます。Helm は要りません。"
+            },
+            {
+              "id": "c",
+              "text": "Helm は kubectl に組み込まれていて、kubectl helm で使う",
+              "why": "kubectl に組み込まれているのは Kustomize (kubectl apply -k など) のほうです。Helm は別の道具です。"
+            },
+            {
+              "id": "d",
+              "text": "どちらも YAML を使わず、独自の言語でリソースを書く",
+              "why": "どちらも Kubernetes の YAML を扱います。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "Helm は、設定済みの Kubernetes のリソースの包み (Helm チャート) を管理する道具です。Kustomize はマニフェストをたどって設定を足す・消す・変える道具で、単体でも kubectl の機能としても使えます。",
+          "source": "https://kubernetes.io/docs/concepts/workloads/management/"
+        },
+        {
+          "id": "w7-l3-q2",
+          "type": "choice",
+          "prompt": "Kustomize の作りの説明として正しいのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "{{ .Values.x }} のようなテンプレートの書き方で、値を差し込む",
+              "why": "それは Helm のテンプレートの書き方です。Kustomize はテンプレートを使いません。"
+            },
+            {
+              "id": "b",
+              "text": "テンプレートを使わず、元の YAML をそのまま残して、上から差分 (パッチ) を重ねる"
+            },
+            {
+              "id": "c",
+              "text": "元の YAML を直接書き換えて、環境ごとのファイルを作る",
+              "why": "元の YAML は書き換えず、そのまま使える形で残します。"
+            },
+            {
+              "id": "d",
+              "text": "リリースごとにリビジョンの番号を振り、履歴をクラスタに残す",
+              "why": "リリースとリビジョンを持つのは Helm です。"
+            }
+          ],
+          "answer": "b",
+          "explanation": "Kustomize はテンプレートを使わない (template-free) やり方で、元の YAML に手を加えずにパッチで環境ごとの違いを足します。Helm のようにテンプレートに値を差し込む仕組みや、リリースの履歴は持ちません。",
+          "source": "https://kubectl.docs.kubernetes.io/guides/introduction/kustomize/"
+        },
+        {
+          "id": "w7-l3-q3",
+          "type": "fill",
+          "prompt": "overlays/prod の kustomization.yaml で、1 つ上の base を元にしたい。空欄に入る欄は?",
+          "language": "yaml",
+          "code": "# overlays/prod/kustomization.yaml\n{{blank}}:\n  - ../../base\nnamePrefix: prod-",
+          "answers": [
+            "resources"
+          ],
+          "candidates": [
+            "resources",
+            "patches",
+            "images",
+            "namespace"
+          ],
+          "explanation": "resources は、取り込むリソースのファイルや、kustomization.yaml のあるフォルダ (base) を並べる欄です。overlay はここで base を指し、その上に namePrefix などを重ねます。",
+          "wrongNotes": {
+            "patches": "patches は取り込んだリソースに当てる差分を書く欄で、base を取り込む欄ではありません。",
+            "images": "images はコンテナイメージの名前やタグを差し替える欄です。",
+            "namespace": "namespace はすべてのリソースに付ける namespace を 1 つ書く欄で、一覧は取りません。"
+          },
+          "source": "https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/"
+        },
+        {
+          "id": "w7-l3-q4",
+          "type": "fill",
+          "prompt": "dev の overlay で、すべてのリソースの名前の頭に dev- を付けたい。空欄に入る欄は?",
+          "language": "yaml",
+          "code": "# overlays/dev/kustomization.yaml\nresources:\n  - ../../base\n{{blank}}: dev-",
+          "answers": [
+            "namePrefix"
+          ],
+          "candidates": [
+            "namePrefix",
+            "nameSuffix",
+            "namespace",
+            "commonAnnotations"
+          ],
+          "output": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: dev-my-nginx\nspec:\n  replicas: 2",
+          "explanation": "namePrefix はすべてのリソースの名前の頭に文字を付けます。同じ base を dev と prod の overlay で使い、名前を分けるときによく使います。",
+          "wrongNotes": {
+            "nameSuffix": "nameSuffix は名前の後ろに付けるので、my-nginxdev- のようになります。",
+            "namespace": "namespace は名前ではなく、置き場所の namespace を変えます。",
+            "commonAnnotations": "commonAnnotations は注釈 (アノテーション) を足す欄で、名前は変えません。"
+          },
+          "source": "https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/"
+        },
+        {
+          "id": "w7-l3-q5",
+          "type": "fill",
+          "prompt": "base の nginx のイメージを、overlay ではタグだけ 1.27 に差し替えたい。空欄に入る欄は?",
+          "language": "yaml",
+          "code": "resources:\n  - ../../base\nimages:\n  - name: nginx\n    {{blank}}: \"1.27\"",
+          "answers": [
+            "newTag"
+          ],
+          "candidates": [
+            "newTag",
+            "newName",
+            "digest",
+            "tag"
+          ],
+          "output": "    spec:\n      containers:\n      - image: nginx:1.27\n        name: nginx",
+          "explanation": "images の newTag は、name に合うイメージのタグを書き換えます。元の YAML を直さずに、環境ごとに使う版を変えられます。",
+          "wrongNotes": {
+            "newName": "newName はイメージの名前のほうを差し替える欄で、nginx が 1.27 という名前に変わってしまいます。",
+            "digest": "digest は sha256 の digest で版を固定する欄で、タグは書きません。",
+            "tag": "images に tag という欄はありません。タグを変えるのは newTag です。"
+          },
+          "source": "https://kubectl.docs.kubernetes.io/references/kustomize/kustomization/images/"
+        },
+        {
+          "id": "w7-l3-q6",
+          "type": "fill",
+          "prompt": "overlays/prod の kustomization.yaml を組み立てて、クラスタに当てたい。空欄に入るフラグは?",
+          "language": "bash",
+          "code": "kubectl apply {{blank}} overlays/prod",
+          "answers": [
+            "-k",
+            "--kustomize"
+          ],
+          "candidates": [
+            "-k",
+            "-f",
+            "-R",
+            "-l"
+          ],
+          "output": "service/prod-my-nginx created\ndeployment.apps/prod-my-nginx created",
+          "explanation": "-k (--kustomize) は、kustomization.yaml のあるフォルダを組み立ててから当てます。get・describe・diff・delete でも -k で同じフォルダを指せます。",
+          "wrongNotes": {
+            "-f": "-f はファイルをそのまま当てるので、kustomization.yaml を組み立てません。",
+            "-R": "-R は -f でフォルダを指したときに、下のフォルダまでたどるフラグです。",
+            "-l": "-l はラベルで対象を絞るフラグです。"
+          },
+          "source": "https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/"
+        },
+        {
+          "id": "w7-l3-q7",
+          "type": "fill",
+          "prompt": "クラスタには当てずに、overlays/prod を組み立てた結果の YAML を画面で確かめたい。空欄に入るサブコマンドは?",
+          "language": "bash",
+          "code": "kubectl {{blank}} overlays/prod",
+          "answers": [
+            "kustomize"
+          ],
+          "candidates": [
+            "kustomize",
+            "apply",
+            "describe",
+            "get"
+          ],
+          "output": "apiVersion: v1\nkind: Service\nmetadata:\n  name: prod-my-nginx\n---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: prod-my-nginx",
+          "explanation": "kubectl kustomize は、フォルダの kustomization.yaml を組み立てた結果を出すだけで、クラスタは変えません。当てる前の確かめに使います。",
+          "wrongNotes": {
+            "apply": "apply はクラスタに当てるコマンドです。",
+            "describe": "describe はクラスタにあるリソースの詳しい状態を出すコマンドです。",
+            "get": "get はクラスタにあるリソースの一覧を出すコマンドです。"
+          },
+          "source": "https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/"
+        },
+        {
+          "id": "w7-l3-q8",
+          "type": "choice",
+          "prompt": "Kustomize の base と overlay の関係として正しいのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "overlay で変えた内容は、base のファイルにも書き戻される",
+              "why": "base は書き換わりません。組み立てた結果だけが変わります。"
+            },
+            {
+              "id": "b",
+              "text": "1 つの base は、1 つの overlay からしか使えない",
+              "why": "同じ base を dev と prod のように、いくつもの overlay から使えます。"
+            },
+            {
+              "id": "c",
+              "text": "base は overlay のことを知らず、いくつもの overlay から使える"
+            },
+            {
+              "id": "d",
+              "text": "overlay には base の YAML を全部写しておく必要がある",
+              "why": "overlay は resources で base を指すだけで、YAML を写しません。"
+            }
+          ],
+          "answer": "c",
+          "explanation": "base はリソースとその設定を持つ kustomization.yaml のフォルダで、overlay は base を指して違いを重ねるフォルダです。base は overlay を知らないので、同じ base をいくつもの overlay で使い回せます。",
+          "source": "https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/"
+        }
+      ]
+    },
+    {
+      "id": "w7-l4",
+      "kind": "quiz",
+      "title": "デプロイの戦略とデバッグ",
+      "summary": "4 択とコマンドの穴埋め · 9 問",
+      "domain": "Cloud Native Application Delivery",
+      "questions": [
+        {
+          "id": "w7-l4-q1",
+          "type": "choice",
+          "prompt": "カナリアリリースの利点として正しいのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "新しい版にまず少しの通信だけを流し、本番の条件で様子を見てから全体に広げられる"
+            },
+            {
+              "id": "b",
+              "text": "古い版と新しい版を同時に動かさないので、資源がいちばん少なくて済む",
+              "why": "カナリアは安定版の横で新しい版を同時に動かします。同時に動かさないのは Recreate です。"
+            },
+            {
+              "id": "c",
+              "text": "すべての通信を一度に新しい版へ切り替えるので、切り替えが 1 回で済む",
+              "why": "一度に全部を切り替えるのはブルーグリーンの考え方です。カナリアは少しずつ移します。"
+            },
+            {
+              "id": "d",
+              "text": "本番に出す前のテストが要らなくなる",
+              "why": "テストは要ります。カナリアは、テストをすり抜けた不具合の影響を小さくする工夫です。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "カナリアは安定版の横で新しい版を動かし、通信のごく一部だけを新しい版へ流します。本番の条件で確かめてから広げるので、不具合があっても影響が小さく、すぐ安定版へ戻せます。",
+          "source": "https://kubernetes.io/docs/concepts/workloads/management/"
+        },
+        {
+          "id": "w7-l4-q2",
+          "type": "choice",
+          "prompt": "ブルーグリーンデプロイの説明として正しいのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "Pod を 1 つずつ新しい版に入れ替え、古い版と新しい版が混ざった状態で進める",
+              "why": "それはローリング更新です。"
+            },
+            {
+              "id": "b",
+              "text": "通信の 1% から始め、10%、25% と少しずつ新しい版へ移す",
+              "why": "それはカナリアです。"
+            },
+            {
+              "id": "c",
+              "text": "古い Pod をすべて止めてから、新しい Pod を作る",
+              "why": "それは Deployment の Recreate で、間に止まる時間があります。"
+            },
+            {
+              "id": "d",
+              "text": "本番の環境と別に新しい版の環境を用意し、確かめ終えたら通信をまとめて切り替える"
+            }
+          ],
+          "answer": "d",
+          "explanation": "ブルーグリーンは 2 つの環境を持ち、片方が本番の通信を受けている間にもう片方を新しくします。確かめ終えたら、ロードバランサーなどで通信をまとめて切り替えるので、止まる時間をほぼ無くせます。",
+          "source": "https://glossary.cncf.io/blue-green-deployment/"
+        },
+        {
+          "id": "w7-l4-q3",
+          "type": "choice",
+          "prompt": "Deployment の .spec.strategy.type を Recreate にしたときの更新の動きはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "新しい Pod を先に全部作り、そろってから古い Pod を消す",
+              "why": "Recreate は逆で、古い Pod を先に消します。"
+            },
+            {
+              "id": "b",
+              "text": "古い Pod をすべて止めてから新しい Pod を作るので、間に止まる時間がある"
+            },
+            {
+              "id": "c",
+              "text": "maxSurge と maxUnavailable の値に合わせて、少しずつ入れ替える",
+              "why": "その 2 つで進み方を決めるのは RollingUpdate (既定) です。"
+            },
+            {
+              "id": "d",
+              "text": "Pod は入れ替えず、動いているコンテナの中身だけを書き換える",
+              "why": "Deployment は Pod を作り直して入れ替えます。コンテナの中は書き換えません。"
+            }
+          ],
+          "answer": "b",
+          "explanation": "Recreate では、今ある Pod をすべて止めてから新しい Pod を作ります。古い版と新しい版を同時に動かせないアプリに向きますが、間に止まる時間があります。既定は RollingUpdate です。",
+          "source": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"
+        },
+        {
+          "id": "w7-l4-q4",
+          "type": "fill",
+          "prompt": "ローリング更新の間、望む数より 1 つ多くまで Pod を作ってよく、使えない Pod は 0 にしたい。空欄に入る欄は?",
+          "language": "yaml",
+          "code": "spec:\n  replicas: 3\n  strategy:\n    type: RollingUpdate\n    rollingUpdate:\n      {{blank}}: 1\n      maxUnavailable: 0",
+          "answers": [
+            "maxSurge"
+          ],
+          "candidates": [
+            "maxSurge",
+            "maxUnavailable",
+            "replicas",
+            "minReadySeconds"
+          ],
+          "explanation": "maxSurge は、更新の間に望む数を超えて作ってよい Pod の数です。maxUnavailable は更新の間に使えなくてよい Pod の数で、両方を 0 にはできません。",
+          "wrongNotes": {
+            "maxUnavailable": "maxUnavailable は使えなくてよい Pod の数で、すでに下の行で 0 にしています。",
+            "replicas": "replicas は望む Pod の数で、rollingUpdate の中に書く欄ではありません。",
+            "minReadySeconds": "minReadySeconds は、新しい Pod が使えると見なすまで待つ秒数で、spec の直下に書きます。"
+          },
+          "source": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"
+        },
+        {
+          "id": "w7-l4-q5",
+          "type": "fill",
+          "prompt": "Deployment web の更新 (ロールアウト) が終わるまで、進み具合を見ていたい。空欄に入るサブコマンドは?",
+          "language": "bash",
+          "code": "kubectl rollout {{blank}} deployment/web",
+          "answers": [
+            "status"
+          ],
+          "candidates": [
+            "status",
+            "history",
+            "undo",
+            "pause"
+          ],
+          "output": "Waiting for deployment \"web\" rollout to finish: 2 out of 3 new replicas have been updated...\ndeployment \"web\" successfully rolled out",
+          "explanation": "kubectl rollout status は、ロールアウトが終わるまで進み具合を出し続けます。終わると successfully rolled out と出ます。",
+          "wrongNotes": {
+            "history": "history はこれまでのリビジョンの一覧を出すだけで、進み具合は追いません。",
+            "undo": "undo は前のリビジョンに戻すコマンドです。",
+            "pause": "pause はロールアウトを一時止めるコマンドです。"
+          },
+          "source": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"
+        },
+        {
+          "id": "w7-l4-q6",
+          "type": "fill",
+          "prompt": "新しいイメージにした Deployment web の具合が悪いので、1 つ前のリビジョンに戻したい。空欄に入るサブコマンドは?",
+          "language": "bash",
+          "code": "kubectl rollout {{blank}} deployment/web",
+          "answers": [
+            "undo"
+          ],
+          "candidates": [
+            "undo",
+            "restart",
+            "status",
+            "resume"
+          ],
+          "output": "deployment.apps/web rolled back",
+          "explanation": "kubectl rollout undo は Deployment を 1 つ前のリビジョンに戻します。--to-revision を付けると、戻す先のリビジョンを選べます。",
+          "wrongNotes": {
+            "restart": "restart は同じ設定のまま Pod を作り直すだけで、前の版には戻りません。",
+            "status": "status は進み具合を出すだけです。",
+            "resume": "resume は pause で止めたロールアウトを再び進めるコマンドです。"
+          },
+          "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_rollout/kubectl_rollout_undo/"
+        },
+        {
+          "id": "w7-l4-q7",
+          "type": "fill",
+          "prompt": "Pod web-7d9f8c6b5-k2x4p のコンテナが落ちて再起動を繰り返している。落ちる前のコンテナのログを読みたい。空欄に入るフラグは?",
+          "language": "bash",
+          "code": "kubectl logs web-7d9f8c6b5-k2x4p {{blank}}",
+          "answers": [
+            "--previous",
+            "-p"
+          ],
+          "candidates": [
+            "--previous",
+            "--follow",
+            "--timestamps",
+            "--tail=10"
+          ],
+          "output": "Starting server on :8080\npanic: open /etc/app/config.yaml: no such file or directory",
+          "explanation": "--previous (-p) を付けると、再起動する前のコンテナのログを出します。今のコンテナは起動し直したばかりなので、落ちた理由は前のログに残っています。",
+          "wrongNotes": {
+            "--follow": "--follow は今のコンテナのログを流し続けるフラグで、前のコンテナのログは出しません。",
+            "--timestamps": "--timestamps はログの行に時刻を付けるだけです。",
+            "--tail=10": "--tail は今のコンテナのログの最後の行だけを出すフラグです。"
+          },
+          "source": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-running-pod/"
+        },
+        {
+          "id": "w7-l4-q8",
+          "type": "choice",
+          "prompt": "新しく作った Pod が、いつまでも Pending のままになっている。まず考えることとして正しいのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "どのノードにも置けていないので、kubectl describe pod で資源の不足などのイベントを見る"
+            },
+            {
+              "id": "b",
+              "text": "コンテナが起動してすぐ落ちているので、kubectl logs --previous を見る",
+              "why": "起動して落ちるのはノードに置かれたあとの話で、CrashLoopBackOff などになります。Pending はまだ置かれていません。"
+            },
+            {
+              "id": "c",
+              "text": "Service の selector が合っていないので、Service を作り直す",
+              "why": "Service は通信の振り分けで、Pod がノードに置かれるかどうかには関わりません。"
+            },
+            {
+              "id": "d",
+              "text": "Helm のリリースが古いので、helm rollback する",
+              "why": "Pending はスケジュールの問題で、まず原因を describe で確かめます。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "kubectl get pods の STATUS が Pending のままなのは、多くは Pod をどのノードにも割り当てられていないときです (Pod の phase の Pending は、イメージの取得中も含みます)。原因の多くは CPU やメモリの不足で、kubectl describe pod のイベントに理由が出ます。",
+          "source": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-pods/"
+        },
+        {
+          "id": "w7-l4-q9",
+          "type": "choice",
+          "prompt": "kubectl get pods の出力です。この Pod について、まず確かめることとして正しいのはどれ?",
+          "code": {
+            "language": "plaintext",
+            "text": "NAME                  READY   STATUS             RESTARTS   AGE\nweb-5c8d7f9b4-q7m2n   0/1     ImagePullBackOff   0          3m"
+          },
+          "choices": [
+            {
+              "id": "a",
+              "text": "ノードの CPU が足りているか",
+              "why": "資源が足りないと Pending のままになります。この Pod はノードに置かれたあと、イメージを取れずに待っています。"
+            },
+            {
+              "id": "b",
+              "text": "アプリが落ちる前のログ",
+              "why": "RESTARTS が 0 で、コンテナはまだ一度も起動していません。読めるログがありません。"
+            },
+            {
+              "id": "c",
+              "text": "イメージの名前とタグが正しいか、レジストリに置いてあるか"
+            },
+            {
+              "id": "d",
+              "text": "Deployment の maxSurge の値",
+              "why": "maxSurge は更新の進み方を決める値で、イメージを取れるかどうかには関わりません。"
+            }
+          ],
+          "answer": "c",
+          "explanation": "Pod がノードに置かれたのに動けずに待っているとき、いちばん多い原因はイメージを取れないことです。イメージの名前が正しいか、レジストリに push してあるか、手で pull できるかを確かめます。",
+          "source": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-pods/"
+        }
+      ]
+    },
+    {
+      "id": "w7-lab",
+      "kind": "lab",
+      "title": "週末の実習: Helm で入れて、Kustomize で書き直す",
+      "summary": "家のクラスタで手を動かす · 7 手順",
+      "domain": "Cloud Native Application Delivery",
+      "source": "https://helm.sh/docs/intro/using_helm/",
+      "steps": [
+        {
+          "text": "helm を入れた端末で (入れ方: https://helm.sh/docs/intro/install/)、nginx を動かす見本のチャートのひな形を作る (hello/ に Chart.yaml・values.yaml・templates/ ができる)",
+          "command": "helm create hello"
+        },
+        {
+          "text": "dojo という namespace に、リリース hello として入れる (REVISION: 1 と出る)",
+          "command": "helm install hello ./hello -n dojo --create-namespace"
+        },
+        {
+          "text": "--set で replicaCount を 2 にして upgrade し、リビジョンが 2 に増えたことと Pod が 2 つになったことを確かめる",
+          "command": "helm upgrade hello ./hello -n dojo --set replicaCount=2 && helm history hello -n dojo && kubectl get pods -n dojo"
+        },
+        {
+          "text": "同じものを Kustomize で書くため、Helm の側と同じ replicaCount=2 でチャートを手元で描いた YAML を base にする (テストの Pod は除く)",
+          "command": "mkdir -p kust/base kust/overlays/home && helm template hello ./hello --set replicaCount=2 --skip-tests > kust/base/hello.yaml && printf 'resources:\\n  - hello.yaml\\n' > kust/base/kustomization.yaml"
+        },
+        {
+          "text": "overlay を書く。base を指し、namespace を dojo-kust に、名前の頭に k- を付ける (書き方は https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/ を見る)",
+          "command": "printf 'resources:\\n  - ../../base\\nnamespace: dojo-kust\\nnamePrefix: k-\\n' > kust/overlays/home/kustomization.yaml"
+        },
+        {
+          "text": "当てる前に組み立てた結果を見て、名前が k-hello になっていることを確かめてから、kubectl apply -k で当てる",
+          "command": "kubectl kustomize kust/overlays/home | grep 'name: k-' && kubectl create namespace dojo-kust && kubectl apply -k kust/overlays/home"
+        },
+        {
+          "text": "Helm の側と Kustomize の側の両方で Pod が動いていることを確かめてから、片付ける",
+          "command": "kubectl get deploy -n dojo && kubectl get deploy -n dojo-kust && kubectl delete -k kust/overlays/home && kubectl delete namespace dojo-kust && helm uninstall hello -n dojo && kubectl delete namespace dojo"
+        }
+      ]
+    }
+  ]
+}
