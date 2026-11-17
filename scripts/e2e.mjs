@@ -49,9 +49,11 @@ async function noHorizontalOverflow(page, width, label) {
   check(sw <= width, `${label}: 横にはみ出さない (scrollWidth ${sw} <= ${width})`);
 }
 
+// 選択肢は出すたびに混ぜるので、記号ではなく文で選ぶ
+const escapeRe = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const choiceLabel = (q, choiceId) => {
-  const i = q.choices.findIndex((c) => c.id === choiceId);
-  return `${String.fromCharCode(65 + i)}. ${q.choices[i].text}`;
+  const text = q.choices.find((c) => c.id === choiceId).text;
+  return new RegExp(`^[A-D]\\. ${escapeRe(text)}$`);
 };
 
 async function run(browser, name, width, height) {
@@ -81,6 +83,10 @@ async function run(browser, name, width, height) {
     await page.getByRole('button', { name: '確かめる' }).click();
     if (i === 0) {
       check(await page.getByText('不正解 · 正しくは').isVisible(), `${tag} 不正解のとき知らせが出る`);
+      // 「正しくは X」の記号が、画面の並びでの正解の位置と合う
+      const answerLabel = (await page.getByText(choiceLabel(q, q.answer)).first().textContent()) ?? '';
+      const answerLetter = answerLabel.trim().slice(0, 1);
+      check(/^[A-D]$/.test(answerLetter) && (await page.getByText(`不正解 · 正しくは ${answerLetter}`).isVisible()), `${tag} 「正しくは ${answerLetter}」が画面の並びと合う`);
       check(await page.getByText(q.explanation).isVisible(), `${tag} 不正解のとき解説が出る`);
       await noHorizontalOverflow(page, width, `${tag} 4 択の解説`);
     } else {

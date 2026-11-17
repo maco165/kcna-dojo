@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Button } from '@astryxdesign/core/Button';
 import { CheckboxList, CheckboxListItem } from '@astryxdesign/core/CheckboxList';
 import { Code } from '@astryxdesign/core/Code';
@@ -16,6 +16,7 @@ import { DAILY_GOAL_XP } from '../content/curriculum';
 import type { LabLesson, Lesson, QuizLesson } from '../content/types';
 import { XP_PER_CORRECT, XP_PER_LAB } from '../lib/grade';
 import { completeLesson, currentStreak, recordAnswer, todayXp, type Progress } from '../lib/progress';
+import { shuffleChoices } from '../lib/shuffle';
 import { weekHref } from '../lib/route';
 import { WIDE_QUERY, useMediaQuery } from '../lib/useMediaQuery';
 
@@ -57,8 +58,10 @@ function QuizRun({ lesson, week, progress, updateProgress }: Props & { lesson: Q
   const [attempt, setAttempt] = useState(0);
   const [startedAt, setStartedAt] = useState(() => Date.now());
   const [elapsed, setElapsed] = useState(0);
-  const total = lesson.questions.length;
-  const q = lesson.questions[index];
+  // 4 択の選択肢は、開いたときと「もう一度解く」のたびに混ぜ直す (attempt が変わるたび)
+  const questions = useMemo(() => lesson.questions.map((question) => shuffleChoices(question)), [lesson, attempt]);
+  const total = questions.length;
+  const q = questions[index];
   const isLast = index === total - 1;
 
   const onChecked = (correct: boolean) => {
@@ -100,7 +103,7 @@ function QuizRun({ lesson, week, progress, updateProgress }: Props & { lesson: Q
           { label: '時間', value: formatDuration(elapsed) },
         ]}
         progress={progress}
-        rows={lesson.questions.map((question, i) => ({ id: question.id, label: question.prompt, correct: results[i] }))}
+        rows={questions.map((question, i) => ({ id: question.id, label: question.prompt, correct: results[i] }))}
         onRetry={restart}
       />
     );

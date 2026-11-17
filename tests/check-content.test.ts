@@ -76,6 +76,7 @@ describe('check-content', { timeout: 30_000 }, () => {
       ['wrongnotes-value-number', (d) => (d.lessons[1].questions[0].wrongNotes.RUN = 1), 'w1-l2-q1'],
       ['why-number', (d) => (d.lessons[0].questions[0].choices[1].why = 1), 'w1-l1-q1'],
       ['dup-candidates', (d) => d.lessons[1].questions[0].candidates.push('COPY'), 'w1-l2-q1'],
+      ['fixedorder-string', (d) => (d.lessons[0].questions[0].fixedOrder = 'yes'), 'w1-l1-q1'],
     ];
     for (const [name, fn, id] of cases) {
       const r = run(mutate(name, fn));
