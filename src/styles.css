@@ -910,7 +910,7 @@ body {
   grid-column: 2;
 }
 
-.guide-path a {
+.guide-body .guide-path a {
   font-weight: 600;
   color: var(--color-text-primary);
 }
@@ -1030,6 +1030,48 @@ body {
 
 .guide-foot {
   margin: 12px 0 0;
+}
+
+.guide-cols {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.guide-col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* PC (デザイン案の PC): 本文を 2 列に。試験の説明と問題の作り方は、中を 2 列に分ける */
+@media (min-width: 1024px) {
+  .guide {
+    max-width: 1040px;
+  }
+
+  .guide-body {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 40px;
+  }
+
+  .guide-section--card,
+  .guide-section--wide,
+  .guide-foot {
+    grid-column: 1 / -1;
+  }
+
+  .guide-cols {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 24px 40px;
+  }
+
+  .guide-h3--top {
+    margin-top: 0;
+  }
 }
 
 @media (min-width: 768px) {
