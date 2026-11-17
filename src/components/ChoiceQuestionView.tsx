@@ -53,10 +53,12 @@ export default function ChoiceQuestionView({
       </RadioList>
 
       {!checked ? (
-        <HStack gap={3} justify="between" wrap="wrap" vAlign="center">
+        <VStack gap={3}>
+          <HStack justify="end">
+            <Button variant="primary" label="確かめる" isDisabled={value === ''} onClick={check} />
+          </HStack>
           <AskAi question={question} />
-          <Button variant="primary" label="確かめる" isDisabled={value === ''} onClick={check} />
-        </HStack>
+        </VStack>
       ) : (
         <VStack gap={4}>
           <Feedback
@@ -66,10 +68,10 @@ export default function ChoiceQuestionView({
             note={result ? undefined : picked?.why}
             source={question.source}
           />
-          <HStack gap={3} justify="between" wrap="wrap" vAlign="center">
-            <AskAi question={question} answered={{ picked: value, correct: result }} />
+          <HStack justify="end">
             <Button variant="primary" label={nextLabel} onClick={onNext} />
           </HStack>
+          <AskAi question={question} answered={{ picked: value, correct: result }} />
         </VStack>
       )}
     </VStack>

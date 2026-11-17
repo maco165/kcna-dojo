@@ -89,10 +89,12 @@ export default function FillQuestionView({
       )}
 
       {!checked ? (
-        <HStack gap={3} justify="between" wrap="wrap" vAlign="center">
+        <VStack gap={3}>
+          <HStack justify="end">
+            <Button variant="primary" label="確かめる" isDisabled={typed === ''} onClick={check} />
+          </HStack>
           <AskAi question={question} />
-          <Button variant="primary" label="確かめる" isDisabled={typed === ''} onClick={check} />
-        </HStack>
+        </VStack>
       ) : (
         <VStack gap={4}>
           <Feedback
@@ -105,10 +107,10 @@ export default function FillQuestionView({
           {result && question.output && (
             <CodeBlock code={question.output} title="実行結果の例 (列の一部)" width="100%" size="sm" hasCopyButton={false} />
           )}
-          <HStack gap={3} justify="between" wrap="wrap" vAlign="center">
-            <AskAi question={question} answered={{ picked: typed, correct: result }} />
+          <HStack justify="end">
             <Button variant="primary" label={nextLabel} onClick={onNext} />
           </HStack>
+          <AskAi question={question} answered={{ picked: typed, correct: result }} />
         </VStack>
       )}
     </VStack>
