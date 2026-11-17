@@ -6,8 +6,18 @@ export const STORAGE_KEY = 'kcna.v1';
 export type LessonRecord = { done: boolean; best: number; at: string };
 export type AnswerRecord = { right: number; wrong: number; last: string };
 
+/** 設定 (目標と受験日)。無ければ既定の値を使う */
+export type Profile = { dailyGoalXp: number; examDate: string };
+
+/** 1 日の目標の XP の既定と選べる値 */
+export const DEFAULT_GOAL_XP = 30;
+export const GOAL_CHOICES = [10, 20, 30, 50] as const;
+/** 受験日の既定 (学習計画の「2027-03 上旬」) */
+export const DEFAULT_EXAM_DATE = '2027-03-06';
+
 export type Progress = {
   v: 1;
+  profile?: Profile;
   streak: { count: number; lastDay: string | null };
   xp: { total: number; byDay: Record<string, number> };
   lessons: Record<string, LessonRecord>;
@@ -44,6 +54,44 @@ function isObject(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
+/** JSON から読んだものを、欠けや形の違いを埋めた進捗にする。v が 1 でなければ null */
+export function normalizeProgress(raw: unknown): Progress | null {
+  if (!isObject(raw) || raw.v !== 1) return null;
+  const base = emptyProgress();
+  const streak = isObject(raw.streak) ? raw.streak : {};
+  const xp = isObject(raw.xp) ? raw.xp : {};
+  const profile = isObject(raw.profile) ? raw.profile : null;
+  const out: Progress = {
+    v: 1,
+    streak: {
+      count: typeof streak.count === 'number' ? streak.count : 0,
+      lastDay: typeof streak.lastDay === 'string' ? streak.lastDay : null,
+    },
+    xp: {
+      total: typeof xp.total === 'number' ? xp.total : 0,
+      byDay: isObject(xp.byDay) ? (xp.byDay as Record<string, number>) : {},
+    },
+    lessons: isObject(raw.lessons) ? (raw.lessons as Record<string, LessonRecord>) : base.lessons,
+    answers: isObject(raw.answers) ? (raw.answers as Record<string, AnswerRecord>) : base.answers,
+  };
+  if (profile) {
+    out.profile = {
+      dailyGoalXp: typeof profile.dailyGoalXp === 'number' && profile.dailyGoalXp > 0 ? profile.dailyGoalXp : DEFAULT_GOAL_XP,
+      examDate: typeof profile.examDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(profile.examDate) ? profile.examDate : DEFAULT_EXAM_DATE,
+    };
+  }
+  return out;
+}
+
+/** 書き出したファイルの中身を読む。読めない・形が違うときは null */
+export function parseProgressText(text: string): Progress | null {
+  try {
+    return normalizeProgress(JSON.parse(text));
+  } catch {
+    return null;
+  }
+}
+
 /** 読めない・形が違うときは初期値で始める (例外を外に出さない) */
 export function loadProgress(storage: KeyValueStorage | undefined = safeLocalStorage()): Progress {
   if (!storage) return emptyProgress();
@@ -54,28 +102,7 @@ export function loadProgress(storage: KeyValueStorage | undefined = safeLocalSto
     return emptyProgress();
   }
   if (!raw) return emptyProgress();
-  try {
-    const p = JSON.parse(raw) as unknown;
-    if (!isObject(p) || p.v !== 1) return emptyProgress();
-    const base = emptyProgress();
-    const streak = isObject(p.streak) ? p.streak : {};
-    const xp = isObject(p.xp) ? p.xp : {};
-    return {
-      v: 1,
-      streak: {
-        count: typeof streak.count === 'number' ? streak.count : 0,
-        lastDay: typeof streak.lastDay === 'string' ? streak.lastDay : null,
-      },
-      xp: {
-        total: typeof xp.total === 'number' ? xp.total : 0,
-        byDay: isObject(xp.byDay) ? (xp.byDay as Record<string, number>) : {},
-      },
-      lessons: isObject(p.lessons) ? (p.lessons as Record<string, LessonRecord>) : base.lessons,
-      answers: isObject(p.answers) ? (p.answers as Record<string, AnswerRecord>) : base.answers,
-    };
-  } catch {
-    return emptyProgress();
-  }
+  return parseProgressText(raw) ?? emptyProgress();
 }
 
 export function saveProgress(p: Progress, storage: KeyValueStorage | undefined = safeLocalStorage()): void {
@@ -140,4 +167,28 @@ export function currentStreak(p: Progress, now: Date): number {
   const today = dayKey(now);
   if (p.streak.lastDay === today || p.streak.lastDay === addDays(today, -1)) return p.streak.count;
   return 0;
+}
+
+export function goalXp(p: Progress): number {
+  return p.profile?.dailyGoalXp ?? DEFAULT_GOAL_XP;
+}
+
+export function examDate(p: Progress): string {
+  return p.profile?.examDate ?? DEFAULT_EXAM_DATE;
+}
+
+export function setProfile(p: Progress, change: Partial<Profile>): Progress {
+  return { ...p, profile: { dailyGoalXp: goalXp(p), examDate: examDate(p), ...change } };
+}
+
+/** 記録を消す。目標と受験日の設定は残す */
+export function resetProgress(p: Progress): Progress {
+  const next = emptyProgress();
+  if (p.profile) next.profile = { ...p.profile };
+  return next;
+}
+
+/** 書き出すファイルの名前 (kcna-progress-YYYY-MM-DD.json) */
+export function exportFileName(now: Date): string {
+  return `kcna-progress-${dayKey(now)}.json`;
 }

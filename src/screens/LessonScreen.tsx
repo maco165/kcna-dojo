@@ -12,10 +12,9 @@ import { XMarkIcon } from '@heroicons/react/24/outline';
 import ChoiceQuestionView from '../components/ChoiceQuestionView';
 import FillQuestionView from '../components/FillQuestionView';
 import { ActionArea, PrimaryAction, QuestionHead } from '../components/QuestionFrame';
-import { DAILY_GOAL_XP } from '../content/curriculum';
 import type { LabLesson, Lesson, QuizLesson } from '../content/types';
 import { XP_PER_CORRECT, XP_PER_LAB } from '../lib/grade';
-import { completeLesson, currentStreak, recordAnswer, todayXp, type Progress } from '../lib/progress';
+import { completeLesson, currentStreak, goalXp, recordAnswer, todayXp, type Progress } from '../lib/progress';
 import { shuffleChoices } from '../lib/shuffle';
 import { weekHref } from '../lib/route';
 import { WIDE_QUERY, useMediaQuery } from '../lib/useMediaQuery';
@@ -196,7 +195,8 @@ function ResultView({
   const isWide = useMediaQuery(WIDE_QUERY);
   const now = new Date();
   const today = todayXp(progress, now);
-  const reached = today >= DAILY_GOAL_XP;
+  const goal = goalXp(progress);
+  const reached = today >= goal;
   return (
     <div className="page result">
       <header className="result__head">
@@ -218,10 +218,10 @@ function ResultView({
       <section className="band band--spaced">
         <ProgressBar
           label={reached ? '今日の目標を達成' : '今日の目標'}
-          value={Math.min(today, DAILY_GOAL_XP)}
-          max={DAILY_GOAL_XP}
+          value={Math.min(today, goal)}
+          max={goal}
           hasValueLabel
-          formatValueLabel={() => `${today} / ${DAILY_GOAL_XP} XP · ${currentStreak(progress, now)} 日連続`}
+          formatValueLabel={() => `${today} / ${goal} XP · ${currentStreak(progress, now)} 日連続`}
         />
       </section>
 

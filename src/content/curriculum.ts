@@ -17,12 +17,6 @@ export type WeekMeta = {
   content?: WeekContent;
 };
 
-/** 受験の目安。計画の文書の「2027-03 上旬」 */
-export const EXAM_DATE = '2027-03-06';
-
-/** 1 日の目標の XP */
-export const DAILY_GOAL_XP = 30;
-
 const WEEK_LIST: Omit<WeekMeta, 'content'>[] = [
   {
     week: 1,
