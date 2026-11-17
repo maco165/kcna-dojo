@@ -1,0 +1,1021 @@
+{
+  "week": 8,
+  "lessons": [
+    {
+      "id": "w8-l1",
+      "kind": "quiz",
+      "title": "ログ・メトリクス・トレース",
+      "summary": "4 択と穴埋め · 7 問",
+      "domain": "Cloud Native Architecture",
+      "questions": [
+        {
+          "id": "w8-l1-q1",
+          "type": "choice",
+          "prompt": "注文の API がときどき遅い。遅かった 1 件のリクエストが、どのサービスのどの処理で時間を使ったかを追いたい。いちばん向くのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "メトリクス",
+              "why": "メトリクスは一定の時間の数値の集計なので、平均や割合は分かっても、1 件のリクエストの道筋は分かりません。"
+            },
+            {
+              "id": "b",
+              "text": "トレース"
+            },
+            {
+              "id": "c",
+              "text": "ログ",
+              "why": "ログは時刻付きのメッセージで、特定のリクエストに結びついているとは限らないので、サービスをまたいだ道筋はつなげにくいです。"
+            },
+            {
+              "id": "d",
+              "text": "Pod のイベント (kubectl describe の Events)",
+              "why": "イベントは Pod の起動や再起動など Kubernetes の出来事で、アプリの中のリクエストの処理は記録しません。"
+            }
+          ],
+          "answer": "b",
+          "explanation": "トレースは 1 つのリクエストがアプリの中を通る道筋で、処理ごとのスパンに分かれ、それぞれの開始と終了の時刻を持ちます。どこで時間を使ったかはトレースで分かり、全体の傾向はメトリクスで見ます。",
+          "source": "https://opentelemetry.io/docs/concepts/signals/traces/"
+        },
+        {
+          "id": "w8-l1-q2",
+          "type": "choice",
+          "prompt": "直近 1 週間のエラー率と CPU 使用率の推移を見て、悪くなっているかを判断したい。いちばん向くのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "トレース",
+              "why": "トレースは 1 件ずつのリクエストの道筋で、期間全体の率の推移を見るものではありません。"
+            },
+            {
+              "id": "b",
+              "text": "ログ",
+              "why": "ログを数えて率を出すこともできますが、数値を時間で集計したものはメトリクスです。"
+            },
+            {
+              "id": "c",
+              "text": "メトリクス"
+            },
+            {
+              "id": "d",
+              "text": "コンテナイメージの SBOM",
+              "why": "SBOM はイメージに入っている部品の一覧で、動いているときの数値は持ちません。"
+            }
+          ],
+          "answer": "c",
+          "explanation": "メトリクスは、インフラやアプリの数値を一定の時間ごとに集計したものです。エラー率・CPU 使用率・1 秒あたりのリクエスト数などが例で、推移の把握や警報に向きます。",
+          "source": "https://opentelemetry.io/docs/concepts/observability-primer/"
+        },
+        {
+          "id": "w8-l1-q3",
+          "type": "choice",
+          "prompt": "別々のサービスで作られたスパンを、同じ 1 つのトレースとしてまとめられるのはなぜ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "スパンが同じトレース ID を持ち、親のスパン ID で親子の関係をたどれるから"
+            },
+            {
+              "id": "b",
+              "text": "スパンが同じノードで作られるから",
+              "why": "スパンはどのノードやサービスで作られてもかまいません。まとめる鍵はトレース ID です。"
+            },
+            {
+              "id": "c",
+              "text": "スパンの名前が全部同じだから",
+              "why": "スパンの名前は処理ごとに違います (例: /v1/sys/health)。"
+            },
+            {
+              "id": "d",
+              "text": "コレクターが受け取った時刻の順に並べるから",
+              "why": "時刻だけでは別のリクエストのスパンと区別できません。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "各スパンのスパンコンテキストにはトレース ID とスパン ID が入っています。同じトレース ID を持つスパンが 1 つのトレースになり、親のスパン ID で処理の親子をたどれます。",
+          "source": "https://opentelemetry.io/docs/concepts/signals/traces/"
+        },
+        {
+          "id": "w8-l1-q4",
+          "type": "choice",
+          "prompt": "Pod が消えたりノードが落ちたりしても、アプリのログを後から読めるようにしたい。Kubernetes の文書が勧める考え方はどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "kubectl logs で読めるので、何もしなくてよい",
+              "why": "kubectl logs はノードにあるログを読むので、Pod が消されたりノードが落ちたりすると読めなくなります。"
+            },
+            {
+              "id": "b",
+              "text": "ログをノードや Pod とは別の保存先と寿命で持つ (クラスタレベルのロギング)"
+            },
+            {
+              "id": "c",
+              "text": "Kubernetes に組み込みのログの保存先を有効にする",
+              "why": "Kubernetes はログの保存先を自分では持ちません。別のバックエンドを用意します。"
+            },
+            {
+              "id": "d",
+              "text": "etcd にログを書き込む",
+              "why": "etcd はクラスタの状態を持つ所で、アプリのログの置き場ではありません。"
+            }
+          ],
+          "answer": "b",
+          "explanation": "ログはノード・Pod・コンテナとは別の保存先と寿命を持つべきで、これをクラスタレベルのロギングと呼びます。Kubernetes は保存先を持たないので、ノードのログ収集エージェントなどで別のバックエンドへ送ります。",
+          "source": "https://kubernetes.io/docs/concepts/cluster-administration/logging/"
+        },
+        {
+          "id": "w8-l1-q5",
+          "type": "fill",
+          "prompt": "web の Pod のコンテナが落ちて再起動した。落ちる前のコンテナのログを読みたい。空欄に入るオプションは?",
+          "language": "bash",
+          "code": "kubectl logs {{blank}} web-7c9f6d8b5-k2m4p",
+          "answers": [
+            "--previous",
+            "-p"
+          ],
+          "candidates": [
+            "--previous",
+            "--follow",
+            "--timestamps",
+            "--all-containers"
+          ],
+          "explanation": "--previous (-p) は、Pod の中の 1 つ前のコンテナのログを出します。再起動の原因を調べるときに使います。",
+          "wrongNotes": {
+            "--follow": "--follow (-f) は今のコンテナのログを流し続けるオプションで、前のコンテナのログは出ません。",
+            "--timestamps": "--timestamps は各行に時刻を付けるオプションで、読む対象は今のコンテナのままです。",
+            "--all-containers": "--all-containers は Pod の中の全部のコンテナのログを出すオプションで、前のコンテナではありません。"
+          },
+          "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_logs/"
+        },
+        {
+          "id": "w8-l1-q6",
+          "type": "choice",
+          "prompt": "OpenTelemetry の説明として正しいのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "トレース・メトリクス・ログを作って集めて送り出すための、業者に依らない枠組みと道具。保存と可視化は他の道具に任せる"
+            },
+            {
+              "id": "b",
+              "text": "テレメトリを長く保存して検索する、専用のデータベース",
+              "why": "OpenTelemetry は観測のバックエンド (保存先) ではありません。保存は Jaeger や Prometheus などに任せます。"
+            },
+            {
+              "id": "c",
+              "text": "メトリクスだけを扱う、Prometheus の後継",
+              "why": "OpenTelemetry はトレース・メトリクス・ログを扱い、Prometheus をバックエンドとして使うこともできます。"
+            },
+            {
+              "id": "d",
+              "text": "ダッシュボードを描くための画面の道具",
+              "why": "可視化 (フロントエンド) も、わざと他の道具に任せています。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "OpenTelemetry は、トレース・メトリクス・ログの生成・収集・送り出しのための枠組みと道具で、特定の業者や道具に依りません。観測のバックエンドそのものではなく、保存と可視化は他の道具に任せています。",
+          "source": "https://opentelemetry.io/docs/what-is-opentelemetry/"
+        },
+        {
+          "id": "w8-l1-q7",
+          "type": "fill",
+          "prompt": "Kubernetes のコンポーネントが OTLP で送るトレースを、OpenTelemetry Collector で受け取って標準出力に出したい。受け取る側を書く節の名前は?",
+          "language": "yaml",
+          "code": "{{blank}}:\n  otlp:\n    protocols:\n      grpc:\nexporters:\n  debug:\n    verbosity: detailed\nservice:\n  pipelines:\n    traces:\n      receivers: [otlp]\n      exporters: [debug]",
+          "answers": [
+            "receivers"
+          ],
+          "candidates": [
+            "receivers",
+            "processors",
+            "exporters",
+            "extensions"
+          ],
+          "explanation": "Collector はテレメトリを受け取り (receivers)、加工し (processors)、送り出し (exporters) ます。Kubernetes のコンポーネントは既定で OTLP の gRPC (4317 番) でトレースを送るので、receivers に otlp を書きます。",
+          "wrongNotes": {
+            "processors": "processors は受け取ったデータをまとめたり絞ったりする節で、受け取る口ではありません。",
+            "exporters": "exporters は送り出す先を書く節で、この例では下の debug がそれです。",
+            "extensions": "extensions は健康確認など、データの流れの外の機能を書く節です。"
+          },
+          "source": "https://kubernetes.io/docs/concepts/cluster-administration/system-traces/"
+        }
+      ]
+    },
+    {
+      "id": "w8-l2",
+      "kind": "quiz",
+      "title": "Prometheus・Grafana と SLO",
+      "summary": "4 択とコマンドの穴埋め · 7 問",
+      "domain": "Cloud Native Architecture",
+      "questions": [
+        {
+          "id": "w8-l2-q1",
+          "type": "choice",
+          "prompt": "Prometheus がメトリクスを集めるときの、基本のやり方はどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "監視する対象の HTTP の口へ、Prometheus のほうから定期的に取りに行く (pull)"
+            },
+            {
+              "id": "b",
+              "text": "各アプリが Prometheus へ直接送りつける (push) のが基本",
+              "why": "push も中継の gateway を通せばできますが、補助のやり方です。基本は pull です。"
+            },
+            {
+              "id": "c",
+              "text": "etcd に書かれた値を読み取る",
+              "why": "Prometheus は etcd を読みません。対象の /metrics などの口から集めます。"
+            },
+            {
+              "id": "d",
+              "text": "ノードのログファイルを読んで数を数える",
+              "why": "ログの収集は別の道具の役目です。Prometheus は数値のメトリクスを集めます。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "Prometheus は HTTP で対象から取りに行く pull で時系列を集めます。対象はサービスディスカバリか静的な設定で見つけます。push は補助のやり方で、短命のジョブ向けの中継の gateway や、有効にしたときだけ使える OTLP・remote write の受け口を通します。",
+          "source": "https://prometheus.io/docs/introduction/overview/"
+        },
+        {
+          "id": "w8-l2-q2",
+          "type": "choice",
+          "prompt": "いま同時に処理しているリクエストの数を、メトリクスとして出したい。Prometheus のメトリクスの種類で合うのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "Counter",
+              "why": "Counter は増える一方 (再起動で 0 に戻るだけ) の値です。減ることのある値に使ってはいけません。"
+            },
+            {
+              "id": "b",
+              "text": "Gauge"
+            },
+            {
+              "id": "c",
+              "text": "Histogram",
+              "why": "Histogram は所要時間などの観測値を区間ごとに数え、分布を見るための種類です。"
+            },
+            {
+              "id": "d",
+              "text": "Summary",
+              "why": "Summary も観測値の分布を見るための種類で、分位数を出します。"
+            }
+          ],
+          "answer": "b",
+          "explanation": "Gauge は上がりも下がりもする 1 つの数値で、メモリの使用量や同時に処理しているリクエストの数に使います。処理したリクエストの総数のように増える一方の値は Counter にします。",
+          "source": "https://prometheus.io/docs/concepts/metric_types/"
+        },
+        {
+          "id": "w8-l2-q3",
+          "type": "choice",
+          "prompt": "Prometheus の次の 1 行で、この時系列を 1 つに決めているものはどれ?",
+          "code": {
+            "language": "text",
+            "text": "http_requests_total{method=\"POST\", handler=\"/api/orders\", code=\"500\"} 42"
+          },
+          "choices": [
+            {
+              "id": "a",
+              "text": "メトリクス名と、すべてのラベル (キーと値の組) の組み合わせ"
+            },
+            {
+              "id": "b",
+              "text": "末尾の値 42",
+              "why": "42 はその時点の値 (サンプル) で、時系列を見分ける鍵ではありません。"
+            },
+            {
+              "id": "c",
+              "text": "メトリクス名だけ",
+              "why": "同じメトリクス名でも、ラベルの値 (code=\"200\" と \"500\" など) が違えば別の時系列です。"
+            },
+            {
+              "id": "d",
+              "text": "handler のラベルだけ",
+              "why": "ラベルの一部だけでは決まりません。名前とすべてのラベルの組で決まります。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "Prometheus の時系列は、メトリクス名とラベルと呼ぶキーと値の組で 1 つに決まります。ラベルの値が 1 つでも違えば別の時系列になります。",
+          "source": "https://prometheus.io/docs/concepts/data_model/"
+        },
+        {
+          "id": "w8-l2-q4",
+          "type": "fill",
+          "prompt": "API サーバーが出しているメトリクスを、Prometheus の形式のまま見たい。空欄に入るパスは?",
+          "language": "bash",
+          "code": "kubectl get --raw {{blank}} | grep apiserver_request_total | head -3",
+          "answers": [
+            "/metrics"
+          ],
+          "candidates": [
+            "/metrics",
+            "/version",
+            "/readyz",
+            "/apis"
+          ],
+          "output": "# HELP apiserver_request_total [STABLE] Counter of apiserver requests broken out for each verb, dry run value, group, version, resource, scope, component, and HTTP response code.\n# TYPE apiserver_request_total counter\napiserver_request_total{code=\"200\",component=\"apiserver\",dry_run=\"\",group=\"\",resource=\"pods\",scope=\"namespace\",subresource=\"\",verb=\"LIST\",version=\"v1\"} 1532",
+          "explanation": "Kubernetes のコンポーネントは、ほとんどの場合 HTTP の /metrics でメトリクスを Prometheus の形式で出します。本番では Prometheus などに定期的に集めさせ、時系列のデータベースに貯めます。 /metrics を読むには、その非リソースの URL への get の権限が要ります。",
+          "wrongNotes": {
+            "/version": "/version は API サーバーのバージョンの情報を返すパスです。",
+            "/readyz": "/readyz は API サーバーが要求を受けられる状態かを返すパスで、メトリクスは出ません。",
+            "/apis": "/apis は API グループの一覧を返すパスです。"
+          },
+          "source": "https://kubernetes.io/docs/concepts/cluster-administration/system-metrics/"
+        },
+        {
+          "id": "w8-l2-q5",
+          "type": "choice",
+          "prompt": "Grafana の役目として正しいのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "メトリクス・ログ・トレースを、置いてある場所から問い合わせ、グラフやダッシュボードで見せ、警報を出す"
+            },
+            {
+              "id": "b",
+              "text": "対象から pull でメトリクスを集めて時系列として貯める",
+              "why": "それは Prometheus の役目です。Grafana は Prometheus などをデータソースとして読みます。"
+            },
+            {
+              "id": "c",
+              "text": "アプリに計装を足してトレースを作る",
+              "why": "計装は OpenTelemetry の SDK などの役目です。"
+            },
+            {
+              "id": "d",
+              "text": "Pod の数を負荷に合わせて増減する",
+              "why": "それは HorizontalPodAutoscaler の役目です。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "Grafana は、メトリクス・ログ・トレースを置き場所から問い合わせて、グラフやダッシュボードで見せ、警報も出せる道具です。データを集めて貯めるのは Prometheus などのデータソースの役目です。",
+          "source": "https://grafana.com/docs/grafana/latest/introduction/"
+        },
+        {
+          "id": "w8-l2-q6",
+          "type": "choice",
+          "prompt": "「リクエストのうち 300 ミリ秒以内に返せた割合」のように、サービスの水準を数で測ったものを何と呼ぶ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "SLI (Service Level Indicator)"
+            },
+            {
+              "id": "b",
+              "text": "SLO (Service Level Objective)",
+              "why": "SLO は SLI で測った値の目標 (例: 99.9% 以上) です。測る数そのものではありません。"
+            },
+            {
+              "id": "c",
+              "text": "SLA (Service Level Agreement)",
+              "why": "SLA は利用者との取り決めで、SLO を外したときの結果 (返金など) を含みます。"
+            },
+            {
+              "id": "d",
+              "text": "エラーバジェット",
+              "why": "エラーバジェットは SLO を外してよい割合のことです。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "SLI はサービスの水準のある面を、定義をはっきりさせて数で測ったものです。リクエストの遅延・エラー率・処理量などがよく使われ、その目標が SLO です。",
+          "source": "https://sre.google/sre-book/service-level-objectives/"
+        },
+        {
+          "id": "w8-l2-q7",
+          "type": "choice",
+          "prompt": "SLO を決めておく理由として正しいのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "100% の可用性を約束するため",
+              "why": "100% は実現できず、目指すと変更が遅くなり費用も膨らみます。だから外してよい分 (エラーバジェット) を決めます。"
+            },
+            {
+              "id": "b",
+              "text": "どこまでの信頼性を目指すかを数で共有し、外してよい分を使って、変更を出す速さと信頼性の釣り合いを判断できるから"
+            },
+            {
+              "id": "c",
+              "text": "守れなかったときに利用者へ返す金額を決めるため",
+              "why": "外したときの結果を決めるのは SLA です。SLO は内部の目標で、結果の取り決めを持たないこともあります。"
+            },
+            {
+              "id": "d",
+              "text": "使う監視の道具を 1 つに決めるため",
+              "why": "SLO は信頼性の目標で、道具の選び方とは関係ありません。"
+            }
+          ],
+          "answer": "b",
+          "explanation": "SLO はサービスの信頼性の目標で、信頼性をデータで判断するための中心になります。100% は正しい目標ではないので、外してよい分 (エラーバジェット) を決め、新しい変更を出すか信頼性の改善を優先するかを判断します。",
+          "source": "https://sre.google/workbook/implementing-slos/"
+        }
+      ]
+    },
+    {
+      "id": "w8-l3",
+      "kind": "quiz",
+      "title": "オートスケール",
+      "summary": "コマンドと YAML の穴埋めと 4 択 · 9 問",
+      "domain": "Cloud Native Architecture",
+      "questions": [
+        {
+          "id": "w8-l3-q1",
+          "type": "fill",
+          "prompt": "クラスタのノードごとの CPU とメモリの使用量を見たい。空欄に入るリソースは?",
+          "language": "bash",
+          "code": "kubectl top {{blank}}",
+          "answers": [
+            "nodes",
+            "node",
+            "no"
+          ],
+          "candidates": [
+            "nodes",
+            "pods",
+            "events",
+            "deployments"
+          ],
+          "output": "NAME    CPU(cores)   CPU(%)   MEMORY(bytes)   MEMORY(%)\nnode1   312m         7%       2861Mi          36%\nnode2   145m         3%       1907Mi          24%",
+          "explanation": "kubectl top node はノードの CPU とメモリの使用量を出します。数値は metrics-server が出す Metrics API から読むので、metrics-server が入っていないと使えません。",
+          "wrongNotes": {
+            "pods": "pods は Pod ごとの使用量で、ノードごとにはなりません。",
+            "events": "kubectl top が扱うのは node と pod だけで、events はありません。",
+            "deployments": "kubectl top が扱うのは node と pod だけで、Deployment の使用量は出ません。"
+          },
+          "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_top/kubectl_top_node/"
+        },
+        {
+          "id": "w8-l3-q2",
+          "type": "fill",
+          "prompt": "すべての namespace の Pod を、メモリを多く使っている順に並べたい。空欄に入る値は?",
+          "language": "bash",
+          "code": "kubectl top pods -A --sort-by={{blank}}",
+          "answers": [
+            "memory"
+          ],
+          "candidates": [
+            "memory",
+            "cpu",
+            "name",
+            "restarts"
+          ],
+          "output": "NAMESPACE     NAME                                     CPU(cores)   MEMORY(bytes)\nkube-system   traefik-d7c9c5778-7gq2p                  2m           48Mi\nkube-system   metrics-server-5489f84d5d-7zwkt          6m           24Mi\nkube-system   coredns-6799fbcd5-x2k9q                  4m           19Mi\nkube-system   local-path-provisioner-64ffb68fd-xx98j   1m           9Mi",
+          "explanation": "kubectl top pod の --sort-by には cpu か memory を渡せます。-A (--all-namespaces) で全部の namespace の Pod を出します。",
+          "wrongNotes": {
+            "cpu": "cpu は CPU の使用量の順で、メモリの順にはなりません。",
+            "name": "--sort-by に渡せるのは cpu と memory だけです。",
+            "restarts": "--sort-by に渡せるのは cpu と memory だけで、再起動の回数は kubectl top では出ません。"
+          },
+          "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_top/kubectl_top_pod/"
+        },
+        {
+          "id": "w8-l3-q3",
+          "type": "choice",
+          "prompt": "kubectl top や HorizontalPodAutoscaler が使う CPU とメモリの数値を、各ノードの kubelet から集めて Metrics API として出しているのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "Prometheus",
+              "why": "Prometheus も使用量を集められますが、Metrics API を出す標準の部品は metrics-server です。"
+            },
+            {
+              "id": "b",
+              "text": "metrics-server"
+            },
+            {
+              "id": "c",
+              "text": "etcd",
+              "why": "etcd はクラスタの状態を持つ所で、使用量のメトリクスは集めません。"
+            },
+            {
+              "id": "d",
+              "text": "kube-scheduler",
+              "why": "kube-scheduler は Pod を置くノードを選ぶ部品で、requests を見ますが使用量は集めません。"
+            }
+          ],
+          "answer": "b",
+          "explanation": "metrics-server は各ノードの kubelet から使用量を集めてまとめ、API サーバーを通して Metrics API として出す追加の部品です。主な役目はオートスケーラーに使用量を渡すことで、kubectl top もこれを読みます。",
+          "source": "https://kubernetes.io/docs/tasks/debug/debug-cluster/resource-metrics-pipeline/"
+        },
+        {
+          "id": "w8-l3-q4",
+          "type": "fill",
+          "prompt": "php-apache の Deployment の Pod を、CPU 使用率 50% を目安に 1〜10 個で自動で増減させたい。空欄に入るサブコマンドは?",
+          "language": "bash",
+          "code": "kubectl {{blank}} deployment php-apache --cpu=50% --min=1 --max=10",
+          "answers": [
+            "autoscale"
+          ],
+          "candidates": [
+            "autoscale",
+            "scale",
+            "rollout",
+            "top"
+          ],
+          "output": "horizontalpodautoscaler.autoscaling/php-apache autoscaled",
+          "explanation": "kubectl autoscale は HorizontalPodAutoscaler を作るコマンドです。できた HPA は kubectl get hpa で確かめられます。 --cpu は kubectl 1.34 から使え、古い kubectl では --cpu-percent=50 と書きます。",
+          "wrongNotes": {
+            "scale": "scale はレプリカの数を 1 回だけ手で変えるコマンドで、負荷に合わせて増減はしません。",
+            "rollout": "rollout は Deployment の更新の状況を見たり、戻したりするコマンドです。",
+            "top": "top は使用量を見るだけで、何も作りません。"
+          },
+          "source": "https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale-walkthrough/"
+        },
+        {
+          "id": "w8-l3-q5",
+          "type": "fill",
+          "prompt": "autoscaling/v2 の HPA で、Pod の CPU の平均の使用率を 50% に保つように書きたい。空欄に入る欄の名前は?",
+          "language": "yaml",
+          "code": "apiVersion: autoscaling/v2\nkind: HorizontalPodAutoscaler\nmetadata:\n  name: php-apache\nspec:\n  scaleTargetRef:\n    apiVersion: apps/v1\n    kind: Deployment\n    name: php-apache\n  minReplicas: 1\n  maxReplicas: 10\n  metrics:\n  - type: Resource\n    resource:\n      name: cpu\n      target:\n        type: Utilization\n        {{blank}}: 50",
+          "answers": [
+            "averageUtilization"
+          ],
+          "candidates": [
+            "averageUtilization",
+            "averageValue",
+            "targetCPUUtilizationPercentage",
+            "maxReplicas"
+          ],
+          "explanation": "type: Utilization のときは averageUtilization に、requests に対する平均の使用率 (%) を書きます。autoscaling/v1 の targetCPUUtilizationPercentage は、v2 では metrics の配列に置き換わりました。",
+          "wrongNotes": {
+            "averageValue": "averageValue は type: AverageValue のときに使う、割合ではない量 (例: 100m) の目標です。",
+            "targetCPUUtilizationPercentage": "targetCPUUtilizationPercentage は古い autoscaling/v1 の欄で、v2 では metrics の配列に置き換わっています。",
+            "maxReplicas": "maxReplicas は増やす数の上限で、spec の直下に書きます。上でもう書いています。"
+          },
+          "source": "https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale-walkthrough/"
+        },
+        {
+          "id": "w8-l3-q6",
+          "type": "fill",
+          "prompt": "作った HorizontalPodAutoscaler の、いまの使用率と目標、レプリカの数を見たい。空欄に入るリソースの短い名前は?",
+          "language": "bash",
+          "code": "kubectl get {{blank}} php-apache",
+          "answers": [
+            "hpa",
+            "horizontalpodautoscaler",
+            "horizontalpodautoscalers"
+          ],
+          "candidates": [
+            "hpa",
+            "deploy",
+            "rs",
+            "pdb"
+          ],
+          "output": "NAME         REFERENCE               TARGETS       MINPODS   MAXPODS   REPLICAS   AGE\nphp-apache   Deployment/php-apache   cpu: 0%/50%   1         10        1          18s",
+          "explanation": "hpa は horizontalpodautoscaler の短い名前で、どちらでも使えます。TARGETS の列は、メトリクスごとに、対象の Pod の平均のいまの値と目標 (例: cpu: 0%/50%) を示します。",
+          "wrongNotes": {
+            "deploy": "deploy は Deployment で、レプリカの数は出ますが使用率と目標は出ません。",
+            "rs": "rs は ReplicaSet で、HPA の目標は出ません。",
+            "pdb": "pdb は PodDisruptionBudget で、自主的な退避のときに残す Pod の数を決めるものです。"
+          },
+          "source": "https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale-walkthrough/"
+        },
+        {
+          "id": "w8-l3-q7",
+          "type": "choice",
+          "prompt": "HPA で type: Utilization の CPU の使用率は、何に対する割合として計算される?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "ノードの CPU 全体",
+              "why": "ノードの大きさではなく、Pod が requests で求めた量が基準です。"
+            },
+            {
+              "id": "b",
+              "text": "Pod のコンテナの limits の合計",
+              "why": "基準は limits ではなく requests です。"
+            },
+            {
+              "id": "c",
+              "text": "Pod のコンテナの requests の合計"
+            },
+            {
+              "id": "d",
+              "text": "直近 5 分の使用量の最大値",
+              "why": "過去の最大値は基準になりません。5 分の窓は縮めるときの安定化の既定値の話です。"
+            }
+          ],
+          "answer": "c",
+          "explanation": "使用率は、いまの使用量と Pod の requests の比です。requests を書いていないコンテナがあると、HPA は CPU の使用率で動けません。",
+          "source": "https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/"
+        },
+        {
+          "id": "w8-l3-q8",
+          "type": "choice",
+          "prompt": "Pod の数は増やさず、各 Pod に割り当てる CPU とメモリの requests を、実際の使用量に合わせて自動で直したい。使うのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "HorizontalPodAutoscaler (HPA)",
+              "why": "HPA は Pod の数を増減して負荷を分ける、横方向のスケールです。"
+            },
+            {
+              "id": "b",
+              "text": "VerticalPodAutoscaler (VPA)"
+            },
+            {
+              "id": "c",
+              "text": "Cluster Autoscaler",
+              "why": "Cluster Autoscaler はノードの数を増減するもので、Pod の requests は直しません。"
+            },
+            {
+              "id": "d",
+              "text": "KEDA",
+              "why": "KEDA はキューのメッセージの数などのイベントの量に応じて、Pod の数を増減します。"
+            }
+          ],
+          "answer": "b",
+          "explanation": "VPA は縦方向のスケールで、使用量に合わせて requests と limits を直します。HPA と違って Kubernetes に最初から入ってはおらず、追加で入れる部品で、metrics-server も要ります。 VPA は Pod を作り直して新しい requests を当てます。",
+          "source": "https://kubernetes.io/docs/concepts/workloads/autoscaling/"
+        },
+        {
+          "id": "w8-l3-q9",
+          "type": "choice",
+          "prompt": "requests が大きく、どのノードにも置けずに Pending のままの Pod がある。これを見てノードを足すのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "Cluster Autoscaler や Karpenter などのノードのオートスケーラー"
+            },
+            {
+              "id": "b",
+              "text": "HorizontalPodAutoscaler",
+              "why": "HPA は Pod の数を増やすだけで、置き場のノードは足しません。Pod を増やすほど Pending が増えることもあります。"
+            },
+            {
+              "id": "c",
+              "text": "VerticalPodAutoscaler",
+              "why": "VPA は Pod の requests を直すもので、ノードは足しません。"
+            },
+            {
+              "id": "d",
+              "text": "metrics-server",
+              "why": "metrics-server は使用量を集めて出すだけで、何も増減しません。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "ノードのオートスケーラーは、置き場の無い Pending の Pod の requests などの条件を見て、置けるノードを足します。これを provisioning と呼びます (Cluster Autoscaler では以前 scale-up と呼んでいました)。SIG Autoscaling が支えているのは Cluster Autoscaler と Karpenter の 2 つです。",
+          "source": "https://kubernetes.io/docs/concepts/cluster-administration/node-autoscaling/"
+        }
+      ]
+    },
+    {
+      "id": "w8-l4",
+      "kind": "quiz",
+      "title": "サーバーレスと CNCF・オープンな標準",
+      "summary": "4 択とコマンドの穴埋め · 11 問",
+      "domain": "Cloud Native Architecture",
+      "questions": [
+        {
+          "id": "w8-l4-q1",
+          "type": "choice",
+          "prompt": "使われていないときは Pod を 0 個まで縮め、リクエストが来たら起動する、Kubernetes の上のサーバーレスの仕組みはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "Knative Serving"
+            },
+            {
+              "id": "b",
+              "text": "CPU の使用率で動かす HPA で minReplicas を 0 にする",
+              "why": "HPA で 0 まで縮められるのは object か external のメトリクスを使うときだけで、CPU のような resource のメトリクスでは 0 にできません。"
+            },
+            {
+              "id": "c",
+              "text": "replicas: 0 の Deployment",
+              "why": "それは止めたままにするだけで、リクエストが来ても自動では起動しません。"
+            },
+            {
+              "id": "d",
+              "text": "CronJob",
+              "why": "CronJob は決まった時刻に Job を動かすもので、リクエストに応じて起動はしません。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "Knative Serving は、HTTP のサービスの配置・経路・自動のスケールを受け持ち、0 まで縮めること (scale to zero) が既定で有効です。イベントのやり取りは Knative Eventing が CloudEvents で受け持ちます。",
+          "source": "https://knative.dev/docs/serving/autoscaling/scale-to-zero/"
+        },
+        {
+          "id": "w8-l4-q2",
+          "type": "choice",
+          "prompt": "CNCF のプロジェクトの段階を、成熟の低いほうから並べたものはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "Sandbox → Incubating → Graduated"
+            },
+            {
+              "id": "b",
+              "text": "Incubating → Sandbox → Graduated",
+              "why": "Sandbox がいちばん初めの段階です。"
+            },
+            {
+              "id": "c",
+              "text": "Sandbox → Graduated → Incubating",
+              "why": "Graduated がいちばん成熟した段階です。"
+            },
+            {
+              "id": "d",
+              "text": "Graduated → Incubating → Sandbox",
+              "why": "成熟の高いほうから並べています。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "Sandbox は試しの段階、Incubating は採用が広がり安定に取り組む段階、Graduated は本番での採用が示された成熟した段階です。使われなくなったものは Archived になります。",
+          "source": "https://github.com/cncf/toc/blob/main/process/README.md"
+        },
+        {
+          "id": "w8-l4-q3",
+          "type": "choice",
+          "prompt": "Incubating のプロジェクトが Graduated になるための条件のあらましとして、正しいのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "本番などで使っている採用組織を示し、第三者のセキュリティレビューと OpenSSF Best Practices の passing バッジを揃え、統治とメンテナの文書を整える"
+            },
+            {
+              "id": "b",
+              "text": "GitHub のスターの数が決められた数を超える",
+              "why": "スターの数は条件にありません。問われるのは、使っている組織 (採用者) です。"
+            },
+            {
+              "id": "c",
+              "text": "1 社がメンテナを全員出し、方針を素早く決められる体制にする",
+              "why": "条件は逆で、方針の決め方が特定の業者に偏らない (vendor-neutral) ことが求められます。"
+            },
+            {
+              "id": "d",
+              "text": "Kubernetes の SIG に承認される",
+              "why": "CNCF の段階を決めるのは CNCF の TOC で、Kubernetes の SIG ではありません。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "Graduated の申請では、採用組織の一覧と聞き取り、統治とメンテナの文書、第三者のセキュリティレビュー、OpenSSF Best Practices の passing バッジなどを示し、TOC の Due Diligence を受けます。",
+          "source": "https://github.com/cncf/toc/blob/main/.github/ISSUE_TEMPLATE/template-graduation-application.md"
+        },
+        {
+          "id": "w8-l4-q4",
+          "type": "choice",
+          "prompt": "CNCF で、プロジェクトの条件を審査し、段階を上げるかを投票で決めるのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "TOC (Technical Oversight Committee)"
+            },
+            {
+              "id": "b",
+              "text": "TAG (Technical Advisory Group)",
+              "why": "TAG は分野ごとに技術の助言をする集まりで、段階を決める投票はしません。"
+            },
+            {
+              "id": "c",
+              "text": "Kubernetes の Steering Committee",
+              "why": "Kubernetes プロジェクトの中の統治の機関で、CNCF のほかのプロジェクトの段階は決めません。"
+            },
+            {
+              "id": "d",
+              "text": "Linux Foundation の OCI",
+              "why": "OCI はコンテナの仕様を決める集まりで、CNCF の段階には関わりません。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "TOC は CNCF の技術の統治機関で、各段階の条件を満たしたかを Due Diligence で審査します。Incubating と Graduated への移動は、TOC の 2/3 以上の賛成 (supermajority) で決まります。",
+          "source": "https://github.com/cncf/toc/blob/main/process/README.md"
+        },
+        {
+          "id": "w8-l4-q5",
+          "type": "choice",
+          "prompt": "CNCF の TAG (Technical Advisory Group) の説明として正しいのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "TOC のもとに作られた、セキュリティやインフラなど分野ごとの技術の集まり (例: TAG Security and Compliance)"
+            },
+            {
+              "id": "b",
+              "text": "Kubernetes のコードを分野ごとに受け持つ集まり",
+              "why": "それは Kubernetes プロジェクトの SIG です。"
+            },
+            {
+              "id": "c",
+              "text": "プロジェクトの段階を投票で決める機関",
+              "why": "段階を決める投票をするのは TOC です。"
+            },
+            {
+              "id": "d",
+              "text": "コンテナイメージに付ける版の名前",
+              "why": "それはイメージのタグで、CNCF の TAG とは別物です。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "TAG は TOC が設置を認めた分野ごとの技術の集まりで、いまは Developer Experience・Infrastructure・Operational Resilience・Security and Compliance・Workloads Foundation があります。プロジェクトの段階を決めるのは TOC です。",
+          "source": "https://github.com/cncf/toc"
+        },
+        {
+          "id": "w8-l4-q6",
+          "type": "choice",
+          "prompt": "Prometheus は、CNCF でいまどの段階のプロジェクト?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "Sandbox",
+              "why": "Prometheus は 2016 年に Incubating で受け入れられ、Sandbox だったことはありません。"
+            },
+            {
+              "id": "b",
+              "text": "Incubating",
+              "why": "受け入れられたときは Incubating でしたが、2018 年に Graduated になりました。"
+            },
+            {
+              "id": "c",
+              "text": "Graduated"
+            },
+            {
+              "id": "d",
+              "text": "Archived",
+              "why": "Archived は使われなくなったプロジェクトの段階で、Prometheus は今も活発です。"
+            }
+          ],
+          "answer": "c",
+          "explanation": "Prometheus は 2016 年に Kubernetes に次ぐ 2 つ目のプロジェクトとして Incubating で受け入れられ、2018 年 8 月に Graduated になりました。Kubernetes・containerd・etcd・CoreDNS も Graduated です。",
+          "source": "https://www.cncf.io/projects/prometheus/"
+        },
+        {
+          "id": "w8-l4-q7",
+          "type": "choice",
+          "prompt": "OCI (Open Container Initiative) が決めている仕様の組み合わせはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "ランタイムの仕様・イメージの仕様・配布の仕様"
+            },
+            {
+              "id": "b",
+              "text": "CRI・CNI・CSI",
+              "why": "この 3 つは Kubernetes 側の、ランタイム・ネットワーク・ストレージにつなぐための取り決めです。"
+            },
+            {
+              "id": "c",
+              "text": "OTLP・PromQL・CloudEvents",
+              "why": "それぞれ OpenTelemetry・Prometheus・CNCF の CloudEvents の取り決めで、OCI ではありません。"
+            },
+            {
+              "id": "d",
+              "text": "Dockerfile の書き方と docker のコマンド",
+              "why": "Dockerfile は Docker の書式で、OCI の仕様ではありません。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "OCI は Linux Foundation のもとでコンテナの業界標準を作る集まりで、ランタイムの仕様 (runtime-spec)・イメージの仕様 (image-spec)・配布の仕様 (distribution-spec) の 3 つを持ちます。",
+          "source": "https://opencontainers.org/about/overview/"
+        },
+        {
+          "id": "w8-l4-q8",
+          "type": "choice",
+          "prompt": "ストレージの業者が、Kubernetes 本体にコードを足さずに自分のストレージのドライバを出せるようにする取り決めはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "CRI (Container Runtime Interface)",
+              "why": "CRI は kubelet とコンテナランタイムをつなぐ取り決めです。"
+            },
+            {
+              "id": "b",
+              "text": "CNI (Container Network Interface)",
+              "why": "CNI はネットワークのプラグインの取り決めです。"
+            },
+            {
+              "id": "c",
+              "text": "CSI (Container Storage Interface)"
+            },
+            {
+              "id": "d",
+              "text": "OCI のイメージの仕様",
+              "why": "イメージの中身の形を決める仕様で、ストレージのドライバとは関係ありません。"
+            }
+          ],
+          "answer": "c",
+          "explanation": "CSI は本体の外 (out-of-tree) のボリュームのプラグインの取り決めで、ストレージの業者は Kubernetes のリポジトリにコードを足さずにドライバを出せます。以前は本体の中 (in-tree) にプラグインを入れていました。",
+          "source": "https://kubernetes.io/docs/concepts/storage/volumes/"
+        },
+        {
+          "id": "w8-l4-q9",
+          "type": "choice",
+          "prompt": "Kubernetes の各ノードで、Pod のネットワーク (ネットワークのインターフェースの追加や削除など) を受け持つプラグインの取り決めはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "CNI (Container Network Interface)"
+            },
+            {
+              "id": "b",
+              "text": "CSI (Container Storage Interface)",
+              "why": "CSI はストレージのドライバの取り決めです。"
+            },
+            {
+              "id": "c",
+              "text": "CRI (Container Runtime Interface)",
+              "why": "CRI はコンテナを動かすランタイムとの取り決めで、ネットワークはランタイムが CNI のプラグインに任せます。"
+            },
+            {
+              "id": "d",
+              "text": "OTLP",
+              "why": "OTLP はテレメトリを送るための OpenTelemetry の取り決めです。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "Kubernetes のネットワークのモデルは各ノードのコンテナランタイムが実装し、多くのランタイムは CNI のプラグインでネットワークを扱います。CNI のプラグインは多くの業者が作っています。",
+          "source": "https://kubernetes.io/docs/concepts/cluster-administration/networking/"
+        },
+        {
+          "id": "w8-l4-q10",
+          "type": "choice",
+          "prompt": "Kubernetes プロジェクトを主に分けている単位で、Networking や Documentation など特定の話題を受け持ち、複数の会社の人が集まるものはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "SIG (Special Interest Group)"
+            },
+            {
+              "id": "b",
+              "text": "WG (Working Group)",
+              "why": "WG は、SIG をまたぐ話題や短い期間の話題を話し合うための集まりです。"
+            },
+            {
+              "id": "c",
+              "text": "Committee",
+              "why": "Committee は Steering Committee が作る、誰でも入れるわけではない集まりです。"
+            },
+            {
+              "id": "d",
+              "text": "TAG",
+              "why": "TAG は CNCF の TOC のもとの集まりで、Kubernetes プロジェクトの中の単位ではありません。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "Kubernetes プロジェクトは主に SIG に分かれ、各 SIG は担当の範囲を決めた charter を持ちます。SIG をまたぐ話題は WG で話し合います。",
+          "source": "https://github.com/kubernetes/community/blob/master/governance.md"
+        },
+        {
+          "id": "w8-l4-q11",
+          "type": "fill",
+          "prompt": "各ノードが CRI でどのコンテナランタイムを使っているかを、CONTAINER-RUNTIME の列で見たい。空欄に入る出力の形は?",
+          "language": "bash",
+          "code": "kubectl get nodes -o {{blank}}",
+          "answers": [
+            "wide"
+          ],
+          "candidates": [
+            "wide",
+            "name",
+            "yaml",
+            "json"
+          ],
+          "output": "NAME    STATUS   VERSION        CONTAINER-RUNTIME\nnode1   Ready    v1.33.5+k3s1   containerd://2.1.4-k3s1\nnode2   Ready    v1.33.5+k3s1   containerd://2.1.4-k3s1",
+          "explanation": "-o wide を付けると、CONTAINER-RUNTIME の列にランタイムの種類と版が出ます。k3s は CRI のランタイムとして containerd を同梱しています。(出力は列の一部を省いた例です)",
+          "wrongNotes": {
+            "name": "-o name は node/node1 のように名前だけを出し、列は出ません。",
+            "yaml": "-o yaml でもランタイムは status.nodeInfo に載りますが、CONTAINER-RUNTIME の列にはなりません。",
+            "json": "-o json も中身を丸ごと出す形で、列の一覧にはなりません。"
+          },
+          "source": "https://kubernetes.io/docs/tasks/administer-cluster/migrating-from-dockershim/find-out-runtime-you-use/"
+        }
+      ]
+    },
+    {
+      "id": "w8-lab",
+      "kind": "lab",
+      "title": "週末の実習: 使用量を見て、部品の段階を調べる",
+      "summary": "家のクラスタで手を動かす · 6 手順",
+      "domain": "Cloud Native Architecture",
+      "source": "https://docs.k3s.io/installation/packaged-components",
+      "steps": [
+        {
+          "text": "k3s が同梱の部品として入れる metrics-server が動いていることを確かめる (READY が 1/1 なら使える)",
+          "command": "kubectl get deployment metrics-server -n kube-system"
+        },
+        {
+          "text": "ノードごとの CPU とメモリの使用量を見る (CPU の m はミリコア)",
+          "command": "kubectl top nodes"
+        },
+        {
+          "text": "すべての namespace の Pod の使用量を、メモリの多い順に見る",
+          "command": "kubectl top pods -A --sort-by=memory"
+        },
+        {
+          "text": "クラスタに入っている部品を、Pod とイメージの一覧で書き出す (coredns・traefik・local-path-provisioner・metrics-server など)",
+          "command": "kubectl get pods -A -o custom-columns='NAMESPACE:.metadata.namespace,NAME:.metadata.name,IMAGE:.spec.containers[*].image'"
+        },
+        {
+          "text": "ノードのコンテナランタイムと Kubernetes の版も書き出す (CONTAINER-RUNTIME と VERSION の列)",
+          "command": "kubectl get nodes -o wide"
+        },
+        {
+          "text": "書き出した部品 (Kubernetes・containerd・CoreDNS・Traefik・metrics-server と、k3s に組み込まれていて Pod には出ない flannel など) を CNCF の Landscape (https://landscape.cncf.io/) で探し、Graduated・Incubating・Sandbox のどれかを書き出す。段階の付かないもの (CNCF のプロジェクトではない、または別のプロジェクトの一部) はそう書き、段階は cncf.io/projects の各ページでも確かめる"
+        }
+      ]
+    }
+  ]
+}
