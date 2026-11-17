@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { WEEKS } from '../src/content/curriculum';
 import glossary from '../src/content/glossary.json';
-import { searchTerms, sortTerms, validateGlossary, type GlossaryTerm } from '../src/lib/glossary';
+import { searchTerms, sortTerms, termDomain, validateGlossary, type GlossaryTerm } from '../src/lib/glossary';
 
 const lessonIds = new Set(WEEKS.flatMap((w) => (w.content?.lessons ?? []).map((l) => l.id)));
 const terms = (glossary as { terms: GlossaryTerm[] }).terms;
@@ -51,4 +51,13 @@ describe('searchTerms', () => {
   });
   it('空白で区切った語はすべて含むものだけ', () => expect(searchTerms(list, 'pod 入口').map((x) => x.id)).toEqual(['svc']));
   it('読みの順に並べる', () => expect(sortTerms(list).map((x) => x.id)).toEqual(['pv', 'pod', 'svc']));
+});
+
+describe('termDomain', () => {
+  const order = ['A', 'B', 'C'] as const;
+  const dom: Record<string, 'A' | 'B' | 'C'> = { l1: 'A', l2: 'B', l3: 'B', l4: 'C' };
+  const t = (lessons: string[]): GlossaryTerm => ({ id: 'x', term: 'x', description: 'x', source: 'https://x/', lessons });
+  it('いちばん多い分野', () => expect(termDomain(t(['l1', 'l2', 'l3']), (id) => dom[id], order)).toBe('B'));
+  it('同じ数なら order の先', () => expect(termDomain(t(['l4', 'l1']), (id) => dom[id], order)).toBe('A'));
+  it('見つからなければ undefined', () => expect(termDomain(t(['zz']), (id) => dom[id], order)).toBeUndefined());
 });
