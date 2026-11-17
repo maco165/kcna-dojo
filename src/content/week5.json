@@ -1,0 +1,827 @@
+{
+  "week": 5,
+  "lessons": [
+    {
+      "id": "w5-l1",
+      "kind": "quiz",
+      "title": "Service の種類",
+      "summary": "YAML とコマンドの穴埋めと 4 択 · 7 問",
+      "domain": "Container Orchestration",
+      "questions": [
+        {
+          "id": "w5-l1-q1",
+          "type": "choice",
+          "prompt": "Deployment で動かしている Pod に、別の Pod から Pod の IP を直接書いて繋いでいる。Service を使わないと何が困る?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "Pod は作り直されるたびに別の IP になるので、どこへ繋げばよいかを追い続けなければならない"
+            },
+            {
+              "id": "b",
+              "text": "Pod の IP はクラスタの外からしか届かないので、Pod どうしでは通信できない",
+              "why": "Pod どうしは、ノードが違っても Pod の IP で直接通信できます。困るのは IP が変わることです。"
+            },
+            {
+              "id": "c",
+              "text": "Pod の中のコンテナどうしが localhost で通信できなくなる",
+              "why": "同じ Pod のコンテナはネットワークを共有するので、Service が無くても localhost で通信できます。"
+            },
+            {
+              "id": "d",
+              "text": "Pod にイメージを取ってこられなくなる",
+              "why": "イメージの取得はノードのランタイムの仕事で、Service とは関係ありません。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "Pod は一時的なもので、作り直されると別の IP を持ちます。Service は Pod の集まりに変わらない名前と IP を与え、そのときに動いている Pod へ振り分けます。",
+          "source": "https://kubernetes.io/ja/docs/concepts/services-networking/service/"
+        },
+        {
+          "id": "w5-l1-q2",
+          "type": "fill",
+          "prompt": "Service の 80 番で受けた通信を、Pod の中のコンテナが待ち受けている 8080 番へ送りたい。空欄に入る欄の名前は?",
+          "language": "yaml",
+          "code": "apiVersion: v1\nkind: Service\nmetadata:\n  name: web\nspec:\n  selector:\n    app: web\n  ports:\n    - protocol: TCP\n      port: 80\n      {{blank}}: 8080",
+          "answers": [
+            "targetPort"
+          ],
+          "candidates": [
+            "targetPort",
+            "nodePort",
+            "containerPort",
+            "hostPort"
+          ],
+          "explanation": "port は Service が受けるポート、targetPort は転送先の Pod のポートです。書かなければ port と同じ番号になります。",
+          "wrongNotes": {
+            "nodePort": "nodePort は NodePort の Service で、各ノードが外から受けるポートです。",
+            "containerPort": "containerPort は Pod の定義でコンテナのポートを書く欄で、Service の欄ではありません。",
+            "hostPort": "hostPort は Pod の定義でノードのポートを直接使う欄で、Service の欄ではありません。"
+          },
+          "source": "https://kubernetes.io/ja/docs/concepts/services-networking/service/"
+        },
+        {
+          "id": "w5-l1-q3",
+          "type": "fill",
+          "prompt": "ロードバランサーを使わずに、クラスタの外から、どのノードの IP に繋いでも同じポート番号で届くようにしたい。空欄に入る type は?",
+          "language": "yaml",
+          "code": "apiVersion: v1\nkind: Service\nmetadata:\n  name: web\nspec:\n  type: {{blank}}\n  selector:\n    app: web\n  ports:\n    - port: 80\n      targetPort: 8080",
+          "answers": [
+            "NodePort"
+          ],
+          "candidates": [
+            "NodePort",
+            "ClusterIP",
+            "LoadBalancer",
+            "ExternalName"
+          ],
+          "output": "NAME   TYPE       CLUSTER-IP     EXTERNAL-IP   PORT(S)        AGE\nweb    NodePort   10.43.0.120    <none>        80:31380/TCP   5s",
+          "explanation": "NodePort は、すべてのノードの同じポート (既定の範囲から割り当て) で Service を公開します。ClusterIP も作られるので、クラスタの中からはこれまでどおり ClusterIP でも届きます。",
+          "wrongNotes": {
+            "ClusterIP": "ClusterIP はクラスタの中からだけ届く既定の種類で、ノードのポートは開きません。",
+            "LoadBalancer": "LoadBalancer も既定でノードのポートを開きますが、外のロードバランサーを付けるための種類です。ノードのポートだけで出すなら NodePort です。",
+            "ExternalName": "ExternalName は Service の名前を外の DNS 名に対応させるだけで、ポートを開きません。"
+          },
+          "source": "https://kubernetes.io/ja/docs/concepts/services-networking/service/"
+        },
+        {
+          "id": "w5-l1-q4",
+          "type": "choice",
+          "prompt": "Service のマニフェストで type を書かなかった。できる Service はどうなる?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "ClusterIP になり、クラスタの中からだけ届く"
+            },
+            {
+              "id": "b",
+              "text": "NodePort になり、すべてのノードのポートが開く",
+              "why": "NodePort は type に書いたときだけ作られます。"
+            },
+            {
+              "id": "c",
+              "text": "LoadBalancer になり、外のロードバランサーが作られる",
+              "why": "LoadBalancer も type に書いたときだけです。実装が無ければ外の IP は付きません。"
+            },
+            {
+              "id": "d",
+              "text": "type が無いので作れず、エラーになる",
+              "why": "type は省略でき、そのときは既定の種類で作られます。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "type を省略すると既定の ClusterIP になり、クラスタの中だけで使える仮想の IP が付きます。外に出すには NodePort・LoadBalancer か、Ingress や Gateway を使います。",
+          "source": "https://kubernetes.io/ja/docs/concepts/services-networking/service/"
+        },
+        {
+          "id": "w5-l1-q5",
+          "type": "fill",
+          "prompt": "クラスタの中のアプリから、外にあるデータベース db.example.com を、クラスタの中の名前 my-db で引けるようにしたい。空欄に入る欄の名前は?",
+          "language": "yaml",
+          "code": "apiVersion: v1\nkind: Service\nmetadata:\n  name: my-db\nspec:\n  type: ExternalName\n  {{blank}}: db.example.com",
+          "answers": [
+            "externalName"
+          ],
+          "candidates": [
+            "externalName",
+            "externalIPs",
+            "clusterIP",
+            "selector"
+          ],
+          "output": "NAME    TYPE           CLUSTER-IP   EXTERNAL-IP      PORT(S)   AGE\nmy-db   ExternalName   <none>       db.example.com   <none>    3s",
+          "explanation": "ExternalName の Service は、クラスタの DNS が my-db の問い合わせに externalName の値を CNAME で返すだけで、通信をプロキシしません。そのためセレクターも ClusterIP も持ちません。",
+          "wrongNotes": {
+            "externalIPs": "externalIPs は、Service をその外部の IP でも受けるようにする欄で、DNS 名は書きません。",
+            "clusterIP": "clusterIP はクラスタの中の IP を書く欄です。ExternalName の Service には ClusterIP が付きません。",
+            "selector": "selector は送り先の Pod をラベルで選ぶ欄で、外の DNS 名は書けません。"
+          },
+          "source": "https://kubernetes.io/ja/docs/concepts/services-networking/service/"
+        },
+        {
+          "id": "w5-l1-q6",
+          "type": "fill",
+          "prompt": "Deployment web の Pod (8080 番で待ち受け) に、80 番で受ける Service をコマンド 1 つで作りたい。空欄に入るサブコマンドは?",
+          "language": "bash",
+          "code": "kubectl {{blank}} deployment web --port=80 --target-port=8080",
+          "answers": [
+            "expose"
+          ],
+          "candidates": [
+            "expose",
+            "port-forward",
+            "run",
+            "proxy"
+          ],
+          "output": "service/web exposed",
+          "explanation": "kubectl expose は、Deployment などのセレクターを引き継いだ Service を作ります。--type を付けなければ ClusterIP になります。",
+          "wrongNotes": {
+            "port-forward": "port-forward は手元の端末から Pod へ一時的に穴を開けるだけで、Service は作りません。",
+            "run": "run は Pod を 1 つ作るコマンドです。",
+            "proxy": "proxy は手元と API サーバーの間をつなぐコマンドで、Service は作りません。"
+          },
+          "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_expose/"
+        },
+        {
+          "id": "w5-l1-q7",
+          "type": "choice",
+          "prompt": "クラウドの外に作ったクラスタで type: LoadBalancer の Service を作った。ロードバランサーの実装を何も入れていないと、どうなる?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "外の IP が割り当てられず、Pending のまま待ち続ける"
+            },
+            {
+              "id": "b",
+              "text": "Kubernetes 本体に入っているロードバランサーがすぐに外の IP を付ける",
+              "why": "Kubernetes 本体はロードバランサーの実装を持っていません。k3s は ServiceLB を同梱しているので付きます。"
+            },
+            {
+              "id": "c",
+              "text": "自動で ExternalName の Service に変わる",
+              "why": "Service の種類が勝手に変わることはありません。"
+            },
+            {
+              "id": "d",
+              "text": "Service を作る時点で API サーバーに拒否される",
+              "why": "作ることはできます。外の IP が付かないだけです。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "Kubernetes 本体は LoadBalancer の Service を作れても、ロードバランサーそのものは用意しないので、実装を入れるまで Pending のままです。k3s は ServiceLB を同梱していて、ノードのポートを使ってクラウドが無くても LoadBalancer を使えます。",
+          "source": "https://docs.k3s.io/networking/networking-services"
+        }
+      ]
+    },
+    {
+      "id": "w5-l2",
+      "kind": "quiz",
+      "title": "名前で引く: DNS と EndpointSlice",
+      "summary": "出力を読む・コマンドと YAML の穴埋め · 6 問",
+      "domain": "Container Orchestration",
+      "questions": [
+        {
+          "id": "w5-l2-q1",
+          "type": "fill",
+          "prompt": "Namespace default の Pod から、Namespace shop にある Service web を、省略しない名前で引きたい。空欄に入るのは? (クラスタのドメインは cluster.local)",
+          "language": "bash",
+          "code": "kubectl run tmp --rm -it --image=busybox:1.36 --restart=Never -- \\\n  nslookup web.{{blank}}.svc.cluster.local",
+          "answers": [
+            "shop"
+          ],
+          "candidates": [
+            "shop",
+            "default",
+            "kube-system",
+            "service"
+          ],
+          "output": "Server:\t\t10.43.0.10\nAddress:\t10.43.0.10:53\n\nName:\tweb.shop.svc.cluster.local\nAddress: 10.43.0.25",
+          "explanation": "Service の名前は <Service 名>.<Namespace 名>.svc.<クラスタのドメイン> の形で、引くと ClusterIP が返ります。Namespace の部分には、引く側ではなく Service のある Namespace を書きます。",
+          "wrongNotes": {
+            "default": "default は引く側の Pod の Namespace です。Service web は shop にあります。",
+            "kube-system": "kube-system はクラスタの部品が入る Namespace で、web はありません。",
+            "service": "名前の中の svc は決まった語で、その前には Namespace 名が入ります。"
+          },
+          "source": "https://kubernetes.io/ja/docs/concepts/services-networking/dns-pod-service/"
+        },
+        {
+          "id": "w5-l2-q2",
+          "type": "choice",
+          "prompt": "Namespace test の Pod の中からは、同じ Namespace の Service data を、短い名前 data だけで引ける。なぜ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "kubelet が Pod の /etc/resolv.conf に、自分の Namespace を含む検索ドメイン (search) を書いているから"
+            },
+            {
+              "id": "b",
+              "text": "Service の名前はクラスタ全体で 1 つしか作れないから",
+              "why": "同じ名前の Service を別の Namespace に作れます。だから短い名前は自分の Namespace で解決されます。"
+            },
+            {
+              "id": "c",
+              "text": "kube-proxy が Pod の通信を見て、名前を IP に書き換えているから",
+              "why": "kube-proxy は Service の IP あての通信を振り分けるもので、名前の解決はしません。"
+            },
+            {
+              "id": "d",
+              "text": "Pod の /etc/hosts に、すべての Service が書き込まれているから",
+              "why": "Service の名前はクラスタの DNS が答えます。/etc/hosts には書かれません。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "kubelet は各 Pod の /etc/resolv.conf に test.svc.cluster.local などの検索ドメインを書くので、data は data.test.svc.cluster.local に展開されます。別の Namespace の Service は data.prod のように Namespace を付けて引きます。",
+          "source": "https://kubernetes.io/ja/docs/concepts/services-networking/dns-pod-service/"
+        },
+        {
+          "id": "w5-l2-q3",
+          "type": "fill",
+          "prompt": "ClusterIP を付けず、名前を引くと選ばれた Pod の IP がそのまま返る Service (ヘッドレス Service) を作りたい。空欄に入る値は?",
+          "language": "yaml",
+          "code": "apiVersion: v1\nkind: Service\nmetadata:\n  name: db\nspec:\n  clusterIP: {{blank}}\n  selector:\n    app: db\n  ports:\n    - port: 5432",
+          "answers": [
+            "None",
+            "\"None\""
+          ],
+          "candidates": [
+            "None",
+            "0.0.0.0",
+            "Headless",
+            "false"
+          ],
+          "explanation": ".spec.clusterIP を None にすると IP が割り当てられないヘッドレス Service になります。名前を引くと、ClusterIP ではなく選ばれたすべての Pod の IP が返ります。",
+          "wrongNotes": {
+            "0.0.0.0": "clusterIP に書く IP は Service の IP の範囲の中のものに限られ、0.0.0.0 では IP を持たない意味になりません。",
+            "Headless": "Headless という値はありません。決まった書き方は None です。",
+            "false": "clusterIP は IP を書く欄で、真偽値は書けません。"
+          },
+          "source": "https://kubernetes.io/ja/docs/concepts/services-networking/service/"
+        },
+        {
+          "id": "w5-l2-q4",
+          "type": "fill",
+          "prompt": "Service web が今どの Pod の IP に振り分けているかを、Kubernetes が自動で作る資源で確かめたい。空欄に入る資源の種類は?",
+          "language": "bash",
+          "code": "kubectl get {{blank}} -l kubernetes.io/service-name=web",
+          "answers": [
+            "endpointslices",
+            "endpointslice"
+          ],
+          "candidates": [
+            "endpointslices",
+            "pods",
+            "services",
+            "ingresses"
+          ],
+          "output": "NAME        ADDRESSTYPE   PORTS   ENDPOINTS              AGE\nweb-7xk2p   IPv4          8080    10.42.0.15,10.42.1.9   5m",
+          "explanation": "Service のコントローラーは、セレクターに合う Pod を見て EndpointSlice を作り直します。EndpointSlice には kubernetes.io/service-name のラベルで、元の Service の名前が付きます。",
+          "wrongNotes": {
+            "pods": "pods にすると Pod を探しますが、Pod には kubernetes.io/service-name のラベルが付かないので、No resources found と出るだけです。",
+            "services": "Service の一覧では、振り分け先の Pod の IP までは分かりません。",
+            "ingresses": "Ingress は外からの HTTP の振り分けの決まりで、Service の振り分け先は持ちません。"
+          },
+          "source": "https://kubernetes.io/ja/docs/concepts/services-networking/endpoint-slices/"
+        },
+        {
+          "id": "w5-l2-q5",
+          "type": "choice",
+          "prompt": "Service web はあるのに、名前で繋ぐと応答が無い。次の出力から考えて、いちばん疑わしい原因はどれ?",
+          "code": {
+            "language": "bash",
+            "text": "$ kubectl get service web\nNAME   TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE\nweb    ClusterIP   10.43.0.87   <none>        80/TCP    2m\n\n$ kubectl get endpointslices -l kubernetes.io/service-name=web\nNAME        ADDRESSTYPE   PORTS     ENDPOINTS   AGE\nweb-q8m4z   IPv4          <unset>   <unset>     2m\n$ kubectl get service web -o jsonpath='{.spec.selector}'\n{\"app\":\"web\"}\n$ kubectl get pods --show-labels\nNAME                     READY   STATUS    RESTARTS   AGE   LABELS\nweb-6d4f8c7b9-k2x7p      1/1     Running   0          2m    app=web-v2,pod-template-hash=6d4f8c7b9\nweb-6d4f8c7b9-m9q4z      1/1     Running   0          2m    app=web-v2,pod-template-hash=6d4f8c7b9"
+          },
+          "choices": [
+            {
+              "id": "a",
+              "text": "Service のセレクター app=web が、Pod のラベル app=web-v2 と合っていない"
+            },
+            {
+              "id": "b",
+              "text": "クラスタの DNS が止まっていて、web の名前を引けない",
+              "why": "名前が引けないかどうかはこの出力からは分かりません。振り分け先が空になっていることが手がかりです。"
+            },
+            {
+              "id": "c",
+              "text": "ClusterIP の 10.43.0.87 がクラスタの外の IP だから",
+              "why": "10.43.0.87 は Service の IP の範囲の中の、ふつうの ClusterIP です。"
+            },
+            {
+              "id": "d",
+              "text": "Pod が Running になっていないから",
+              "why": "Pod は 2 つとも Running です。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "Service が振り分ける Pod は selector で選ばれ、選ばれた Pod が EndpointSlice に入ります。ENDPOINTS が空なのは、selector に合うラベルの Pod が 1 つも無いからです。",
+          "source": "https://kubernetes.io/ja/docs/concepts/services-networking/service/"
+        },
+        {
+          "id": "w5-l2-q6",
+          "type": "choice",
+          "prompt": "Service の安定した IP あての通信を、そのとき動いている Pod へ届くように各ノードで仕込むのは何?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "Service と EndpointSlice を見張るサービスプロキシ (kube-proxy など)"
+            },
+            {
+              "id": "b",
+              "text": "kube-scheduler",
+              "why": "kube-scheduler は Pod を置くノードを決めるもので、通信は扱いません。"
+            },
+            {
+              "id": "c",
+              "text": "クラスタの DNS (CoreDNS など)",
+              "why": "DNS は名前を ClusterIP に変えるまでで、その IP あての通信を Pod へ届けるのは別の仕組みです。"
+            },
+            {
+              "id": "d",
+              "text": "Ingress コントローラー",
+              "why": "Ingress コントローラーは外からの HTTP の入口で、クラスタの中の Service の通信は受け持ちません。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "サービスプロキシは Service と EndpointSlice の変化を見て、ノードのパケットの書き換えなどで Service の IP あての通信を Pod へ届けます。Kubernetes の標準の実装は各ノードで動く kube-proxy です。",
+          "source": "https://kubernetes.io/docs/reference/command-line-tools-reference/kube-proxy/"
+        }
+      ]
+    },
+    {
+      "id": "w5-l3",
+      "kind": "quiz",
+      "title": "Ingress と Gateway API",
+      "summary": "YAML の穴埋めと 4 択 · 7 問",
+      "domain": "Container Orchestration",
+      "questions": [
+        {
+          "id": "w5-l3-q1",
+          "type": "choice",
+          "prompt": "Ingress と type: LoadBalancer の Service の違いとして正しいのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "Ingress は HTTP(S) のホスト名やパスで、1 つの入口から複数の Service に振り分ける。LoadBalancer は Service ごとに外の入口を作り、HTTP 以外のポートも出せる"
+            },
+            {
+              "id": "b",
+              "text": "Ingress は Service の種類の 1 つで、type: Ingress と書いて作る",
+              "why": "Ingress は Service の種類ではなく、別の API の資源です。"
+            },
+            {
+              "id": "c",
+              "text": "Ingress は TCP や UDP の任意のポートも外に出せるが、LoadBalancer は HTTP だけ",
+              "why": "逆です。Ingress は HTTP と HTTPS だけで、それ以外は NodePort か LoadBalancer を使います。"
+            },
+            {
+              "id": "d",
+              "text": "Ingress を作るだけで、コントローラーが無くても外から届く",
+              "why": "Ingress はコントローラーが読んで初めて効きます。資源を作るだけでは何も起きません。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "Ingress は HTTP と HTTPS のルールを 1 つの資源にまとめ、ホスト名やパスで複数の Service へ振り分けます。HTTP 以外を外に出すときや、Service 1 つをそのまま出すときは NodePort か LoadBalancer を使います。",
+          "source": "https://kubernetes.io/ja/docs/concepts/services-networking/ingress/"
+        },
+        {
+          "id": "w5-l3-q2",
+          "type": "choice",
+          "prompt": "Ingress の資源を作ったのに、外から繋いでも何も起きない。まず確かめることはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "クラスタで Ingress コントローラーが動いているか"
+            },
+            {
+              "id": "b",
+              "text": "kube-controller-manager が動いているか",
+              "why": "Ingress コントローラーは kube-controller-manager の中では動きません。別に入れて動かします。"
+            },
+            {
+              "id": "c",
+              "text": "Pod のコンテナに Ingress のポートが書かれているか",
+              "why": "Ingress はコンテナの定義には書きません。振り分け先は Service で決めます。"
+            },
+            {
+              "id": "d",
+              "text": "NetworkPolicy が作られているか",
+              "why": "NetworkPolicy は通信を絞る仕組みで、無くても Ingress は動きます。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "Ingress は決まりを書いた資源で、それを読んで通信を振り分けるのは Ingress コントローラーです。ほかのコントローラーと違い kube-controller-manager に含まれないので、少なくとも 1 つを入れておく必要があります (k3s は Traefik を同梱しています)。",
+          "source": "https://kubernetes.io/ja/docs/concepts/services-networking/ingress-controllers/"
+        },
+        {
+          "id": "w5-l3-q3",
+          "type": "fill",
+          "prompt": "この Ingress を、クラスタにある IngressClass traefik のコントローラーに処理させたい。空欄に入る欄の名前は?",
+          "language": "yaml",
+          "code": "apiVersion: networking.k8s.io/v1\nkind: Ingress\nmetadata:\n  name: web\nspec:\n  {{blank}}: traefik\n  rules:\n    - host: web.example.test\n      http:\n        paths:\n          - path: /\n            pathType: Prefix\n            backend:\n              service:\n                name: web\n                port:\n                  number: 80",
+          "answers": [
+            "ingressClassName"
+          ],
+          "candidates": [
+            "ingressClassName",
+            "gatewayClassName",
+            "controller",
+            "type"
+          ],
+          "output": "NAME   CLASS     HOSTS              ADDRESS      PORTS   AGE\nweb    traefik   web.example.test   192.0.2.10   80      10s",
+          "explanation": "ingressClassName で、どの IngressClass (つまりどのコントローラー) がこの Ingress を処理するかを決めます。省略すると、既定に決めた IngressClass があればそれが使われます。",
+          "wrongNotes": {
+            "gatewayClassName": "gatewayClassName は Gateway API の Gateway に書く欄で、Ingress にはありません。",
+            "controller": "controller は IngressClass の側に書く欄で、Ingress の spec にはありません。",
+            "type": "type は Service の種類を書く欄で、Ingress にはありません。"
+          },
+          "source": "https://kubernetes.io/ja/docs/concepts/services-networking/ingress/"
+        },
+        {
+          "id": "w5-l3-q4",
+          "type": "fill",
+          "prompt": "/api と、/api/v1 のようにその下のパスの全部を Service api に送りたい。空欄に入る pathType は?",
+          "language": "yaml",
+          "code": "rules:\n  - http:\n      paths:\n        - path: /api\n          pathType: {{blank}}\n          backend:\n            service:\n              name: api\n              port:\n                number: 8080",
+          "answers": [
+            "Prefix"
+          ],
+          "candidates": [
+            "Prefix",
+            "Exact",
+            "PathPrefix",
+            "Regex"
+          ],
+          "explanation": "Prefix は / で区切った要素ごとの前方一致で、/api は /api・/api/・/api/v1 に一致しますが /apix には一致しません。Exact は大文字と小文字まで含めて完全に同じパスだけに一致します。",
+          "wrongNotes": {
+            "Exact": "Exact は /api だけに一致し、/api/v1 には一致しません。",
+            "PathPrefix": "PathPrefix は Gateway API の HTTPRoute で使う書き方で、Ingress の pathType にはありません。",
+            "Regex": "Regex という pathType はありません。決まっているのは Exact・Prefix・ImplementationSpecific です。"
+          },
+          "source": "https://kubernetes.io/ja/docs/concepts/services-networking/ingress/"
+        },
+        {
+          "id": "w5-l3-q5",
+          "type": "choice",
+          "prompt": "Ingress コントローラーを別の製品に入れ替える。Ingress のマニフェストについて正しいのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "ingressClassName を新しいコントローラーの IngressClass に向け直し、コントローラーごとに違う注釈 (annotations) の設定を書き直す。host・path・backend の基本の欄はそのまま使える"
+            },
+            {
+              "id": "b",
+              "text": "Ingress は Kubernetes 本体が処理するので、何も変えなくてよい",
+              "why": "Ingress を処理するのはコントローラーです。注釈の意味や細かい動作はコントローラーごとに違います。"
+            },
+            {
+              "id": "c",
+              "text": "Ingress は使えなくなるので、Service を全部 type: LoadBalancer に書き直す",
+              "why": "Ingress の API は共通なので、コントローラーを替えても Ingress のまま使えます。"
+            },
+            {
+              "id": "d",
+              "text": "Pod の IP の振り方が変わるので、Pod を作り直す",
+              "why": "Pod の IP を振るのは CNI プラグインで、Ingress コントローラーとは関係ありません。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "Ingress の基本の欄は共通の仕様ですが、使える注釈 (rewrite-target など) と細かい動作はコントローラーごとに違います。入れ替えるときは ingressClassName と注釈を見直し、振り分けを確かめ直します。",
+          "source": "https://kubernetes.io/ja/docs/concepts/services-networking/ingress/"
+        },
+        {
+          "id": "w5-l3-q6",
+          "type": "fill",
+          "prompt": "Gateway API で、この HTTPRoute を Gateway example-gateway に結び付けたい。空欄に入る欄の名前は?",
+          "language": "yaml",
+          "code": "apiVersion: gateway.networking.k8s.io/v1\nkind: HTTPRoute\nmetadata:\n  name: example-httproute\nspec:\n  {{blank}}:\n    - name: example-gateway\n  hostnames:\n    - \"www.example.com\"\n  rules:\n    - matches:\n        - path:\n            type: PathPrefix\n            value: /login\n      backendRefs:\n        - name: example-svc\n          port: 8080",
+          "answers": [
+            "parentRefs"
+          ],
+          "candidates": [
+            "parentRefs",
+            "backendRefs",
+            "gatewayClassName",
+            "ingressClassName"
+          ],
+          "output": "httproute.gateway.networking.k8s.io/example-httproute created",
+          "explanation": "HTTPRoute は parentRefs で、どの Gateway に付くかを決めます。backendRefs は振り分け先の Service です。",
+          "wrongNotes": {
+            "backendRefs": "backendRefs は振り分け先 (多くは Service) を書く欄で、この例では rules の中にすでにあります。",
+            "gatewayClassName": "gatewayClassName は Gateway の側に書き、どの GatewayClass を使うかを決める欄です。",
+            "ingressClassName": "ingressClassName は Ingress の欄で、Gateway API の HTTPRoute にはありません。"
+          },
+          "source": "https://kubernetes.io/ja/docs/concepts/services-networking/gateway/"
+        },
+        {
+          "id": "w5-l3-q7",
+          "type": "choice",
+          "prompt": "Gateway API の 3 つの資源の役目の組み合わせとして正しいのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "GatewayClass は同じ設定を持つゲートウェイの種類とそのコントローラー、Gateway は通信を受ける入口のインスタンス、HTTPRoute は入口から Service への HTTP の振り分けの決まり"
+            },
+            {
+              "id": "b",
+              "text": "GatewayClass は振り分けの決まり、Gateway は Service、HTTPRoute は Pod の IP の割り当て",
+              "why": "振り分けの決まりは HTTPRoute です。Pod の IP の割り当ては CNI プラグインの仕事です。"
+            },
+            {
+              "id": "c",
+              "text": "3 つとも Ingress の別名で、どれを書いても同じ動きになる",
+              "why": "Gateway API は Ingress の後継として設計された別の API で、役目ごとに資源を分けています。"
+            },
+            {
+              "id": "d",
+              "text": "1 つの Gateway が複数の GatewayClass に同時に属し、どのコントローラーでも処理される",
+              "why": "Gateway はただ 1 つの GatewayClass に結び付き、そのクラスのコントローラーが管理します。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "Gateway API は、基盤の提供者・クラスタの運用者・アプリ開発者という役目に合わせて資源を分けています。Ingress が 1 つの資源にまとめていた入口と振り分けを、Gateway と HTTPRoute に分けて持てるのが違いです。",
+          "source": "https://kubernetes.io/ja/docs/concepts/services-networking/gateway/"
+        }
+      ]
+    },
+    {
+      "id": "w5-l4",
+      "kind": "quiz",
+      "title": "CNI・NetworkPolicy・サービスメッシュ",
+      "summary": "YAML の穴埋めと 4 択 · 8 問",
+      "domain": "Container Orchestration",
+      "questions": [
+        {
+          "id": "w5-l4-q1",
+          "type": "choice",
+          "prompt": "CNI (Container Network Interface) の説明として正しいのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "Linux のコンテナのネットワークインターフェースを設定するプラグインのための仕様とライブラリで、CNCF のプロジェクト"
+            },
+            {
+              "id": "b",
+              "text": "コンテナのイメージの形とレジストリの決まり",
+              "why": "それは OCI の仕様の話です。"
+            },
+            {
+              "id": "c",
+              "text": "kubelet がコンテナランタイムにコンテナの起動を頼むための API",
+              "why": "それは CRI です。CNI はネットワークの設定だけを受け持ちます。"
+            },
+            {
+              "id": "d",
+              "text": "Service の ClusterIP あての通信を Pod へ振り分ける仕組み",
+              "why": "それはサービスプロキシ (kube-proxy など) の仕事です。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "CNI は、コンテナのネットワークの接続と、コンテナを消したときの後片付けだけに絞ったプラグインの仕様です。CRI はコンテナの起動、OCI はイメージと実行の形を決めるもので、CNI とは受け持ちが違います。",
+          "source": "https://github.com/containernetworking/cni"
+        },
+        {
+          "id": "w5-l4-q2",
+          "type": "choice",
+          "prompt": "Pod に IP を振り、ノードをまたいだ Pod どうしの通信をつなぐ Kubernetes のネットワークモデルを、実際に作るのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "コンテナランタイムが読み込む CNI プラグイン"
+            },
+            {
+              "id": "b",
+              "text": "kube-apiserver",
+              "why": "API サーバーは資源を受け付けて保存するだけで、ノードのネットワークは組みません。"
+            },
+            {
+              "id": "c",
+              "text": "Ingress コントローラー",
+              "why": "Ingress コントローラーは外からの HTTP の入口で、Pod の IP は振りません。"
+            },
+            {
+              "id": "d",
+              "text": "kubelet の中に組み込まれたネットワークの機能",
+              "why": "Kubernetes 1.24 から、CNI の管理は kubelet の受け持ちではなくなりました。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "Kubernetes のネットワークモデルを実装するには、クラスタに合った CNI プラグインが要ります。コンテナランタイムがその CNI プラグインを読み込んで Pod のネットワークを組みます。",
+          "source": "https://kubernetes.io/ja/docs/concepts/extend-kubernetes/compute-storage-net/network-plugins/"
+        },
+        {
+          "id": "w5-l4-q3",
+          "type": "fill",
+          "prompt": "この Namespace のすべての Pod について、どのポリシーでも許していない内向きの通信を拒否したい。空欄に入る値は?",
+          "language": "yaml",
+          "code": "apiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: default-deny-ingress\nspec:\n  podSelector: {{blank}}\n  policyTypes:\n    - Ingress",
+          "answers": [
+            "{}"
+          ],
+          "candidates": [
+            "{}",
+            "\"*\"",
+            "all",
+            "[]"
+          ],
+          "output": "networkpolicy.networking.k8s.io/default-deny-ingress created",
+          "explanation": "podSelector を空 ({}) にすると、その Namespace のすべての Pod が選ばれます。ingress のルールを 1 つも書かないので、選ばれた Pod への内向きの通信は、ほかのポリシーで許したもの以外すべて拒否されます。",
+          "wrongNotes": {
+            "\"*\"": "podSelector はラベルで選ぶ欄で、* のような全部を表す文字はありません。",
+            "all": "all という書き方はありません。全部を選ぶのは空のセレクター {} です。",
+            "[]": "podSelector はセレクター (オブジェクト) で、配列は書けません。"
+          },
+          "source": "https://kubernetes.io/ja/docs/concepts/services-networking/network-policies/"
+        },
+        {
+          "id": "w5-l4-q4",
+          "type": "fill",
+          "prompt": "role: db の Pod の 6379 番へ、role: frontend の Pod からだけ入れるようにしたい。空欄に入る欄の名前は?",
+          "language": "yaml",
+          "code": "apiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: db-allow-frontend\nspec:\n  podSelector:\n    matchLabels:\n      role: db\n  policyTypes:\n    - Ingress\n  {{blank}}:\n    - from:\n        - podSelector:\n            matchLabels:\n              role: frontend\n      ports:\n        - protocol: TCP\n          port: 6379",
+          "answers": [
+            "ingress"
+          ],
+          "candidates": [
+            "ingress",
+            "egress",
+            "allow",
+            "Ingress"
+          ],
+          "explanation": "内向きに許す通信は ingress の下に from とポートで書きます。policyTypes に Ingress があるので、ここに書いたもの以外の内向きの通信は db の Pod に届きません。",
+          "wrongNotes": {
+            "egress": "egress は選んだ Pod から出ていく通信の決まりで、書く先は to です。",
+            "allow": "NetworkPolicy に allow という欄はありません。書いたものが許す一覧になります。",
+            "Ingress": "大文字の Ingress は policyTypes に書く値です。ルールを書く欄の名前は小文字の ingress です。大文字で書くと unknown field \"spec.Ingress\" で拒否されます。"
+          },
+          "source": "https://kubernetes.io/ja/docs/concepts/services-networking/network-policies/"
+        },
+        {
+          "id": "w5-l4-q5",
+          "type": "fill",
+          "prompt": "role: db の Pod へ、ラベル project: myproject の付いた Namespace の Pod からの通信を許したい。空欄に入るセレクターは?",
+          "language": "yaml",
+          "code": "ingress:\n  - from:\n      - {{blank}}:\n          matchLabels:\n            project: myproject",
+          "answers": [
+            "namespaceSelector"
+          ],
+          "candidates": [
+            "namespaceSelector",
+            "podSelector",
+            "nodeSelector",
+            "ipBlock"
+          ],
+          "explanation": "namespaceSelector は、ラベルの合う Namespace のすべての Pod を送り元として許します。podSelector だけなら、ポリシーと同じ Namespace の Pod を選びます。",
+          "wrongNotes": {
+            "podSelector": "from の中の podSelector だけでは、ポリシーと同じ Namespace の Pod しか選べません。",
+            "nodeSelector": "nodeSelector は Pod を置くノードを選ぶ Pod の欄で、NetworkPolicy にはありません。",
+            "ipBlock": "ipBlock は CIDR の範囲で選ぶ欄で、ラベルは書けません。"
+          },
+          "source": "https://kubernetes.io/ja/docs/concepts/services-networking/network-policies/"
+        },
+        {
+          "id": "w5-l4-q6",
+          "type": "choice",
+          "prompt": "NetworkPolicy を作ったのに、通信がまったく止まらない。考えられる原因はどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "使っているネットワークプラグインが NetworkPolicy を実装していない"
+            },
+            {
+              "id": "b",
+              "text": "NetworkPolicy は kube-proxy を作り直すまで効かない",
+              "why": "NetworkPolicy を実装するのはネットワークプラグインです。kube-proxy は関係ありません。"
+            },
+            {
+              "id": "c",
+              "text": "NetworkPolicy は default の Namespace でしか効かない",
+              "why": "NetworkPolicy はどの Namespace にも作れ、その Namespace の Pod に効きます。"
+            },
+            {
+              "id": "d",
+              "text": "NetworkPolicy は Pod を作り直さないと読まれない",
+              "why": "対応したプラグインなら、動いている Pod にもそのまま効きます。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "NetworkPolicy はネットワークプラグインが実装するもので、対応していないプラグインでは作っても効果がありません。k3s はネットワークポリシーのコントローラー (kube-router のライブラリ) を同梱しているので、そのままで効きます。",
+          "source": "https://kubernetes.io/ja/docs/concepts/services-networking/network-policies/"
+        },
+        {
+          "id": "w5-l4-q7",
+          "type": "choice",
+          "prompt": "同じ Pod を 2 つの NetworkPolicy が選んでいる。片方は frontend から、もう片方は monitoring からの通信を許している。この Pod に届くのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "frontend からと monitoring からの両方 (2 つのポリシーの許可を合わせたもの)"
+            },
+            {
+              "id": "b",
+              "text": "後から作ったポリシーが許した側だけ",
+              "why": "評価の順番は結果に影響しません。"
+            },
+            {
+              "id": "c",
+              "text": "両方のポリシーが許した通信だけなので、どちらも届かない",
+              "why": "許可は重なりではなく足し合わせで決まります。"
+            },
+            {
+              "id": "d",
+              "text": "ポリシーどうしが競合するので、すべての通信が届く",
+              "why": "NetworkPolicy は足し合わせ式なので、競合は起きません。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "NetworkPolicy は足し合わせ式で、Pod に許される通信は、それを選ぶポリシーの ingress と egress のルールの和集合になります。そのため評価の順番は結果に影響しません。",
+          "source": "https://kubernetes.io/ja/docs/concepts/services-networking/network-policies/"
+        },
+        {
+          "id": "w5-l4-q8",
+          "type": "choice",
+          "prompt": "サービスメッシュの説明として正しいのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "サービスどうしの通信を受け持ち、信頼性・可観測性・暗号化などを、アプリのコードを変えずにすべてのサービスへ同じように足す"
+            },
+            {
+              "id": "b",
+              "text": "Pod に IP を振り、ノードをまたいだ通信をつなぐ仕組み",
+              "why": "それは CNI プラグインの仕事です。サービスメッシュはその上で、サービス間の通信を管理します。"
+            },
+            {
+              "id": "c",
+              "text": "外から入る HTTP をホスト名やパスで振り分ける資源",
+              "why": "それは Ingress や Gateway API の話です。"
+            },
+            {
+              "id": "d",
+              "text": "各サービスのコードに通信のライブラリを組み込んで、機能を足す方法",
+              "why": "サービスメッシュは、そのような組み込みをせずに済ませるためのものです。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "サービスメッシュは、サービスどうしの通信を管理して、信頼性・可観測性・セキュリティの機能をコードの変更なしに足します。Pod ごとにプロキシを付けるサイドカー型と、OS の側 (eBPF など) で受け持つサイドカーレス型があります。",
+          "source": "https://glossary.cncf.io/ja/service-mesh/"
+        }
+      ]
+    },
+    {
+      "id": "w5-lab",
+      "kind": "lab",
+      "title": "週末の実習: 外から Pod まで経路をたどり、1 本止める",
+      "summary": "家のクラスタで手を動かす · 7 手順",
+      "domain": "Container Orchestration",
+      "source": "https://docs.k3s.io/networking/networking-services",
+      "steps": [
+        {
+          "text": "nginx を 2 つ動かし、80 番で受ける ClusterIP の Service を作る (Pod には app=web のラベルが付き、Service はそれを選ぶ)",
+          "command": "kubectl create deployment web --image=nginx:1.27-alpine --replicas=2 && kubectl expose deployment web --port=80"
+        },
+        {
+          "text": "使い捨ての Pod から、Service を名前で引いて中身を取る (nginx の歓迎ページの HTML が返る)",
+          "command": "kubectl run tmp --rm -it --image=busybox:1.36 --restart=Never -- wget -qO- -T 3 http://web.default.svc.cluster.local"
+        },
+        {
+          "text": "IngressClass の名前を確かめ (権限が無ければ kubectl get ingress -A の CLASS 列を見る)、Traefik の Ingress を作る",
+          "command": "kubectl get ingress -A ; kubectl create ingress web --class=traefik --rule=\"web.example.test/*=web:80\""
+        },
+        {
+          "text": "クラスタの外の機械から、ノードの IP の 80 番へ Host ヘッダーを付けて繋ぐ (<ノードのIP> は kubectl get nodes -o wide の INTERNAL-IP)",
+          "command": "curl -H \"Host: web.example.test\" http://<ノードのIP>/"
+        },
+        {
+          "text": "経路を外 → Ingress → Service → Pod の順にたどる。Traefik の LoadBalancer の Service (ServiceLB が 80 と 443 をノードで受ける) → Ingress の振り分け → Service の EndpointSlice → その IP の Pod の順に、IP とポートがつながっているかを見る (Traefik の Namespace は 1 つ目のコマンドで確かめる)",
+          "command": "kubectl get svc -A | grep traefik && kubectl describe ingress web && kubectl get endpointslices -l kubernetes.io/service-name=web && kubectl get pods -l app=web -o wide"
+        },
+        {
+          "text": "NetworkPolicy で、web の Pod へは Traefik のいる Namespace (ここでは kube-system) からだけ入れるようにする。k3s は NetworkPolicy のコントローラーを同梱しているので、入れ足さずに効く。手順 2 をもう一度走らせると繋がらずに失敗し (k3s ではすぐにエラーになる。プラグインによっては時間切れになる)、手順 4 の curl は今までどおり返ることを確かめる",
+          "command": "kubectl apply -f - <<'EOF'\napiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: web-from-traefik-only\nspec:\n  podSelector:\n    matchLabels:\n      app: web\n  policyTypes:\n    - Ingress\n  ingress:\n    - from:\n        - namespaceSelector:\n            matchLabels:\n              kubernetes.io/metadata.name: kube-system\nEOF"
+        },
+        {
+          "text": "片付ける",
+          "command": "kubectl delete networkpolicy web-from-traefik-only && kubectl delete ingress web && kubectl delete service web && kubectl delete deployment web"
+        }
+      ]
+    }
+  ]
+}
