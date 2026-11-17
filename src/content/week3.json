@@ -1,0 +1,838 @@
+{
+  "week": 3,
+  "lessons": [
+    {
+      "id": "w3-l1",
+      "kind": "quiz",
+      "title": "Pod とマニフェスト",
+      "summary": "YAML とコマンドの穴埋めと 4 択 · 7 問",
+      "domain": "Kubernetes Fundamentals",
+      "questions": [
+        {
+          "id": "w3-l1-q1",
+          "type": "fill",
+          "prompt": "nginx のコンテナを 1 つ動かす Pod のマニフェストを書きたい。空欄に入る apiVersion は?",
+          "language": "yaml",
+          "code": "apiVersion: {{blank}}\nkind: Pod\nmetadata:\n  name: nginx\nspec:\n  containers:\n  - name: nginx\n    image: nginx:1.14.2\n    ports:\n    - containerPort: 80",
+          "answers": [
+            "v1"
+          ],
+          "candidates": [
+            "v1",
+            "apps/v1",
+            "batch/v1",
+            "networking.k8s.io/v1"
+          ],
+          "explanation": "Pod はグループ名の無いコアの API にあるので、apiVersion は v1 です。Deployment などは apps/v1、Job と CronJob は batch/v1 のように、種類ごとに属する API のグループと版が決まっています。",
+          "wrongNotes": {
+            "apps/v1": "apps/v1 は Deployment・ReplicaSet・StatefulSet・DaemonSet の版です。",
+            "batch/v1": "batch/v1 は Job と CronJob の版です。",
+            "networking.k8s.io/v1": "networking.k8s.io/v1 は Ingress や NetworkPolicy など、通信の設定の版です。"
+          },
+          "source": "https://kubernetes.io/ja/docs/concepts/workloads/pods/"
+        },
+        {
+          "id": "w3-l1-q2",
+          "type": "choice",
+          "prompt": "Kubernetes のオブジェクトを YAML のマニフェストで作るとき、値を入れておく必要がある欄の組み合わせはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "apiVersion・kind・metadata・spec"
+            },
+            {
+              "id": "b",
+              "text": "kind・spec・status",
+              "why": "status は Kubernetes が現在の状態を書き込む欄で、作る人は書きません。"
+            },
+            {
+              "id": "c",
+              "text": "apiVersion・kind・image",
+              "why": "image は spec の中のコンテナに書く欄で、マニフェストの最上位の欄ではありません。"
+            },
+            {
+              "id": "d",
+              "text": "name・namespace・labels",
+              "why": "どれも metadata の中に書く欄です。name 以外は任意です。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "apiVersion は使う API の版、kind はオブジェクトの種類、metadata は name などの特定する情報、spec は望ましい状態です。ConfigMap のように spec の代わりに data を持つものもあります。",
+          "source": "https://kubernetes.io/ja/docs/concepts/overview/working-with-objects/kubernetes-objects/"
+        },
+        {
+          "id": "w3-l1-q3",
+          "type": "choice",
+          "prompt": "マニフェストでは spec に望ましい状態を書く。では status の欄を書き込み、更新するのは誰?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "Kubernetes のシステムとそのコンポーネント"
+            },
+            {
+              "id": "b",
+              "text": "マニフェストを書いた利用者",
+              "why": "利用者が書くのは spec です。status は現在の状態を表し、利用者は書きません。"
+            },
+            {
+              "id": "c",
+              "text": "コンテナのイメージを作った Dockerfile",
+              "why": "Dockerfile はイメージの作り方で、クラスターの中のオブジェクトの状態は書きません。"
+            },
+            {
+              "id": "d",
+              "text": "コンテナの中で動くアプリ",
+              "why": "アプリはオブジェクトの欄を書き換えません。status はコントロールプレーンなどが更新します。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "status はオブジェクトの現在の状態で、Kubernetes のシステムが書き込み更新します。コントロールプレーンは spec (望ましい状態) と status (現在の状態) が一致するよう常に動きます。",
+          "source": "https://kubernetes.io/ja/docs/concepts/overview/working-with-objects/kubernetes-objects/"
+        },
+        {
+          "id": "w3-l1-q4",
+          "type": "fill",
+          "prompt": "Pod の中で動かすコンテナの一覧を書く欄の名前は?",
+          "language": "yaml",
+          "code": "apiVersion: v1\nkind: Pod\nmetadata:\n  name: nginx\nspec:\n  {{blank}}:\n  - name: nginx\n    image: nginx:1.14.2",
+          "answers": [
+            "containers"
+          ],
+          "candidates": [
+            "containers",
+            "template",
+            "selector",
+            "replicas"
+          ],
+          "explanation": "Pod の spec の containers に、動かすコンテナを名前とイメージで並べます。1 つの Pod に複数のコンテナを並べることもできます。",
+          "wrongNotes": {
+            "template": "template は Deployment などが Pod を作るときの型 (Pod テンプレート) の欄で、Pod 自身は持ちません。",
+            "selector": "selector は Deployment などが自分の Pod をラベルで選ぶ欄です。",
+            "replicas": "replicas は Deployment などが Pod をいくつ動かすかの欄で、Pod 自身は持ちません。"
+          },
+          "source": "https://kubernetes.io/ja/docs/concepts/workloads/pods/"
+        },
+        {
+          "id": "w3-l1-q5",
+          "type": "choice",
+          "prompt": "1 つの Pod の中にある複数のコンテナについて、正しいのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "IP アドレスとポートを含むネットワークを共有し、localhost で互いに通信できる"
+            },
+            {
+              "id": "b",
+              "text": "コンテナごとに別の IP アドレスが付き、Service を通さないと通信できない",
+              "why": "IP アドレスは Pod ごとに付き、Pod の中のコンテナは同じ IP を共有します。"
+            },
+            {
+              "id": "c",
+              "text": "ボリュームを付けなくても、互いのファイルシステムがそのまま見える",
+              "why": "ファイルを分け合うには、Pod に共有のボリュームを指定します。"
+            },
+            {
+              "id": "d",
+              "text": "Kubernetes が別々のノードに分けて置く",
+              "why": "1 つの Pod のコンテナは必ず同じノードで一緒に動きます。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "Pod の中のコンテナは IP アドレスとネットワークポートを含むネットワーク名前空間を共有し、localhost で通信できます。ファイルの共有にはボリュームを使います。",
+          "source": "https://kubernetes.io/ja/docs/concepts/workloads/pods/"
+        },
+        {
+          "id": "w3-l1-q6",
+          "type": "choice",
+          "prompt": "1 つのコンテナだけを動かす場合でも、Pod を直接作らず Deployment などのワークロードリソースに作らせるのがふつう。その理由はどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "Pod は使い捨ての存在として設計されていて、止まったときに作り直すのはコントローラーの役目だから"
+            },
+            {
+              "id": "b",
+              "text": "Pod は kubectl apply では作れないから",
+              "why": "Pod も kubectl apply -f でマニフェストから作れます。"
+            },
+            {
+              "id": "c",
+              "text": "Pod を直接作るとコンテナを 1 つしか入れられないから",
+              "why": "直接作った Pod にも複数のコンテナを入れられます。"
+            },
+            {
+              "id": "d",
+              "text": "Pod を直接作るとノードに置かれないから",
+              "why": "直接作った Pod もスケジューラーがノードに置きます。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "Pod はある程度一時的で使い捨ての存在として設計され、ノードの停止などで消えると自分では戻りません。Deployment などのワークロードリソースが Pod を作り、数を保ちます。",
+          "source": "https://kubernetes.io/ja/docs/concepts/workloads/pods/"
+        },
+        {
+          "id": "w3-l1-q7",
+          "type": "fill",
+          "prompt": "書いたマニフェスト pod.yaml から Pod を作りたい。空欄に入るサブコマンドは?",
+          "language": "bash",
+          "code": "kubectl {{blank}} -f pod.yaml",
+          "answers": [
+            "apply",
+            "create"
+          ],
+          "candidates": [
+            "apply",
+            "run",
+            "describe",
+            "explain"
+          ],
+          "output": "pod/nginx created",
+          "explanation": "kubectl apply -f はファイルに書いた状態をクラスターに反映し、無ければ作ります。create -f でも作れますが、あとで同じファイルを直して反映するなら apply を使います。",
+          "wrongNotes": {
+            "run": "run はイメージを指定してその場で Pod を作るコマンドで、-f でマニフェストは読みません。",
+            "describe": "describe はできているオブジェクトの詳しい状態を出すコマンドです。",
+            "explain": "explain はマニフェストの欄の意味を調べるコマンドで、何も作りません。"
+          },
+          "source": "https://kubernetes.io/ja/docs/concepts/workloads/pods/"
+        }
+      ]
+    },
+    {
+      "id": "w3-l2",
+      "kind": "quiz",
+      "title": "ReplicaSet と Deployment",
+      "summary": "YAML とコマンドの穴埋めと 4 択 · 7 問",
+      "domain": "Kubernetes Fundamentals",
+      "questions": [
+        {
+          "id": "w3-l2-q1",
+          "type": "fill",
+          "prompt": "Deployment のマニフェストの 1 行目。空欄に入る apiVersion は?",
+          "language": "yaml",
+          "code": "apiVersion: {{blank}}\nkind: Deployment\nmetadata:\n  name: nginx-deployment\nspec:\n  replicas: 3",
+          "answers": [
+            "apps/v1"
+          ],
+          "candidates": [
+            "apps/v1",
+            "v1",
+            "batch/v1",
+            "networking.k8s.io/v1"
+          ],
+          "explanation": "Deployment は apps グループの API にあるので apps/v1 です。同じグループに ReplicaSet・StatefulSet・DaemonSet があります。",
+          "wrongNotes": {
+            "v1": "v1 は Pod・Service・ConfigMap などコアの API の版で、Deployment はありません。",
+            "batch/v1": "batch/v1 は Job と CronJob の版です。",
+            "networking.k8s.io/v1": "networking.k8s.io/v1 は Ingress など通信の設定の版です。"
+          },
+          "source": "https://kubernetes.io/ja/docs/concepts/workloads/controllers/deployment/"
+        },
+        {
+          "id": "w3-l2-q2",
+          "type": "fill",
+          "prompt": "Deployment が管理する Pod を、ラベル app: nginx で選ばせたい。空欄に入る欄の名前は?",
+          "language": "yaml",
+          "code": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: nginx-deployment\n  labels:\n    app: nginx\nspec:\n  replicas: 3\n  selector:\n    {{blank}}:\n      app: nginx\n  template:\n    metadata:\n      labels:\n        app: nginx\n    spec:\n      containers:\n      - name: nginx\n        image: nginx:1.14.2",
+          "answers": [
+            "matchLabels"
+          ],
+          "candidates": [
+            "matchLabels",
+            "labels",
+            "matchExpressions",
+            "nodeSelector"
+          ],
+          "explanation": "selector の matchLabels に書いたラベルを持つ Pod を、Deployment が自分のものとして数えます。template の labels と一致させます。",
+          "wrongNotes": {
+            "labels": "labels はオブジェクトにラベルを付ける欄 (metadata の中) で、selector の下には書きません。",
+            "matchExpressions": "matchExpressions は key・operator・values の並びで条件を書く欄で、app: nginx の組の形は取りません。",
+            "nodeSelector": "nodeSelector は Pod を置くノードをノードのラベルで選ぶ、Pod の spec の欄です。"
+          },
+          "source": "https://kubernetes.io/ja/docs/concepts/workloads/controllers/deployment/"
+        },
+        {
+          "id": "w3-l2-q3",
+          "type": "fill",
+          "prompt": "Deployment nginx-deployment のコンテナ nginx を、nginx:1.16.1 のイメージに更新したい。空欄に入る語は?",
+          "language": "bash",
+          "code": "kubectl set {{blank}} deployment/nginx-deployment nginx=nginx:1.16.1",
+          "answers": [
+            "image"
+          ],
+          "candidates": [
+            "image",
+            "env",
+            "resources",
+            "selector"
+          ],
+          "output": "deployment.apps/nginx-deployment image updated",
+          "explanation": "kubectl set image は、コンテナ名=新しいイメージ の形で Pod テンプレートのイメージを書き換え、ロールアウトを始めます。",
+          "wrongNotes": {
+            "env": "set env は環境変数を書き換えるコマンドです。",
+            "resources": "set resources は CPU とメモリの要求と上限を書き換えるコマンドです。",
+            "selector": "set selector はラベルセレクターを書き換えるコマンドで、イメージは変えません。"
+          },
+          "source": "https://kubernetes.io/ja/docs/concepts/workloads/controllers/deployment/"
+        },
+        {
+          "id": "w3-l2-q4",
+          "type": "fill",
+          "prompt": "更新を始めた Deployment が、全部の Pod を新しくし終えるまで見届けたい。空欄に入るサブコマンドは?",
+          "language": "bash",
+          "code": "kubectl rollout {{blank}} deployment/nginx-deployment",
+          "answers": [
+            "status"
+          ],
+          "candidates": [
+            "status",
+            "history",
+            "undo",
+            "pause"
+          ],
+          "output": "Waiting for rollout to finish: 2 out of 3 new replicas have been updated...\ndeployment \"nginx-deployment\" successfully rolled out",
+          "explanation": "rollout status はロールアウトの進み具合を出し、終わるまで待ちます。終わると successfully rolled out と出ます。",
+          "wrongNotes": {
+            "history": "history は過去のリビジョンの一覧を出すだけで、進み具合は待ちません。",
+            "undo": "undo は前のリビジョンへ巻き戻すコマンドです。",
+            "pause": "pause はロールアウトを一時停止するコマンドです。"
+          },
+          "source": "https://kubernetes.io/ja/docs/concepts/workloads/controllers/deployment/"
+        },
+        {
+          "id": "w3-l2-q5",
+          "type": "fill",
+          "prompt": "新しいイメージで Pod が起動しなくなった。Deployment を 1 つ前のリビジョンへ戻したい。空欄に入るサブコマンドは?",
+          "language": "bash",
+          "code": "kubectl rollout {{blank}} deployment/nginx-deployment",
+          "answers": [
+            "undo"
+          ],
+          "candidates": [
+            "undo",
+            "history",
+            "restart",
+            "resume"
+          ],
+          "output": "deployment.apps/nginx-deployment rolled back",
+          "explanation": "rollout undo は 1 つ前のリビジョンへ巻き戻します。--to-revision を付けると、history で見た番号のリビジョンへ戻せます。",
+          "wrongNotes": {
+            "history": "history はリビジョンの一覧を出すだけで、巻き戻しはしません。",
+            "restart": "restart はイメージなどの中身を変えずに Pod を作り直すコマンドです (新しいリビジョンになります)。前のイメージには戻りません。",
+            "resume": "resume は pause で止めたロールアウトを再開するコマンドです。"
+          },
+          "source": "https://kubernetes.io/ja/docs/concepts/workloads/controllers/deployment/"
+        },
+        {
+          "id": "w3-l2-q6",
+          "type": "choice",
+          "prompt": "ReplicaSet を直接作らず、Deployment を使うことが勧められている理由はどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "Deployment が ReplicaSet を管理し、Pod の宣言的な更新や巻き戻しまで受け持つから"
+            },
+            {
+              "id": "b",
+              "text": "ReplicaSet は指定した数の Pod を保てないから",
+              "why": "指定した数のレプリカの Pod を保つのが ReplicaSet の役目です。"
+            },
+            {
+              "id": "c",
+              "text": "ReplicaSet はもう廃止されたから",
+              "why": "ReplicaSet は今も使われ、Deployment が内部で作って管理します。"
+            },
+            {
+              "id": "d",
+              "text": "Deployment だけが複数の Namespace にまたがって Pod を置けるから",
+              "why": "Deployment も ReplicaSet も、1 つの Namespace の中で Pod を作ります。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "ReplicaSet は決まった数の Pod を保ちます。Deployment はその上で ReplicaSet を管理し、更新のたびに新しい ReplicaSet を作って入れ替えるので、独自の更新の手順が要らなければ Deployment を使います。",
+          "source": "https://kubernetes.io/ja/docs/concepts/workloads/controllers/replicaset/"
+        },
+        {
+          "id": "w3-l2-q7",
+          "type": "choice",
+          "prompt": "Deployment の更新で「古い Pod をすべて止めてから新しい Pod を作る」ようにしたい。.spec.strategy.type に指定する値はどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "Recreate"
+            },
+            {
+              "id": "b",
+              "text": "RollingUpdate",
+              "why": "RollingUpdate (既定) は古い Pod と新しい Pod を少しずつ入れ替え、止める時間を作らない戦略です。"
+            },
+            {
+              "id": "c",
+              "text": "OnDelete",
+              "why": "OnDelete は StatefulSet や DaemonSet の更新の戦略で、Deployment には指定できません。"
+            },
+            {
+              "id": "d",
+              "text": "BlueGreen",
+              "why": "BlueGreen は Kubernetes の Deployment の戦略の値にはありません。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "Recreate を指定すると、既存の Pod を全部消してから新しい Pod を作ります。既定の RollingUpdate は少しずつ入れ替えます。",
+          "source": "https://kubernetes.io/ja/docs/concepts/workloads/controllers/deployment/"
+        }
+      ]
+    },
+    {
+      "id": "w3-l3",
+      "kind": "quiz",
+      "title": "StatefulSet・DaemonSet・Job・CronJob",
+      "summary": "YAML の穴埋めと 4 択・出力を読む · 7 問",
+      "domain": "Kubernetes Fundamentals",
+      "questions": [
+        {
+          "id": "w3-l3-q1",
+          "type": "choice",
+          "prompt": "データベースのように、Pod ごとに決まった名前と、作り直しても同じ永続ストレージが要るアプリを動かしたい。向いているワークロードはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "StatefulSet"
+            },
+            {
+              "id": "b",
+              "text": "Deployment",
+              "why": "Deployment はどの Pod も同じに扱うステートレスなアプリ向けで、Pod の名前やストレージは固定しません。"
+            },
+            {
+              "id": "c",
+              "text": "DaemonSet",
+              "why": "DaemonSet は各ノードに 1 つずつ Pod を置くためのもので、Pod ごとの ID は持ちません。"
+            },
+            {
+              "id": "d",
+              "text": "Job",
+              "why": "Job は終わりのある処理を最後まで走らせるためのものです。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "StatefulSet は安定した一意のネットワーク ID、安定した永続ストレージ、順序立てたデプロイとスケーリングが要るアプリに向きます。どれも要らないなら Deployment を使います。",
+          "source": "https://kubernetes.io/ja/docs/concepts/workloads/controllers/statefulset/"
+        },
+        {
+          "id": "w3-l3-q2",
+          "type": "choice",
+          "prompt": "あるワークロードの Pod を一覧した。Pod の名前から、このワークロードとして最も考えられるのはどれ?",
+          "code": {
+            "language": "bash",
+            "text": "$ kubectl get pods -l app=nginx\nNAME    READY   STATUS    RESTARTS   AGE\nweb-0   1/1     Running   0          3m\nweb-1   1/1     Running   0          2m\nweb-2   1/1     Running   0          1m"
+          },
+          "choices": [
+            {
+              "id": "a",
+              "text": "StatefulSet"
+            },
+            {
+              "id": "b",
+              "text": "Deployment",
+              "why": "Deployment の Pod の名前は、ReplicaSet の名前 (ハッシュ入り) の後ろにランダムな文字が付き、番号順にはなりません。"
+            },
+            {
+              "id": "c",
+              "text": "DaemonSet",
+              "why": "DaemonSet の Pod の名前は、DaemonSet の名前の後ろにランダムな文字が付きます。"
+            },
+            {
+              "id": "d",
+              "text": "CronJob",
+              "why": "CronJob が作る Job の Pod は、Job の名前の後ろにランダムな文字が付きます。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "StatefulSet の Pod は 0 から始まる順序番号を持ち、名前は $(StatefulSet 名)-$(順序番号) になります。作り直しても同じ名前で戻ります。",
+          "source": "https://kubernetes.io/ja/docs/concepts/workloads/controllers/statefulset/"
+        },
+        {
+          "id": "w3-l3-q3",
+          "type": "choice",
+          "prompt": "DaemonSet で動かすのが向いているものはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "すべてのノードでログを集めるエージェント"
+            },
+            {
+              "id": "b",
+              "text": "3 つのレプリカで動かす Web アプリ",
+              "why": "数を決めて動かすステートレスなアプリには Deployment を使います。"
+            },
+            {
+              "id": "c",
+              "text": "毎晩 1 回だけ動かすバックアップ",
+              "why": "決まった時刻に動かす処理には CronJob を使います。"
+            },
+            {
+              "id": "d",
+              "text": "Pod ごとに専用のディスクを持つデータベース",
+              "why": "Pod ごとに ID とストレージが要るものには StatefulSet を使います。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "DaemonSet はすべて (またはいくつか) のノードに Pod を 1 つずつ置き、ノードが増えればそこにも置きます。ログの集計・ノードの監視・ストレージのデーモンが典型的な使い道です。",
+          "source": "https://kubernetes.io/ja/docs/concepts/workloads/controllers/daemonset/"
+        },
+        {
+          "id": "w3-l3-q4",
+          "type": "fill",
+          "prompt": "replicas を書かずに、各ノードに Pod を 1 つずつ置きたい。空欄に入る kind は?",
+          "language": "yaml",
+          "code": "apiVersion: apps/v1\nkind: {{blank}}\nmetadata:\n  name: fluentd-elasticsearch\n  namespace: kube-system\nspec:\n  selector:\n    matchLabels:\n      name: fluentd-elasticsearch\n  template:\n    metadata:\n      labels:\n        name: fluentd-elasticsearch\n    spec:\n      containers:\n      - name: fluentd-elasticsearch\n        image: quay.io/fluentd_elasticsearch/fluentd:v2.5.2",
+          "answers": [
+            "DaemonSet"
+          ],
+          "candidates": [
+            "DaemonSet",
+            "Deployment",
+            "StatefulSet",
+            "ReplicaSet"
+          ],
+          "explanation": "DaemonSet は Pod の数をノードの数で決めるので replicas の欄がありません。ノードが加わると Pod も足され、外れると片付けられます。",
+          "wrongNotes": {
+            "Deployment": "Deployment は replicas で決めた数の Pod を動かし、ノードごとに 1 つとは限りません。",
+            "StatefulSet": "StatefulSet は replicas で決めた数の Pod に順序番号を付けて動かします。",
+            "ReplicaSet": "ReplicaSet は replicas で決めた数の Pod を保ちます。"
+          },
+          "source": "https://kubernetes.io/ja/docs/concepts/workloads/controllers/daemonset/"
+        },
+        {
+          "id": "w3-l3-q5",
+          "type": "fill",
+          "prompt": "円周率を計算して終わる Job を書いている。空欄に入る、Job で使える restartPolicy は?",
+          "language": "yaml",
+          "code": "apiVersion: batch/v1\nkind: Job\nmetadata:\n  name: pi\nspec:\n  template:\n    spec:\n      containers:\n      - name: pi\n        image: perl:5.34.0\n        command: [\"perl\", \"-Mbignum=bpi\", \"-wle\", \"print bpi(2000)\"]\n      restartPolicy: {{blank}}\n  backoffLimit: 4",
+          "answers": [
+            "Never",
+            "OnFailure"
+          ],
+          "candidates": [
+            "Never",
+            "OnFailure",
+            "Always",
+            "IfNotPresent"
+          ],
+          "explanation": "Job の Pod テンプレートの restartPolicy は Never か OnFailure だけが使えます。処理が終わったコンテナを再起動し続けないためです。",
+          "wrongNotes": {
+            "Always": "Always は終わったコンテナも再起動し続けるので、Job では使えません。",
+            "IfNotPresent": "IfNotPresent はイメージの取得の決まり (imagePullPolicy) の値で、restartPolicy には書けません。"
+          },
+          "source": "https://kubernetes.io/ja/docs/concepts/workloads/controllers/job/"
+        },
+        {
+          "id": "w3-l3-q6",
+          "type": "fill",
+          "prompt": "毎分 1 回 Job を動かす CronJob を書いている。空欄に入る欄の名前は?",
+          "language": "yaml",
+          "code": "apiVersion: batch/v1\nkind: CronJob\nmetadata:\n  name: hello\nspec:\n  {{blank}}: \"* * * * *\"\n  jobTemplate:\n    spec:\n      template:\n        spec:\n          containers:\n          - name: hello\n            image: busybox\n            command: [\"/bin/sh\", \"-c\", \"date; echo Hello from the Kubernetes cluster\"]\n          restartPolicy: OnFailure",
+          "answers": [
+            "schedule"
+          ],
+          "candidates": [
+            "schedule",
+            "cron",
+            "interval",
+            "startingDeadlineSeconds"
+          ],
+          "explanation": "CronJob の schedule に Cron の書式 (分・時・日・月・曜日) で動かす時刻を書き、jobTemplate に作る Job の型を書きます。",
+          "wrongNotes": {
+            "cron": "cron という欄はありません。Cron の書式は schedule に書きます。",
+            "interval": "interval という欄はありません。間隔も schedule の Cron の書式で表します。",
+            "startingDeadlineSeconds": "startingDeadlineSeconds は、予定の時刻に始められなかったときに何秒遅れまで始めてよいかを決める欄です。"
+          },
+          "source": "https://kubernetes.io/ja/docs/concepts/workloads/controllers/cron-jobs/"
+        },
+        {
+          "id": "w3-l3-q7",
+          "type": "fill",
+          "prompt": "CronJob hello の時刻を待たずに、同じ中身の Job を今すぐ 1 回動かしたい。空欄に入る値は?",
+          "language": "bash",
+          "code": "kubectl create job hello-now --from={{blank}}",
+          "answers": [
+            "cronjob/hello"
+          ],
+          "candidates": [
+            "cronjob/hello",
+            "job/hello",
+            "deployment/hello",
+            "pod/hello"
+          ],
+          "output": "job.batch/hello-now created",
+          "explanation": "kubectl create job の --from=cronjob/<名前> は、CronJob の jobTemplate から Job を 1 つ作ります。動作を確かめるときに使えます。",
+          "wrongNotes": {
+            "job/hello": "--from に指定できるのは CronJob で、Job からは作れません。",
+            "deployment/hello": "Deployment には Job の型が無いので、--from には指定できません。",
+            "pod/hello": "Pod には Job の型が無いので、--from には指定できません。"
+          },
+          "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_create/kubectl_create_job/"
+        }
+      ]
+    },
+    {
+      "id": "w3-l4",
+      "kind": "quiz",
+      "title": "Namespace・ラベル・ConfigMap",
+      "summary": "YAML とコマンドの穴埋めと 4 択 · 8 問",
+      "domain": "Kubernetes Fundamentals",
+      "questions": [
+        {
+          "id": "w3-l4-q1",
+          "type": "fill",
+          "prompt": "ラベル app=nginx が付いた Pod だけを一覧したい。空欄に入るオプションは?",
+          "language": "bash",
+          "code": "kubectl get pods {{blank}} app=nginx",
+          "answers": [
+            "-l",
+            "--selector"
+          ],
+          "candidates": [
+            "-l",
+            "-n",
+            "-o",
+            "-A"
+          ],
+          "output": "NAME                                READY   STATUS    RESTARTS   AGE\nnginx-deployment-75675f5897-7ci7o   1/1     Running   0          18s\nnginx-deployment-75675f5897-kzszj   1/1     Running   0          18s\nnginx-deployment-75675f5897-qqcnn   1/1     Running   0          18s",
+          "explanation": "-l (--selector) にラベルセレクターを渡すと、条件に合うものだけを出します。environment=production,tier=frontend のようにコンマで並べると、全部を満たすものになります。",
+          "wrongNotes": {
+            "-n": "-n は Namespace を選ぶオプションで、ラベルでは絞りません。",
+            "-o": "-o は出力の形 (wide・yaml など) を選ぶオプションです。",
+            "-A": "-A はすべての Namespace を対象にするオプションで、ラベルでは絞りません。"
+          },
+          "source": "https://kubernetes.io/ja/docs/concepts/overview/working-with-objects/labels/"
+        },
+        {
+          "id": "w3-l4-q2",
+          "type": "fill",
+          "prompt": "どの Namespace にあるかを問わず、クラスターの Pod を全部一覧したい。空欄に入るオプションは?",
+          "language": "bash",
+          "code": "kubectl get pods {{blank}}",
+          "answers": [
+            "-A",
+            "--all-namespaces"
+          ],
+          "candidates": [
+            "-A",
+            "-n",
+            "-l",
+            "-w"
+          ],
+          "output": "NAMESPACE     NAME                                READY   STATUS    RESTARTS   AGE\ndefault       nginx-deployment-75675f5897-7ci7o   1/1     Running   0          18s\nkube-system   coredns-6799fbcd5-x2k9q             1/1     Running   0          12d",
+          "explanation": "-A (--all-namespaces) を付けると、すべての Namespace のものを出し、NAMESPACE の列が増えます。付けないと、今のコンテキストの Namespace (ふつうは default) だけが出ます。",
+          "wrongNotes": {
+            "-n": "-n は 1 つの Namespace を選ぶオプションで、名前を続けて書きます。",
+            "-l": "-l はラベルで絞るオプションです。",
+            "-w": "-w は変化を見張り続けるオプションで、Namespace は広げません。"
+          },
+          "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_get/"
+        },
+        {
+          "id": "w3-l4-q3",
+          "type": "choice",
+          "prompt": "Pod にラベルを 1 つも付けなかったとき、いちばん困ることはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "Service や ReplicaSet などはラベルセレクターで対象を選ぶので、その Pod をまとめて選べない"
+            },
+            {
+              "id": "b",
+              "text": "Pod が起動できない",
+              "why": "ラベルは任意の欄で、無くても Pod は起動します。"
+            },
+            {
+              "id": "c",
+              "text": "Pod の名前が他と重なってしまう",
+              "why": "名前は metadata.name で決まり、ラベルとは関係ありません。ラベルはそもそも一意ではありません。"
+            },
+            {
+              "id": "d",
+              "text": "Pod をどの Namespace にも入れられない",
+              "why": "Namespace は metadata.namespace で決まり、ラベルとは関係ありません。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "ラベルセレクターは Kubernetes のまとめ方の中心で、Service が通信を送る Pod や、コントローラーが数える Pod はラベルで決まります。ラベルが無いと、名前を 1 つずつ指すほかなくなります。",
+          "source": "https://kubernetes.io/ja/docs/concepts/overview/working-with-objects/labels/"
+        },
+        {
+          "id": "w3-l4-q4",
+          "type": "choice",
+          "prompt": "ビルドの番号や担当者の連絡先のように、オブジェクトを選ぶのには使わない情報をオブジェクトに付けたい。どこに書くのが向いている?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "アノテーション"
+            },
+            {
+              "id": "b",
+              "text": "ラベル",
+              "why": "ラベルは選ぶための識別に使います。識別用途でない情報はアノテーションに書くとされています。"
+            },
+            {
+              "id": "c",
+              "text": "Namespace",
+              "why": "Namespace はオブジェクトを分ける区画で、付加情報を書く場所ではありません。"
+            },
+            {
+              "id": "d",
+              "text": "status",
+              "why": "status は Kubernetes が現在の状態を書く欄で、利用者は書きません。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "ラベルは検索や選択に使う識別のための情報です。選択に使わない付加情報はアノテーションに記録します。",
+          "source": "https://kubernetes.io/ja/docs/concepts/overview/working-with-objects/labels/"
+        },
+        {
+          "id": "w3-l4-q5",
+          "type": "choice",
+          "prompt": "次のうち、どの Namespace にも属さないリソースはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "Node"
+            },
+            {
+              "id": "b",
+              "text": "Pod",
+              "why": "Pod は Namespace に属します。"
+            },
+            {
+              "id": "c",
+              "text": "Deployment",
+              "why": "Deployment は Namespace に属します。"
+            },
+            {
+              "id": "d",
+              "text": "ConfigMap",
+              "why": "ConfigMap は Namespace に属し、同じ Namespace の Pod から使います。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "Node や PersistentVolume のような低レベルのリソースはどの Namespace にも属しません。Namespace に属するかどうかは kubectl api-resources --namespaced=true / false で確かめられます。",
+          "source": "https://kubernetes.io/ja/docs/concepts/overview/working-with-objects/namespaces/"
+        },
+        {
+          "id": "w3-l4-q6",
+          "type": "fill",
+          "prompt": "ConfigMap game-demo のキー player_initial_lives の値を、環境変数として Pod に渡したい。空欄に入る欄の名前は?",
+          "language": "yaml",
+          "code": "    env:\n    - name: PLAYER_INITIAL_LIVES\n      valueFrom:\n        {{blank}}:\n          name: game-demo\n          key: player_initial_lives",
+          "answers": [
+            "configMapKeyRef"
+          ],
+          "candidates": [
+            "configMapKeyRef",
+            "secretKeyRef",
+            "fieldRef",
+            "resourceFieldRef"
+          ],
+          "explanation": "valueFrom の configMapKeyRef に ConfigMap の名前とキーを書くと、その値が環境変数に入ります。環境変数の名前とキーの名前は違っていてもかまいません。",
+          "wrongNotes": {
+            "secretKeyRef": "secretKeyRef は Secret のキーを読む欄で、ConfigMap は読みません。",
+            "fieldRef": "fieldRef は Pod 自身の欄 (metadata.name など) を読む欄です。",
+            "resourceFieldRef": "resourceFieldRef はコンテナの CPU やメモリの要求と上限を読む欄です。"
+          },
+          "source": "https://kubernetes.io/ja/docs/concepts/configuration/configmap/"
+        },
+        {
+          "id": "w3-l4-q7",
+          "type": "fill",
+          "prompt": "ConfigMap に設定の値を書いている。キーと文字の値の組を入れる欄の名前は?",
+          "language": "yaml",
+          "code": "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: game-demo\n{{blank}}:\n  player_initial_lives: \"3\"\n  ui_properties_file_name: \"user-interface.properties\"",
+          "answers": [
+            "data"
+          ],
+          "candidates": [
+            "data",
+            "spec",
+            "binaryData",
+            "status"
+          ],
+          "explanation": "ConfigMap は spec を持たず、data (UTF-8 の文字) と binaryData (バイナリ) にキーと値の組を入れます。",
+          "wrongNotes": {
+            "spec": "ほとんどのオブジェクトと違い、ConfigMap には spec がありません。",
+            "binaryData": "binaryData はバイナリのデータを入れる欄で、\"3\" のような文字の値は data に書きます。",
+            "status": "status は Kubernetes が現在の状態を書く欄で、ConfigMap の値は入れません。"
+          },
+          "source": "https://kubernetes.io/ja/docs/concepts/configuration/configmap/"
+        },
+        {
+          "id": "w3-l4-q8",
+          "type": "choice",
+          "prompt": "データベースのパスワードを Pod に渡したい。ConfigMap ではなく Secret を使うべき理由はどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "ConfigMap は機密性や暗号化を提供しないから"
+            },
+            {
+              "id": "b",
+              "text": "ConfigMap は環境変数として Pod に渡せないから",
+              "why": "ConfigMap も環境変数やボリュームのファイルとして Pod に渡せます。"
+            },
+            {
+              "id": "c",
+              "text": "ConfigMap は 1 つの Pod からしか読めないから",
+              "why": "同じ Namespace の複数の Pod から同じ ConfigMap を読めます。"
+            },
+            {
+              "id": "d",
+              "text": "ConfigMap は数字の値を入れられないから",
+              "why": "数字も文字として入れられます (\"3\" のように書きます)。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "ConfigMap は機密でない設定をイメージから切り離すためのもので、機密性や暗号化は提供しません。機密の情報には Secret か、ほかの道具を使います。",
+          "source": "https://kubernetes.io/ja/docs/concepts/configuration/configmap/"
+        }
+      ]
+    },
+    {
+      "id": "w3-lab",
+      "kind": "lab",
+      "title": "週末の実習: Deployment の更新と巻き戻し、CronJob",
+      "summary": "家のクラスタで手を動かす · 7 手順",
+      "domain": "Kubernetes Fundamentals",
+      "source": "https://kubernetes.io/ja/docs/concepts/workloads/controllers/deployment/",
+      "steps": [
+        {
+          "text": "nginx:1.26-alpine で 3 つのレプリカの Deployment web を作り、全部の Pod が揃うまで待つ (Pod にはラベル app=web が付く)",
+          "command": "kubectl create deployment web --image=nginx:1.26-alpine --replicas=3 && kubectl rollout status deployment/web"
+        },
+        {
+          "text": "コンテナ nginx のイメージを nginx:1.27-alpine に更新し、ローリングアップデートが終わるまで見届ける",
+          "command": "kubectl set image deployment/web nginx=nginx:1.27-alpine && kubectl rollout status deployment/web"
+        },
+        {
+          "text": "リビジョンが 2 つになったこと、古い ReplicaSet が 0 個に縮んで残っていることを確かめる",
+          "command": "kubectl rollout history deployment/web && kubectl get rs -l app=web"
+        },
+        {
+          "text": "1 つ前のリビジョンへ巻き戻し、イメージが nginx:1.26-alpine に戻ったことを確かめる",
+          "command": "kubectl rollout undo deployment/web && kubectl rollout status deployment/web && kubectl get deployment web -o jsonpath='{.spec.template.spec.containers[0].image}'"
+        },
+        {
+          "text": "毎分 date を出す CronJob hello を作る",
+          "command": "kubectl create cronjob hello --image=busybox:1.36 --schedule=\"*/1 * * * *\" -- date"
+        },
+        {
+          "text": "1〜2 分待って Job ができ COMPLETIONS が 1/1 になったことを確かめ、表示された Job の名前でログを読む (日時が出る)",
+          "command": "kubectl get cronjob hello && kubectl get jobs && kubectl logs $(kubectl get jobs -o name | grep /hello- | tail -n 1)"
+        },
+        {
+          "text": "片付ける (CronJob を消すと、作られた Job と Pod も消える)",
+          "command": "kubectl delete cronjob hello && kubectl delete deployment web"
+        }
+      ]
+    }
+  ]
+}
