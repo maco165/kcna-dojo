@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // README の画像を作り直す: npm run readme:images
+// - public/og-image.png: SNS で URL を共有したときの画像 (1200×630、OGP と X のカード)
 // - docs/images/banner-light.png / banner-dark.png: 見出しの画像。色と字体はアプリと同じ Astryx のトークン (src/themes/kcna/kcna.css の値)
 // - docs/images/*.png: 組み立てた dist を vite preview で配り、見本の進捗を入れた状態で撮った画面
 // 画面を変えたら走らせ直し、画像も同じ PR でコミットする。
@@ -21,19 +22,19 @@ const TOKENS = {
   dark: { body: '#111112', surface: '#1F1F22', text: '#DFE2E5', sub: '#AAAFB5', border: '#F2F4F619', strong: '#494D53', accent: '#0171E3', success: '#0D8626', successText: '#A5F690', successMuted: '#0B991F3F' },
 };
 
-function bannerHtml(t) {
+function bannerHtml(t, { width = 1280, height = 360, pad = 72, zoom = 1, lead = 'コマンドと YAML の穴埋め・4 択を、週ごとのレッスンで。<br>進捗はブラウザの中だけに残ります。' } = {}) {
   return `<!doctype html><html lang="ja"><head><meta charset="utf-8">
 <style>
   * { box-sizing: border-box; }
-  body { margin: 0; width: 1280px; height: 360px; background: ${t.body}; color: ${t.text};
+  body { margin: 0; width: ${width}px; height: ${height}px; background: ${t.body}; color: ${t.text};
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Sans", "Noto Sans JP", "Noto Sans CJK JP", sans-serif; }
-  .wrap { display: flex; gap: 56px; align-items: center; height: 100%; padding: 0 72px; }
+  .wrap { display: flex; gap: 56px; align-items: center; height: ${height / zoom}px; padding: 0 ${pad}px; zoom: ${zoom}; }
   .lead { flex: 1 1 0; display: flex; flex-direction: column; gap: 12px; }
   .eyebrow { font-size: 17px; color: ${t.sub}; }
   h1 { margin: 0; font-size: 56px; font-weight: 600; letter-spacing: -0.01em; }
   .brand { display: flex; align-items: center; gap: 16px; }
   p { margin: 0; font-size: 20px; line-height: 1.6; color: ${t.sub}; }
-  .card { flex: 0 0 520px; background: ${t.surface}; border: 1px solid ${t.border}; border-radius: 12px; overflow: hidden; }
+  .card { flex: 0 0 480px; background: ${t.surface}; border: 1px solid ${t.border}; border-radius: 12px; overflow: hidden; }
   .bar { padding: 8px 16px; border-bottom: 1px solid ${t.border}; font-size: 13px; color: ${t.sub}; }
   .code { padding: 20px 16px; font-family: "SF Mono", Monaco, Consolas, monospace; font-size: 17px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .blank { border: 1px solid ${t.success}; border-radius: 4px; padding: 2px 10px; }
@@ -45,9 +46,9 @@ function bannerHtml(t) {
   .row span:last-child { margin-left: auto; color: ${t.sub}; font-size: 13px; }
 </style></head><body><div class="wrap">
   <div class="lead">
-    <div class="eyebrow">KCNA-JP の学習サイト</div>
-    <div class="brand"><svg width="56" height="56" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="${t.accent}"/><path d="M17 20l12 12-12 12" fill="none" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/><path d="M34 44h13" fill="none" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round"/></svg><h1>kcna-dojo</h1></div>
-    <p>コマンドと YAML の穴埋め・4 択を、週ごとのレッスンで。<br>進捗はブラウザの中だけに残ります。</p>
+    <div class="eyebrow">KCNA-JP 対策 · 非公式の学習サイト</div>
+    <div class="brand"><svg width="56" height="56" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="${t.accent}"/><path d="M17 20l12 12-12 12" fill="none" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/><path d="M34 44h13" fill="none" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round"/></svg><h1>クラネイ</h1></div>
+    <p>${lead}</p>
   </div>
   <div class="card">
     <div class="bar">bash</div>
@@ -98,6 +99,14 @@ try {
     const page = await browser.newPage({ viewport: { width: 1280, height: 360 }, deviceScaleFactor: 2 });
     await page.setContent(bannerHtml(TOKENS[mode]), { waitUntil: 'networkidle' });
     await page.screenshot({ path: `${OUT}banner-${mode}.png` });
+    await page.close();
+  }
+
+  // SNS の共有の画像 (明るい側だけ。OGP の推奨の 1200×630)
+  {
+    const page = await browser.newPage({ viewport: { width: 1200, height: 630 }, deviceScaleFactor: 1 });
+    await page.setContent(bannerHtml(TOKENS.light, { width: 1200, height: 630, pad: 40, zoom: 1.3, lead: 'コマンドと YAML の穴埋めと<br>4 択を、週ごとのレッスンで。' }), { waitUntil: 'networkidle' });
+    await page.screenshot({ path: new URL('../public/og-image.png', import.meta.url).pathname });
     await page.close();
   }
 
