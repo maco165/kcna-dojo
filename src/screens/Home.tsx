@@ -73,6 +73,9 @@ function summarize(week: number, progress: Progress): Summary {
 
 const goalLabel = (today: number, goal: number) => `${today} / ${goal} XP`;
 
+/** 試験までの日数の表示。受験日を過ぎたら日数を出さない */
+const examLabel = (days: number) => (days > 0 ? `試験まで ${days} 日` : days === 0 ? '今日が試験日' : '試験日を過ぎました');
+
 export default function Home({ week, progress }: { week: number; progress: Progress }) {
   const isWide = useMediaQuery(WIDE_QUERY);
   const s = summarize(week, progress);
@@ -108,7 +111,7 @@ function PhoneHome({ s, progress }: { s: Summary; progress: Progress }) {
         </span>
         <span className="topbar__end">
           <Text type="supporting">
-            {s.streak} 日連続 · {progress.xp.total} XP · 試験まで {s.examDays} 日
+            {s.streak} 日連続 · {progress.xp.total} XP · {examLabel(s.examDays)}
           </Text>
           <RepoLink />
         </span>
@@ -312,7 +315,13 @@ function DesktopHome({ s, progress }: { s: Summary; progress: Progress }) {
               連続 <Text weight="semibold">{s.streak} 日</Text>
             </Text>
             <Text type="supporting">
-              試験まで <Text weight="semibold">{s.examDays} 日</Text>
+              {s.examDays > 0 ? (
+                <>
+                  試験まで <Text weight="semibold">{s.examDays} 日</Text>
+                </>
+              ) : (
+                <Text weight="semibold">{examLabel(s.examDays)}</Text>
+              )}
             </Text>
           </HStack>
         </header>

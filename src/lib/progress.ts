@@ -54,30 +54,60 @@ function isObject(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
+const isCount = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0;
+
+/** 実在する日付 (YYYY-MM-DD) か。2027-02-31 のようなものは偽 */
+export function isValidDay(v: unknown): v is string {
+  if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
+  const [y, m, d] = v.split('-').map(Number);
+  return dayKey(new Date(y, m - 1, d)) === v;
+}
+
+/** 値を 1 つずつ確かめ、形の合うものだけ残す (読み込んだファイルや壊れた localStorage で画面が落ちないように) */
+function cleanRecords<T>(raw: unknown, clean: (v: Record<string, unknown>) => T | null): Record<string, T> {
+  const out: Record<string, T> = {};
+  if (!isObject(raw)) return out;
+  for (const [key, value] of Object.entries(raw)) {
+    if (!isObject(value)) continue;
+    const c = clean(value);
+    if (c !== null) out[key] = c;
+  }
+  return out;
+}
+
 /** JSON から読んだものを、欠けや形の違いを埋めた進捗にする。v が 1 でなければ null */
 export function normalizeProgress(raw: unknown): Progress | null {
   if (!isObject(raw) || raw.v !== 1) return null;
-  const base = emptyProgress();
   const streak = isObject(raw.streak) ? raw.streak : {};
   const xp = isObject(raw.xp) ? raw.xp : {};
   const profile = isObject(raw.profile) ? raw.profile : null;
+  const byDay: Record<string, number> = {};
+  if (isObject(xp.byDay)) {
+    for (const [day, v] of Object.entries(xp.byDay)) if (isValidDay(day) && isCount(v)) byDay[day] = v;
+  }
   const out: Progress = {
     v: 1,
     streak: {
-      count: typeof streak.count === 'number' ? streak.count : 0,
-      lastDay: typeof streak.lastDay === 'string' ? streak.lastDay : null,
+      count: isCount(streak.count) ? Math.floor(streak.count) : 0,
+      lastDay: isValidDay(streak.lastDay) ? streak.lastDay : null,
     },
-    xp: {
-      total: typeof xp.total === 'number' ? xp.total : 0,
-      byDay: isObject(xp.byDay) ? (xp.byDay as Record<string, number>) : {},
-    },
-    lessons: isObject(raw.lessons) ? (raw.lessons as Record<string, LessonRecord>) : base.lessons,
-    answers: isObject(raw.answers) ? (raw.answers as Record<string, AnswerRecord>) : base.answers,
+    xp: { total: isCount(xp.total) ? xp.total : 0, byDay },
+    lessons: cleanRecords(raw.lessons, (v) =>
+      v.done === true ? { done: true, best: isCount(v.best) ? Math.min(v.best, 1) : 0, at: typeof v.at === 'string' ? v.at : '' } : null,
+    ),
+    answers: cleanRecords(raw.answers, (v) => {
+      const a: AnswerRecord = {
+        right: isCount(v.right) ? Math.floor(v.right) : 0,
+        wrong: isCount(v.wrong) ? Math.floor(v.wrong) : 0,
+        last: typeof v.last === 'string' ? v.last : '',
+      };
+      return a;
+    }),
   };
   if (profile) {
     out.profile = {
-      dailyGoalXp: typeof profile.dailyGoalXp === 'number' && profile.dailyGoalXp > 0 ? profile.dailyGoalXp : DEFAULT_GOAL_XP,
-      examDate: typeof profile.examDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(profile.examDate) ? profile.examDate : DEFAULT_EXAM_DATE,
+      dailyGoalXp: (GOAL_CHOICES as readonly number[]).includes(profile.dailyGoalXp as number) ? (profile.dailyGoalXp as number) : DEFAULT_GOAL_XP,
+      examDate: isValidDay(profile.examDate) ? profile.examDate : DEFAULT_EXAM_DATE,
     };
   }
   return out;
@@ -105,12 +135,14 @@ export function loadProgress(storage: KeyValueStorage | undefined = safeLocalSto
   return parseProgressText(raw) ?? emptyProgress();
 }
 
-export function saveProgress(p: Progress, storage: KeyValueStorage | undefined = safeLocalStorage()): void {
-  if (!storage) return;
+/** 保存できたら true。保存できない環境 (プライベートモード・容量の上限など) では false で、その場限りの記録になる */
+export function saveProgress(p: Progress, storage: KeyValueStorage | undefined = safeLocalStorage()): boolean {
+  if (!storage) return false;
   try {
     storage.setItem(STORAGE_KEY, JSON.stringify(p));
+    return true;
   } catch {
-    // 保存できない環境 (プライベートモードなど) では、その場限りの記録になる
+    return false;
   }
 }
 
