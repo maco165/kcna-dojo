@@ -1,6 +1,7 @@
 // 模擬試験: 問題を配点の割合で選び、最後にまとめて採点する
 import type { Domain, Question } from '../content/types';
-import { gradeChoice, gradeFill } from './grade';
+import { XP_PER_CORRECT, gradeChoice, gradeFill } from './grade';
+import { addExamRecord, completeReview, recordAnswer, type Progress } from './progress';
 import { shuffleChoices } from './shuffle';
 
 export const EXAM_QUESTIONS = 60;
@@ -54,8 +55,11 @@ export function pickExamQuestions(bank: BankItem[], random: () => number = Math.
 
 export type ExamAnswer = string | undefined;
 
+/** 答えたか (空白だけは答えなしとみなす) */
+export const isAnswered = (answer: ExamAnswer): answer is string => answer !== undefined && answer.trim() !== '';
+
 export function isCorrect(q: Question, answer: ExamAnswer): boolean {
-  if (answer === undefined) return false;
+  if (!isAnswered(answer)) return false;
   return q.type === 'fill' ? gradeFill(q, answer) : gradeChoice(q, answer);
 }
 
@@ -82,4 +86,22 @@ export function gradeExam(items: BankItem[], answers: ExamAnswer[]): ExamResult 
 export function formatClock(seconds: number): string {
   const s = Math.max(0, Math.ceil(seconds));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
+/**
+ * 採点の結果を記録に入れる。答えた問題だけを復習の規則で記録し (答えなしは記録しない。
+ * 途中の復習の段階を戻さないため)、正解の数の XP と試験の結果を足す
+ */
+export function recordExam(p: Progress, items: BankItem[], answers: ExamAnswer[], now: Date): Progress {
+  let next = p;
+  let correct = 0;
+  items.forEach((item, i) => {
+    const a = answers[i];
+    if (!isAnswered(a)) return;
+    const ok = isCorrect(item.question, a);
+    if (ok) correct++;
+    next = recordAnswer(next, item.question.id, ok, now);
+  });
+  next = completeReview(next, correct * XP_PER_CORRECT, now);
+  return addExamRecord(next, { at: now.toISOString(), correct, total: items.length });
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { questionBank } from '../src/content';
-import { EXAM_QUESTIONS, domainCounts, formatClock, gradeExam, isCorrect, pickExamQuestions } from '../src/lib/exam';
+import { EXAM_QUESTIONS, domainCounts, formatClock, gradeExam, isCorrect, pickExamQuestions, recordExam } from '../src/lib/exam';
 import { MAX_EXAM_RECORDS, addExamRecord, emptyProgress, normalizeProgress } from '../src/lib/progress';
 
 /** 決まった並びの乱数 (試験の結果を毎回同じにする) */
@@ -95,5 +95,33 @@ describe('addExamRecord と記録の検査', () => {
       ],
     });
     expect(p?.exams).toEqual([{ at: '2026-11-18T00:00:00.000Z', correct: 45, total: 60 }]);
+  });
+});
+
+describe('recordExam', () => {
+  const items = pickExamQuestions(questionBank(), seeded(11));
+  const right = items.map(({ question: q }) => (q.type === 'fill' ? q.answers[0] : q.answer));
+  const now = new Date('2026-11-18T09:00:00');
+
+  it('答えなしの問題は記録せず、途中の復習の段階を戻さない', () => {
+    const p = emptyProgress();
+    for (const { question } of items) p.answers[question.id] = { right: 2, wrong: 0, last: '2026-11-10', stage: 2, nextReview: '2099-01-01' };
+    const next = recordExam(p, items, items.map(() => undefined), now);
+    expect(next.answers).toEqual(p.answers);
+    expect(next.exams?.[0]).toMatchObject({ correct: 0, total: EXAM_QUESTIONS });
+  });
+  it('空白だけの答えも答えなしとみなす', () => {
+    const next = recordExam(emptyProgress(), items, items.map(() => '   '), now);
+    expect(Object.keys(next.answers)).toHaveLength(0);
+  });
+  it('答えた問題は正誤を記録し、正解の数 × 3 XP を足す', () => {
+    const answers: (string | undefined)[] = [...right];
+    answers[0] = 'まちがい';
+    answers[1] = undefined;
+    const next = recordExam(emptyProgress(), items, answers, now);
+    expect(Object.keys(next.answers)).toHaveLength(EXAM_QUESTIONS - 1);
+    expect(next.answers[items[0].question.id].wrong).toBe(1);
+    expect(next.xp.total).toBe((EXAM_QUESTIONS - 2) * 3);
+    expect(next.exams?.[0].correct).toBe(EXAM_QUESTIONS - 2);
   });
 });

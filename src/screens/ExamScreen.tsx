@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertDialog } from '@astryxdesign/core/AlertDialog';
 import { AppShell } from '@astryxdesign/core/AppShell';
 import { Banner } from '@astryxdesign/core/Banner';
@@ -29,14 +29,16 @@ import {
   domainCounts,
   formatClock,
   gradeExam,
+  isAnswered,
   isCorrect,
   pickExamQuestions,
+  recordExam,
   type BankItem,
   type ExamAnswer,
   type ExamResult,
 } from '../lib/exam';
-import { XP_PER_CORRECT } from '../lib/grade';
-import { addExamRecord, completeReview, recordAnswer, type Progress } from '../lib/progress';
+import { normalizeAnswer } from '../lib/grade';
+import type { Progress } from '../lib/progress';
 import { SITE_NAME } from '../lib/site';
 import { WIDE_QUERY, useMediaQuery } from '../lib/useMediaQuery';
 
@@ -90,7 +92,7 @@ function Intro({ progress, onStart }: { progress: Progress; onStart: () => void 
               <ListItem key={d} label={d} endContent={<Text type="supporting">{`配点 ${EXAM_WEIGHTS[d]}% · ${counts[d]} 問`}</Text>} />
             ))}
           </List>
-          <Text type="supporting">合格の目安は {Math.round(PASS_MARK * 100)}% としています (公式では確かめられていない目安です)。間違えた問題は復習に入ります。</Text>
+          <Text type="supporting">合格の目安は {Math.round(PASS_MARK * 100)}% としています (公式では確かめられていない目安です)。答えて間違えた問題は復習に入ります。</Text>
           <div>
             <Button variant="primary" label="模擬試験を始める" onClick={onStart} />
           </div>
@@ -160,7 +162,7 @@ function ExamQuestion({ question, answer, onAnswer }: { question: Question; answ
       {question.candidates && (
         <HStack gap={2} wrap="wrap">
           {question.candidates.map((c) => (
-            <Button key={c} label={c} variant={answer === c ? 'primary' : 'secondary'} onClick={() => onAnswer(c)} />
+            <Button key={c} label={c} variant={normalizeAnswer(answer ?? '') === c ? 'primary' : 'secondary'} onClick={() => onAnswer(c)} />
           ))}
         </HStack>
       )}
@@ -174,7 +176,11 @@ function Running({ items, onFinish, onQuit }: { items: BankItem[]; onFinish: (an
   const [endsAt] = useState(() => Date.now() + EXAM_MINUTES * 60 * 1000);
   const [left, setLeft] = useState(EXAM_MINUTES * 60);
   const [confirm, setConfirm] = useState(false);
-  const answered = answers.filter((a) => a !== undefined && a.trim() !== '').length;
+  const [confirmQuit, setConfirmQuit] = useState(false);
+  const answered = answers.filter(isAnswered).length;
+  // 時計は答えの変化で張り直さない。時間切れのときは最新の答えで採点する
+  const latest = useRef({ answers, onFinish });
+  latest.current = { answers, onFinish };
 
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -182,11 +188,11 @@ function Running({ items, onFinish, onQuit }: { items: BankItem[]; onFinish: (an
       setLeft(rest);
       if (rest <= 0) {
         window.clearInterval(id);
-        onFinish(answers);
+        latest.current.onFinish(latest.current.answers);
       }
     }, 1000);
     return () => window.clearInterval(id);
-  }, [endsAt, onFinish, answers]);
+  }, [endsAt]);
 
   const item = items[index];
   const setAnswer = (a: string) => setAnswers((prev) => prev.map((x, i) => (i === index ? a : x)));
@@ -195,7 +201,7 @@ function Running({ items, onFinish, onQuit }: { items: BankItem[]; onFinish: (an
   return (
     <div className="lesson">
       <header className="lesson-bar">
-        <Button variant="ghost" label="模擬試験をやめる" isIconOnly icon={<XMarkIcon width={20} height={20} />} onClick={onQuit} />
+        <Button variant="ghost" label="模擬試験をやめる" isIconOnly icon={<XMarkIcon width={20} height={20} />} onClick={() => setConfirmQuit(true)} />
         <div className="lesson-bar__progress">
           <HStack justify="between">
             <Text type="supporting">
@@ -238,6 +244,18 @@ function Running({ items, onFinish, onQuit }: { items: BankItem[]; onFinish: (an
           onFinish(answers);
         }}
       />
+      <AlertDialog
+        isOpen={confirmQuit}
+        onOpenChange={setConfirmQuit}
+        title="模擬試験をやめますか?"
+        description="やめると、ここまでの答えは残らず、採点もしません。"
+        actionLabel="やめる"
+        cancelLabel="続ける"
+        onAction={() => {
+          setConfirmQuit(false);
+          onQuit();
+        }}
+      />
     </div>
   );
 }
@@ -277,13 +295,18 @@ function Result({ items, answers, result, onRestart }: { items: BankItem[]; answ
       </Card>
       {wrong.length > 0 && (
         <VStack gap={4}>
-          <h2 className="h-sm">間違えた問題 ({wrong.length}) — 復習に入りました</h2>
+          <VStack gap={1}>
+            <h2 className="h-sm">間違えた・答えなしの問題 ({wrong.length})</h2>
+            <Text type="supporting">
+              答えて間違えた {wrong.filter((w) => isAnswered(w.answer)).length} 問は復習に入りました。答えなしの問題は記録しません。
+            </Text>
+          </VStack>
           {wrong.map(({ item, answer }) => {
             const q = item.question;
             const correctAnswer =
               q.type === 'fill' ? q.answers[0] : String.fromCharCode(65 + q.choices.findIndex((c) => c.id === q.answer));
             const mine =
-              answer === undefined || answer.trim() === ''
+              !isAnswered(answer)
                 ? '(答えなし)'
                 : q.type === 'fill'
                   ? answer
@@ -302,8 +325,8 @@ function Result({ items, answers, result, onRestart }: { items: BankItem[]; answ
                   )}
                   {q.type === 'fill' && <CodeBlock code={q.code.replace('{{blank}}', '____')} width="100%" size="sm" hasCopyButton={false} />}
                   <Text type="supporting">あなたの答え: {mine}</Text>
-                  <Feedback correct={false} correctAnswer={correctAnswer} explanation={q.explanation} note={q.type === 'choice' ? q.choices.find((c) => c.id === answer)?.why : q.wrongNotes?.[answer ?? '']} source={q.source} />
-                  <AskAi question={q} answered={{ picked: answer ?? '', correct: false }} />
+                  <Feedback correct={false} correctAnswer={correctAnswer} explanation={q.explanation} note={q.type === 'choice' ? q.choices.find((c) => c.id === answer)?.why : q.wrongNotes?.[normalizeAnswer(answer ?? '')]} source={q.source} />
+                  <AskAi question={q} answered={isAnswered(answer) ? { picked: answer, correct: false } : undefined} />
                 </VStack>
               </Card>
             );
@@ -332,15 +355,7 @@ export default function ExamScreen({ progress, updateProgress }: Props) {
 
   const finish = (final: ExamAnswer[]) => {
     const now = new Date();
-    const graded = gradeExam(items, final);
-    updateProgress((p) => {
-      let next = p;
-      items.forEach((item, i) => {
-        next = recordAnswer(next, item.question.id, isCorrect(item.question, final[i]), now);
-      });
-      next = completeReview(next, graded.correct * XP_PER_CORRECT, now);
-      return addExamRecord(next, { at: now.toISOString(), correct: graded.correct, total: graded.total });
-    });
+    updateProgress((p) => recordExam(p, items, final, now));
     setAnswers(final);
     setPhase('result');
     window.scrollTo(0, 0);
