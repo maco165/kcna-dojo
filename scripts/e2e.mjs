@@ -33,9 +33,14 @@ function check(cond, label) {
 
 async function waitForServer() {
   for (let i = 0; i < 50; i++) {
+    if (serverExited) throw new Error(`vite preview が ${PORT} 番で立ちませんでした (番号が埋まっていないか確かめる)`);
     try {
       const res = await fetch(BASE);
-      if (res.ok) return;
+      // 残っている別のサーバー (古い build) ではなく、いま組み立てた dist を配っていることを確かめる
+      if (res.ok) {
+        if ((await res.text()) === readFileSync(new URL('../dist/index.html', import.meta.url), 'utf8')) return;
+        throw new Error(`${BASE} が今の dist と違う中身を返します (古い vite preview が残っていないか確かめる)`);
+      }
     } catch {
       // 立ち上がるまで待つ
     }
@@ -201,11 +206,37 @@ async function run(browser, name, width, height) {
   check(await page.getByText(/非公式の学習サイト/).isVisible(), `${tag} このサイトについてに非公式と書いてある`);
   await noHorizontalOverflow(page, width, `${tag} このサイトについて`);
 
+  // 10. 設定: 目標を変える・書き出す・読み込む・記録を消す
+  await page.goto(`${BASE}#/settings`);
+  await page.getByRole('heading', { name: '設定' }).waitFor();
+  await page.getByRole('radio', { name: '10 XP' }).click();
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('kcna.v1') ?? 'null'));
+  check(saved?.profile?.dailyGoalXp === 10, `${tag} 1 日の目標を 10 XP にすると記録に残る`);
+  const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: '記録を書き出す (JSON)' }).click()]);
+  check(/^kcna-progress-\d{4}-\d{2}-\d{2}\.json$/.test(download.suggestedFilename()), `${tag} 記録を書き出すと日付入りの JSON が保存される`);
+  const exported = JSON.parse(await (await import('node:fs/promises')).readFile(await download.path(), 'utf8'));
+  check(exported.v === 1 && exported.profile?.dailyGoalXp === 10, `${tag} 書き出した中身が今の記録と同じ`);
+  await page.getByRole('button', { name: '記録を消す' }).click();
+  await page.getByRole('button', { name: '消す', exact: true }).click();
+  const cleared = await page.evaluate(() => JSON.parse(localStorage.getItem('kcna.v1') ?? 'null'));
+  check(Object.keys(cleared?.lessons ?? {}).length === 0 && cleared?.profile?.dailyGoalXp === 10, `${tag} 記録を消すと進捗は空で、目標は残る`);
+  await page.locator('input[type="file"]').setInputFiles({ name: 'back.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(exported)) });
+  await page.getByRole('button', { name: '置き換える' }).click();
+  const restored = await page.evaluate(() => JSON.parse(localStorage.getItem('kcna.v1') ?? 'null'));
+  check(JSON.stringify(restored?.lessons) === JSON.stringify(exported.lessons), `${tag} 書き出したファイルを読み込むと記録が戻る`);
+  await page.goto(BASE);
+  await page.getByRole('heading', { name: 'コンテナの基礎' }).waitFor();
+  check(await page.getByText(/ \/ 10 XP/).first().isVisible(), `${tag} ホームの今日の目標が 10 XP になる`);
+  await noHorizontalOverflow(page, width, `${tag} 設定`);
+
   check(errors.length === 0, `${tag} ページのエラーが無い ${errors.length ? errors.join(' / ') : ''}`);
   await context.close();
 }
 
 const server = spawn('npx', ['vite', 'preview', '--port', String(PORT), '--strictPort'], { stdio: 'ignore' });
+// 自分のサーバーが立たなかったとき (番号が埋まっているなど)、残っている別のサーバーにつないで偽の結果を出さないよう止める
+let serverExited = false;
+server.on('exit', () => (serverExited = true));
 let browser;
 try {
   await waitForServer();

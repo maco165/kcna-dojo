@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
+  DEFAULT_EXAM_DATE,
+  DEFAULT_GOAL_XP,
   STORAGE_KEY,
+  examDate,
+  exportFileName,
+  goalXp,
+  isValidDay,
+  parseProgressText,
+  resetProgress,
+  setProfile,
   completeLesson,
   currentStreak,
   emptyProgress,
@@ -111,5 +120,77 @@ describe('loadProgress / saveProgress', () => {
       setItem: () => {},
     };
     expect(loadProgress(s)).toEqual(emptyProgress());
+  });
+});
+
+describe('設定と記録の書き出し・読み込み・消す', () => {
+  it('目標と受験日は、設定が無ければ既定の値', () => {
+    expect(goalXp(emptyProgress())).toBe(DEFAULT_GOAL_XP);
+    expect(examDate(emptyProgress())).toBe(DEFAULT_EXAM_DATE);
+  });
+
+  it('setProfile は片方だけ変えても、もう片方を既定の値で埋める', () => {
+    const p = setProfile(emptyProgress(), { dailyGoalXp: 50 });
+    expect(p.profile).toEqual({ dailyGoalXp: 50, examDate: DEFAULT_EXAM_DATE });
+    expect(goalXp(p)).toBe(50);
+  });
+
+  it('書き出した中身を読み戻すと同じ進捗になる', () => {
+    let p = completeLesson(emptyProgress(), 'w1-l1', score, 12, at('2026-11-23'));
+    p = setProfile(p, { dailyGoalXp: 20, examDate: '2027-04-01' });
+    expect(parseProgressText(JSON.stringify(p))).toEqual(p);
+  });
+
+  it('読めないファイルや、ほかの形の JSON は null', () => {
+    expect(parseProgressText('not json')).toBeNull();
+    expect(parseProgressText('{"v":2}')).toBeNull();
+    expect(parseProgressText('[]')).toBeNull();
+  });
+
+  it('設定の値がおかしければ既定の値に直す', () => {
+    const p = parseProgressText(JSON.stringify({ v: 1, profile: { dailyGoalXp: -5, examDate: 'あした' } }));
+    expect(p?.profile).toEqual({ dailyGoalXp: DEFAULT_GOAL_XP, examDate: DEFAULT_EXAM_DATE });
+  });
+
+  it('記録を消すと進捗は空になり、目標と受験日は残る', () => {
+    let p = completeLesson(emptyProgress(), 'w1-l1', score, 12, at('2026-11-23'));
+    p = setProfile(p, { dailyGoalXp: 10 });
+    const r = resetProgress(p);
+    expect(r.lessons).toEqual({});
+    expect(r.xp.total).toBe(0);
+    expect(r.profile?.dailyGoalXp).toBe(10);
+  });
+
+  it('書き出すファイルの名前は日付入り', () => {
+    expect(exportFileName(at('2026-11-23'))).toBe('kcna-progress-2026-11-23.json');
+  });
+});
+
+describe('壊れた・悪意のある記録を読み込んでも落ちない', () => {
+  it('lessons と answers の中の形の違う値は捨てる', () => {
+    const p = parseProgressText(JSON.stringify({ v: 1, lessons: { 'w1-l1': null, 'w1-l2': 'x', 'w1-l3': { done: true, best: 'a' } }, answers: { q: 5 } }));
+    expect(p?.lessons).toEqual({ 'w1-l3': { done: true, best: 0, at: '' } });
+    expect(p?.answers).toEqual({});
+  });
+
+  it('XP の日ごとの値・合計・連続日数は、0 以上の有限の数だけ受ける', () => {
+    const p = parseProgressText('{"v":1,"xp":{"total":1e400,"byDay":{"2026-11-18":"abc","2026-11-19":5,"あした":3}},"streak":{"count":-1,"lastDay":"2026-02-31"}}');
+    expect(p?.xp).toEqual({ total: 0, byDay: { '2026-11-19': 5 } });
+    expect(p?.streak).toEqual({ count: 0, lastDay: null });
+  });
+
+  it('実在しない受験日と、選べない目標 XP は既定の値に直す', () => {
+    for (const examDate of ['2027-02-31', '9999-99-99']) {
+      const p = parseProgressText(JSON.stringify({ v: 1, profile: { dailyGoalXp: 7, examDate } }));
+      expect(p?.profile).toEqual({ dailyGoalXp: DEFAULT_GOAL_XP, examDate: DEFAULT_EXAM_DATE });
+    }
+    expect(isValidDay('2028-02-29')).toBe(true);
+    expect(isValidDay('2027-02-29')).toBe(false);
+  });
+
+  it('保存できなければ false を返す', () => {
+    const full = { getItem: () => null, setItem: () => { throw new Error('QuotaExceededError'); } };
+    expect(saveProgress(emptyProgress(), full)).toBe(false);
+    expect(saveProgress(emptyProgress(), memoryStorage())).toBe(true);
   });
 });

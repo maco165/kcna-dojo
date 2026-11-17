@@ -1,4 +1,4 @@
-import { weekHref } from '../lib/route';
+import { settingsHref, weekHref } from '../lib/route';
 
 type Tab = { key: string; label: string; href?: string; icon: React.ReactNode };
 
@@ -8,10 +8,10 @@ const TABS: Tab[] = [
   { key: 'learn', label: '学習', href: weekHref(1), icon: <path d="M4 6h16M4 12h16M4 18h10" /> },
   { key: 'review', label: '復習', icon: (<><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /></>) },
   { key: 'stats', label: '進捗', icon: <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /> },
-  { key: 'config', label: '設定', icon: (<><path d="M4 7h10M18 7h2M4 17h4M12 17h8" /><circle cx="16" cy="7" r="2" /><circle cx="10" cy="17" r="2" /></>) },
+  { key: 'config', label: '設定', href: settingsHref, icon: (<><path d="M4 7h10M18 7h2M4 17h4M12 17h8" /><circle cx="16" cy="7" r="2" /><circle cx="10" cy="17" r="2" /></>) },
 ];
 
-/** スマホの下のタブ。学習のほかはまだ機能が無いので「準備中」として押せない */
+/** スマホの下のタブ。まだ機能が無いものは「準備中」として押せない */
 export default function BottomTabs({ current }: { current: string }) {
   return (
     <nav aria-label="メイン" className="tabs">
