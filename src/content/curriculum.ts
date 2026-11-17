@@ -1,6 +1,9 @@
 // 週の並びと日付。カリキュラムの正本は本人の学習計画の文書で、ここはサイトに出すための写し。
 import type { Domain, WeekContent } from './types';
-import week1 from './week1.json';
+
+// 問題データは src/content/week<n>.json を置けば、その週に自動でつながる (週ごとの PR が同じファイルを触らないため)
+const CONTENT_FILES = import.meta.glob<WeekContent>('./week*.json', { eager: true, import: 'default' });
+const CONTENT_BY_WEEK = new Map<number, WeekContent>(Object.values(CONTENT_FILES).map((c) => [c.week, c]));
 
 export type WeekMeta = {
   week: number;
@@ -20,7 +23,7 @@ export const EXAM_DATE = '2027-03-06';
 /** 1 日の目標の XP */
 export const DAILY_GOAL_XP = 30;
 
-export const WEEKS: WeekMeta[] = [
+const WEEK_LIST: Omit<WeekMeta, 'content'>[] = [
   {
     week: 1,
     title: 'コンテナの基礎',
@@ -28,7 +31,6 @@ export const WEEKS: WeekMeta[] = [
     area: 'Containerization',
     start: '2026-11-23',
     goals: ['コンテナはなぜ VM より軽いか', 'OCI と CRI は何を標準にしたか', 'k3s は Docker を使っているか'],
-    content: week1 as WeekContent,
   },
   {
     week: 2,
@@ -87,3 +89,5 @@ export const WEEKS: WeekMeta[] = [
     goals: ['メトリクスとトレースで分かることの違い', 'SLO を決める理由', 'Graduated になる条件のあらまし'],
   },
 ];
+
+export const WEEKS: WeekMeta[] = WEEK_LIST.map((w) => ({ ...w, content: CONTENT_BY_WEEK.get(w.week) }));
