@@ -318,20 +318,51 @@ async function run(browser, name, width, height) {
     await tp.close();
   }
 
-  // 12. 用語集: 検索とレッスンへのリンク
+  // 12. 用語集: 検索・分野で絞る・開く・レッスンへのリンク (スマホは閉じた一覧、PC は一覧と説明の 2 列)
   await page.goto(`${BASE}#/glossary`);
   await page.getByRole('heading', { name: '用語集', level: 1 }).waitFor();
-  check((await page.locator('article.gloss').count()) >= 70, `${tag} 用語集に 70 語以上ある`);
+  const isWide = width >= 768;
+  const termButtons = isWide ? page.getByRole('navigation', { name: '用語の一覧' }).getByRole('button') : page.locator('.gloss-row__head');
+  check((await termButtons.count()) >= 70, `${tag} 用語集に 70 語以上ある`);
+  await page.getByRole('button', { name: /^設計 \d+/ }).click();
+  check((await page.getByRole('button', { name: /^設計 \d+/ }).getAttribute('aria-pressed')) === 'true', `${tag} 押した分野の札が押された状態になる`);
+  const designCount = await termButtons.count();
+  check(designCount > 0 && designCount < 30, `${tag} 分野で絞ると語が減る (${designCount})`);
+  await page.getByRole('button', { name: /^すべて \d+/ }).click();
   await page.getByRole('searchbox', { name: '用語を探す' }).fill('ｋｕｂｅｌｅｔ');
-  check(await page.getByRole('heading', { name: 'kubelet', level: 2 }).isVisible(), `${tag} 全角で探しても kubelet が見つかる`);
+  if (!isWide) {
+    check((await page.locator('.gloss-row__head[aria-expanded="true"]').count()) === 0, `${tag} スマホの一覧は閉じて並ぶ`);
+    await page.locator('.gloss-row__head').filter({ hasText: 'kubelet' }).first().click();
+    check((await page.locator('.gloss-row__head[aria-expanded="true"]').count()) === 1, `${tag} 押すと 1 語だけ開く`);
+  }
+  check(await page.getByText('各ノードで動き').first().isVisible(), `${tag} 全角で探しても kubelet の説明が出る`);
   await page.getByRole('searchbox', { name: '用語を探す' }).fill('存在しない語ですzzz');
   check(await page.getByText('見つかりませんでした').isVisible(), `${tag} 見つからないときに知らせる`);
   await page.getByRole('searchbox', { name: '用語を探す' }).fill('etcd');
-  await page.locator('article.gloss').first().getByRole('link', { name: /^第 \d+ 週/ }).first().click();
+  if (!isWide) await page.locator('.gloss-row__head').first().click();
+  await page.locator('.gloss-chip').first().click();
   await page.waitForURL(/#\/lesson\//);
   check(page.url().includes('#/lesson/'), `${tag} 用語集からレッスンへ飛べる`);
   await page.goto(`${BASE}#/glossary`);
   await noHorizontalOverflow(page, width, `${tag} 用語集`);
+  if (isWide) {
+    // 768〜1000 幅でも説明欄が一覧の横 (画面の中) に出る
+    const narrow = await context.newPage();
+    await narrow.setViewportSize({ width: 900, height: 700 });
+    await narrow.goto(`${BASE}#/glossary`);
+    await narrow.getByRole('navigation', { name: /用語の一覧/ }).getByRole('button').nth(5).click();
+    const paneTop = await narrow.locator('.gloss-pane').evaluate((el) => el.getBoundingClientRect().top);
+    check(paneTop < 700, `${tag} 900x700 でも説明欄が画面の中に出る (上端 ${Math.round(paneTop)})`);
+    // 一覧は Tab で 1 語だけに止まり、下の矢印で次の語へ移る
+    const first = narrow.getByRole('navigation', { name: /用語の一覧/ }).getByRole('button', { name: /./ });
+    check((await narrow.locator('.gloss-index__item[tabindex="0"]').count()) === 1, `${tag} 一覧の Tab の止まり先は 1 語だけ`);
+    await narrow.locator('.gloss-index__item[tabindex="0"]').focus();
+    const before = await narrow.locator('#gloss-pane-term').innerText();
+    await narrow.keyboard.press('ArrowDown');
+    const after = await narrow.locator('#gloss-pane-term').innerText();
+    check(before !== after && (await first.count()) > 0, `${tag} 下の矢印で次の語の説明に移る (${before} → ${after})`);
+    await narrow.close();
+  }
 
   // 13. 説明のページ: 見本の問題を解ける・数字が問題データと合う・左の一覧/ホームから入れる
   await page.goto(BASE);
