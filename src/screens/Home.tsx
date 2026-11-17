@@ -26,6 +26,7 @@ import {
   lessonStatuses,
   type LessonStatus,
 } from '../lib/lessonStatus';
+import { SITE_NAME } from '../lib/site';
 import { currentStreak, dayKey, daysBetween, todayXp, type Progress } from '../lib/progress';
 import { aboutHref, lessonHref, weekHref } from '../lib/route';
 import { WIDE_QUERY, useMediaQuery } from '../lib/useMediaQuery';
@@ -100,7 +101,7 @@ function PhoneHome({ s, progress }: { s: Summary; progress: Progress }) {
       <header className="topbar">
         <span className="topbar__brand">
           <SiteLogo />
-          <Text type="large">KCNA 学習</Text>
+          <Text type="large">{SITE_NAME}</Text>
         </span>
         <span className="topbar__end">
           <Text type="supporting">
