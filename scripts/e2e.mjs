@@ -325,6 +325,7 @@ async function run(browser, name, width, height) {
   const termButtons = isWide ? page.getByRole('navigation', { name: '用語の一覧' }).getByRole('button') : page.locator('.gloss-row__head');
   check((await termButtons.count()) >= 70, `${tag} 用語集に 70 語以上ある`);
   await page.getByRole('button', { name: /^設計 \d+/ }).click();
+  check((await page.getByRole('button', { name: /^設計 \d+/ }).getAttribute('aria-pressed')) === 'true', `${tag} 押した分野の札が押された状態になる`);
   const designCount = await termButtons.count();
   check(designCount > 0 && designCount < 30, `${tag} 分野で絞ると語が減る (${designCount})`);
   await page.getByRole('button', { name: /^すべて \d+/ }).click();
@@ -344,6 +345,24 @@ async function run(browser, name, width, height) {
   check(page.url().includes('#/lesson/'), `${tag} 用語集からレッスンへ飛べる`);
   await page.goto(`${BASE}#/glossary`);
   await noHorizontalOverflow(page, width, `${tag} 用語集`);
+  if (isWide) {
+    // 768〜1000 幅でも説明欄が一覧の横 (画面の中) に出る
+    const narrow = await context.newPage();
+    await narrow.setViewportSize({ width: 900, height: 700 });
+    await narrow.goto(`${BASE}#/glossary`);
+    await narrow.getByRole('navigation', { name: /用語の一覧/ }).getByRole('button').nth(5).click();
+    const paneTop = await narrow.locator('.gloss-pane').evaluate((el) => el.getBoundingClientRect().top);
+    check(paneTop < 700, `${tag} 900x700 でも説明欄が画面の中に出る (上端 ${Math.round(paneTop)})`);
+    // 一覧は Tab で 1 語だけに止まり、下の矢印で次の語へ移る
+    const first = narrow.getByRole('navigation', { name: /用語の一覧/ }).getByRole('button', { name: /./ });
+    check((await narrow.locator('.gloss-index__item[tabindex="0"]').count()) === 1, `${tag} 一覧の Tab の止まり先は 1 語だけ`);
+    await narrow.locator('.gloss-index__item[tabindex="0"]').focus();
+    const before = await narrow.locator('#gloss-pane-term').innerText();
+    await narrow.keyboard.press('ArrowDown');
+    const after = await narrow.locator('#gloss-pane-term').innerText();
+    check(before !== after && (await first.count()) > 0, `${tag} 下の矢印で次の語の説明に移る (${before} → ${after})`);
+    await narrow.close();
+  }
 
   check(errors.length === 0, `${tag} ページのエラーが無い ${errors.length ? errors.join(' / ') : ''}`);
   await context.close();

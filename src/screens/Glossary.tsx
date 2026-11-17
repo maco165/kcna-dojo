@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AppShell } from '@astryxdesign/core/AppShell';
 import { Link } from '@astryxdesign/core/Link';
 import { VStack } from '@astryxdesign/core/Stack';
@@ -86,24 +86,34 @@ function Filters({ value, onChange, counts }: { value: Domain | 'all'; onChange:
 /** スマホ: 語と説明の 1 行目だけの閉じた一覧。押すと開く */
 function PhoneList({ hits }: { hits: Entry[] }) {
   const [open, setOpen] = useState<string | null>(null);
+  // 検索や絞り込みで消えた語は閉じたことにする (戻したときに勝手に開かない)
+  useEffect(() => {
+    if (open && !hits.some((t) => t.id === open)) setOpen(null);
+  }, [hits, open]);
   return (
     <ul className="gloss-rows">
       {hits.map((t) => {
         const isOpen = open === t.id;
         return (
           <li key={t.id} className="gloss-row">
-            <button type="button" className="gloss-row__head" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : t.id)}>
+            <h2 className="gloss-row__h">
+            <button type="button" className="gloss-row__head" aria-expanded={isOpen} aria-controls={`gloss-body-${t.id}`} onClick={() => setOpen(isOpen ? null : t.id)}>
               <span className="gloss-row__text">
                 <span className="gloss-row__name">
                   <span className="gloss-row__term">{t.term}</span>
                   {t.aliases?.[0] && <span className="gloss-row__alias">{t.aliases[0]}</span>}
                 </span>
-                {!isOpen && <span className="gloss-row__gist">{t.description}</span>}
+                {!isOpen && (
+                  <span className="gloss-row__gist" aria-hidden="true">
+                    {t.description}
+                  </span>
+                )}
               </span>
               <ChevronDownIcon width={18} height={18} aria-hidden="true" className={isOpen ? 'gloss-row__chev gloss-row__chev--open' : 'gloss-row__chev'} />
             </button>
+            </h2>
             {isOpen && (
-              <div className="gloss-row__body">
+              <div className="gloss-row__body" id={`gloss-body-${t.id}`}>
                 {t.aliases && t.aliases.length > 1 && <Text type="supporting">{t.aliases.join(' · ')}</Text>}
                 <Detail t={t} />
               </div>
@@ -118,13 +128,28 @@ function PhoneList({ hits }: { hits: Entry[] }) {
 /** PC: 左に分野ごとの語の一覧、右に選んだ語の説明 */
 function DeskList({ hits }: { hits: Entry[] }) {
   const [picked, setPicked] = useState<string | null>(null);
+  const buttons = useRef(new Map<string, HTMLButtonElement>());
+  // 検索や絞り込みで消えた語の選択は外す (戻したときに勝手に戻らない)
+  useEffect(() => {
+    if (picked && !hits.some((t) => t.id === picked)) setPicked(null);
+  }, [hits, picked]);
   const current = hits.find((t) => t.id === picked) ?? hits[0];
   const groups: { d: string; items: Entry[] }[] = ORDER.map((d) => ({ d: d as string, items: hits.filter((t) => t.domain === d) })).filter((g) => g.items.length > 0);
   const other = hits.filter((t) => !t.domain);
   if (other.length) groups.push({ d: 'その他', items: other });
+  // 一覧はロービングタブインデックス: Tab で入るのは今の語だけ、上下の矢印・Home・End で移る
+  const ordered = groups.flatMap((g) => g.items);
+  const move = (e: React.KeyboardEvent, from: string) => {
+    const i = ordered.findIndex((t) => t.id === from);
+    const to = e.key === 'ArrowDown' ? i + 1 : e.key === 'ArrowUp' ? i - 1 : e.key === 'Home' ? 0 : e.key === 'End' ? ordered.length - 1 : null;
+    if (to === null || to < 0 || to >= ordered.length) return;
+    e.preventDefault();
+    setPicked(ordered[to].id);
+    buttons.current.get(ordered[to].id)?.focus();
+  };
   return (
     <div className="gloss-desk">
-      <nav aria-label="用語の一覧" className="gloss-index">
+      <nav aria-label="用語の一覧 (上下の矢印で移る)" className="gloss-index">
         {groups.map((g) => (
           <section key={g.d}>
             <h2 className="gloss-index__head">
@@ -133,7 +158,19 @@ function DeskList({ hits }: { hits: Entry[] }) {
             <ul className="gloss-index__list">
               {g.items.map((t) => (
                 <li key={t.id}>
-                  <button type="button" className="gloss-index__item" aria-current={current?.id === t.id ? 'true' : undefined} onClick={() => setPicked(t.id)}>
+                  <button
+                    type="button"
+                    className="gloss-index__item"
+                    ref={(el) => {
+                      if (el) buttons.current.set(t.id, el);
+                      else buttons.current.delete(t.id);
+                    }}
+                    tabIndex={current?.id === t.id ? 0 : -1}
+                    aria-current={current?.id === t.id ? 'true' : undefined}
+                    aria-controls="gloss-pane"
+                    onClick={() => setPicked(t.id)}
+                    onKeyDown={(e) => move(e, t.id)}
+                  >
                     <span className="gloss-index__term">{t.term}</span>
                     {t.aliases?.[0] && <span className="gloss-index__alias">{t.aliases[0]}</span>}
                   </button>
@@ -144,10 +181,12 @@ function DeskList({ hits }: { hits: Entry[] }) {
         ))}
       </nav>
       {current && (
-        <article className="gloss-pane" aria-live="polite">
+        <article className="gloss-pane" id="gloss-pane" aria-labelledby="gloss-pane-term">
           <div>
             {current.domain && <Text type="supporting">{current.domain}</Text>}
-            <h2 className="gloss-pane__term">{current.term}</h2>
+            <h2 className="gloss-pane__term" id="gloss-pane-term">
+              {current.term}
+            </h2>
             {current.aliases && current.aliases.length > 0 && <Text type="supporting">{current.aliases.join(' · ')}</Text>}
           </div>
           <Detail t={current} large />

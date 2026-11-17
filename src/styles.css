@@ -487,13 +487,15 @@ body {
 }
 
 .gloss-filter[aria-pressed='true'] {
+  /* 白字に accent の地はダークで 3.11:1 しか無いので、薄い青の地に濃い青の字 (8:1 以上) */
   border-color: var(--color-accent);
-  background: var(--color-accent);
-  color: var(--color-on-accent);
+  background: var(--color-accent-muted);
+  color: var(--color-text-blue);
+  font-weight: 600;
 }
 
 .gloss-filter__count {
-  opacity: 0.75;
+  color: inherit;
 }
 
 .gloss-rows,
@@ -509,6 +511,11 @@ body {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-container);
   overflow: hidden;
+}
+
+.gloss-row__h {
+  margin: 0;
+  font: inherit;
 }
 
 .gloss-row + .gloss-row {
@@ -640,16 +647,15 @@ body {
 }
 
 .gloss-desk {
-  display: flex;
-  flex-wrap: wrap;
+  /* 折り返すと説明欄が一覧の下 (画面の外) に回るので、いつも 2 列 */
+  display: grid;
+  grid-template-columns: minmax(12rem, 20rem) minmax(0, 1fr);
   gap: var(--spacing-4);
-  align-items: flex-start;
+  align-items: start;
 }
 
 .gloss-index {
-  flex: 1 1 260px;
-  max-width: 340px;
-  max-height: calc(100vh - 260px);
+  max-height: max(15rem, calc(100dvh - 260px));
   overflow-y: auto;
   background: var(--color-background-card);
   border: 1px solid var(--color-border);
@@ -694,7 +700,6 @@ body {
 }
 
 .gloss-pane {
-  flex: 2 1 420px;
   min-width: 0;
   position: sticky;
   top: var(--spacing-4);
