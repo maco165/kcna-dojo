@@ -1,0 +1,38 @@
+/* Astryx の部品で描けない、穴埋めのコードの枠だけをここで描く。色・角丸・字体は Astryx のトークンを使う。 */
+.fill-code {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-container);
+  background: var(--color-background-muted);
+  overflow: hidden;
+}
+
+.fill-code__header {
+  padding: var(--spacing-1-5) var(--spacing-3);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.fill-code__body {
+  padding: var(--spacing-3);
+  font-family: var(--font-family-code);
+  font-size: var(--text-code-size);
+  line-height: 2.2;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--color-text-primary);
+}
+
+.fill-code__prompt {
+  color: var(--color-text-secondary);
+}
+
+.fill-code__blank {
+  display: inline-block;
+  vertical-align: middle;
+  max-width: 100%;
+  white-space: normal;
+  line-height: normal;
+}
+
+.fill-code__blank input {
+  font-family: var(--font-family-code);
+}
