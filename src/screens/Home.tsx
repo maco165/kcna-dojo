@@ -28,9 +28,9 @@ import {
 } from '../lib/lessonStatus';
 import { downloadProgress } from '../lib/download';
 import { SITE_NAME } from '../lib/site';
-import { currentStreak, dayKey, daysBetween, dueReviewIds, examDate, goalXp, todayXp, type Progress } from '../lib/progress';
+import { currentStreak, dayKey, daysBetween, examDate, goalXp, todayXp, type Progress } from '../lib/progress';
 import { aboutHref, lessonHref, reviewHref, weekHref } from '../lib/route';
-import { dueQuestions } from './Review';
+import { dueQuestions } from '../content';
 import { WIDE_QUERY, useMediaQuery } from '../lib/useMediaQuery';
 
 function formatDate(day: string): string {
@@ -192,7 +192,7 @@ function PhoneHome({ s, progress }: { s: Summary; progress: Progress }) {
         </div>
       </main>
 
-      <BottomTabs current="learn" reviewCount={dueReviewIds(progress, new Date()).length} />
+      <BottomTabs current="learn" reviewCount={dueQuestions(progress, new Date()).length} />
     </div>
   );
 }

@@ -9,10 +9,10 @@ import AppSideNav from '../components/AppSideNav';
 import BottomTabs from '../components/BottomTabs';
 import RepoLink from '../components/RepoLink';
 import SiteLogo from '../components/SiteLogo';
-import { findQuestion, type QuestionRef } from '../content';
+import { dueQuestions, isKnownQuestion, type QuestionRef } from '../content';
 import { XP_PER_CORRECT } from '../lib/grade';
-import { completeReview, dueReviewIds, upcomingReview, type Progress } from '../lib/progress';
-import { reviewHref, weekHref } from '../lib/route';
+import { completeReview, upcomingReview, type Progress } from '../lib/progress';
+import { reviewHref } from '../lib/route';
 import { SITE_NAME } from '../lib/site';
 import { WIDE_QUERY, useMediaQuery } from '../lib/useMediaQuery';
 import { QuestionRun } from './LessonScreen';
@@ -24,17 +24,10 @@ function formatDay(day: string): string {
   return `${m}/${d}`;
 }
 
-/** 今日の復習の問題 (問題データから消えた id は飛ばす) */
-export function dueQuestions(p: Progress, now: Date): QuestionRef[] {
-  return dueReviewIds(p, now)
-    .map((id) => findQuestion(id))
-    .filter((r): r is QuestionRef => r !== undefined);
-}
-
 function Overview({ progress, onStart }: { progress: Progress; onStart: () => void }) {
   const now = new Date();
   const due = dueQuestions(progress, now);
-  const upcoming = upcomingReview(progress, now);
+  const upcoming = upcomingReview(progress, now, isKnownQuestion);
   return (
     <VStack gap={6}>
       <VStack gap={1}>
@@ -85,12 +78,15 @@ export default function Review({ progress, updateProgress }: Props) {
         resultLabel="今日の復習"
         questions={questions}
         domainOf={(q) => domains.get(q.id) ?? ''}
-        closeHref={weekHref(1)}
+        closeHref={reviewHref}
+        onClose={() => setRunning(null)}
         backHref={reviewHref}
         onBack={() => setRunning(null)}
         progress={progress}
         updateProgress={updateProgress}
-        onFinish={(p, correct) => completeReview(p, correct * XP_PER_CORRECT, new Date())}
+        // 復習では解いた問題が今日の一覧から外れるので、XP は正解のたびに入れる (途中で閉じても残る)
+        onCorrect={(p) => completeReview(p, XP_PER_CORRECT, new Date())}
+        onFinish={(p) => completeReview(p, 0, new Date())}
       />
     );
   }
@@ -115,7 +111,7 @@ export default function Review({ progress, updateProgress }: Props) {
         <RepoLink />
       </header>
       <main className="page__section">{body}</main>
-      <BottomTabs current="review" reviewCount={dueReviewIds(progress, new Date()).length} />
+      <BottomTabs current="review" reviewCount={dueQuestions(progress, new Date()).length} />
     </div>
   );
 }

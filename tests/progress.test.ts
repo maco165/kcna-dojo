@@ -192,6 +192,27 @@ describe('復習の予定 (1・3・7 日後)', () => {
     expect(dueReviewIds(p, at('2027-01-01'))).toEqual([]);
   });
 
+  it('同じ日に間違えてすぐ正解しても、予定は翌日のまま (段階は進まない)', () => {
+    let p = recordAnswer(emptyProgress(), q, false, at('2026-11-23', 9));
+    p = recordAnswer(p, q, true, at('2026-11-23', 10));
+    p = recordAnswer(p, q, true, at('2026-11-23', 11));
+    expect(p.answers[q]).toMatchObject({ stage: 0, nextReview: '2026-11-24' });
+  });
+
+  it('予定の日より前に正解しても、間隔は進まない', () => {
+    let p = recordAnswer(emptyProgress(), q, false, at('2026-11-23'));
+    p = recordAnswer(p, q, true, at('2026-11-24'));
+    expect(p.answers[q]).toMatchObject({ stage: 1, nextReview: '2026-11-27' });
+    p = recordAnswer(p, q, true, at('2026-11-25'));
+    expect(p.answers[q]).toMatchObject({ stage: 1, nextReview: '2026-11-27' });
+  });
+
+  it('読み込みでも復習の予定を残す (実在する日付だけ)', () => {
+    const p = parseProgressText(JSON.stringify({ v: 1, answers: { a: { right: 0, wrong: 1, last: '', stage: 9, nextReview: '2026-11-24' }, b: { right: 0, wrong: 1, last: '', nextReview: '2026-02-31' } } }));
+    expect(p?.answers.a).toMatchObject({ stage: 2, nextReview: '2026-11-24' });
+    expect(p?.answers.b.nextReview).toBeUndefined();
+  });
+
   it('復習の途中で間違えたら、翌日に戻す', () => {
     let p = recordAnswer(emptyProgress(), q, false, at('2026-11-23'));
     p = recordAnswer(p, q, true, at('2026-11-24'));

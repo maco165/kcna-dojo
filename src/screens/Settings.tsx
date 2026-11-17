@@ -13,10 +13,10 @@ import AppSideNav from '../components/AppSideNav';
 import BottomTabs from '../components/BottomTabs';
 import RepoLink from '../components/RepoLink';
 import SiteLogo from '../components/SiteLogo';
+import { dueQuestions } from '../content';
 import { downloadProgress } from '../lib/download';
 import {
   GOAL_CHOICES,
-  dueReviewIds,
   examDate,
   goalXp,
   parseProgressText,
@@ -196,7 +196,7 @@ export default function Settings(props: Props) {
       <main className="page__section">
         <Body {...props} />
       </main>
-      <BottomTabs current="config" reviewCount={dueReviewIds(props.progress, new Date()).length} />
+      <BottomTabs current="config" reviewCount={dueQuestions(props.progress, new Date()).length} />
     </div>
   );
 }

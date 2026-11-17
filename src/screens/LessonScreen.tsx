@@ -27,10 +27,24 @@ type Props = {
 };
 
 /** 上の帯: 閉じる・レッスン名と何問目か・進み具合 */
-function LessonBar({ title, closeHref, current, total, unit }: { title: string; closeHref: string; current: number; total: number; unit: string }) {
+function LessonBar({
+  title,
+  closeHref,
+  onClose,
+  current,
+  total,
+  unit,
+}: {
+  title: string;
+  closeHref: string;
+  onClose?: () => void;
+  current: number;
+  total: number;
+  unit: string;
+}) {
   return (
     <header className="lesson-bar">
-      <Button variant="ghost" label="レッスンを閉じる" isIconOnly icon={<XMarkIcon width={20} height={20} />} href={closeHref} />
+      <Button variant="ghost" label="レッスンを閉じる" isIconOnly icon={<XMarkIcon width={20} height={20} />} href={onClose ? undefined : closeHref} onClick={onClose} />
       <div className="lesson-bar__progress">
         <Text type="supporting">
           {title} · {current} / {total} {unit}
@@ -79,6 +93,8 @@ export function QuestionRun({
   updateProgress,
   canRetry,
   onBack,
+  onClose,
+  onCorrect,
   onFinish,
 }: {
   title: string;
@@ -92,6 +108,10 @@ export function QuestionRun({
   canRetry?: boolean;
   /** 結果の画面の「一覧へ戻る」で、URL を変えずに戻すとき (同じ URL の画面から始めた復習など) */
   onBack?: () => void;
+  /** 上の × で、URL を変えずに閉じるとき */
+  onClose?: () => void;
+  /** 正解のたびに進捗に反映する (復習の XP など) */
+  onCorrect?: (p: Progress) => Progress;
   /** 最後の問題のあと、進捗に反映する (XP・完了など) */
   onFinish: (p: Progress, correct: number, total: number) => Progress;
 }) {
@@ -109,7 +129,10 @@ export function QuestionRun({
 
   const onChecked = (correct: boolean) => {
     setResults((r) => [...r, correct]);
-    updateProgress((p) => recordAnswer(p, q.id, correct, new Date()));
+    updateProgress((p) => {
+      const recorded = recordAnswer(p, q.id, correct, new Date());
+      return correct && onCorrect ? onCorrect(recorded) : recorded;
+    });
   };
 
   const onNext = useCallback(() => {
@@ -156,7 +179,7 @@ export function QuestionRun({
   const nextLabel = isLast ? '結果を見る' : '次へ';
   return (
     <div className="lesson">
-      <LessonBar title={title} closeHref={closeHref} current={index + 1} total={total} unit="問" />
+      <LessonBar title={title} closeHref={closeHref} onClose={onClose} current={index + 1} total={total} unit="問" />
       <main className="lesson__main">
         {q.type === 'fill' ? (
           <FillQuestionView key={`${attempt}-${q.id}`} question={q} domain={domainOf(q)} onChecked={onChecked} nextLabel={nextLabel} onNext={onNext} />

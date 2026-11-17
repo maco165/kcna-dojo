@@ -1,5 +1,6 @@
 import { WEEKS } from './curriculum';
 import type { Lesson, Question } from './types';
+import { dueReviewIds, type Progress } from '../lib/progress';
 
 export function findLesson(lessonId: string): { lesson: Lesson; week: number } | undefined {
   for (const w of WEEKS) {
@@ -22,3 +23,12 @@ export function findQuestion(questionId: string): QuestionRef | undefined {
   }
   return undefined;
 }
+
+/** 今日の復習の問題。問題データから消えた id は飛ばす (件数のバッジもこれで数える) */
+export function dueQuestions(p: Progress, now: Date): QuestionRef[] {
+  return dueReviewIds(p, now)
+    .map((id) => findQuestion(id))
+    .filter((r): r is QuestionRef => r !== undefined);
+}
+
+export const isKnownQuestion = (id: string): boolean => findQuestion(id) !== undefined;

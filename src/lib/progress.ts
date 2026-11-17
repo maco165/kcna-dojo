@@ -108,6 +108,10 @@ export function normalizeProgress(raw: unknown): Progress | null {
         wrong: isCount(v.wrong) ? Math.floor(v.wrong) : 0,
         last: typeof v.last === 'string' ? v.last : '',
       };
+      if (isValidDay(v.nextReview)) {
+        a.nextReview = v.nextReview;
+        a.stage = isCount(v.stage) ? Math.min(Math.floor(v.stage), REVIEW_INTERVALS.length - 1) : 0;
+      }
       return a;
     }),
   };
@@ -173,13 +177,17 @@ export function recordAnswer(p: Progress, questionId: string, correct: boolean, 
     // 間違えたら (初めてでも、復習の途中でも) 翌日からやり直す
     next.stage = 0;
     next.nextReview = addDays(today, REVIEW_INTERVALS[0]);
-  } else if (prev.nextReview !== undefined) {
-    // 復習の対象を正解した: 間を空ける。3 回続けて正解したら終わり
+  } else if (prev.nextReview !== undefined && prev.nextReview <= today) {
+    // 予定の日が来た復習の対象を正解した: 間を空ける。3 回続けて正解したら終わり
     const stage = (prev.stage ?? 0) + 1;
     if (stage < REVIEW_INTERVALS.length) {
       next.stage = stage;
       next.nextReview = addDays(today, REVIEW_INTERVALS[stage]);
     }
+  } else if (prev.nextReview !== undefined) {
+    // 予定の日より前に (レッスンのやり直しなどで) 正解しても、予定は進めずそのまま残す
+    next.stage = prev.stage ?? 0;
+    next.nextReview = prev.nextReview;
   }
   return { ...p, answers: { ...p.answers, [questionId]: next } };
 }
@@ -193,11 +201,12 @@ export function dueReviewIds(p: Progress, now: Date): string[] {
     .map(([id]) => id);
 }
 
-/** まだ来ていない復習のうち、いちばん近い予定の日と件数 */
-export function upcomingReview(p: Progress, now: Date): { day: string; count: number } | null {
+/** まだ来ていない復習のうち、いちばん近い予定の日と件数。isKnown で問題データにある id だけに絞れる */
+export function upcomingReview(p: Progress, now: Date, isKnown: (id: string) => boolean = () => true): { day: string; count: number } | null {
   const today = dayKey(now);
-  const days = Object.values(p.answers)
-    .map((a) => a.nextReview)
+  const days = Object.entries(p.answers)
+    .filter(([id]) => isKnown(id))
+    .map(([, a]) => a.nextReview)
     .filter((d): d is string => d !== undefined && d > today)
     .sort();
   if (days.length === 0) return null;
