@@ -3,7 +3,7 @@
   <img alt="クラネイ: KCNA-JP 対策。コマンドと YAML の穴埋め・4 択を、週ごとのレッスンで。進捗はブラウザの中だけに残ります" src="docs/images/banner-light.png">
 </picture>
 
-**クラネイ** (クラウドネイティブの略) は、KCNA-JP (Kubernetes and Cloud Native Associate 日本語版) 対策の非公式の学習サイト。リポジトリ名は kcna-dojo。週ごとのレッスンで、コマンドの穴埋め・Dockerfile や YAML の穴埋め・4 択・家のクラスタでの実習を解く。進捗はブラウザの localStorage にだけ残し、サーバーは持たない。
+**クラネイ** (クラウドネイティブの略) は、KCNA-JP (Kubernetes and Cloud Native Associate 日本語版) 対策の非公式の学習サイト。リポジトリ名は kcna-dojo。週ごとのレッスンで、コマンドの穴埋め・Dockerfile や YAML の穴埋め・4 択・家のクラスタでの実習を解く。間違えた問題は 1・3・7 日後に復習で出し、本番に近い 60 問・90 分の模擬試験と、問題に出る用語の用語集もある。進捗はブラウザの localStorage にだけ残し、サーバーは持たない。
 
 | | |
 |---|---|
@@ -28,7 +28,24 @@
   </tr>
 </table>
 
+<table>
+  <tr>
+    <td width="25%"><img alt="復習: 今日の復習の問題の一覧" src="docs/images/review-phone.png"></td>
+    <td width="25%"><img alt="進捗: 試験までの日数・分野ごとの正答率・7 日の XP" src="docs/images/progress-phone.png"></td>
+    <td width="25%"><img alt="模擬試験: 残り時間と 1 問ずつの解答" src="docs/images/exam-phone.png"></td>
+    <td width="25%"><img alt="用語集: 検索と用語の説明・出典・出てくるレッスン" src="docs/images/glossary-phone.png"></td>
+  </tr>
+  <tr>
+    <td>復習。間違えた問題を 1・3・7 日後に出す</td>
+    <td>進捗。計画との差と、分野ごとの正答率を見る</td>
+    <td>模擬試験。4 分野の配点の割合で 60 問・90 分。途中では正誤を見せない</td>
+    <td>用語集。用語・別名・説明から探し、出てくるレッスンへ飛べる</td>
+  </tr>
+</table>
+
 <img alt="PC のホーム: 左に週の一覧、本文にレッスンの一覧" src="docs/images/home-pc.png">
+
+設定 (目標 XP・受験日・記録の書き出しと読み込み・記録を消す) は `docs/images/settings-phone.png`。
 
 ## 全体の作り
 
