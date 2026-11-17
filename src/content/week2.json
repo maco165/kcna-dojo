@@ -1,0 +1,892 @@
+{
+  "week": 2,
+  "lessons": [
+    {
+      "id": "w2-l1",
+      "kind": "quiz",
+      "title": "コントロールプレーン",
+      "summary": "4 択とコマンドの穴埋め · 7 問",
+      "domain": "Kubernetes Fundamentals",
+      "questions": [
+        {
+          "id": "w2-l1-q1",
+          "type": "choice",
+          "prompt": "kubectl・kubelet・コントローラーなど、クラスターの部品どうしのやりとりは、どこを通る?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "部品どうしが直接つながり、必要な相手に直接頼む",
+              "why": "Kubernetes は「ハブアンドスポーク」の形で、ノードからの API の利用はすべて API サーバーで終わります。"
+            },
+            {
+              "id": "b",
+              "text": "すべて kube-apiserver が公開する HTTP API を通る"
+            },
+            {
+              "id": "c",
+              "text": "すべて etcd に直接読み書きして伝え合う",
+              "why": "etcd に読み書きするのは API サーバーです。ほかの部品は API サーバーを通して状態を見ます。"
+            },
+            {
+              "id": "d",
+              "text": "すべて kube-scheduler が中継する",
+              "why": "kube-scheduler は Pod の置き場所を決める部品で、やりとりの中継はしません。"
+            }
+          ],
+          "answer": "b",
+          "explanation": "コントロールプレーンの中核は API サーバーと、それが公開する HTTP API です。ユーザーもクラスターの部品も外の部品も、API サーバーを通して互いにやりとりします。",
+          "source": "https://kubernetes.io/ja/docs/concepts/overview/kubernetes-api/"
+        },
+        {
+          "id": "w2-l1-q2",
+          "type": "choice",
+          "prompt": "etcd の役目として正しいのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "Pod を動かすノードを選ぶ",
+              "why": "それは kube-scheduler の役目です。"
+            },
+            {
+              "id": "b",
+              "text": "ノードのネットワークのルールを保つ",
+              "why": "それは各ノードの kube-proxy の役目です。"
+            },
+            {
+              "id": "c",
+              "text": "API サーバーのすべてのデータを保存する、一貫性と高可用性を持つキーバリューストア"
+            },
+            {
+              "id": "d",
+              "text": "コンテナイメージを保存して配るレジストリ",
+              "why": "イメージはレジストリに置きます。etcd はクラスターの状態を保存するもので、イメージは入りません。"
+            }
+          ],
+          "answer": "c",
+          "explanation": "etcd はクラスターのすべての情報を保存するキーバリューストアです。Kubernetes は API のリソースの状態を etcd に書き込んで保存します。etcd のデータはスナップショットで残せます (第 3 課)。",
+          "source": "https://kubernetes.io/ja/docs/concepts/overview/components/"
+        },
+        {
+          "id": "w2-l1-q3",
+          "type": "choice",
+          "prompt": "kube-scheduler がしていることとして正しいのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "まだノードが割り当てられていない Pod を見つけ、動かすのに合うノードを選ぶ"
+            },
+            {
+              "id": "b",
+              "text": "選んだノードに入って、コンテナを自分で起動する",
+              "why": "スケジューラーは割り当てを決めて API サーバーに伝えるだけです。コンテナを動かすのはそのノードの kubelet とコンテナランタイムです。"
+            },
+            {
+              "id": "c",
+              "text": "Deployment の Pod の数が決めた数より少なければ、Pod を足す",
+              "why": "それは kube-controller-manager の中の Deployment などのコントローラーの役目です。"
+            },
+            {
+              "id": "d",
+              "text": "クラウドのロードバランサーを作る",
+              "why": "それは cloud-controller-manager の Service コントローラーの役目です。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "kube-scheduler は、ノードに割り当てられていない Pod を見張り、資源の要求や制約を考えて最も合うノードを選びます。決めたノードは binding として API サーバーに伝えます。",
+          "source": "https://kubernetes.io/ja/docs/concepts/scheduling-eviction/kube-scheduler/"
+        },
+        {
+          "id": "w2-l1-q4",
+          "type": "choice",
+          "prompt": "Deployment コントローラーや Job コントローラーなど、組み込みのコントローラーを動かしているのはどの部品?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "kubelet",
+              "why": "kubelet は各ノードで Pod のコンテナを動かし続けるエージェントで、コントローラーは動かしません。"
+            },
+            {
+              "id": "b",
+              "text": "etcd",
+              "why": "etcd はデータを保存するだけで、状態を直す処理はしません。"
+            },
+            {
+              "id": "c",
+              "text": "kube-apiserver",
+              "why": "API サーバーは API を公開する部品です。コントローラーは API サーバーを通して状態を見て、変更を頼む側です。"
+            },
+            {
+              "id": "d",
+              "text": "kube-controller-manager"
+            }
+          ],
+          "answer": "d",
+          "explanation": "kube-controller-manager は、Deployment コントローラーや Job コントローラーなどの組み込みのコントローラーを 1 つのプロセスにまとめて動かします。",
+          "source": "https://kubernetes.io/ja/docs/concepts/architecture/controller/"
+        },
+        {
+          "id": "w2-l1-q5",
+          "type": "choice",
+          "prompt": "cloud-controller-manager の説明として正しいのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "どのクラスターにも必ずあり、無いと Pod が動かない",
+              "why": "オンプレミスや自分の PC の学習環境では、cloud-controller-manager は無くてもかまいません。"
+            },
+            {
+              "id": "b",
+              "text": "クラスターをクラウドプロバイダーの API とつなぎ、クラウド特有の制御 (ノード・ルート・ロードバランサー) を受け持つ"
+            },
+            {
+              "id": "c",
+              "text": "クラウドの上でコンテナイメージを作る",
+              "why": "イメージを作る仕組みではありません。"
+            },
+            {
+              "id": "d",
+              "text": "各ノードで動き、Pod のコンテナを起動する",
+              "why": "それは kubelet とコンテナランタイムの役目です。cloud-controller-manager はコントロールプレーンの部品です。"
+            }
+          ],
+          "answer": "b",
+          "explanation": "cloud-controller-manager はクラウド特有の制御をまとめたコントロールプレーンの部品で、Node・Route・Service のコントローラーがクラウドの API とやりとりします。クラウドとの結合を分けたことで、クラウドの事業者は Kubernetes 本体とは別の速さで機能を出せます。",
+          "source": "https://kubernetes.io/ja/docs/concepts/architecture/cloud-controller/"
+        },
+        {
+          "id": "w2-l1-q6",
+          "type": "fill",
+          "prompt": "kubeconfig が指しているコントロールプレーン (API サーバー) の住所と、主なサービスの住所を確かめたい。空欄に入るサブコマンドは?",
+          "language": "bash",
+          "code": "kubectl {{blank}}",
+          "answers": [
+            "cluster-info"
+          ],
+          "candidates": [
+            "cluster-info",
+            "version",
+            "top",
+            "logs"
+          ],
+          "output": "Kubernetes control plane is running at https://127.0.0.1:6443\nCoreDNS is running at https://127.0.0.1:6443/api/v1/namespaces/kube-system/services/kube-dns:dns/proxy\nMetrics-server is running at https://127.0.0.1:6443/api/v1/namespaces/kube-system/services/https:metrics-server:https/proxy\n\nTo further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.",
+          "explanation": "cluster-info は、コントロールプレーンの住所と、kubernetes.io/cluster-service=true の札が付いたサービスの住所を出します。kubectl がどの API サーバーにつながっているかを最初に確かめるのに使います。",
+          "wrongNotes": {
+            "version": "version は kubectl とサーバーの版を出すコマンドで、住所は出ません。",
+            "top": "top はノードや Pod の CPU とメモリの使用量を出すコマンドです。",
+            "logs": "logs は Pod のコンテナのログを読むコマンドです。"
+          },
+          "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_cluster-info/"
+        },
+        {
+          "id": "w2-l1-q7",
+          "type": "fill",
+          "prompt": "API サーバーが扱えるリソースの種類 (Pod・Node・Lease など) を一覧したい。空欄に入るサブコマンドは?",
+          "language": "bash",
+          "code": "kubectl {{blank}}",
+          "answers": [
+            "api-resources"
+          ],
+          "candidates": [
+            "api-resources",
+            "explain",
+            "get",
+            "cluster-info"
+          ],
+          "output": "NAME          SHORTNAMES   APIVERSION               NAMESPACED   KIND\nnodes         no           v1                       false        Node\npods          po           v1                       true         Pod\nservices      svc          v1                       true         Service\ndeployments   deploy       apps/v1                  true         Deployment\nleases                     coordination.k8s.io/v1   true         Lease",
+          "explanation": "api-resources は、API サーバーが受け付けるリソースの種類を、短い名前・API のグループと版・namespace に属するかと一緒に出します。kubectl get に渡せる種類の名前はここで確かめられます。",
+          "wrongNotes": {
+            "explain": "explain は 1 つのリソースの欄の説明を出すコマンドで、種類の一覧は出ません。",
+            "get": "get はリソースの実物 (Pod など) の一覧を出すコマンドで、種類を渡す必要があります。",
+            "cluster-info": "cluster-info はコントロールプレーンと主なサービスの住所を出すコマンドです。"
+          },
+          "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_api-resources/"
+        }
+      ]
+    },
+    {
+      "id": "w2-l2",
+      "kind": "quiz",
+      "title": "ノードの部品と Pod が動くまで",
+      "summary": "出力を読む・穴埋めと 4 択 · 7 問",
+      "domain": "Kubernetes Fundamentals",
+      "questions": [
+        {
+          "id": "w2-l2-q1",
+          "type": "choice",
+          "prompt": "各ノードで動き、受け取った PodSpec に書かれたコンテナが動いていて正常であることを保証するエージェントはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "kubelet"
+            },
+            {
+              "id": "b",
+              "text": "kube-proxy",
+              "why": "kube-proxy はノードのネットワークのルールを保つ部品で、コンテナは見張りません。"
+            },
+            {
+              "id": "c",
+              "text": "コンテナランタイム",
+              "why": "コンテナを実際に動かすのはランタイムですが、PodSpec を受け取って見張るのは kubelet で、ランタイムは kubelet から頼まれて動きます。"
+            },
+            {
+              "id": "d",
+              "text": "kube-scheduler",
+              "why": "kube-scheduler はコントロールプレーンの部品で、Pod の置き場所を決めるだけです。PodSpec を受け取ってコンテナを見張るのは各ノードの kubelet です。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "kubelet はクラスターの各ノードで動くエージェントで、PodSpec に書かれたコンテナが動いて正常であることを保証します。Kubernetes が作ったのではないコンテナは管理しません。",
+          "source": "https://kubernetes.io/ja/docs/concepts/architecture/"
+        },
+        {
+          "id": "w2-l2-q2",
+          "type": "choice",
+          "prompt": "kube-proxy の役目として正しいのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "Pod に IP アドレスを割り当て、Pod どうしをつなぐ",
+              "why": "それは CNI の仕様を実装したネットワークプラグインの役目です。"
+            },
+            {
+              "id": "b",
+              "text": "Service の名前を DNS で引けるようにする",
+              "why": "それはクラスター DNS (k3s では CoreDNS) の役目です。"
+            },
+            {
+              "id": "c",
+              "text": "各ノードでネットワークのルールを保ち、Service への通信を Pod に届ける"
+            },
+            {
+              "id": "d",
+              "text": "kubectl からの命令を受け付ける",
+              "why": "命令を受け付けるのは kube-apiserver です。"
+            }
+          ],
+          "answer": "c",
+          "explanation": "kube-proxy は各ノードで動くネットワークプロキシで、Service の仕組みの一部を実装します。ノードのネットワークのルールを保ち、クラスターの内や外からの通信を Pod に届けます。",
+          "source": "https://kubernetes.io/ja/docs/concepts/architecture/"
+        },
+        {
+          "id": "w2-l2-q3",
+          "type": "choice",
+          "prompt": "kubectl で Pod を作る命令を出してから、コンテナが動くまでに通る部品の順番として正しいのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "kubectl → kube-apiserver (etcd に記録) → kube-scheduler (ノードを決めて API サーバーに伝える) → 選ばれたノードの kubelet → コンテナランタイム"
+            },
+            {
+              "id": "b",
+              "text": "kubectl → kube-scheduler → kube-apiserver → etcd → kubelet",
+              "why": "kubectl がやりとりするのは API サーバーだけです。スケジューラーは API サーバーに記録された Pod を見つけて動きます。"
+            },
+            {
+              "id": "c",
+              "text": "kubectl → etcd → kubelet → kube-scheduler",
+              "why": "etcd に直接書くのは API サーバーです。また、ノードが決まる前に kubelet は動き出しません。"
+            },
+            {
+              "id": "d",
+              "text": "kubectl → kubelet → コンテナランタイム → kube-apiserver",
+              "why": "kubectl はノードの kubelet に直接 Pod を作らせません。必ず API サーバーを通します。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "API サーバーが Pod を受け付けて etcd に保存し、スケジューラーがノードの決まっていない Pod を見つけて置き場所を決め、API サーバーに伝えます。そのノードの kubelet が自分に割り当てられた Pod を受け取り、CRI でコンテナランタイムに起動を頼みます。",
+          "source": "https://kubernetes.io/ja/docs/concepts/architecture/"
+        },
+        {
+          "id": "w2-l2-q4",
+          "type": "fill",
+          "prompt": "kube-scheduler が Pod web の置き場所を node1 に決めたあと、kubectl get pod web -o yaml で見える欄の一部です。空欄に入る欄の名前は?",
+          "language": "yaml",
+          "code": "apiVersion: v1\nkind: Pod\nmetadata:\n  name: web\nspec:\n  {{blank}}: node1\n  containers:\n  - name: web\n    image: nginx:1.27",
+          "answers": [
+            "nodeName"
+          ],
+          "candidates": [
+            "nodeName",
+            "nodeSelector",
+            "hostname",
+            "schedulerName"
+          ],
+          "explanation": "nodeName は Pod が置かれたノードを表します。空のあいだはスケジューラーの対象で、値が入ると、そのノードの kubelet が Pod を受け持ちます。",
+          "wrongNotes": {
+            "nodeSelector": "nodeSelector は「この札の付いたノードに置いて」という条件で、置かれた先のノードの名前ではありません。",
+            "hostname": "hostname は Pod の中から見えるホスト名を決める欄です。",
+            "schedulerName": "schedulerName は、どのスケジューラーに置き場所を決めさせるかを書く欄です。"
+          },
+          "source": "https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/"
+        },
+        {
+          "id": "w2-l2-q5",
+          "type": "fill",
+          "prompt": "Pod web が作られてから起動するまでの出来事 (イベント) を、その Pod に絞って一覧したい。空欄に入るサブコマンドは?",
+          "language": "bash",
+          "code": "kubectl {{blank}} --for pod/web",
+          "answers": [
+            "events"
+          ],
+          "candidates": [
+            "events",
+            "logs",
+            "describe",
+            "top"
+          ],
+          "output": "LAST SEEN   TYPE     REASON      OBJECT    MESSAGE\n20s         Normal   Scheduled   Pod/web   Successfully assigned default/web to node1\n19s         Normal   Pulling     Pod/web   Pulling image \"nginx:1.27\"\n14s         Normal   Pulled      Pod/web   Successfully pulled image \"nginx:1.27\" in 4.8s (4.8s including waiting). Image size: 72099501 bytes.\n14s         Normal   Created     Pod/web   Container created\n14s         Normal   Started     Pod/web   Container started",
+          "explanation": "kubectl events は最近のイベントを一覧し、--for で 1 つのリソースに絞れます。Pod が置かれてから動くまでのどこで止まったかを調べるときに使います。",
+          "wrongNotes": {
+            "logs": "logs はコンテナの中のアプリが出したログを読むコマンドで、Kubernetes のイベントは出ません。",
+            "describe": "describe でも最後にイベントが出ますが、--for という指定は受け付けません。",
+            "top": "top は CPU とメモリの使用量を出すコマンドです。"
+          },
+          "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_events/"
+        },
+        {
+          "id": "w2-l2-q6",
+          "type": "choice",
+          "prompt": "kubectl events --for pod/web の出力です。ここから分かることとして正しいのはどれ?",
+          "code": {
+            "language": "plaintext",
+            "text": "LAST SEEN   TYPE     REASON      OBJECT    MESSAGE\n20s         Normal   Scheduled   Pod/web   Successfully assigned default/web to node1\n19s         Normal   Pulling     Pod/web   Pulling image \"nginx:1.27\"\n14s         Normal   Pulled      Pod/web   Successfully pulled image \"nginx:1.27\" in 4.8s (4.8s including waiting). Image size: 72099501 bytes.\n14s         Normal   Created     Pod/web   Container created\n14s         Normal   Started     Pod/web   Container started"
+          },
+          "choices": [
+            {
+              "id": "a",
+              "text": "先にイメージを取ってきてから、置き場所のノードを選んだ",
+              "why": "最初の出来事は Scheduled (node1 への割り当て) です。イメージは、置き場所が決まったノードで取ってきます。"
+            },
+            {
+              "id": "b",
+              "text": "node1 に割り当てられたあと、node1 でイメージを取ってきてコンテナを起動した"
+            },
+            {
+              "id": "c",
+              "text": "kube-scheduler が node1 に入ってコンテナを起動した",
+              "why": "スケジューラーは割り当てを決めるだけです。起動はそのノードの kubelet がコンテナランタイムに頼んで行います。"
+            },
+            {
+              "id": "d",
+              "text": "コンテナが失敗して、何度も再起動している",
+              "why": "TYPE はすべて Normal で、BackOff のような失敗の出来事はありません。"
+            }
+          ],
+          "answer": "b",
+          "explanation": "スケジューラーが node1 に割り当て (Scheduled)、そのノードでイメージを取ってきて (Pulling・Pulled)、コンテナを作って起動しました (Created・Started)。割り当てが先で、起動はそのあと選ばれたノードで行われます。",
+          "source": "https://kubernetes.io/ja/docs/concepts/scheduling-eviction/kube-scheduler/"
+        },
+        {
+          "id": "w2-l2-q7",
+          "type": "fill",
+          "prompt": "各ノードの kubelet が「生きている」と知らせる心拍 (Lease) を一覧したい。空欄に入る namespace は?",
+          "language": "bash",
+          "code": "kubectl get leases -n {{blank}}",
+          "answers": [
+            "kube-node-lease"
+          ],
+          "candidates": [
+            "kube-node-lease",
+            "kube-system",
+            "kube-public",
+            "default"
+          ],
+          "output": "NAME    HOLDER   AGE\nnode1   node1    12d\nnode2   node2    12d",
+          "explanation": "ノードごとに、同じ名前の Lease が kube-node-lease の namespace にあり、kubelet がこれを定期的に更新します。コントロールプレーンは、この更新の時刻でノードが使えるかを判断します。",
+          "wrongNotes": {
+            "kube-system": "kube-system はクラスターの部品やアドオンの Pod などを置く namespace で、ノードの心拍の Lease はありません。",
+            "kube-public": "kube-public はノードの心拍の置き場所ではありません。",
+            "default": "default は namespace を指定しないときに使われる namespace で、ノードの心拍の Lease はありません。"
+          },
+          "source": "https://kubernetes.io/docs/concepts/architecture/leases/"
+        }
+      ]
+    },
+    {
+      "id": "w2-l3",
+      "kind": "quiz",
+      "title": "etcd と望ましい状態",
+      "summary": "コマンドとマニフェストの穴埋めと 4 択 · 8 問",
+      "domain": "Kubernetes Fundamentals",
+      "questions": [
+        {
+          "id": "w2-l3-q1",
+          "type": "choice",
+          "prompt": "etcd のメンバーの過半数が壊れて、etcd が使えなくなった。クラスターで起きることとして正しいのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "すでに動いている Pod も含めて、すべてのコンテナがすぐに止まる",
+              "why": "すでに置かれた Pod は動き続けることがあります。止まるのは、クラスターの状態を変えることです。"
+            },
+            {
+              "id": "b",
+              "text": "kube-scheduler が代わりに状態を覚えるので、何も変わらない",
+              "why": "スケジューラーは状態を保存しません。クラスターの状態の保存場所は etcd だけです。"
+            },
+            {
+              "id": "c",
+              "text": "API サーバーが自動で新しい etcd を作り、元の状態に戻す",
+              "why": "自動では戻りません。人がバックアップなどから etcd を復旧させる必要があります。"
+            },
+            {
+              "id": "d",
+              "text": "動いている Pod は動き続けることがあるが、クラスターの状態を変えられず、新しい Pod はスケジュールされない"
+            }
+          ],
+          "answer": "d",
+          "explanation": "etcd のメンバーの過半数が壊れると、Kubernetes は現在の状態を変えられなくなります。スケジュール済みの Pod は動き続けることがありますが、新しい Pod は置けず、etcd を復旧させる必要があります。",
+          "source": "https://kubernetes.io/ja/docs/tasks/administer-cluster/configure-upgrade-etcd/"
+        },
+        {
+          "id": "w2-l3-q2",
+          "type": "choice",
+          "prompt": "組み込みの etcd を使う k3s のサーバーが 3 台ある。etcd が多数決 (クォーラム) を保ったまま、同時に止まってよいのは何台まで?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "0 台 (1 台でも止まると書き込めない)",
+              "why": "3 台のときのクォーラムは 2 台なので、1 台止まっても書き込めます。"
+            },
+            {
+              "id": "b",
+              "text": "1 台"
+            },
+            {
+              "id": "c",
+              "text": "2 台",
+              "why": "2 台止まると残りは 1 台で、クォーラムの 2 台に届きません。"
+            },
+            {
+              "id": "d",
+              "text": "3 台 (止まっても自動で作り直される)",
+              "why": "全台が止まると etcd は動けません。"
+            }
+          ],
+          "answer": "b",
+          "explanation": "n 台のときのクォーラムは、n を 2 で割って小数を切り捨て、1 を足した数です。3 台なら 2 台が要るので、止まってよいのは 1 台です。4 台に増やしてもクォーラムは 3 台で、止まってよい台数は 1 台のままなので、台数は奇数にします。",
+          "source": "https://docs.k3s.io/datastore/ha-embedded"
+        },
+        {
+          "id": "w2-l3-q3",
+          "type": "fill",
+          "prompt": "動いている etcd から、今のデータのスナップショットを snapshot.db に取りたい。空欄に入るサブコマンドは?",
+          "language": "bash",
+          "code": "ETCDCTL_API=3 etcdctl --endpoints $ENDPOINT snapshot {{blank}} snapshot.db",
+          "answers": [
+            "save"
+          ],
+          "candidates": [
+            "save",
+            "restore",
+            "status",
+            "get"
+          ],
+          "output": "Snapshot saved at snapshot.db",
+          "explanation": "etcdctl snapshot save は、動いているメンバーからスナップショットを取ります。スナップショットを取ってもメンバーの性能には影響しません。",
+          "wrongNotes": {
+            "restore": "restore はスナップショットから etcd を戻すときの操作で、取る側ではありません。",
+            "status": "status は取ったスナップショットの中身 (大きさや版) を確かめる操作です。",
+            "get": "get はキーの値を読む操作で、スナップショットではありません。"
+          },
+          "source": "https://kubernetes.io/ja/docs/tasks/administer-cluster/configure-upgrade-etcd/"
+        },
+        {
+          "id": "w2-l3-q4",
+          "type": "choice",
+          "prompt": "Kubernetes のオブジェクトで、人が望ましい状態を書く欄と、Kubernetes が現在の状態を書く欄の組み合わせはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "望ましい状態は status、現在の状態は spec",
+              "why": "逆です。spec は人が書き、status は Kubernetes の部品が書き換えます。"
+            },
+            {
+              "id": "b",
+              "text": "望ましい状態は metadata、現在の状態は spec",
+              "why": "metadata は名前・UID・namespace など、オブジェクトを見分けるための情報です。"
+            },
+            {
+              "id": "c",
+              "text": "望ましい状態は spec、現在の状態は status"
+            },
+            {
+              "id": "d",
+              "text": "どちらも metadata の labels に書く",
+              "why": "labels はオブジェクトを選ぶための札で、状態を書く場所ではありません。"
+            }
+          ],
+          "answer": "c",
+          "explanation": "spec にはオブジェクトに持たせたい特徴 (望ましい状態) を書き、status にはシステムとその部品が現在の状態を書きます。コントロールプレーンは、この 2 つが一致するように常に管理します。",
+          "source": "https://kubernetes.io/ja/docs/concepts/overview/working-with-objects/kubernetes-objects/"
+        },
+        {
+          "id": "w2-l3-q5",
+          "type": "fill",
+          "prompt": "「nginx の Pod を 3 つ動かしてほしい」という望ましい状態を書く Deployment です。空欄に入る欄の名前は?",
+          "language": "yaml",
+          "code": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web\n{{blank}}:\n  replicas: 3\n  selector:\n    matchLabels:\n      app: web\n  template:\n    metadata:\n      labels:\n        app: web\n    spec:\n      containers:\n      - name: web\n        image: nginx:1.27",
+          "answers": [
+            "spec"
+          ],
+          "candidates": [
+            "spec",
+            "status",
+            "metadata",
+            "data"
+          ],
+          "explanation": "マニフェストに必ず書く欄は apiVersion・kind・metadata・spec で、望ましい状態は spec に書きます。Kubernetes は spec を読み、現在の状態が一致するように Pod を動かします。",
+          "wrongNotes": {
+            "status": "status は Kubernetes が現在の状態を書く欄で、人がマニフェストに書くものではありません。",
+            "metadata": "metadata は名前やラベルなど、オブジェクトを見分けるための欄で、すでに上にあります。",
+            "data": "data は ConfigMap や Secret の中身を書く欄で、Deployment にはありません。"
+          },
+          "source": "https://kubernetes.io/ja/docs/concepts/overview/working-with-objects/kubernetes-objects/"
+        },
+        {
+          "id": "w2-l3-q6",
+          "type": "choice",
+          "prompt": "replicas: 3 の Deployment が動いている。そのうち 1 つの Pod を手で消すと、どうなる?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "Pod は 2 つのまま。spec を書き換えるまで変わらない",
+              "why": "spec は 3 のままなので、現在の状態 (2 つ) との違いを Kubernetes が直しに行きます。"
+            },
+            {
+              "id": "b",
+              "text": "コントローラーが望ましい状態との違いに気づき、新しい Pod を作って 3 つに戻す"
+            },
+            {
+              "id": "c",
+              "text": "Deployment ごと消えて、ほかの 2 つの Pod も止まる",
+              "why": "Pod を 1 つ消しても、Deployment は消えません。"
+            },
+            {
+              "id": "d",
+              "text": "消した Pod をノードの kubelet が同じ名前でよみがえらせる",
+              "why": "Deployment の Pod はコントローラーが API サーバーを通して新しく作ります。名前も新しくなります。"
+            }
+          ],
+          "answer": "b",
+          "explanation": "Kubernetes は spec と status の違いに反応し、落ちた分の代わりを立ち上げて現在の状態を spec に合わせます。この見張って直す繰り返しを、制御ループ (調整のループ) と呼びます。",
+          "source": "https://kubernetes.io/ja/docs/concepts/overview/working-with-objects/kubernetes-objects/"
+        },
+        {
+          "id": "w2-l3-q7",
+          "type": "fill",
+          "prompt": "configs フォルダのマニフェストを、作るか更新するかを kubectl に判断させて (宣言的に) 反映したい。空欄に入るサブコマンドは?",
+          "language": "bash",
+          "code": "kubectl {{blank}} -f configs/",
+          "answers": [
+            "apply"
+          ],
+          "candidates": [
+            "apply",
+            "create",
+            "replace",
+            "run"
+          ],
+          "output": "deployment.apps/web configured\nservice/web unchanged",
+          "explanation": "宣言型の apply では、作るか更新するかを kubectl がオブジェクトごとに判断し、変わった箇所だけを patch で反映します。ファイルから消したオブジェクトは、--prune を付けない限り消えません。ほかの人が直接加えた変更も、設定ファイルに無ければ残ります。",
+          "wrongNotes": {
+            "create": "create は「作れ」と操作を指定する命令型のやり方で、すでにあるオブジェクトの更新はしません。",
+            "replace": "replace は今の設定を丸ごと置き換える命令型のやり方で、ファイルに無い変更は消えます。",
+            "run": "run は引数で Pod を作る命令型のコマンドで、ファイルは読みません。"
+          },
+          "source": "https://kubernetes.io/ja/docs/concepts/overview/working-with-objects/object-management/"
+        },
+        {
+          "id": "w2-l3-q8",
+          "type": "fill",
+          "prompt": "反映する前に、今のクラスターとマニフェストの違いを確かめたい。空欄に入るサブコマンドは?",
+          "language": "bash",
+          "code": "kubectl {{blank}} -f configs/",
+          "answers": [
+            "diff"
+          ],
+          "candidates": [
+            "diff",
+            "apply",
+            "get",
+            "explain"
+          ],
+          "output": "diff -u -N /tmp/LIVE-1234/apps.v1.Deployment.default.web /tmp/MERGED-5678/apps.v1.Deployment.default.web\n--- /tmp/LIVE-1234/apps.v1.Deployment.default.web\n+++ /tmp/MERGED-5678/apps.v1.Deployment.default.web\n (途中を省いた例)\n spec:\n-  replicas: 2\n+  replicas: 3",
+          "explanation": "diff は、今クラスターにあるものと、apply したらこうなるものとの違いを出します。宣言型の管理では、diff で確かめてから apply します。",
+          "wrongNotes": {
+            "apply": "apply はすぐに反映してしまうので、確かめる前に変わります。",
+            "get": "get は今の状態を出すだけで、ファイルとの違いは出しません。",
+            "explain": "explain はリソースの欄の説明を出すコマンドです。"
+          },
+          "source": "https://kubernetes.io/ja/docs/concepts/overview/working-with-objects/object-management/"
+        }
+      ]
+    },
+    {
+      "id": "w2-l4",
+      "kind": "quiz",
+      "title": "k3s が違うところ",
+      "summary": "出力を読む・コマンドの穴埋めと 4 択 · 8 問",
+      "domain": "Kubernetes Fundamentals",
+      "questions": [
+        {
+          "id": "w2-l4-q1",
+          "type": "choice",
+          "prompt": "k3s のサーバーでは、API サーバー・スケジューラー・コントローラーマネージャーなどのコントロールプレーンの部品はどう動いている?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "部品ごとに別の static Pod として kube-system に置かれる",
+              "why": "それは kubeadm などがよく使うやり方です。k3s はまとめて 1 つのプロセスで動かします。"
+            },
+            {
+              "id": "b",
+              "text": "1 つのバイナリの、1 つのプロセスにまとめて動く"
+            },
+            {
+              "id": "c",
+              "text": "クラウドのマネージドサービスが動かし、ユーザーからは見えない",
+              "why": "それはマネージドの Kubernetes の話です。k3s は自分の機械で動かします。"
+            },
+            {
+              "id": "d",
+              "text": "agent ノードごとに 1 組ずつ動く",
+              "why": "agent ノードにはコントロールプレーンもデータストアもありません。"
+            }
+          ],
+          "answer": "b",
+          "explanation": "k3s は Kubernetes のすべてのコントロールプレーンの部品を 1 つのバイナリの 1 つのプロセスにまとめています。そのおかげで、証明書の配布のような面倒な作業を k3s が自動で行えます。",
+          "source": "https://docs.k3s.io/"
+        },
+        {
+          "id": "w2-l4-q2",
+          "type": "choice",
+          "prompt": "データストアの設定を何もせずに、k3s のサーバーを 1 台だけ入れた。クラスターの状態を保存しているのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "組み込みの SQLite"
+            },
+            {
+              "id": "b",
+              "text": "組み込みの etcd",
+              "why": "組み込みの etcd は、--cluster-init などで etcd のクラスターを始めたときや、etcd のファイルがすでにあるときに選ばれます。"
+            },
+            {
+              "id": "c",
+              "text": "外部の MySQL",
+              "why": "外部のデータベースを使うには --datastore-endpoint で接続先を指定する必要があります。"
+            },
+            {
+              "id": "d",
+              "text": "どこにも保存せず、メモリにだけ持つ",
+              "why": "状態は保存されます。メモリだけでは再起動で消えてしまいます。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "k3s の既定のデータストアは、軽い組み込みの SQLite です。etcd 以外のデータストアを使えるのが k3s の特徴ですが、SQLite はサーバーが複数のクラスターでは使えません。",
+          "source": "https://docs.k3s.io/datastore"
+        },
+        {
+          "id": "w2-l4-q3",
+          "type": "choice",
+          "prompt": "k3s が最初から入れてくれる部品のうち、Ingress コントローラーはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "CoreDNS",
+              "why": "CoreDNS も同梱されますが、クラスターの DNS です。"
+            },
+            {
+              "id": "b",
+              "text": "Flannel",
+              "why": "Flannel は同梱のネットワークプラグイン (CNI) です。"
+            },
+            {
+              "id": "c",
+              "text": "ServiceLB",
+              "why": "ServiceLB は同梱の LoadBalancer のコントローラーで、Ingress コントローラーではありません。"
+            },
+            {
+              "id": "d",
+              "text": "Traefik"
+            }
+          ],
+          "answer": "d",
+          "explanation": "k3s には Traefik が Ingress コントローラーとして同梱されています。ほかにも containerd・Flannel・CoreDNS・ServiceLB・local-path-provisioner などが入っていて、入れてすぐ使えるクラスターになります。",
+          "source": "https://docs.k3s.io/"
+        },
+        {
+          "id": "w2-l4-q4",
+          "type": "fill",
+          "prompt": "別の Ingress コントローラーを使うので、同梱の Ingress コントローラーを入れずに k3s のサーバーを入れたい。空欄に入る名前は?",
+          "language": "bash",
+          "code": "curl -sfL https://get.k3s.io | sh -s - server --disable={{blank}}",
+          "answers": [
+            "traefik"
+          ],
+          "candidates": [
+            "traefik",
+            "coredns",
+            "servicelb",
+            "metrics-server"
+          ],
+          "explanation": "--disable に同梱の部品の名前を渡すと、その部品を入れません。すでに入っているクラスターでは、その部品を消して、マニフェストのファイルも消します。",
+          "wrongNotes": {
+            "coredns": "coredns を外すとクラスターの DNS が無くなります。Ingress コントローラーではありません。",
+            "servicelb": "servicelb は LoadBalancer の Service を受け持つ部品で、Ingress コントローラーではありません。",
+            "metrics-server": "metrics-server は CPU やメモリの使用量を集める部品です。"
+          },
+          "source": "https://docs.k3s.io/installation/packaged-components"
+        },
+        {
+          "id": "w2-l4-q5",
+          "type": "fill",
+          "prompt": "組み込みの etcd を使う 3 台の k3s を作る。1 台目のサーバーで、新しい etcd のクラスターを始めたい。空欄に入る指定は?",
+          "language": "bash",
+          "code": "curl -sfL https://get.k3s.io | K3S_TOKEN=SECRET sh -s - server {{blank}}",
+          "answers": [
+            "--cluster-init"
+          ],
+          "candidates": [
+            "--cluster-init",
+            "--cluster-reset",
+            "--datastore-endpoint",
+            "--disable-scheduler"
+          ],
+          "explanation": "--cluster-init は、組み込みの etcd で新しいクラスターを始めます。2 台目と 3 台目は、同じトークンと --server に 1 台目の住所を渡して加わります。",
+          "wrongNotes": {
+            "--cluster-reset": "--cluster-reset はほかのメンバーを忘れて、自分だけの新しいクラスターになる、復旧のための指定です。",
+            "--datastore-endpoint": "--datastore-endpoint は外部のデータストア (PostgreSQL・MySQL・etcd など) の接続先を渡す指定です。",
+            "--disable-scheduler": "--disable-scheduler は既定のスケジューラーを止める指定で、etcd とは関係しません。"
+          },
+          "source": "https://docs.k3s.io/datastore/ha-embedded"
+        },
+        {
+          "id": "w2-l4-q6",
+          "type": "choice",
+          "prompt": "k3s のクラスターでの kubectl get pods -n kube-system の出力の一部です。kube-apiserver の Pod が出てこない理由として正しいのはどれ?",
+          "code": {
+            "language": "plaintext",
+            "text": "NAME                                      READY   STATUS    RESTARTS   AGE\ncoredns-ccb96694c-8xk2p                   1/1     Running   0          12d\nlocal-path-provisioner-5cf85fd84d-q7w9v   1/1     Running   0          12d\nmetrics-server-5985cbc9d7-2nm4h           1/1     Running   0          12d\ntraefik-5d45fc8cd9-4hx7t                  1/1     Running   0          12d"
+          },
+          "choices": [
+            {
+              "id": "a",
+              "text": "API サーバーが止まっているから",
+              "why": "この一覧を返しているのが API サーバーです。止まっていれば一覧そのものが出ません。"
+            },
+            {
+              "id": "b",
+              "text": "k3s ではコントロールプレーンの部品が k3s のプロセスの中で動き、Pod としては置かれないから"
+            },
+            {
+              "id": "c",
+              "text": "kube-apiserver の Pod は kube-public の namespace にあるから",
+              "why": "namespace の違いではありません。k3s ではそもそも Pod になっていません。"
+            },
+            {
+              "id": "d",
+              "text": "-o wide を付けないとコントロールプレーンの Pod は出ないから",
+              "why": "-o wide は IP やノードの列を増やすだけで、出てくる Pod は変わりません。"
+            }
+          ],
+          "answer": "b",
+          "explanation": "k3s はコントロールプレーンの部品を 1 つのプロセスにまとめて動かすので、kube-system に出てくるのは、CoreDNS や Traefik などの同梱の部品と、それらが作る Pod (svclb-*・helm-install-* など) です。kubeadm で作ったクラスターでは、コントロールプレーンの部品が static Pod として出てきます。",
+          "source": "https://docs.k3s.io/"
+        },
+        {
+          "id": "w2-l4-q7",
+          "type": "choice",
+          "prompt": "k3s の agent ノード (k3s agent で動くノード) で動いているものの組み合わせはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "API サーバーとデータストア",
+              "why": "それは server ノードだけが持つものです。agent ノードにはコントロールプレーンもデータストアもありません。"
+            },
+            {
+              "id": "b",
+              "text": "kube-scheduler だけ",
+              "why": "スケジューラーはコントロールプレーンの部品で、server ノードで動きます。"
+            },
+            {
+              "id": "c",
+              "text": "kubelet・コンテナランタイム・CNI"
+            },
+            {
+              "id": "d",
+              "text": "何も動かず、server ノードが遠くからコンテナを動かす",
+              "why": "コンテナはそれぞれのノードの kubelet とコンテナランタイムが動かします。"
+            }
+          ],
+          "answer": "c",
+          "explanation": "server ノードは k3s server で動き、コントロールプレーンとデータストアを持ちます。agent ノードは k3s agent で動き、server と同じく kubelet・コンテナランタイム・CNI を動かしますが、コントロールプレーンとデータストアは持ちません。",
+          "source": "https://docs.k3s.io/architecture"
+        },
+        {
+          "id": "w2-l4-q8",
+          "type": "fill",
+          "prompt": "k3s の server ノードで、置くだけで kubectl apply のように自動で反映されるフォルダに web.yaml を入れたい。空欄に入るフォルダの名前は?",
+          "language": "bash",
+          "code": "sudo cp web.yaml /var/lib/rancher/k3s/server/{{blank}}/",
+          "answers": [
+            "manifests"
+          ],
+          "candidates": [
+            "manifests",
+            "db",
+            "static",
+            "storage"
+          ],
+          "explanation": "/var/lib/rancher/k3s/server/manifests に置いたファイルは、起動したときとファイルが変わったときに、kubectl apply と同じように反映されます。同梱の Traefik や CoreDNS もこの仕組みで入ります。",
+          "wrongNotes": {
+            "db": "db はデータストアの側のファイル (etcd のスナップショットなど) を置くところで、マニフェストは読みません。",
+            "static": "static は、置いたファイルを API サーバーからクラスターの中に配るところで、反映はしません。",
+            "storage": "ローカルのボリュームの既定の置き場所は /var/lib/rancher/k3s/storage で、マニフェストは読みません。"
+          },
+          "source": "https://docs.k3s.io/installation/packaged-components"
+        }
+      ]
+    },
+    {
+      "id": "w2-lab",
+      "kind": "lab",
+      "title": "週末の実習: 部品がどこで動くかを確かめる",
+      "summary": "家のクラスタで手を動かす · 7 手順",
+      "domain": "Kubernetes Fundamentals",
+      "source": "https://docs.k3s.io/architecture",
+      "steps": [
+        {
+          "text": "ノードの一覧を出し、ROLES の列で server (control-plane,master などと出る) と agent (<none> と出る) を見分け、CONTAINER-RUNTIME の列でランタイム (containerd://…-k3s…) を確かめる",
+          "command": "kubectl get nodes -o wide"
+        },
+        {
+          "text": "kube-system の Pod がどのノードで動くかを見る。CoreDNS や Traefik などの同梱の部品はあるが、kube-apiserver や etcd の Pod は無いことを確かめる",
+          "command": "kubectl get pods -n kube-system -o wide"
+        },
+        {
+          "text": "server ノードに入り、コントロールプレーンの部品が 1 つの k3s server のプロセスとして動いていることを確かめる (agent ノードでは k3s agent のプロセスが出る)",
+          "command": "ps -ef | grep -E '[k]3s (server|agent)'"
+        },
+        {
+          "text": "各ノードの kubelet が更新している心拍 (Lease) を見る。ノードと同じ名前の Lease が並ぶ (Forbidden と出たら、server ノードに入って sudo k3s kubectl で見る)",
+          "command": "kubectl get leases -n kube-node-lease || sudo k3s kubectl get leases -n kube-node-lease"
+        },
+        {
+          "text": "望ましい状態として、nginx を 2 つ動かす Deployment を作り、どのノードに置かれたかを見る",
+          "command": "kubectl create deployment web --image=nginx:1.27 --replicas=2 && kubectl get pods -l app=web -o wide"
+        },
+        {
+          "text": "Pod を手で消し、コントローラーが新しい名前の Pod を作って 2 つに戻すことを確かめる (少し待ってから get をもう一度打つ)",
+          "command": "kubectl delete pod -l app=web && kubectl get pods -l app=web -o wide"
+        },
+        {
+          "text": "片付ける",
+          "command": "kubectl delete deployment web"
+        }
+      ]
+    }
+  ]
+}
