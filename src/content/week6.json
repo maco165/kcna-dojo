@@ -1,0 +1,863 @@
+{
+  "week": 6,
+  "lessons": [
+    {
+      "id": "w6-l1",
+      "kind": "quiz",
+      "title": "RBAC と ServiceAccount",
+      "summary": "マニフェストとコマンドの穴埋めと 4 択 · 8 問",
+      "domain": "Container Orchestration",
+      "questions": [
+        {
+          "id": "w6-l1-q1",
+          "type": "choice",
+          "prompt": "Role と ClusterRole の違いとして正しいのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "Role は 1 つの namespace の中の権限を決め、ClusterRole は namespace に属さず、クラスター全体で使える"
+            },
+            {
+              "id": "b",
+              "text": "Role は人のための権限で、ClusterRole は ServiceAccount のための権限",
+              "why": "どちらも、だれに与えるかは決めません。だれに与えるかは RoleBinding と ClusterRoleBinding の subjects で決めます。"
+            },
+            {
+              "id": "c",
+              "text": "Role は許可を、ClusterRole は禁止 (deny) を書く",
+              "why": "RBAC の権限は足していく方式だけで、禁止のルールはありません。"
+            },
+            {
+              "id": "d",
+              "text": "ClusterRole はノードの権限だけを書け、Pod の権限は書けない",
+              "why": "ClusterRole には Pod のような namespace のあるリソースの権限も書けます。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "Role は必ずどれか 1 つの namespace に属し、その中の権限を決めます。ClusterRole は namespace に属さないリソースで、ノードのようなクラスター全体のリソースや、すべての namespace にまたがる権限を書けます。",
+          "source": "https://kubernetes.io/ja/docs/reference/access-authn-authz/rbac/"
+        },
+        {
+          "id": "w6-l1-q2",
+          "type": "fill",
+          "prompt": "default namespace の中だけで、Pod を読む (get・watch・list) 権限を定めたい。空欄に入る kind は?",
+          "language": "yaml",
+          "code": "apiVersion: rbac.authorization.k8s.io/v1\nkind: {{blank}}\nmetadata:\n  namespace: default\n  name: pod-reader\nrules:\n- apiGroups: [\"\"]\n  resources: [\"pods\"]\n  verbs: [\"get\", \"watch\", \"list\"]",
+          "answers": [
+            "Role"
+          ],
+          "candidates": [
+            "Role",
+            "ClusterRole",
+            "RoleBinding",
+            "ServiceAccount"
+          ],
+          "explanation": "Role は 1 つの namespace の中の権限を rules に書きます。権限を定めるだけで、だれに与えるかは別の RoleBinding で決めます。",
+          "wrongNotes": {
+            "ClusterRole": "ClusterRole は namespace に属さないリソースです。1 つの namespace の中だけの権限を書くのは Role です。",
+            "RoleBinding": "RoleBinding は権限を書くものではなく、Role をだれかに結びつけるものです。rules は持ちません。",
+            "ServiceAccount": "ServiceAccount は Pod の中のプログラムが名乗る身元で、権限そのものは書けません。"
+          },
+          "source": "https://kubernetes.io/ja/docs/reference/access-authn-authz/rbac/"
+        },
+        {
+          "id": "w6-l1-q3",
+          "type": "fill",
+          "prompt": "default namespace の ServiceAccount viewer に、Role pod-reader を与えたい。空欄に入る subjects の kind は?",
+          "language": "yaml",
+          "code": "apiVersion: rbac.authorization.k8s.io/v1\nkind: RoleBinding\nmetadata:\n  name: read-pods\n  namespace: default\nsubjects:\n- kind: {{blank}}\n  name: viewer\n  namespace: default\nroleRef:\n  kind: Role\n  name: pod-reader\n  apiGroup: rbac.authorization.k8s.io",
+          "answers": [
+            "ServiceAccount"
+          ],
+          "candidates": [
+            "ServiceAccount",
+            "User",
+            "Group",
+            "Role"
+          ],
+          "explanation": "subjects には権限を与える相手を書き、ユーザー・グループ・サービスアカウントのどれかを選びます。ServiceAccount は namespace に属するので、subjects にも namespace を書きます。",
+          "wrongNotes": {
+            "User": "User は人など、クラスターの外で認証される利用者です。ServiceAccount は kind: ServiceAccount と書きます。",
+            "Group": "Group は利用者の集まりです。1 つの ServiceAccount を指すなら kind: ServiceAccount です。",
+            "Role": "Role は与える権限の側で、roleRef に書きます。subjects には書きません。"
+          },
+          "source": "https://kubernetes.io/ja/docs/reference/access-authn-authz/rbac/"
+        },
+        {
+          "id": "w6-l1-q4",
+          "type": "fill",
+          "prompt": "ServiceAccount viewer になりすまして、Pod を一覧できるかを確かめたい。空欄に入るサブコマンドは?",
+          "language": "bash",
+          "code": "kubectl auth {{blank}} list pods -n default --as=system:serviceaccount:default:viewer",
+          "answers": [
+            "can-i"
+          ],
+          "candidates": [
+            "can-i",
+            "whoami",
+            "reconcile",
+            "check"
+          ],
+          "output": "yes",
+          "explanation": "kubectl auth can-i は、その操作が許されているかを yes か no で答えます。--as で別の利用者になりすまして確かめられ、ServiceAccount の利用者名は system:serviceaccount:<namespace>:<名前> の形です。",
+          "wrongNotes": {
+            "whoami": "whoami は今の自分がだれとして認証されているかを出すだけで、操作の可否は答えません。",
+            "reconcile": "reconcile はファイルに書いた RBAC のオブジェクトを作るか、足りない権限を足して更新するコマンドです。",
+            "check": "kubectl auth に check というサブコマンドはありません。"
+          },
+          "source": "https://kubernetes.io/docs/reference/access-authn-authz/authorization/"
+        },
+        {
+          "id": "w6-l1-q5",
+          "type": "choice",
+          "prompt": "namespace dev の RoleBinding が、roleRef で組み込みの ClusterRole view を指している。結びつけた相手ができることは?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "dev の中だけで、view に書かれた読み取りができる"
+            },
+            {
+              "id": "b",
+              "text": "すべての namespace で、view に書かれた読み取りができる",
+              "why": "すべての namespace に効かせるには ClusterRoleBinding を使います。RoleBinding はそれ自身の namespace の中だけです。"
+            },
+            {
+              "id": "c",
+              "text": "RoleBinding は ClusterRole を指せないので、作るときに拒否される",
+              "why": "RoleBinding は ClusterRole を指せます。同じ権限を namespace ごとに使い回すための使い方です。"
+            },
+            {
+              "id": "d",
+              "text": "ノードのようなクラスター全体のリソースも読める",
+              "why": "RoleBinding で与えた権限は、その namespace の中のリソースにしか効きません。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "RoleBinding は ClusterRole を指すこともでき、その場合は ClusterRole の権限を RoleBinding の namespace の中だけで与えます。全部の namespace で与えるなら ClusterRoleBinding を使います。",
+          "source": "https://kubernetes.io/ja/docs/reference/access-authn-authz/rbac/"
+        },
+        {
+          "id": "w6-l1-q6",
+          "type": "choice",
+          "prompt": "ServiceAccount viewer の権限を kubectl auth can-i で確かめた結果です。正しいのはどれ?",
+          "code": {
+            "language": "plaintext",
+            "text": "$ kubectl auth can-i list pods -n dev --as=system:serviceaccount:dev:viewer\nyes\n$ kubectl auth can-i delete pods -n dev --as=system:serviceaccount:dev:viewer\nno\n$ kubectl auth can-i list pods -n kube-system --as=system:serviceaccount:dev:viewer\nno"
+          },
+          "choices": [
+            {
+              "id": "a",
+              "text": "viewer は dev の Pod を一覧できるが、消せず、kube-system の Pod も一覧できない"
+            },
+            {
+              "id": "b",
+              "text": "viewer はクラスター全体の Pod を一覧できる",
+              "why": "kube-system での list pods が no なので、全体には効いていません。"
+            },
+            {
+              "id": "c",
+              "text": "viewer は dev の Pod を一覧も削除もできる",
+              "why": "delete pods が no なので、削除はできません。"
+            },
+            {
+              "id": "d",
+              "text": "no と出たのは ServiceAccount viewer が存在しないから",
+              "why": "can-i は権限があるかを答えるだけです。dev で yes が出ているので、権限はそこにだけあると読めます。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "can-i は namespace と操作ごとに yes か no を返します。dev の list だけが yes なので、dev の中だけの読み取りの権限 (RoleBinding) が与えられていると読めます。",
+          "source": "https://kubernetes.io/docs/reference/access-authn-authz/authorization/"
+        },
+        {
+          "id": "w6-l1-q7",
+          "type": "choice",
+          "prompt": "Pod のマニフェストに serviceAccountName を書かずに作った。この Pod はどの ServiceAccount として API サーバーに認証される?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "その namespace の default という名前の ServiceAccount"
+            },
+            {
+              "id": "b",
+              "text": "kube-system の default という ServiceAccount",
+              "why": "割り当てられるのは、Pod と同じ namespace の default です。"
+            },
+            {
+              "id": "c",
+              "text": "クラスターの管理者 (cluster-admin)",
+              "why": "既定で管理者の権限が付くことはありません。default の ServiceAccount は、RBAC が有効なら API の検出の権限のほかは持ちません。"
+            },
+            {
+              "id": "d",
+              "text": "どの ServiceAccount も割り当てられず、Pod を作れない",
+              "why": "書かなければ Kubernetes が自動で default を割り当て、Pod は作れます。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "どの namespace にも default という ServiceAccount があり、指定しなければ Pod にはそれが自動で割り当てられます。アプリに API の権限が要るときは、専用の ServiceAccount を作って RoleBinding で必要な分だけ与えます。",
+          "source": "https://kubernetes.io/ja/docs/tasks/configure-pod-container/configure-service-account/"
+        },
+        {
+          "id": "w6-l1-q8",
+          "type": "fill",
+          "prompt": "組み込みの ClusterRole view を、namespace dev の ServiceAccount viewer に、dev の中だけで与えたい。空欄に入るオプションの名前は?",
+          "language": "bash",
+          "code": "kubectl create rolebinding viewer-view --clusterrole=view --{{blank}}=dev:viewer -n dev",
+          "answers": [
+            "serviceaccount"
+          ],
+          "candidates": [
+            "serviceaccount",
+            "user",
+            "group",
+            "role"
+          ],
+          "output": "rolebinding.rbac.authorization.k8s.io/viewer-view created",
+          "explanation": "--serviceaccount=<namespace>:<名前> で ServiceAccount を相手に指定します。RoleBinding なので、view の権限は dev の中だけに効きます。",
+          "wrongNotes": {
+            "user": "--user は人などの利用者の名前を指定します。ServiceAccount は --serviceaccount で指定します。",
+            "group": "--group はグループの名前を指定します。",
+            "role": "--role は与える権限 (Role) を指定する欄で、相手を指定するものではありません。ここでは --clusterrole で権限を指定済みです。"
+          },
+          "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_create/kubectl_create_rolebinding/"
+        }
+      ]
+    },
+    {
+      "id": "w6-l2",
+      "kind": "quiz",
+      "title": "Secret と Pod のセキュリティ",
+      "summary": "マニフェストとコマンドの穴埋めと 4 択 · 7 問",
+      "domain": "Container Orchestration",
+      "questions": [
+        {
+          "id": "w6-l2-q1",
+          "type": "choice",
+          "prompt": "Secret について正しいのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "既定では etcd に暗号化されずに保存されるので、API と etcd に触れる人を絞る必要がある"
+            },
+            {
+              "id": "b",
+              "text": "data の値は base64 で暗号化されているので、そのまま見せても安全",
+              "why": "base64 は文字の置き換え (エンコード) で、だれでも元に戻せます。暗号化ではありません。"
+            },
+            {
+              "id": "c",
+              "text": "Secret は自動でノードのディスクに暗号化して書かれ、etcd には残らない",
+              "why": "Secret は API サーバーの裏の etcd に保存されます。"
+            },
+            {
+              "id": "d",
+              "text": "Secret を作れるのはクラスターの管理者だけ",
+              "why": "RBAC で許されていればだれでも作れます。だから権限を絞ることが大切です。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "Secret は既定では etcd に暗号化されずに保存され、API を読める人はだれでも取り出せます。data の値の base64 はエンコードにすぎないので、保存時の暗号化と RBAC での絞り込みを組み合わせます。",
+          "source": "https://kubernetes.io/ja/docs/concepts/configuration/secret/"
+        },
+        {
+          "id": "w6-l2-q2",
+          "type": "fill",
+          "prompt": "キーと値を直接渡して、パスワードの Secret を作りたい (値は見本)。空欄に入る Secret の種類は?",
+          "language": "bash",
+          "code": "kubectl create secret {{blank}} db-pass --from-literal=password=example-only",
+          "answers": [
+            "generic"
+          ],
+          "candidates": [
+            "generic",
+            "tls",
+            "docker-registry",
+            "opaque"
+          ],
+          "output": "secret/db-pass created",
+          "explanation": "generic は、ファイルや --from-literal で渡したキーと値から Secret を作ります。作られる Secret の type は Opaque です。",
+          "wrongNotes": {
+            "tls": "tls は証明書と秘密鍵 (--cert と --key) から TLS 用の Secret を作ります。",
+            "docker-registry": "docker-registry はコンテナのレジストリにログインするための Secret を作ります。",
+            "opaque": "opaque というサブコマンドはありません。Opaque は generic で作った Secret の type の名前です。"
+          },
+          "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_create/kubectl_create_secret_generic/"
+        },
+        {
+          "id": "w6-l2-q3",
+          "type": "fill",
+          "prompt": "Pod の中のコンテナのプロセスを、すべてユーザー ID 1000 で動かしたい。空欄に入るフィールドは?",
+          "language": "yaml",
+          "code": "apiVersion: v1\nkind: Pod\nmetadata:\n  name: security-context-demo\nspec:\n  securityContext:\n    {{blank}}: 1000\n  containers:\n  - name: app\n    image: busybox:1.36\n    command: [\"sh\", \"-c\", \"sleep 1h\"]",
+          "answers": [
+            "runAsUser"
+          ],
+          "candidates": [
+            "runAsUser",
+            "runAsGroup",
+            "fsGroup",
+            "privileged"
+          ],
+          "explanation": "runAsUser はコンテナのプロセスを動かすユーザー ID を決めます。Pod の securityContext に書くと、Pod の中の全部のコンテナに効きます。",
+          "wrongNotes": {
+            "runAsGroup": "runAsGroup はプロセスの主なグループ ID を決めます。ユーザー ID ではありません。",
+            "fsGroup": "fsGroup はボリュームのファイルに付くグループ ID を決めます。",
+            "privileged": "privileged は特権で動かすかの真偽値で、ユーザー ID は決めません。"
+          },
+          "source": "https://kubernetes.io/ja/docs/tasks/configure-pod-container/security-context/"
+        },
+        {
+          "id": "w6-l2-q4",
+          "type": "fill",
+          "prompt": "コンテナのプロセスが、親のプロセスより強い権限を得られないようにしたい。空欄に入るフィールドは?",
+          "language": "yaml",
+          "code": "containers:\n- name: app\n  image: busybox:1.36\n  securityContext:\n    {{blank}}: false",
+          "answers": [
+            "allowPrivilegeEscalation"
+          ],
+          "candidates": [
+            "allowPrivilegeEscalation",
+            "readOnlyRootFilesystem",
+            "privileged",
+            "runAsNonRoot"
+          ],
+          "explanation": "allowPrivilegeEscalation は、プロセスが親より多くの特権を得られるかを決めます。false にすると、コンテナのプロセスに no_new_privs が付きます。",
+          "wrongNotes": {
+            "readOnlyRootFilesystem": "readOnlyRootFilesystem はルートのファイルシステムを読み取り専用にするもので、権限の引き上げは止めません。",
+            "privileged": "privileged: false は特権のコンテナにしないという意味で、子のプロセスが権限を得ることまでは止めません。",
+            "runAsNonRoot": "runAsNonRoot は root で動くことを拒むもので、false にしても権限の引き上げは止まりません。"
+          },
+          "source": "https://kubernetes.io/ja/docs/tasks/configure-pod-container/security-context/"
+        },
+        {
+          "id": "w6-l2-q5",
+          "type": "choice",
+          "prompt": "Pod Security Standards の 3 つの段階のうち、制限は最小限にしつつ既知の特権昇格は防ぎ、既定の Pod の設定ならそのまま通すものはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "Baseline (ベースライン)"
+            },
+            {
+              "id": "b",
+              "text": "Privileged (特権)",
+              "why": "Privileged は制限をかけない段階で、既知の特権昇格も許します。"
+            },
+            {
+              "id": "c",
+              "text": "Restricted (制限)",
+              "why": "Restricted は Pod を強くするいまの良い慣行に沿って厳しく絞る段階で、既定の設定のままでは通らないことがあります。"
+            },
+            {
+              "id": "d",
+              "text": "Strict (厳格)",
+              "why": "段階は Privileged・Baseline・Restricted の 3 つで、Strict という段階はありません。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "Baseline は既知の特権昇格を防ぎながら、ふつうのコンテナのアプリがそのまま動くように制限を最小限にした段階です。Privileged は制限なし、Restricted はいちばん厳しい段階です。",
+          "source": "https://kubernetes.io/docs/concepts/security/pod-security-standards/"
+        },
+        {
+          "id": "w6-l2-q6",
+          "type": "fill",
+          "prompt": "namespace dev で、Restricted に違反する Pod を作らせない (拒否する) ようにしたい。空欄に入るモードは?",
+          "language": "bash",
+          "code": "kubectl label --overwrite ns dev pod-security.kubernetes.io/{{blank}}=restricted",
+          "answers": [
+            "enforce"
+          ],
+          "candidates": [
+            "enforce",
+            "warn",
+            "audit",
+            "deny"
+          ],
+          "output": "namespace/dev labeled",
+          "explanation": "Pod Security Admission は namespace のラベルで働き、enforce のモードでは違反した Pod を拒否します。warn と audit は知らせるだけで Pod は作られます。",
+          "wrongNotes": {
+            "warn": "warn は違反したときに利用者へ警告を出すだけで、Pod は作られます。",
+            "audit": "audit は違反を監査ログに書くだけで、Pod は作られます。",
+            "deny": "モードは enforce・audit・warn の 3 つで、deny というモードはありません。"
+          },
+          "source": "https://kubernetes.io/ja/docs/concepts/security/pod-security-admission/"
+        },
+        {
+          "id": "w6-l2-q7",
+          "type": "choice",
+          "prompt": "namespace example のラベルは enforce=baseline と warn=restricted。そこで Pod を作ったときの出力です。正しいのはどれ?",
+          "code": {
+            "language": "plaintext",
+            "text": "$ kubectl apply -n example -f baseline-pod.yaml\nWarning: would violate PodSecurity \"restricted:latest\": allowPrivilegeEscalation != false (container \"nginx\" must set securityContext.allowPrivilegeEscalation=false), unrestricted capabilities (container \"nginx\" must set securityContext.capabilities.drop=[\"ALL\"]), runAsNonRoot != true (pod or container \"nginx\" must set securityContext.runAsNonRoot=true), seccompProfile (pod or container \"nginx\" must set securityContext.seccompProfile.type to \"RuntimeDefault\" or \"Localhost\")\npod/nginx created"
+          },
+          "choices": [
+            {
+              "id": "a",
+              "text": "Pod は作られた。Baseline は満たしたが、Restricted には合わない点があると警告された"
+            },
+            {
+              "id": "b",
+              "text": "Pod は Restricted に違反したので拒否され、作られなかった",
+              "why": "最後の行に pod/nginx created とあり、作られています。Restricted は warn なので警告だけです。"
+            },
+            {
+              "id": "c",
+              "text": "Pod は Baseline に違反しているので、あとで自動で消される",
+              "why": "enforce の Baseline に違反していれば、作る時点で拒否されます。作られたので Baseline は満たしています。"
+            },
+            {
+              "id": "d",
+              "text": "警告は kubectl の古さが原因で、Pod の中身とは関係ない",
+              "why": "警告の中身は、allowPrivilegeEscalation などの Pod の securityContext についてです。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "enforce は違反した Pod を拒否し、warn は警告だけを出します。この出力は enforce の Baseline を通り、warn の Restricted に合わない点を知らせたものです。",
+          "source": "https://kubernetes.io/ja/docs/tutorials/security/ns-level-pss/"
+        }
+      ]
+    },
+    {
+      "id": "w6-l3",
+      "kind": "quiz",
+      "title": "PV・PVC・StorageClass",
+      "summary": "マニフェストの穴埋めと 4 択 · 7 問",
+      "domain": "Container Orchestration",
+      "questions": [
+        {
+          "id": "w6-l3-q1",
+          "type": "choice",
+          "prompt": "ストレージを PersistentVolume (PV) と PersistentVolumeClaim (PVC) の 2 つに分けている、いちばんの理由はどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "ストレージを何から用意するか (PV) と、どれだけ要るか (PVC) を分け、利用者が置き場所の詳しさを知らずに使えるようにするため"
+            },
+            {
+              "id": "b",
+              "text": "PV はデータを、PVC はその控え (バックアップ) を入れるため",
+              "why": "PVC は控えではなく、ストレージの要求です。PVC は PV に結びついて使われます。"
+            },
+            {
+              "id": "c",
+              "text": "PV は 1 つの Pod の中だけで使い、PVC はノードどうしで共有するため",
+              "why": "どこから使えるかはアクセスモードで決まり、PV と PVC の分け方とは別の話です。"
+            },
+            {
+              "id": "d",
+              "text": "PVC を使うとコンテナが再起動するたびにデータが消え、PV を使うと残るため",
+              "why": "PVC で要求したストレージも、Pod とは別に残ります。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "PV はクラスターのストレージそのもので、管理者が用意するか StorageClass で自動で作られます。PVC は利用者が大きさやアクセスモードを指定する要求で、PV が何から用意されたかを知らずに使えます。",
+          "source": "https://kubernetes.io/ja/docs/concepts/storage/persistent-volumes/"
+        },
+        {
+          "id": "w6-l3-q2",
+          "type": "fill",
+          "prompt": "1 つのノードから読み書きでマウントする (そのノードの Pod どうしでは共有する) ストレージを要求したい。条件を満たすいちばん狭いアクセスモードとして、空欄に入るものは?",
+          "language": "yaml",
+          "code": "apiVersion: v1\nkind: PersistentVolumeClaim\nmetadata:\n  name: data\nspec:\n  accessModes:\n  - {{blank}}\n  resources:\n    requests:\n      storage: 1Gi",
+          "answers": [
+            "ReadWriteOnce"
+          ],
+          "candidates": [
+            "ReadWriteOnce",
+            "ReadOnlyMany",
+            "ReadWriteMany",
+            "ReadWriteOncePod"
+          ],
+          "explanation": "ReadWriteOnce は 1 つのノードから読み書きでマウントできるモードで、同じノードの Pod どうしなら共有できます。1 つの Pod だけに絞るのは ReadWriteOncePod です。",
+          "wrongNotes": {
+            "ReadOnlyMany": "ReadOnlyMany は多くのノードから読み取り専用でマウントするモードで、書き込めません。",
+            "ReadWriteMany": "ReadWriteMany は多くのノードから読み書きするモードで、要求より広く、対応するストレージも限られます。",
+            "ReadWriteOncePod": "ReadWriteOncePod はクラスター全体で 1 つの Pod だけが読み書きできるモードで、同じノードの別の Pod とは共有できません。"
+          },
+          "source": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/#access-modes"
+        },
+        {
+          "id": "w6-l3-q3",
+          "type": "fill",
+          "prompt": "Pod から、PVC data で要求したストレージを /data にマウントしたい。空欄に入るボリュームの種類は?",
+          "language": "yaml",
+          "code": "spec:\n  containers:\n  - name: app\n    image: busybox:1.36\n    command: [\"sh\", \"-c\", \"sleep 1h\"]\n    volumeMounts:\n    - name: vol\n      mountPath: /data\n  volumes:\n  - name: vol\n    {{blank}}:\n      claimName: data",
+          "answers": [
+            "persistentVolumeClaim"
+          ],
+          "candidates": [
+            "persistentVolumeClaim",
+            "persistentVolume",
+            "emptyDir",
+            "hostPath"
+          ],
+          "explanation": "Pod は volumes に persistentVolumeClaim を書いて PVC の名前 (claimName) を指し、PVC に結びついた PV を使います。Pod から PV を直接は指しません。",
+          "wrongNotes": {
+            "persistentVolume": "Pod のボリュームに persistentVolume という種類はありません。PV は PVC を通して使います。",
+            "emptyDir": "emptyDir は Pod と一緒に作られて Pod と一緒に消える一時的なボリュームで、claimName は持ちません。",
+            "hostPath": "hostPath はノードのファイルやフォルダを直接マウントするもので、PVC は使いません。"
+          },
+          "source": "https://kubernetes.io/ja/docs/concepts/storage/persistent-volumes/"
+        },
+        {
+          "id": "w6-l3-q4",
+          "type": "fill",
+          "prompt": "k3s に同梱の Local Path Provisioner でストレージを用意したい。空欄に入る StorageClass の名前は?",
+          "language": "yaml",
+          "code": "apiVersion: v1\nkind: PersistentVolumeClaim\nmetadata:\n  name: local-path-pvc\n  namespace: default\nspec:\n  accessModes:\n  - ReadWriteOnce\n  storageClassName: {{blank}}\n  resources:\n    requests:\n      storage: 2Gi",
+          "answers": [
+            "local-path"
+          ],
+          "candidates": [
+            "local-path",
+            "longhorn",
+            "standard",
+            "hostpath"
+          ],
+          "explanation": "k3s には Rancher の Local Path Provisioner が入っていて、StorageClass の名前は local-path です。PV はノードの /var/lib/rancher/k3s/storage の下に作られ、Pod はそのノードに縛られます。",
+          "wrongNotes": {
+            "longhorn": "longhorn は k3s で使える分散ストレージですが、同梱ではなく、自分で入れたときの StorageClass の名前です。",
+            "standard": "standard は k3s に同梱の StorageClass の名前ではありません。",
+            "hostpath": "hostpath は k3s に同梱の StorageClass の名前ではありません。ノードの場所を使うのは local-path です。"
+          },
+          "source": "https://docs.k3s.io/add-ons/storage"
+        },
+        {
+          "id": "w6-l3-q5",
+          "type": "choice",
+          "prompt": "PVC の storageClassName に StorageClass fast を書いた。合う PV がまだ無いとき、何が起きる?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "fast のプロビジョナーが、要求に合う PV を自動で作って結びつける"
+            },
+            {
+              "id": "b",
+              "text": "管理者が PV を手で作るまで、PVC はずっと作れない",
+              "why": "StorageClass があれば、PV を手で作らなくても動的に用意されます。"
+            },
+            {
+              "id": "c",
+              "text": "ノードのメモリの上に一時的な PV が作られ、Pod が消えると消える",
+              "why": "StorageClass のプロビジョナーが作るのは、そのクラスのストレージの PV です。"
+            },
+            {
+              "id": "d",
+              "text": "storageClassName は表示用の名前で、PV の用意には関係しない",
+              "why": "storageClassName は、どの StorageClass で PV を用意するかを選ぶ欄です。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "StorageClass はストレージの「クラス」と、それを作るプロビジョナーを決めます。PVC でクラスを指すと、利用者の要求に合わせて PV が自動で作られます (動的プロビジョニング)。",
+          "source": "https://kubernetes.io/ja/docs/concepts/storage/dynamic-provisioning/"
+        },
+        {
+          "id": "w6-l3-q6",
+          "type": "choice",
+          "prompt": "CSI (Container Storage Interface) の説明として正しいのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "Kubernetes のようなコンテナの基盤が、いろいろなストレージをコンテナに見せるための標準のインターフェース"
+            },
+            {
+              "id": "b",
+              "text": "コンテナのイメージをレジストリから取ってくるためのインターフェース",
+              "why": "イメージを扱うのはコンテナのランタイムで、kubelet とは CRI でつながります。"
+            },
+            {
+              "id": "c",
+              "text": "Pod どうしの通信をつなぐネットワークのインターフェース",
+              "why": "ネットワークをつなぐ仕組みは CNI です。"
+            },
+            {
+              "id": "d",
+              "text": "Kubernetes の本体に組み込まれた、特定のクラウドの専用ディスクのドライバー",
+              "why": "CSI のドライバーは Kubernetes の本体とは別に作って入れられます (ツリー外)。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "CSI は、任意のストレージをコンテナに見せるための標準のインターフェースです。ストレージの業者は Kubernetes の本体とは別にドライバーを作り、クラスターに入れて使えます。",
+          "source": "https://kubernetes.io/ja/docs/concepts/storage/volumes/"
+        },
+        {
+          "id": "w6-l3-q7",
+          "type": "choice",
+          "prompt": "PVC data を作ったあとの出力です。正しいのはどれ?",
+          "code": {
+            "language": "plaintext",
+            "text": "$ kubectl get pvc data\nNAME   STATUS    VOLUME   CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE\ndata   Pending                                      standard       <unset>                 20s\n$ kubectl describe pvc data\n...\nEvents:\n  Type    Reason                Age               From                         Message\n  ----    ------                ----              ----                         -------\n  Normal  WaitForFirstConsumer  5s (x3 over 20s)  persistentvolume-controller  waiting for first consumer to be created before binding"
+          },
+          "choices": [
+            {
+              "id": "a",
+              "text": "StorageClass が WaitForFirstConsumer なので、この PVC を使う Pod が作られるまで PV の用意と結びつけを待っている"
+            },
+            {
+              "id": "b",
+              "text": "ストレージの容量が足りず、PVC の作成に失敗した",
+              "why": "イベントは Normal で、失敗ではなく待っていることを伝えています。"
+            },
+            {
+              "id": "c",
+              "text": "PV はもう結びついていて、表示が遅れているだけ",
+              "why": "VOLUME の欄が空で STATUS が Pending なので、まだ結びついていません。"
+            },
+            {
+              "id": "d",
+              "text": "PVC を消して、もう一度作れば Bound になる",
+              "why": "作り直しても同じです。PVC を使う Pod を作れば進みます。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "volumeBindingMode が WaitForFirstConsumer の StorageClass では、PVC を使う Pod が作られるまで PV の用意と結びつけを遅らせます。Pod の置き場所に合わせてストレージを用意するためで、それまでは Pending のままです。",
+          "source": "https://kubernetes.io/ja/docs/concepts/storage/storage-classes/"
+        }
+      ]
+    },
+    {
+      "id": "w6-l4",
+      "kind": "quiz",
+      "title": "障害対応: 状態とコマンドを読む",
+      "summary": "出力を読む・コマンドの穴埋め · 7 問",
+      "domain": "Container Orchestration",
+      "questions": [
+        {
+          "id": "w6-l4-q1",
+          "type": "choice",
+          "prompt": "Pod が次の状態になった。原因を探すために最初に見るものはどれ?",
+          "code": {
+            "language": "plaintext",
+            "text": "$ kubectl get pods\nNAME                   READY   STATUS             RESTARTS      AGE\nweb-7c9d8f6b5d-k2x8p   0/1     CrashLoopBackOff   5 (40s ago)   4m"
+          },
+          "choices": [
+            {
+              "id": "a",
+              "text": "落ちる前のコンテナのログ (kubectl logs --previous) と、describe の Last State の終了コード"
+            },
+            {
+              "id": "b",
+              "text": "ノードの空きの資源 (CPU とメモリの残り)",
+              "why": "空きが足りないときは Pod が Pending のままになります。ここではノードに置かれて、起動してから落ちています。"
+            },
+            {
+              "id": "c",
+              "text": "イメージを取れているか (イメージ名とタグ)",
+              "why": "イメージが取れないときは ImagePullBackOff になります。CrashLoopBackOff は、取れて起動したあとに落ちています。"
+            },
+            {
+              "id": "d",
+              "text": "Service と、その後ろの Pod の一覧",
+              "why": "通信の設定ではなく、コンテナ自身が起動のたびに終わってしまっています。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "CrashLoopBackOff は、コンテナが起動しては終わるので、間を空けて再起動を繰り返している状態です。まず kubectl logs --previous で落ちる前のログを読み、kubectl describe pod で Last State の Reason と Exit Code を見ます。",
+          "source": "https://kubernetes.io/ja/docs/tasks/debug/debug-application/debug-running-pod/"
+        },
+        {
+          "id": "w6-l4-q2",
+          "type": "fill",
+          "prompt": "再起動を繰り返している Pod の、落ちる前のコンテナのログを読みたい。空欄に入るオプションは?",
+          "language": "bash",
+          "code": "kubectl logs web-7c9d8f6b5d-k2x8p {{blank}}",
+          "answers": [
+            "--previous",
+            "-p"
+          ],
+          "candidates": [
+            "--previous",
+            "--follow",
+            "--timestamps",
+            "--all-containers"
+          ],
+          "output": "Error: cannot connect to database at db:5432\nexiting with code 1",
+          "explanation": "--previous (短く -p) は、ひとつ前のコンテナのログを出します。再起動のあとの新しいコンテナのログには、落ちた理由が残っていないことがあります。",
+          "wrongNotes": {
+            "--follow": "--follow は今のコンテナのログを流し続けるもので、前のコンテナのログは出ません。",
+            "--timestamps": "--timestamps は各行に時刻を付けるだけで、前のコンテナのログは出ません。",
+            "--all-containers": "--all-containers は Pod の中の全部のコンテナのログを出すもので、前のコンテナのログではありません。"
+          },
+          "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_logs/"
+        },
+        {
+          "id": "w6-l4-q3",
+          "type": "choice",
+          "prompt": "Pending のままの Pod を describe したイベントです。正しいのはどれ?",
+          "code": {
+            "language": "plaintext",
+            "text": "$ kubectl describe pod big-job\n...\nEvents:\n  Type     Reason            Age   From               Message\n  ----     ------            ----  ----               -------\n  Warning  FailedScheduling  12s   default-scheduler  0/1 nodes are available: 1 Insufficient memory. preemption: 0/1 nodes are available: 1 No preemption victims found for incoming pod."
+          },
+          "choices": [
+            {
+              "id": "a",
+              "text": "要求したメモリを空けられるノードが無く、まだどのノードにも置かれていない"
+            },
+            {
+              "id": "b",
+              "text": "ノードには置かれたが、イメージが取れずに止まっている",
+              "why": "イメージが取れないときは ErrImagePull や ImagePullBackOff と出ます。FailedScheduling はノードに置く前の話です。"
+            },
+            {
+              "id": "c",
+              "text": "コンテナが起動しては落ちるのを繰り返している",
+              "why": "それは CrashLoopBackOff です。この Pod はまだノードに置かれていません。"
+            },
+            {
+              "id": "d",
+              "text": "Pod が使う PVC が足りないので、PVC を足せば動く",
+              "why": "メッセージは Insufficient memory で、メモリが足りないと言っています。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "Pending は、Pod をノードに置けていない状態です。describe のイベントにスケジューラーの理由が出て、ここでは要求したメモリに足りるノードがありません。要求を減らすか、ノードを足します。",
+          "source": "https://kubernetes.io/ja/docs/tasks/debug/debug-application/debug-pods/"
+        },
+        {
+          "id": "w6-l4-q4",
+          "type": "choice",
+          "prompt": "Pod が動かないときの出力です。正しいのはどれ?",
+          "code": {
+            "language": "plaintext",
+            "text": "$ kubectl get pods\nNAME   READY   STATUS             RESTARTS   AGE\nweb    0/1     ImagePullBackOff   0          2m\n$ kubectl describe pod web\n...\nEvents:\n  Type     Reason   Age                From     Message\n  ----     ------   ----               ----     -------\n  Warning  Failed   90s (x3 over 2m)   kubelet  Failed to pull image \"nginx:1.277\": rpc error: code = NotFound desc = failed to pull and unpack image \"docker.io/library/nginx:1.277\": failed to resolve reference \"docker.io/library/nginx:1.277\": docker.io/library/nginx:1.277: not found\n  Normal   BackOff  10s (x6 over 2m)   kubelet  Back-off pulling image \"nginx:1.277\""
+          },
+          "choices": [
+            {
+              "id": "a",
+              "text": "指定したタグのイメージが無いので取れず、間を空けて取り直している。イメージの名前かタグを直す"
+            },
+            {
+              "id": "b",
+              "text": "コンテナは起動したが、アプリがすぐ落ちている",
+              "why": "RESTARTS が 0 で、まだ一度も起動していません。起動してから落ちるのは CrashLoopBackOff です。"
+            },
+            {
+              "id": "c",
+              "text": "ノードの資源が足りず、Pod をどこにも置けていない",
+              "why": "イベントにはイメージの取得の失敗が出ています。置けないときは FailedScheduling と出ます。"
+            },
+            {
+              "id": "d",
+              "text": "レジストリに入るための imagePullSecrets が足りないことが確かになった",
+              "why": "メッセージは not found で、そのタグが見つからないと言っています。認証の失敗とは別です。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "ImagePullBackOff は、イメージが取れずコンテナを始められず、間を空けて取り直している状態です。ここでは not found と出ているので、イメージの名前かタグの誤りを疑います。",
+          "source": "https://kubernetes.io/ja/docs/concepts/containers/images/"
+        },
+        {
+          "id": "w6-l4-q5",
+          "type": "fill",
+          "prompt": "Pod web に関係する最近のイベントだけを並べたい。空欄に入るサブコマンドは?",
+          "language": "bash",
+          "code": "kubectl {{blank}} --for pod/web -n default",
+          "answers": [
+            "events"
+          ],
+          "candidates": [
+            "events",
+            "logs",
+            "describe",
+            "top"
+          ],
+          "output": "LAST SEEN          TYPE      REASON      OBJECT    MESSAGE\n2m                 Normal    Scheduled   Pod/web   Successfully assigned default/web to node1\n90s (x3 over 2m)   Warning   Failed      Pod/web   Failed to pull image \"nginx:1.277\": rpc error: code = NotFound desc = failed to pull and unpack image \"docker.io/library/nginx:1.277\": failed to resolve reference \"docker.io/library/nginx:1.277\": docker.io/library/nginx:1.277: not found\n10s (x6 over 2m)   Normal    BackOff     Pod/web   Back-off pulling image \"nginx:1.277\"",
+          "explanation": "kubectl events は namespace の最近のイベントを並べ、--for で 1 つのリソースに関係するものに絞れます。--watch を足すと、新しいイベントを出し続けます。",
+          "wrongNotes": {
+            "logs": "logs はコンテナが出したログで、Kubernetes のイベントではありません。",
+            "describe": "describe でもイベントは見られますが、--for というオプションはありません。kubectl describe pod web と書きます。",
+            "top": "top は CPU とメモリの使用量を出すコマンドです。"
+          },
+          "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_events/"
+        },
+        {
+          "id": "w6-l4-q6",
+          "type": "fill",
+          "prompt": "動いている Pod web のコンテナの中でシェルを開いて、ファイルを確かめたい。空欄に入るサブコマンドは?",
+          "language": "bash",
+          "code": "kubectl {{blank}} -it web -- sh",
+          "answers": [
+            "exec"
+          ],
+          "candidates": [
+            "exec",
+            "attach",
+            "run",
+            "logs"
+          ],
+          "output": "/ # ls /data\nhello.txt",
+          "explanation": "kubectl exec はコンテナの中でコマンドを動かします。-it で端末をつなぎ、-- のあとに動かすコマンドを書きます。",
+          "wrongNotes": {
+            "attach": "attach は、すでに動いているメインのプロセスに端末をつなぐもので、新しいコマンド (sh) は動かしません。",
+            "run": "run は新しい Pod を作るコマンドで、今ある Pod の中には入りません。",
+            "logs": "logs はログを読むだけで、コンテナの中でコマンドは動かせません。"
+          },
+          "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_exec/"
+        },
+        {
+          "id": "w6-l4-q7",
+          "type": "fill",
+          "prompt": "Deployment web のコンテナ web のイメージのタグを誤っていたので、正しいイメージに差し替えたい。空欄に入るサブコマンドは?",
+          "language": "bash",
+          "code": "kubectl set {{blank}} deployment/web web=nginx:1.27-alpine",
+          "answers": [
+            "image"
+          ],
+          "candidates": [
+            "image",
+            "env",
+            "resources",
+            "serviceaccount"
+          ],
+          "output": "deployment.apps/web image updated",
+          "explanation": "kubectl set image は、コンテナの名前=新しいイメージ の形でイメージを差し替えます。Deployment に対して行うと、新しいイメージで Pod が作り直されます。",
+          "wrongNotes": {
+            "env": "set env は環境変数を変えるもので、イメージは変わりません。",
+            "resources": "set resources は CPU とメモリの要求と上限を変えるものです。",
+            "serviceaccount": "set serviceaccount は Pod が使う ServiceAccount を変えるものです。"
+          },
+          "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_set/kubectl_set_image/"
+        }
+      ]
+    },
+    {
+      "id": "w6-lab",
+      "kind": "lab",
+      "title": "週末の実習: 権限・ストレージ・障害を k3s で試す",
+      "summary": "家のクラスタで手を動かす · 7 手順",
+      "domain": "Container Orchestration",
+      "source": "https://docs.k3s.io/add-ons/storage",
+      "steps": [
+        {
+          "text": "k3s の管理者の kubeconfig で行う (namespace ごとに権限を与えている場合は、作った直後に自分へ admin を結ぶ: kubectl create rolebinding me-admin --clusterrole=admin --user=<自分の利用者名> -n w6-lab)。実習用の namespace と、読むだけの ServiceAccount を作り、組み込みの ClusterRole view を RoleBinding でこの namespace の中だけに与える",
+          "command": "kubectl create namespace w6-lab && kubectl create serviceaccount viewer -n w6-lab && kubectl create rolebinding viewer-view --clusterrole=view --serviceaccount=w6-lab:viewer -n w6-lab"
+        },
+        {
+          "text": "viewer になりすまして確かめる。w6-lab の Pod の一覧は yes、削除は no、default の Pod の一覧は no になる",
+          "command": "kubectl auth can-i list pods -n w6-lab --as=system:serviceaccount:w6-lab:viewer; kubectl auth can-i delete pods -n w6-lab --as=system:serviceaccount:w6-lab:viewer; kubectl auth can-i list pods -n default --as=system:serviceaccount:w6-lab:viewer"
+        },
+        {
+          "text": "k3s に同梱の local-path の StorageClass で PVC を作り、それをマウントして /data/hello.txt に書き込む Pod を作る",
+          "command": "kubectl apply -n w6-lab -f - <<'EOF'\napiVersion: v1\nkind: PersistentVolumeClaim\nmetadata:\n  name: data\nspec:\n  accessModes:\n  - ReadWriteOnce\n  storageClassName: local-path\n  resources:\n    requests:\n      storage: 1Gi\n---\napiVersion: v1\nkind: Pod\nmetadata:\n  name: writer\nspec:\n  containers:\n  - name: writer\n    image: busybox:1.36\n    command: [\"sh\", \"-c\", \"echo hello > /data/hello.txt && sleep 3600\"]\n    volumeMounts:\n    - name: vol\n      mountPath: /data\n  volumes:\n  - name: vol\n    persistentVolumeClaim:\n      claimName: data\nEOF"
+        },
+        {
+          "text": "Pod が起動するのを待ち、PVC が Bound になって VOLUME の欄に PV の名前が出ることと、Pod の中から書いたファイルが読めることを確かめる (管理者の kubeconfig なら kubectl get pv で PV も見られる)",
+          "command": "kubectl wait --for=condition=Ready pod/writer -n w6-lab --timeout=120s && kubectl get pvc -n w6-lab && kubectl exec -n w6-lab writer -- cat /data/hello.txt"
+        },
+        {
+          "text": "わざと存在しないタグのイメージで Deployment を作る。30 秒ほど待って STATUS が ErrImagePull か ImagePullBackOff になっていることを見て、describe の Events で not found の理由を読む",
+          "command": "kubectl create deployment broken --image=nginx:no-such-tag -n w6-lab && sleep 30 && kubectl get pods -n w6-lab -l app=broken && kubectl describe pods -n w6-lab -l app=broken"
+        },
+        {
+          "text": "正しいイメージに差し替えて、Pod が Running になるのを確かめる (コンテナ名は kubectl create deployment がイメージ名から付けた nginx)",
+          "command": "kubectl set image deployment/broken nginx=nginx:1.27-alpine -n w6-lab && kubectl rollout status deployment/broken -n w6-lab"
+        },
+        {
+          "text": "片付ける (namespace ごと消すと、PVC と RoleBinding と ServiceAccount も消える)",
+          "command": "kubectl delete namespace w6-lab"
+        }
+      ]
+    }
+  ]
+}
