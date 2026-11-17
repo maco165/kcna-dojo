@@ -1,22 +1,22 @@
 import { useState } from 'react';
-import { Button } from '@astryxdesign/core/Button';
 import { CodeBlock } from '@astryxdesign/core/CodeBlock';
-import { Heading } from '@astryxdesign/core/Heading';
 import { RadioList, RadioListItem } from '@astryxdesign/core/RadioList';
-import { HStack, VStack } from '@astryxdesign/core/Stack';
-import { Text } from '@astryxdesign/core/Text';
+import { VStack } from '@astryxdesign/core/Stack';
 import type { ChoiceQuestion } from '../content/types';
 import { gradeChoice } from '../lib/grade';
 import AskAi from './AskAi';
 import Feedback from './Feedback';
+import { ActionArea, PrimaryAction, QuestionHead } from './QuestionFrame';
 
 export default function ChoiceQuestionView({
   question,
+  domain,
   onChecked,
   nextLabel,
   onNext,
 }: {
   question: ChoiceQuestion;
+  domain: string;
   onChecked: (correct: boolean) => void;
   nextLabel: string;
   onNext: () => void;
@@ -37,10 +37,7 @@ export default function ChoiceQuestionView({
 
   return (
     <VStack gap={5}>
-      <VStack gap={1}>
-        <Text type="supporting">{question.code ? '出力を読む' : '4 択'}</Text>
-        <Heading level={2}>{question.prompt}</Heading>
-      </VStack>
+      <QuestionHead kind={question.code ? '出力を読む' : '4 択'} domain={domain} prompt={question.prompt} />
 
       {question.code && (
         <CodeBlock code={question.code.text} language={question.code.language} width="100%" size="sm" hasCopyButton={false} />
@@ -52,28 +49,26 @@ export default function ChoiceQuestionView({
         ))}
       </RadioList>
 
-      {!checked ? (
-        <VStack gap={3}>
-          <HStack justify="end">
-            <Button variant="primary" label="確かめる" isDisabled={value === ''} onClick={check} />
-          </HStack>
-          <AskAi question={question} />
-        </VStack>
-      ) : (
-        <VStack gap={4}>
-          <Feedback
-            correct={result}
-            correctAnswer={answerLetter}
-            explanation={question.explanation}
-            note={result ? undefined : picked?.why}
-            source={question.source}
-          />
-          <HStack justify="end">
-            <Button variant="primary" label={nextLabel} onClick={onNext} />
-          </HStack>
-          <AskAi question={question} answered={{ picked: value, correct: result }} />
-        </VStack>
-      )}
+      <ActionArea>
+        {!checked ? (
+          <>
+            <PrimaryAction label="確かめる" onClick={check} isDisabled={value === ''} />
+            <AskAi question={question} />
+          </>
+        ) : (
+          <>
+            <Feedback
+              correct={result}
+              correctAnswer={answerLetter}
+              explanation={question.explanation}
+              note={result ? undefined : picked?.why}
+              source={question.source}
+            />
+            <PrimaryAction label={nextLabel} onClick={onNext} />
+            <AskAi question={question} answered={{ picked: value, correct: result }} />
+          </>
+        )}
+      </ActionArea>
     </VStack>
   );
 }
