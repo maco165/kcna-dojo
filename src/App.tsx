@@ -8,6 +8,7 @@ import { useProgress } from './lib/useProgress';
 import About from './screens/About';
 import Home from './screens/Home';
 import ExamScreen from './screens/ExamScreen';
+import ProgressScreen from './screens/ProgressScreen';
 import Review from './screens/Review';
 import Settings from './screens/Settings';
 import LessonScreen from './screens/LessonScreen';
@@ -22,6 +23,8 @@ export default function App() {
     <Theme theme={kcnaTheme} mode="system">
       {route.name === 'exam' ? (
         <ExamScreen progress={progress} updateProgress={updateProgress} />
+      ) : route.name === 'progress' ? (
+        <ProgressScreen progress={progress} />
       ) : route.name === 'review' ? (
         <Review progress={progress} updateProgress={updateProgress} />
       ) : route.name === 'settings' ? (
