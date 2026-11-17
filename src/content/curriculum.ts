@@ -1,0 +1,89 @@
+// 週の並びと日付。カリキュラムの正本は本人の学習計画の文書で、ここはサイトに出すための写し。
+import type { Domain, WeekContent } from './types';
+import week1 from './week1.json';
+
+export type WeekMeta = {
+  week: number;
+  title: string;
+  domain: Domain;
+  area: string;
+  /** その週の始まりの日 (月曜) */
+  start: string;
+  /** 説明できるようにすること */
+  goals: string[];
+  content?: WeekContent;
+};
+
+/** 受験の目安。計画の文書の「2027-03 上旬」 */
+export const EXAM_DATE = '2027-03-06';
+
+/** 1 日の目標の XP */
+export const DAILY_GOAL_XP = 30;
+
+export const WEEKS: WeekMeta[] = [
+  {
+    week: 1,
+    title: 'コンテナの基礎',
+    domain: 'Kubernetes Fundamentals',
+    area: 'Containerization',
+    start: '2026-11-23',
+    goals: ['コンテナはなぜ VM より軽いか', 'OCI と CRI は何を標準にしたか', 'k3s は Docker を使っているか'],
+    content: week1 as WeekContent,
+  },
+  {
+    week: 2,
+    title: 'クラスタの構成',
+    domain: 'Kubernetes Fundamentals',
+    area: 'Core Concepts',
+    start: '2026-11-30',
+    goals: ['Pod を作る命令が動くまでに通る部品の順番', 'etcd が止まると何が起きるか', '望ましい状態とは何か'],
+  },
+  {
+    week: 3,
+    title: 'ワークロード',
+    domain: 'Kubernetes Fundamentals',
+    area: 'Core Concepts',
+    start: '2026-12-07',
+    goals: ['Deployment と StatefulSet の使い分け', 'DaemonSet が向く用途', 'ラベルが無いと何が困るか'],
+  },
+  {
+    week: 4,
+    title: '管理とスケジューリング',
+    domain: 'Kubernetes Fundamentals',
+    area: 'Administration / Scheduling',
+    start: '2026-12-14',
+    goals: ['スケジューラは何を見て置き場所を決めるか', 'taint と toleration の向き', 'limits を超えた CPU とメモリの違い'],
+  },
+  {
+    week: 5,
+    title: 'ネットワーク',
+    domain: 'Container Orchestration',
+    area: 'Networking',
+    start: '2026-12-21',
+    goals: ['Service が無いと Pod に何が困るか', 'Ingress と LoadBalancer の違い', 'イングレスの移行で何が変わるか'],
+  },
+  {
+    week: 6,
+    title: 'セキュリティ・ストレージ・障害対応',
+    domain: 'Container Orchestration',
+    area: 'Security / Storage / Troubleshooting',
+    start: '2027-01-04',
+    goals: ['Role と ClusterRole の違い', 'PV と PVC を分ける理由', 'CrashLoopBackOff のとき最初に見るもの'],
+  },
+  {
+    week: 7,
+    title: 'アプリの届け方',
+    domain: 'Cloud Native Application Delivery',
+    area: 'Application Delivery / Debugging',
+    start: '2027-01-11',
+    goals: ['GitOps は何を正本にするか', 'Helm と Kustomize の違い', 'カナリアの利点'],
+  },
+  {
+    week: 8,
+    title: 'クラウドネイティブの設計',
+    domain: 'Cloud Native Architecture',
+    area: 'Observability / Ecosystem',
+    start: '2027-01-18',
+    goals: ['メトリクスとトレースで分かることの違い', 'SLO を決める理由', 'Graduated になる条件のあらまし'],
+  },
+];
