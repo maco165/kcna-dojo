@@ -14,7 +14,7 @@ import BottomTabs from '../components/BottomTabs';
 import RepoLink from '../components/RepoLink';
 import SiteLogo from '../components/SiteLogo';
 import StatusIcon from '../components/StatusIcon';
-import { DAILY_GOAL_XP, EXAM_DATE, WEEKS, type WeekMeta } from '../content/curriculum';
+import { WEEKS, type WeekMeta } from '../content/curriculum';
 import type { Lesson } from '../content/types';
 import {
   DOMAINS,
@@ -26,8 +26,9 @@ import {
   lessonStatuses,
   type LessonStatus,
 } from '../lib/lessonStatus';
+import { downloadProgress } from '../lib/download';
 import { SITE_NAME } from '../lib/site';
-import { currentStreak, dayKey, daysBetween, todayXp, type Progress } from '../lib/progress';
+import { currentStreak, dayKey, daysBetween, examDate, goalXp, todayXp, type Progress } from '../lib/progress';
 import { aboutHref, lessonHref, weekHref } from '../lib/route';
 import { WIDE_QUERY, useMediaQuery } from '../lib/useMediaQuery';
 
@@ -52,6 +53,7 @@ type Summary = {
   today: number;
   streak: number;
   examDays: number;
+  goal: number;
 };
 
 function summarize(week: number, progress: Progress): Summary {
@@ -64,11 +66,12 @@ function summarize(week: number, progress: Progress): Summary {
     statuses: lessonStatuses(lessons, progress),
     today: todayXp(progress, now),
     streak: currentStreak(progress, now),
-    examDays: daysBetween(dayKey(now), EXAM_DATE),
+    examDays: daysBetween(dayKey(now), examDate(progress)),
+    goal: goalXp(progress),
   };
 }
 
-const goalLabel = (today: number) => `${today} / ${DAILY_GOAL_XP} XP`;
+const goalLabel = (today: number, goal: number) => `${today} / ${goal} XP`;
 
 export default function Home({ week, progress }: { week: number; progress: Progress }) {
   const isWide = useMediaQuery(WIDE_QUERY);
@@ -114,10 +117,10 @@ function PhoneHome({ s, progress }: { s: Summary; progress: Progress }) {
       <section className="band">
         <ProgressBar
           label="今日の目標"
-          value={Math.min(s.today, DAILY_GOAL_XP)}
-          max={DAILY_GOAL_XP}
+          value={Math.min(s.today, s.goal)}
+          max={s.goal}
           hasValueLabel
-          formatValueLabel={() => goalLabel(s.today)}
+          formatValueLabel={() => goalLabel(s.today, s.goal)}
         />
       </section>
 
@@ -303,7 +306,7 @@ function DesktopHome({ s, progress }: { s: Summary; progress: Progress }) {
           </VStack>
           <HStack gap={6} wrap="wrap">
             <Text type="supporting">
-              今日 <Text weight="semibold">{goalLabel(s.today)}</Text>
+              今日 <Text weight="semibold">{goalLabel(s.today, s.goal)}</Text>
             </Text>
             <Text type="supporting">
               連続 <Text weight="semibold">{s.streak} 日</Text>
@@ -357,7 +360,9 @@ function DesktopHome({ s, progress }: { s: Summary; progress: Progress }) {
             </Card>
             <VStack gap={1}>
               <Text type="supporting">記録はこのブラウザ (localStorage) にだけ保存されます。</Text>
-              <Button size="sm" variant="ghost" label="記録を書き出す (準備中)" isDisabled />
+              <div>
+                <Button size="sm" variant="ghost" label="記録を書き出す (JSON)" onClick={() => downloadProgress(progress, new Date())} />
+              </div>
             </VStack>
           </aside>
         </div>
