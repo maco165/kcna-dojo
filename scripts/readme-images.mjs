@@ -68,15 +68,22 @@ function seedProgress() {
   const d = new Date();
   const key = (x) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
   const today = key(d);
+  const ago = (n) => key(new Date(d.getFullYear(), d.getMonth(), d.getDate() - n));
   const progress = {
     v: 1,
     streak: { count: 3, lastDay: today },
-    xp: { total: 66, byDay: { [today]: 27 } },
+    xp: { total: 66, byDay: { [ago(5)]: 12, [ago(4)]: 30, [ago(2)]: 9, [ago(1)]: 18, [today]: 27 } },
     lessons: {
       'w1-l1': { done: true, best: 0.8, at: d.toISOString() },
       'w1-l2': { done: true, best: 1, at: d.toISOString() },
     },
-    answers: {},
+    // 復習の画面に今日の 2 問を出す
+    answers: {
+      'w1-l1-q1': { right: 0, wrong: 1, last: ago(1), stage: 0, nextReview: today },
+      'w1-l2-q4': { right: 1, wrong: 1, last: ago(1), stage: 0, nextReview: today },
+      'w1-l1-q2': { right: 1, wrong: 0, last: ago(1) },
+    },
+    exams: [{ at: new Date(d.getTime() - 86400000).toISOString(), correct: 41, total: 60 }],
   };
   localStorage.setItem('kcna.v1', JSON.stringify(progress));
 }
@@ -100,7 +107,8 @@ async function waitForServer() {
 }
 
 const browser = await chromium.launch();
-const server = spawn('npx', ['vite', 'preview', '--port', String(PORT), '--strictPort'], { stdio: 'ignore' });
+// npx の子の vite まで止められるよう、別のプロセスグループで立てる
+const server = spawn('npx', ['vite', 'preview', '--port', String(PORT), '--strictPort'], { stdio: 'ignore', detached: true });
 // 自分のサーバーが立たなかったとき (番号が埋まっているなど)、残っている別のサーバーにつないで偽の結果を出さないよう止める
 let serverExited = false;
 server.on('exit', () => (serverExited = true));
@@ -144,8 +152,22 @@ try {
     await page.getByRole('radio').first().check();
     await page.getByRole('button', { name: '確かめる' }).click();
   });
+  await shoot('review-phone', phone, `${BASE}#/review`);
+  await shoot('progress-phone', phone, `${BASE}#/progress`);
+  await shoot('exam-phone', phone, `${BASE}#/exam`, async (page) => {
+    await page.getByRole('button', { name: '模擬試験を始める' }).click();
+    await page.getByRole('radio').first().check().catch(() => {});
+  });
+  await shoot('glossary-phone', phone, `${BASE}#/glossary`, async (page) => {
+    await page.getByRole('searchbox', { name: '用語を探す' }).fill('Pod');
+  });
+  await shoot('settings-phone', phone, `${BASE}#/settings`);
   console.log(`書き出した: ${OUT}`);
 } finally {
   await browser.close();
-  server.kill();
+  try {
+    process.kill(-server.pid);
+  } catch {
+    server.kill();
+  }
 }
