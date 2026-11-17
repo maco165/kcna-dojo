@@ -206,7 +206,7 @@ function LessonRow({ lesson, status }: { lesson: Lesson; status: LessonStatus })
       href={lessonHref(lesson.id)}
       label={lesson.title}
       description={caption}
-      startContent={<StatusIcon status={status} isLab={lesson.kind === 'lab'} />}
+      startContent={<StatusIcon status={status} isLab={lesson.kind === 'lab'} isDecorative />}
       endContent={
         status === 'done' ? (
           <Text type="supporting" color="inherit">
@@ -236,7 +236,13 @@ function DesktopHome({ s, progress }: { s: Summary; progress: Progress }) {
       width: proportional(2),
       renderCell: (r) => (
         <VStack gap={0}>
-          <Text weight={r.status === 'next' ? 'semibold' : 'medium'}>{r.lesson.title}</Text>
+          {r.status === 'next' ? (
+            <Text weight="semibold">{r.lesson.title}</Text>
+          ) : (
+            <Link href={lessonHref(r.lesson.id)} color="primary" weight="medium">
+              {r.lesson.title}
+            </Link>
+          )}
           <span className="caption-code">{r.lesson.id.replace(/^w\d+-/, '')}</span>
         </VStack>
       ),
@@ -251,7 +257,7 @@ function DesktopHome({ s, progress }: { s: Summary; progress: Progress }) {
         </Text>
       ),
     },
-    { key: 'correct', header: '正答', width: pixel(80), renderCell: (r) => <Text>{lessonCorrect(r.lesson, progress)}</Text> },
+    { key: 'correct', header: '最高の正答', width: pixel(100), renderCell: (r) => <Text>{lessonCorrect(r.lesson, progress)}</Text> },
     {
       key: 'status',
       header: '状態',
@@ -276,7 +282,9 @@ function DesktopHome({ s, progress }: { s: Summary; progress: Progress }) {
           <Button variant="primary" size="sm" label="開始" href={lessonHref(r.lesson.id)} />
         ) : r.status === 'done' ? (
           <Link href={lessonHref(r.lesson.id)}>見直す</Link>
-        ) : null,
+        ) : (
+          <Link href={lessonHref(r.lesson.id)}>開く</Link>
+        ),
     },
   ];
 

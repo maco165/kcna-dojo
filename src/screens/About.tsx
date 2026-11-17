@@ -39,7 +39,7 @@ function Body() {
               icon={<GitHubMark />}
               endContent={external}
               href={REPO_URL}
-              target="_blank"
+              target="_blank" rel="noopener noreferrer"
             />
           </div>
           <span className="caption-code">github.com/maco165/kcna-dojo</span>
@@ -53,7 +53,7 @@ function Body() {
             問題は公式の文書 (kubernetes.io・docs.k3s.io など) で確かめて書いていますが、誤りがあれば Issue で知らせてください。問題の id (例: w1-l3-q2) を添えると早く直せます。
           </Text>
           <div>
-            <Button label="Issue を書く" icon={<ExclamationCircleIcon width={18} height={18} />} endContent={external} href={NEW_ISSUE_URL} target="_blank" />
+            <Button label="Issue を書く" icon={<ExclamationCircleIcon width={18} height={18} />} endContent={external} href={NEW_ISSUE_URL} target="_blank" rel="noopener noreferrer" />
           </div>
         </VStack>
       </Card>

@@ -102,7 +102,6 @@ function QuizRun({ lesson, week, progress, updateProgress }: Props & { lesson: Q
         progress={progress}
         rows={lesson.questions.map((question, i) => ({ id: question.id, label: question.prompt, correct: results[i] }))}
         onRetry={restart}
-        retryLabel={correct < total ? '間違いをやり直す' : 'もう一度解く'}
       />
     );
   }
@@ -183,7 +182,6 @@ function ResultView({
   progress,
   rows,
   onRetry,
-  retryLabel,
 }: {
   week: number;
   lessonLabel: string;
@@ -191,7 +189,6 @@ function ResultView({
   progress: Progress;
   rows: { id: string; label: string; correct: boolean | undefined }[];
   onRetry?: () => void;
-  retryLabel?: string;
 }) {
   const isWide = useMediaQuery(WIDE_QUERY);
   const now = new Date();
@@ -245,7 +242,7 @@ function ResultView({
 
       <div className="result__actions">
         <HStack gap={2} justify={isWide ? 'end' : 'start'}>
-          {onRetry && <Button label={retryLabel ?? 'もう一度解く'} onClick={onRetry} width={isWide ? undefined : '100%'} size={isWide ? 'md' : 'lg'} />}
+          {onRetry && <Button label="もう一度解く" onClick={onRetry} width={isWide ? undefined : '100%'} size={isWide ? 'md' : 'lg'} />}
           <Button
             variant="primary"
             label="一覧へ戻る"

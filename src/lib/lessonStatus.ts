@@ -32,7 +32,7 @@ export function lessonCount(l: Lesson): number {
   return l.kind === 'quiz' ? l.questions.length : l.steps.length;
 }
 
-/** 正答の列: そのレッスンの問題の、いちばん新しく数えた正解の数 (答えたことのある問題だけ) */
+/** 「最高の正答」の列: これまでの回でいちばん良かった正答率を、問題の数に掛けて「n / 問題数」にする。終えていなければ — */
 export function lessonCorrect(l: Lesson, progress: Progress): string {
   if (l.kind !== 'quiz') return progress.lessons[l.id]?.done ? `${l.steps.length} / ${l.steps.length}` : '—';
   const rec = progress.lessons[l.id];

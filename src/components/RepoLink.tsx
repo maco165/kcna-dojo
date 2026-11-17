@@ -12,5 +12,5 @@ export function GitHubMark({ size = 18 }: { size?: number }) {
 
 /** 上の帯の右端の、リポジトリを新しいタブで開くボタン */
 export default function RepoLink() {
-  return <Button variant="ghost" size="sm" isIconOnly label="GitHub のリポジトリを開く" icon={<GitHubMark />} href={REPO_URL} target="_blank" />;
+  return <Button variant="ghost" size="sm" isIconOnly label="GitHub のリポジトリを開く" icon={<GitHubMark />} href={REPO_URL} target="_blank" rel="noopener noreferrer" />;
 }

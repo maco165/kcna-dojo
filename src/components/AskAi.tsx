@@ -12,8 +12,8 @@ export default function AskAi({ question, answered }: { question: Question; answ
   return (
     <HStack gap={2} wrap="wrap" vAlign="center">
       <Text type="supporting">{answered ? 'もっと詳しく聞く' : 'AI にヒントを聞く'}</Text>
-      <Button size="sm" variant="ghost" icon={icon} label="Claude" href={links.claude} target="_blank" />
-      <Button size="sm" variant="ghost" icon={icon} label="ChatGPT" href={links.chatgpt} target="_blank" />
+      <Button size="sm" variant="ghost" icon={icon} label="Claude" href={links.claude} target="_blank" rel="noopener noreferrer" />
+      <Button size="sm" variant="ghost" icon={icon} label="ChatGPT" href={links.chatgpt} target="_blank" rel="noopener noreferrer" />
     </HStack>
   );
 }
