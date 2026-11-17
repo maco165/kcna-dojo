@@ -65,6 +65,8 @@ async function run(browser, name, width, height) {
   await page.goto(BASE);
   await page.getByRole('heading', { name: 'コンテナの基礎' }).waitFor();
   const startLinks = page.getByRole('link', { name: '開始' });
+  const lessonLinks = await page.evaluate(() => [...new Set([...document.querySelectorAll('a[href^="#/lesson/"]')].map((a) => a.getAttribute('href')))]);
+  check(lessonLinks.length === week1.lessons.length, `${tag} 空の記録でも全部のレッスンを開ける (${lessonLinks.length} / ${week1.lessons.length})`);
   check((await startLinks.count()) === 1, `${tag} ホームの「開始」は 1 つだけ`);
   check((await startLinks.first().getAttribute('href')) === `#/lesson/${l1.id}`, `${tag} 「開始」は最初のレッスン`);
   check(await page.getByText('0 / 30 XP').isVisible(), `${tag} 今日の目標は 0 / 30 XP`);
@@ -115,6 +117,20 @@ async function run(browser, name, width, height) {
   check(await page.getByText('実行結果の例').isVisible(), `${tag} 正解のあと実行結果の例が出る`);
   await noHorizontalOverflow(page, width, `${tag} 穴埋め`);
 
+  // 4a. 答えたあと、AI に聞くリンクの上の Enter では進まず、それ以外の Enter で次へ進む
+  await page.getByRole('link', { name: 'Claude' }).focus();
+  const [popup] = await Promise.all([page.waitForEvent('popup', { timeout: 5000 }).catch(() => null), page.keyboard.press('Enter')]);
+  await popup?.close();
+  check(await page.getByText(`${l3.title} · 1 / ${l3.questions.length} 問`).isVisible(), `${tag} AI のリンクの上の Enter では次へ進まない`);
+  await page.locator('body').focus();
+  await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur());
+  await page.keyboard.press('Enter');
+  check(await page.getByText(`${l3.title} · 2 / ${l3.questions.length} 問`).isVisible(), `${tag} 答えたあと Enter で次へ進む`);
+  await page.goto(`${BASE}#/lesson/w1-l3`);
+  await page.reload();
+  await page.getByRole('textbox', { name: '空欄' }).fill('get');
+  await page.getByRole('textbox', { name: '空欄' }).press('Enter');
+
   // 4b. 候補を押して不正解なら、なぜ違うかが出る (2 問目は describe が正解なので get を押す)
   await page.getByRole('button', { name: '次へ' }).click();
   const q2 = l3.questions[1];
@@ -149,7 +165,7 @@ async function run(browser, name, width, height) {
     await page.getByRole('button', { name: '確かめる' }).click();
     await page.getByRole('button', { name: i === l1.questions.length - 1 ? '結果を見る' : '次へ' }).click();
   }
-  await page.getByRole('button', { name: '間違いをやり直す' }).click();
+  await page.getByRole('button', { name: 'もう一度解く' }).click();
   check(await page.getByText(`${l1.title} · 1 / ${l1.questions.length} 問`).isVisible(), `${tag} やり直すと 1 問目から始まる`);
 
   // 6. 実習
