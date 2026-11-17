@@ -28,7 +28,7 @@ export type FillQuestion = {
 
 export type Choice = { id: string; text: string; why?: string };
 
-/** 4 択。code があれば問題文の下に出す (出力を読んで答える問題など) */
+/** 4 択。code があれば問題文の下に出す (出力を読んで答える問題など)。選択肢は出すたびに混ぜる (src/lib/shuffle.ts) */
 export type ChoiceQuestion = {
   id: string;
   type: 'choice';
@@ -38,6 +38,8 @@ export type ChoiceQuestion = {
   answer: string;
   explanation: string;
   source: string;
+  /** true なら選択肢を混ぜない (「上のどれでもない」など、位置に意味があるとき) */
+  fixedOrder?: boolean;
 };
 
 export type Question = FillQuestion | ChoiceQuestion;

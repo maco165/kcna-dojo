@@ -128,6 +128,7 @@ for (const file of files) {
           if (c?.why !== undefined && !isNonEmptyString(c.why)) ng(qid, `choices[${ci}].why は空でない文字列にします`);
         }
         if (!ids.includes(q.answer)) ng(qid, `正解 (${q.answer}) が選択肢にありません`);
+        if (q.fixedOrder !== undefined && typeof q.fixedOrder !== 'boolean') ng(qid, 'fixedOrder は true か false にします');
         if (q.code !== undefined && (!isNonEmptyString(q.code?.text) || !isNonEmptyString(q.code?.language))) {
           ng(qid, 'code は language と text を持ちます');
         }
