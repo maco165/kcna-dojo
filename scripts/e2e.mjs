@@ -72,6 +72,8 @@ async function run(browser, name, width, height) {
   check((await startLinks.count()) === 1, `${tag} ホームの「開始」は 1 つだけ`);
   check((await startLinks.first().getAttribute('href')) === `#/lesson/${l1.id}`, `${tag} 「開始」は最初のレッスン`);
   check(await page.getByText('0 / 30 XP').isVisible(), `${tag} 今日の目標は 0 / 30 XP`);
+  check((await page.title()).startsWith('クラネイ'), `${tag} ページの題がクラネイで始まる`);
+  check(await page.getByText('クラネイ', { exact: true }).first().isVisible(), `${tag} サイト名クラネイが出る`);
   await noHorizontalOverflow(page, width, `${tag} ホーム`);
 
   // 2. 4 択のレッスンを解く (1 問目は不正解、残りは正解)
@@ -196,6 +198,7 @@ async function run(browser, name, width, height) {
   check((await page.getByRole('link', { name: /Issue を書く/ }).getAttribute('href')) === 'https://github.com/maco165/kcna-dojo/issues/new', `${tag} Issue を書くリンクがある`);
   const logoOk = await page.evaluate(() => [...document.querySelectorAll('img.site-logo')].every((i) => i.complete && i.naturalWidth > 0));
   check(logoOk, `${tag} サイト名の横の印が読み込める`);
+  check(await page.getByText(/非公式の学習サイト/).isVisible(), `${tag} このサイトについてに非公式と書いてある`);
   await noHorizontalOverflow(page, width, `${tag} このサイトについて`);
 
   check(errors.length === 0, `${tag} ページのエラーが無い ${errors.length ? errors.join(' / ') : ''}`);

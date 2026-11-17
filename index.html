@@ -3,15 +3,63 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="KCNA-JP の学習サイト。コマンドと YAML の穴埋め・4 択をレッスンで解く。" />
+    <meta name="description" content="クラネイは KCNA-JP (Kubernetes and Cloud Native Associate) 対策の非公式の学習サイト。kubectl コマンドや YAML の穴埋めと 4 択を週ごとのレッスンで解き、進捗はブラウザに残ります。" />
+    <link rel="canonical" href="https://maco165.github.io/kcna-dojo/" />
+
+    <!-- SNS で共有したときの画像と説明 (OGP と X のカード)。og:image は絶対の URL にする -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="クラネイ" />
+    <meta property="og:title" content="クラネイ — KCNA-JP 対策" />
+    <meta property="og:description" content="クラネイは KCNA-JP (Kubernetes and Cloud Native Associate) 対策の非公式の学習サイト。kubectl コマンドや YAML の穴埋めと 4 択を週ごとのレッスンで解き、進捗はブラウザに残ります。" />
+    <meta property="og:url" content="https://maco165.github.io/kcna-dojo/" />
+    <meta property="og:image" content="https://maco165.github.io/kcna-dojo/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="クラネイ: KCNA-JP 対策の学習サイト。コマンドの穴埋めの問題の画面" />
+    <meta property="og:locale" content="ja_JP" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="クラネイ — KCNA-JP 対策" />
+    <meta name="twitter:description" content="クラネイは KCNA-JP (Kubernetes and Cloud Native Associate) 対策の非公式の学習サイト。kubectl コマンドや YAML の穴埋めと 4 択を週ごとのレッスンで解き、進捗はブラウザに残ります。" />
+    <meta name="twitter:image" content="https://maco165.github.io/kcna-dojo/og-image.png" />
+
+    <!-- 検索エンジン向けのサイトの情報 -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "クラネイ",
+        "alternateName": ["KCNA-JP 対策 クラネイ", "kcna-dojo"],
+        "url": "https://maco165.github.io/kcna-dojo/",
+        "description": "クラネイは KCNA-JP (Kubernetes and Cloud Native Associate) 対策の非公式の学習サイト。kubectl コマンドや YAML の穴埋めと 4 択を週ごとのレッスンで解き、進捗はブラウザに残ります。",
+        "inLanguage": "ja"
+      }
+    </script>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="theme-color" content="#0064E0" />
-    <title>kcna-dojo</title>
+    <title>クラネイ — KCNA-JP 対策</title>
   </head>
   <body>
-    <div id="root"></div>
+    <!-- JavaScript を動かさない読み手 (一部の検索エンジンや SNS) 向けの説明。画面を描くと置き換わる -->
+    <div id="root">
+      <main style="max-width: 720px; margin: 0 auto; padding: 24px 16px; font-family: system-ui, sans-serif; line-height: 1.7">
+        <h1>クラネイ — KCNA-JP 対策</h1>
+        <p>
+          クラネイ (クラウドネイティブの略) は、KCNA-JP (Kubernetes and Cloud Native Associate 日本語版) の対策のための、個人が作った非公式の学習サイトです。
+          kubectl コマンドや YAML・Dockerfile の穴埋めと 4 択を、週ごとのレッスンで解きます。間違えた問題は、選んだものがなぜ違うかと解説・出典を出します。
+        </p>
+        <h2>学べること</h2>
+        <ul>
+          <li>Kubernetes Fundamentals: コンテナの基礎、クラスタの構成、ワークロード、管理とスケジューリング</li>
+          <li>Container Orchestration: ネットワーク、セキュリティ、ストレージ、障害対応</li>
+          <li>Cloud Native Application Delivery: GitOps、Helm、Kustomize</li>
+          <li>Cloud Native Architecture: 観測、オートスケール、CNCF のエコシステム</li>
+        </ul>
+        <p>進み具合はブラウザの localStorage にだけ残り、サーバーには送りません。表示には JavaScript を使います。</p>
+        <p><a href="https://github.com/maco165/kcna-dojo">GitHub のリポジトリ</a></p>
+      </main>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

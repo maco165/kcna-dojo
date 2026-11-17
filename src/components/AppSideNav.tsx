@@ -12,6 +12,7 @@ import { WEEKS } from '../content/curriculum';
 import SiteLogo from './SiteLogo';
 import type { Progress } from '../lib/progress';
 import { REPO_URL } from '../lib/links';
+import { SITE_NAME, SITE_TAGLINE } from '../lib/site';
 import { aboutHref, weekHref } from '../lib/route';
 import { GitHubMark } from './RepoLink';
 
@@ -20,7 +21,7 @@ export default function AppSideNav({ current, week, progress }: { current: 'lear
   const soon = <Text type="supporting">準備中</Text>;
   return (
     <SideNav
-      header={<SideNavHeading heading="KCNA 学習" icon={<SiteLogo />} headingHref={weekHref(1)} />}
+      header={<SideNavHeading heading={SITE_NAME} subheading={SITE_TAGLINE} icon={<SiteLogo />} headingHref={weekHref(1)} />}
       footer={
         <SideNavSection title="このサイト" isHeaderHidden>
           <SideNavItem label="このサイトについて" icon={InformationCircleIcon} href={aboutHref} isSelected={current === 'about'} />

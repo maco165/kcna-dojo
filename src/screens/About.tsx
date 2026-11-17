@@ -12,6 +12,7 @@ import RepoLink, { GitHubMark } from '../components/RepoLink';
 import SiteLogo from '../components/SiteLogo';
 import { NEW_ISSUE_URL, REPO_URL } from '../lib/links';
 import type { Progress } from '../lib/progress';
+import { SITE_NAME, SITE_TAGLINE } from '../lib/site';
 import { WIDE_QUERY, useMediaQuery } from '../lib/useMediaQuery';
 
 
@@ -21,11 +22,14 @@ function Body() {
   return (
     <VStack gap={6}>
       <VStack gap={1}>
-        <Text type="supporting">kcna-dojo</Text>
+        <Text type="supporting">
+          {SITE_NAME} · {SITE_TAGLINE}
+        </Text>
         <h1 className="week-title">このサイトについて</h1>
         <Text type="supporting">
-          KCNA-JP (Kubernetes and Cloud Native Associate 日本語版) の学習サイトです。コマンドや YAML の穴埋め・4 択を週ごとのレッスンで解きます。
+          {SITE_NAME} (クラウドネイティブの略) は、KCNA-JP (Kubernetes and Cloud Native Associate 日本語版) の対策のための、個人が作った非公式の学習サイトです。コマンドや YAML の穴埋め・4 択を週ごとのレッスンで解きます。
         </Text>
+        <Text type="supporting">The Linux Foundation・CNCF とは関係ありません。Kubernetes と KCNA は The Linux Foundation の商標です。</Text>
       </VStack>
 
       <Card padding={4}>
@@ -97,7 +101,7 @@ export default function About({ progress }: { progress: Progress }) {
       <header className="topbar">
         <span className="topbar__brand">
           <SiteLogo />
-          <Text type="large">KCNA 学習</Text>
+          <Text type="large">{SITE_NAME}</Text>
         </span>
         <RepoLink />
       </header>
