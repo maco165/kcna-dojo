@@ -4,12 +4,13 @@ import { Text } from '@astryxdesign/core/Text';
 import type { ReactNode } from 'react';
 import { WIDE_QUERY, useMediaQuery } from '../lib/useMediaQuery';
 
-/** 問題の見出し (種類 · 分野) と問題文 */
-export function QuestionHead({ kind, domain, prompt }: { kind: string; domain: string; prompt: string }) {
+/** 問題の見出し (種類 · 分野 · この問題を解いた記録) と問題文 */
+export function QuestionHead({ kind, domain, prompt, history }: { kind: string; domain: string; prompt: string; history?: string }) {
   return (
     <VStack gap={1.5}>
       <Text type="supporting">
         {kind} · {domain}
+        {history && ` · ${history}`}
       </Text>
       <h1 className="q-title">{prompt}</h1>
     </VStack>

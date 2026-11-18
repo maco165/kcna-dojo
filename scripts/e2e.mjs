@@ -234,6 +234,34 @@ async function run(browser, name, width, height) {
   await page.getByRole('heading', { name: '今日の復習 0 問' }).waitFor();
   check(await page.getByText(/今日の復習はありません。次は/).isVisible(), `${tag} 終えると今日の復習は 0 で、次の予定が出る`);
 
+  // 9b1. 問題ごとの解いた記録: 前に解いた問題には回数と最後の日が、初めての問題には「はじめて」が出る
+  {
+    await page.goto(`${BASE}#/lesson/w1-l1`);
+    await page.getByRole('button', { name: '確かめる' }).waitFor();
+    check(await page.getByText(/これまで \d+ 回 \(正解 \d+・不正解 \d+\) · 最後 \d+\/\d+/).first().isVisible(), `${tag} 前に解いた問題に、解いた回数と最後の日が出る`);
+    await page.goto(`${BASE}#/lesson/w8-l4`);
+    await page.getByRole('button', { name: '確かめる' }).waitFor();
+    check(await page.getByText('はじめて').first().isVisible(), `${tag} 初めての問題には「はじめて」と出る`);
+    // w1-l1 を全問正解で解き直す: 答えても見出しは始めたときのまま、結果の一覧は答えたあと、もう一度解くと 1 回分増える
+    await page.goto(`${BASE}lesson/w1-l1/`);
+    await page.getByRole('button', { name: '確かめる' }).waitFor();
+    const head = () => page.locator('.lesson__main').getByText(/はじめて|これまで \d+ 回/).first().innerText();
+    const times = (t) => Number(t.match(/これまで (\d+) 回/)?.[1] ?? 0);
+    const first = await head();
+    for (const [i, q] of l1.questions.entries()) {
+      await page.getByRole('radio', { name: choiceLabel(q, q.answer) }).check();
+      await page.getByRole('button', { name: '確かめる' }).click();
+      if (i === 0) check((await head()) === first, `${tag} 答えても、見出しの記録は始めたときのまま`);
+      await page.getByRole('button', { name: i === l1.questions.length - 1 ? '結果を見る' : '次へ' }).click();
+    }
+    await page.getByRole('heading', { name: 'レッスン完了' }).waitFor();
+    check(await page.getByText(new RegExp(`これまで ${times(first) + 1} 回`)).first().isVisible(), `${tag} 結果の一覧に、答えたあとの記録が出る`);
+    await page.getByRole('button', { name: 'もう一度解く' }).click();
+    await page.getByRole('button', { name: '確かめる' }).waitFor();
+    check(times(await head()) === times(first) + 1, `${tag} もう一度解くと、1 回目の分を入れた記録が出る (${first} → ${await head()})`);
+    await page.goto(`${BASE}#/review`);
+  }
+
   // 9b2. ランダム出題: 分野と数を選んで始め、1 問答えると記録に入る
   {
     // 答えた回数の合計 (前の手順で答えた問題が選ばれても 1 つ増える)
