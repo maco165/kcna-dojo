@@ -2167,3 +2167,20 @@ body {
 .hb a.hb-term:hover {
   text-decoration-style: solid;
 }
+
+/* ハンドブックの読んだ記録: 目次のカードの末尾と、トピックの続きからの案内 */
+.hb-topic__read {
+  margin-top: auto;
+  padding-top: 8px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.hb-topic__read--done {
+  color: var(--color-text-success);
+  font-weight: 600;
+}
+
+.hb-resume {
+  margin-top: 8px;
+}
