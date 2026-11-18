@@ -33,7 +33,7 @@
     <td width="25%"><img alt="復習: 今日の復習の問題の一覧" src="docs/images/review-phone.png"></td>
     <td width="25%"><img alt="進捗: 試験までの日数・分野ごとの正答率・7 日の XP" src="docs/images/progress-phone.png"></td>
     <td width="25%"><img alt="模擬試験: 残り時間と 1 問ずつの解答" src="docs/images/exam-phone.png"></td>
-    <td width="25%"><img alt="用語集: 検索と用語の説明・仕組みの図・出典・出てくるレッスン" src="docs/images/glossary-phone.png"></td>
+    <td width="25%"><img alt="用語集: 検索と用語の説明・出典・出てくるレッスン" src="docs/images/glossary-phone.png"></td>
   </tr>
   <tr>
     <td>復習。間違えた問題を 1・3・7 日後に出す</td>
