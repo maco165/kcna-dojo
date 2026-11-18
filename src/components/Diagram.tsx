@@ -66,8 +66,15 @@ function edgePoint(n: DiagramNode, toward: Pt, pad = 4): Pt {
   return { x: cx + dx * s, y: cy + dy * s };
 }
 
-/** 箱の色。highlight の用語を表す箱は主役の色にする */
-const toneOf = (n: DiagramNode, highlight?: string) => (highlight !== undefined && n.term === highlight ? 'accent' : n.tone);
+/**
+ * 箱の class。highlight の用語を表す箱は太い枠 (current) で示し、色の無い箱は主役の色にする。
+ * 失敗の箱 (warn) は赤のまま残す (色が意味を持つので、強調で消さない)
+ */
+function nodeClass(n: DiagramNode, highlight?: string): string {
+  const current = highlight !== undefined && n.term === highlight;
+  const tone = current && n.tone !== 'warn' ? 'accent' : n.tone;
+  return ['dg__node', tone && `dg__node--${tone}`, current && 'dg__node--current'].filter(Boolean).join(' ');
+}
 
 export default function Diagram({ spec, id, highlight }: { spec: DiagramSpec; id: string; highlight?: string }) {
   const marker = `arrow-${id}`;
@@ -95,7 +102,7 @@ export default function Diagram({ spec, id, highlight }: { spec: DiagramSpec; id
           ))}
           {spec.nodes.map((n) => (
             <g key={n.id}>
-              <rect x={n.x} y={n.y} width={n.w} height={n.h} rx="8" className={`dg__node${toneOf(n, highlight) ? ` dg__node--${toneOf(n, highlight)}` : ''}`} />
+              <rect x={n.x} y={n.y} width={n.w} height={n.h} rx="8" className={nodeClass(n, highlight)} />
               <text x={n.x + n.w / 2} y={n.y + (n.sub ? n.h / 2 - 3 : n.h / 2 + 5)} textAnchor="middle" className="dg__label">
                 {n.label}
               </text>

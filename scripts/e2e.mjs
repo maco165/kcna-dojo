@@ -613,7 +613,7 @@ async function run(browser, name, width, height) {
       // 用語の図: 見ている語の箱だけを主役の色にする
       const fig = page.locator('#gloss-pane .gloss-detail__figure');
       check(await fig.locator('svg').isVisible(), `${tag} 用語集の語に図が出る`);
-      const lit = await fig.locator('.dg__node--accent').evaluateAll((els) => els.map((el) => el.parentElement.querySelector('.dg__label')?.textContent));
+      const lit = await fig.locator('.dg__node--current').evaluateAll((els) => els.map((el) => el.parentElement.querySelector('.dg__label')?.textContent));
       check(lit.length >= 1 && lit.every((t) => t === 'etcd'), `${tag} 図では見ている語 (etcd) の箱が強調される (${lit.join('・')})`);
     } else {
       const head = page.locator('#gloss-row-etcd button[aria-expanded]');

@@ -73,6 +73,7 @@ function Detail({ t, large }: { t: Entry; large?: boolean }) {
         </p>
       ))}
       {figure && (
+        {/* 図は図の幅まで (小さい図を引き伸ばさない)。図のデータの width は 640 以下で、欄の幅に収まる */}
         <div className="gloss-detail__figure" style={{ maxWidth: figure.spec.width }}>
           <Diagram spec={figure.spec} id={`gloss-${figure.id}`} highlight={t.id} />
         </div>

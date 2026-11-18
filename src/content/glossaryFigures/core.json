@@ -146,7 +146,7 @@
    "k3s"
   ],
   "spec": {
-   "caption": "k3s server はコントロールプレーンの部品を 1 つのバイナリにまとめ、containerd・Flannel・CoreDNS・Traefik を同梱し、データは既定で sqlite3 に置きます。k3s agent を動かすホストがエージェントとして加わります。",
+   "caption": "k3s server はコントロールプレーンの部品を 1 つのバイナリにまとめ、containerd・Flannel・CoreDNS・Traefik を同梱し、データは既定で sqlite3 に置きます。k3s agent を動かすホストがエージェントとして加わります。agent も同じバイナリで containerd と Flannel を動かします。",
    "width": 640,
    "height": 200,
    "nodes": [
@@ -343,9 +343,9 @@
     },
     {
      "id": "cm",
-     "x": 444,
+     "x": 434,
      "y": 166,
-     "w": 180,
+     "w": 196,
      "h": 52,
      "label": "kube-controller-manager",
      "sub": "望む状態に近づける",
@@ -416,7 +416,7 @@
      "id": "cp",
      "x": 10,
      "y": 110,
-     "w": 150,
+     "w": 160,
      "h": 60,
      "label": "コントロールプレーン",
      "sub": "司令塔",
@@ -475,9 +475,9 @@
    ],
    "edges": [
     {
-     "from": "cp",
-     "to": "kubelet",
-     "label": "Pod の中身",
+     "from": "kubelet",
+     "to": "cp",
+     "label": "Pod の割り当てを見る",
      "fromSide": "top",
      "toSide": "left"
     },
@@ -736,9 +736,9 @@
     },
     {
      "id": "roll",
-     "x": 240,
+     "x": 230,
      "y": 120,
-     "w": 160,
+     "w": 180,
      "h": 52,
      "label": "ローリングアップデート",
      "sub": "止めずに入れ替え",
@@ -813,7 +813,7 @@
    "daemonset"
   ],
   "spec": {
-   "caption": "StatefulSet は Pod に web-0・web-1 のような変わらない名前と、Pod ごとの保存先を持たせます。DaemonSet は各ノードに Pod を 1 つずつ置き、ノードが加わるとそのノードにも足します。",
+   "caption": "StatefulSet は Pod に web-0・web-1 のような変わらない名前を付け、volumeClaimTemplates を書くと Pod ごとの PVC (www-web-0 など) も作ります。DaemonSet は各ノードに Pod を 1 つずつ置き、ノードが加わるとそのノードにも足します。",
    "width": 640,
    "height": 300,
    "nodes": [
@@ -824,7 +824,7 @@
      "w": 180,
      "h": 52,
      "label": "StatefulSet",
-     "sub": "名前と保存先が固定",
+     "sub": "Pod の名前が固定",
      "term": "statefulset"
     },
     {
@@ -834,7 +834,7 @@
      "w": 140,
      "h": 52,
      "label": "Pod web-0",
-     "sub": "専用の PVC"
+     "sub": "PVC www-web-0"
     },
     {
      "id": "web1",
@@ -843,7 +843,7 @@
      "w": 140,
      "h": 52,
      "label": "Pod web-1",
-     "sub": "専用の PVC"
+     "sub": "PVC www-web-1"
     },
     {
      "id": "ds",
@@ -1162,7 +1162,8 @@
     {
      "from": "sel",
      "to": "p3",
-     "dashed": true
+     "dashed": true,
+     "label": "選ばない"
     }
    ]
   }
@@ -1454,7 +1455,7 @@
     {
      "from": "pending",
      "to": "ca",
-     "label": "見つける"
+     "label": "CA が見つける"
     }
    ]
   }
@@ -1613,8 +1614,9 @@
      "y": 30,
      "w": 160,
      "h": 52,
-     "label": "満杯のノード",
-     "tone": "muted"
+     "label": "ノード N",
+     "tone": "muted",
+     "sub": "低い Pod が退くと空く"
     },
     {
      "id": "low",
@@ -1623,7 +1625,7 @@
      "w": 160,
      "h": 52,
      "label": "優先度の低い Pod",
-     "sub": "追い出される",
+     "sub": "ノード N から退く",
      "tone": "warn"
     }
    ],
@@ -1651,7 +1653,7 @@
     {
      "from": "sched",
      "to": "node",
-     "label": "置く"
+     "label": "空いたら置く"
     }
    ]
   }
