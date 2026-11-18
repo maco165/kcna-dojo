@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { CodeBlock } from '@astryxdesign/core/CodeBlock';
 import { RadioList, RadioListItem } from '@astryxdesign/core/RadioList';
 import { VStack } from '@astryxdesign/core/Stack';
@@ -7,6 +7,7 @@ import { gradeChoice } from '../lib/grade';
 import AskAi from './AskAi';
 import Feedback from './Feedback';
 import { ActionArea, PrimaryAction, QuestionHead } from './QuestionFrame';
+import { preloadNotes } from '../lib/preloadNotes';
 
 export default function ChoiceQuestionView({
   question,
@@ -24,6 +25,8 @@ export default function ChoiceQuestionView({
   /** この問題を解いた記録の 1 行 (このレッスンを始めたときのもの) */
   history?: string;
 }) {
+  // 答えたあとに出すコマンドの説明を、問題を開いたときに先に読む (答えてから読むと「次へ」が下へずれる)
+  useEffect(preloadNotes, []);
   const [value, setValue] = useState('');
   const [result, setResult] = useState<boolean | null>(null);
   const checked = result !== null;
@@ -66,6 +69,7 @@ export default function ChoiceQuestionView({
               explanation={question.explanation}
               note={result ? undefined : picked?.why}
               source={question.source}
+              question={question}
             />
             <PrimaryAction label={nextLabel} onClick={onNext} />
             <AskAi question={question} answered={{ picked: value, correct: result }} />
