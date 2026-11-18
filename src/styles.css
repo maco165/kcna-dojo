@@ -2370,6 +2370,68 @@ html[data-loading='true'] body::before {
 }
 
 .cmp-card__lead {
+/* 答えたあとの「出てきたコマンド」。解説の下に、静かな枠で畳める形で出す */
+.cmd-notes {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-container);
+  background: var(--color-background-card);
+  padding: 12px 16px;
+}
+
+.cmd-notes__summary {
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.cmd-notes__list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.cmd-note {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 40em;
+}
+
+.cmd-note + .cmd-note {
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border);
+}
+
+.cmd-note p {
+  margin: 0;
+}
+
+.cmd-note code {
+  font-family: var(--font-family-code, 'SF Mono', Monaco, Consolas, monospace);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.cmd-note__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  line-height: 1.6;
+}
+
+.cmd-note__name {
+  padding: 0 6px;
+  border-radius: 6px;
+  background: var(--color-background-muted);
+  font-weight: 600;
+}
+
+.cmd-note__detail {
   font-size: 14px;
   line-height: 1.7;
   color: var(--color-text-secondary);
@@ -2421,6 +2483,42 @@ html[data-loading='true'] body::before {
 }
 
 .cmp-section {
+.cmd-note__row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 14px;
+}
+
+.cmd-note__label {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.cmd-note__flags {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cmd-note__flags div {
+  display: grid;
+  grid-template-columns: minmax(6em, max-content) 1fr;
+  gap: 12px;
+}
+
+.cmd-note__flags dd {
+  margin: 0;
+  line-height: 1.6;
+}
+
+.cmd-note__source {
+  font-size: 13px;
+}
+
+/* 答えたあとの「読み直す」。ハンドブックと用語集への札を、ラベルと並べる */
+.read-more {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -2440,4 +2538,26 @@ html[data-loading='true'] body::before {
   display: flex;
   flex-direction: column;
   gap: 6px;
+.read-more__title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.read-more__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+}
+
+.read-more__label {
+  /* ラベルは札の上に置く (札が折り返しても揃う) */
+  flex: 0 0 100%;
+.cmd-note__absent {
+  padding: 0 6px;
+  border-radius: 6px;
+  border: 1px dashed var(--color-border-emphasized);
+  font-size: 12px;
+  color: var(--color-text-secondary);
 }

@@ -1,0 +1,918 @@
+{
+  "tools": [
+    {
+      "tool": "kubectl",
+      "globalFlags": [
+        {
+          "flags": [
+            "-n",
+            "--namespace"
+          ],
+          "text": "この操作の対象にする名前空間を指定する"
+        },
+        {
+          "flags": [
+            "--as"
+          ],
+          "text": "指定したユーザーやサービスアカウント (system:serviceaccount:<名前空間>:<名前>) になりきって操作する"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl/"
+    },
+    {
+      "tool": "etcdctl",
+      "globalFlags": [
+        {
+          "flags": [
+            "--endpoints"
+          ],
+          "text": "つなぐ etcd のメンバーの宛先 (gRPC)。複数はコンマで区切る。省くと 127.0.0.1:2379"
+        }
+      ],
+      "source": "https://github.com/etcd-io/etcd/blob/main/etcdctl/README.md"
+    }
+  ],
+  "commands": [
+    {
+      "id": "kubectl-get",
+      "command": "kubectl get",
+      "summary": "リソースの一覧や状態を表で表示します。",
+      "detail": "Pod・Node・Service など種類を指定して、主な情報を 1 行ずつ出します。名前を付けるとその 1 つだけを出します。名前空間に属する種類 (Pod・Service など) は、名前空間を指定しないと今の名前空間の分だけが出ます。",
+      "usage": "kubectl get <種類> [名前] [オプション]",
+      "flags": [
+        {
+          "flags": [
+            "-o",
+            "--output"
+          ],
+          "text": "出力の形を選ぶ (wide で列を増やす、yaml・json で全項目、jsonpath で一部の項目だけ)"
+        },
+        {
+          "flags": [
+            "-l",
+            "--selector"
+          ],
+          "text": "ラベルで絞り込む (=・!=・in・notin が使える。例: -l app=nginx)"
+        },
+        {
+          "flags": [
+            "-A",
+            "--all-namespaces"
+          ],
+          "text": "すべての名前空間のものを出す"
+        },
+        {
+          "flags": [
+            "--show-labels"
+          ],
+          "text": "最後の列に、付いているラベルをすべて出す"
+        },
+        {
+          "flags": [
+            "--field-selector"
+          ],
+          "text": "項目の値で絞り込む (例: status.phase!=Running。使える項目は種類ごとに限られる)"
+        },
+        {
+          "flags": [
+            "--raw"
+          ],
+          "text": "API サーバーの URI (例: /metrics) をそのまま取りに行き、返事を出す"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_get/"
+    },
+    {
+      "id": "kubectl-describe",
+      "command": "kubectl describe",
+      "summary": "リソースの詳しい情報を、関係するイベントと一緒に表示します。",
+      "detail": "get より詳しく、状態・設定・最近のイベントを人が読みやすい形で出します。Pod が起動しない理由 (イメージを取れない、置ける Node が無いなど) を調べるときにまず使います。",
+      "usage": "kubectl describe <種類> [名前] [オプション]",
+      "flags": [
+        {
+          "flags": [
+            "--output-directory"
+          ],
+          "text": "describe にこの指定はありません (ファイルに書き出すのは kubectl cluster-info dump の --output-directory)",
+          "absent": true
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_describe/"
+    },
+    {
+      "id": "kubectl-apply",
+      "command": "kubectl apply",
+      "summary": "ファイルに書いた設定をクラスタに反映します。",
+      "detail": "まだ無ければ作り、あれば違うところだけを書き換えます。同じファイルを何度当てても結果が同じになるので、宣言的な管理 (GitOps など) の基本になります。",
+      "usage": "kubectl apply (-f <ファイルかフォルダ> | -k <フォルダ>) [オプション]",
+      "flags": [
+        {
+          "flags": [
+            "-f",
+            "--filename"
+          ],
+          "text": "反映する設定のファイル・フォルダ・URL を指定する"
+        },
+        {
+          "flags": [
+            "-k",
+            "--kustomize"
+          ],
+          "text": "kustomization.yaml のあるフォルダを Kustomize で組み立ててから反映する (-f とは一緒に使えない)"
+        },
+        {
+          "flags": [
+            "--dry-run"
+          ],
+          "text": "実際には変えずに試す。server は API サーバーで検査まで通して保存しない、client は送る内容を表示するだけ (既定は none)"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_apply/"
+    },
+    {
+      "id": "kubectl-logs",
+      "command": "kubectl logs",
+      "summary": "Pod の中のコンテナが出したログを表示します。",
+      "detail": "コンテナが 1 つだけならコンテナ名は省けます。再起動を繰り返す Pod (CrashLoopBackOff) では、今のコンテナはまだ何も出していないことが多いので、--previous で落ちる前のログを見ます。",
+      "usage": "kubectl logs <Pod 名 | 種類/名前> [-c <コンテナ名>] [オプション]",
+      "flags": [
+        {
+          "flags": [
+            "-p",
+            "--previous"
+          ],
+          "text": "一つ前に動いていた (落ちた) コンテナのログを出す"
+        },
+        {
+          "flags": [
+            "-c",
+            "--container"
+          ],
+          "text": "Pod に複数のコンテナがあるとき、ログを見るコンテナを選ぶ"
+        },
+        {
+          "flags": [
+            "--all-containers"
+          ],
+          "text": "Pod の中のすべてのコンテナのログを出す"
+        },
+        {
+          "flags": [
+            "--timestamps"
+          ],
+          "text": "各行の先頭に時刻を付ける"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_logs/"
+    },
+    {
+      "id": "kubectl-delete",
+      "command": "kubectl delete",
+      "summary": "リソースを削除します。",
+      "detail": "名前・ファイル・ラベルで消すものを指定します。Deployment を消すと、既定では持ち主の消えた ReplicaSet と Pod も後から消されます。Pod だけを消しても、Deployment などが管理していれば新しい Pod がまた作られます。",
+      "usage": "kubectl delete (<種類> <名前> | -f <ファイル> | <種類> -l <ラベル>) [オプション]",
+      "flags": [
+        {
+          "flags": [
+            "--cascade"
+          ],
+          "text": "持ち物 (Deployment の Pod など) の消し方を選ぶ。background (既定) は先に本体を消して後から持ち物を消す、foreground は持ち物を消し終えてから本体を消す、orphan は持ち物を残す"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_delete/",
+      "refs": [
+        {
+          "label": "Garbage Collection (--cascade)",
+          "url": "https://kubernetes.io/docs/concepts/architecture/garbage-collection/"
+        }
+      ]
+    },
+    {
+      "id": "kubectl-exec",
+      "command": "kubectl exec",
+      "summary": "動いているコンテナの中でコマンドを実行します。",
+      "detail": "-- の後ろに、コンテナの中で動かすコマンドを書きます。-it を付けると、sh などを開いて手で操作できます。コンテナにそのコマンドが入っていないと動きません。",
+      "usage": "kubectl exec <Pod 名 | 種類/名前> [-c <コンテナ名>] [オプション] -- <コマンド> [引数...]",
+      "flags": [
+        {
+          "flags": [
+            "-it"
+          ],
+          "text": "-i (--stdin) と -t (--tty) をまとめた形。キーボードの入力をコンテナに渡し、端末として操作できるようにする"
+        },
+        {
+          "flags": [
+            "-c",
+            "--container"
+          ],
+          "text": "Pod に複数のコンテナがあるとき、どのコンテナで動かすかを選ぶ (省くと既定のコンテナか最初のコンテナ)"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_exec/"
+    },
+    {
+      "id": "kubectl-auth-can-i",
+      "command": "kubectl auth can-i",
+      "summary": "ある操作が許可されているかを yes / no で確かめます。",
+      "detail": "「動詞 種類」の形で聞きます (例: list pods)。RBAC の設定が思いどおりか確かめるときに使い、--as で別のユーザーやサービスアカウントになりきって聞けます。",
+      "usage": "kubectl auth can-i <動詞> [<種類> | <種類>/<名前> | <URL>] [オプション]",
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_auth/kubectl_auth_can-i/"
+    },
+    {
+      "id": "kubectl-top",
+      "command": "kubectl top",
+      "summary": "Node や Pod の CPU・メモリの使用量を表示します。",
+      "detail": "kubectl top node と kubectl top pod の 2 つがあります。値はクラスタに入れた Metrics Server から取るので、Metrics Server が無いと動きません。数字は自動スケールの判断向けで、OS の top とは一致しないことがあります。",
+      "usage": "kubectl top (node | pod) [名前 | -l <ラベル>] [オプション]",
+      "flags": [
+        {
+          "flags": [
+            "-A",
+            "--all-namespaces"
+          ],
+          "text": "(top pod で) すべての名前空間の Pod を出す"
+        },
+        {
+          "flags": [
+            "--sort-by"
+          ],
+          "text": "cpu か memory を指定して、その使用量の順に並べる"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_top/kubectl_top_pod/",
+      "refs": [
+        {
+          "label": "kubectl top",
+          "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_top/"
+        }
+      ]
+    },
+    {
+      "id": "kubectl-create-job",
+      "command": "kubectl create job",
+      "summary": "Job を 1 つ作ります。",
+      "detail": "--from=cronjob/<名前> を付けると、CronJob の設定を元に Job をすぐ 1 回作れます。予定の時刻を待たずに試したいときに使います。",
+      "usage": "kubectl create job <名前> (--image=<イメージ> | --from=cronjob/<名前>) [オプション] [-- <コマンド> [引数...]]",
+      "flags": [
+        {
+          "flags": [
+            "--from"
+          ],
+          "text": "元にするリソースを指定する (使えるのは CronJob だけ。例: --from=cronjob/hello)"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_create/kubectl_create_job/"
+    },
+    {
+      "id": "kubectl-create-secret-generic",
+      "command": "kubectl create secret generic",
+      "summary": "キーと値を入れた Secret を作ります。",
+      "detail": "値はファイル・フォルダ・コマンドに直接書いた文字から入れられます。Secret の値は Base64 で符号化されるだけで暗号化ではなく、既定では etcd にも暗号化されずに保存されます (保存時の暗号化は別に設定します)。",
+      "usage": "kubectl create secret generic <名前> [--from-file=[キー=]<ファイル>] [--from-literal=<キー>=<値>] [オプション]",
+      "flags": [
+        {
+          "flags": [
+            "--from-literal"
+          ],
+          "text": "入れるキーと値をコマンドに直接書く (例: --from-literal=password=xxx)"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_create/kubectl_create_secret_generic/",
+      "refs": [
+        {
+          "label": "Secrets",
+          "url": "https://kubernetes.io/docs/concepts/configuration/secret/"
+        }
+      ]
+    },
+    {
+      "id": "kubectl-create-secret-docker-registry",
+      "command": "kubectl create secret docker-registry",
+      "summary": "コンテナレジストリにログインするための Secret を作ります。",
+      "detail": "認証の要るレジストリからイメージを取るときに使います。作った Secret を Pod の imagePullSecrets かサービスアカウントに付けると、Node がその情報でイメージを取れます。imagePullSecrets に書ける Secret は、Pod と同じ名前空間にあるものだけです。",
+      "usage": "kubectl create secret docker-registry <名前> [--docker-server=<サーバー>] --docker-username=<ユーザー> --docker-password=<パスワード> [オプション]",
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_create/kubectl_create_secret_docker-registry/",
+      "refs": [
+        {
+          "label": "Images (imagePullSecrets と名前空間)",
+          "url": "https://kubernetes.io/docs/concepts/containers/images/"
+        }
+      ]
+    },
+    {
+      "id": "kubectl-create-rolebinding",
+      "command": "kubectl create rolebinding",
+      "summary": "Role か ClusterRole を、ユーザーやサービスアカウントに結び付けます。",
+      "detail": "RoleBinding は 1 つの名前空間の中だけで効きます。ClusterRole を指定しても、権限が及ぶのはその名前空間の中だけです。",
+      "usage": "kubectl create rolebinding <名前> (--clusterrole=<名前> | --role=<名前>) [--user=<ユーザー>] [--serviceaccount=<名前空間>:<名前>] [オプション]",
+      "flags": [
+        {
+          "flags": [
+            "--clusterrole"
+          ],
+          "text": "結び付ける ClusterRole の名前 (例: view)"
+        },
+        {
+          "flags": [
+            "--serviceaccount"
+          ],
+          "text": "権限を渡すサービスアカウントを <名前空間>:<名前> の形で指定する"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_create/kubectl_create_rolebinding/",
+      "refs": [
+        {
+          "label": "Using RBAC Authorization",
+          "url": "https://kubernetes.io/docs/reference/access-authn-authz/rbac/"
+        }
+      ]
+    },
+    {
+      "id": "kubectl-events",
+      "command": "kubectl events",
+      "summary": "イベント (何が起きたかの記録) を一覧で表示します。",
+      "detail": "--for で特定のリソースに関するものだけに絞れます。イメージを取れない・置ける Node が無いなど、Pod が動かない理由の手がかりになります。",
+      "usage": "kubectl events [--for <種類>/<名前>] [--types=Normal,Warning] [オプション]",
+      "flags": [
+        {
+          "flags": [
+            "--for"
+          ],
+          "text": "指定したリソース (例: pod/web) に関するイベントだけを出す"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_events/"
+    },
+    {
+      "id": "kubectl-debug",
+      "command": "kubectl debug",
+      "summary": "調べるためのコンテナを付けたり、Pod の写しを作ったりします。",
+      "detail": "動いている Pod に一時的なコンテナ (エフェメラルコンテナ) を足す、設定を変えた Pod の写しを作る、Node のファイルを見られる Pod を作る、の 3 つができます。中にシェルなどの道具が無いイメージを調べるときに使います。",
+      "usage": "kubectl debug (<Pod 名> | <種類>/<名前>) [オプション] [-- <コマンド> [引数...]]",
+      "flags": [
+        {
+          "flags": [
+            "-it"
+          ],
+          "text": "-i (--stdin) と -t (--tty) をまとめた形。入力を開いたままにし、端末を割り当てて手で操作できるようにする"
+        },
+        {
+          "flags": [
+            "--image"
+          ],
+          "text": "調べるためのコンテナに使うイメージ (例: busybox)"
+        },
+        {
+          "flags": [
+            "--target"
+          ],
+          "text": "一時的なコンテナから、この名前のコンテナのプロセスを見られるようにする"
+        },
+        {
+          "flags": [
+            "--copy-to"
+          ],
+          "text": "元の Pod は変えず、この名前で Pod の写しを作って調べる"
+        },
+        {
+          "flags": [
+            "-c",
+            "--container"
+          ],
+          "text": "調べるためのコンテナの名前。--copy-to と一緒に元からあるコンテナの名前を指定すると、写しの中のそのコンテナのコマンドを -- の後ろのものに替える"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_debug/"
+    },
+    {
+      "id": "kubectl-taint",
+      "command": "kubectl taint",
+      "summary": "Node にテイント (Pod を置かせない印) を付けます。",
+      "detail": "キー=値:効果 の形で書きます。効果は NoSchedule (新しい Pod を置かない)・PreferNoSchedule (なるべく置かない)・NoExecute (置かず、動いている Pod も追い出す) の 3 つです。NoSchedule と NoExecute では、合う容認 (toleration) を持つ Pod だけが置けます。PreferNoSchedule はなるべく避けるだけで、置かれることもあります。",
+      "usage": "kubectl taint nodes <Node 名> <キー>=<値>:<効果> [オプション]",
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_taint/"
+    },
+    {
+      "id": "kubectl-set-image",
+      "command": "kubectl set image",
+      "summary": "Deployment などのコンテナのイメージを差し替えます。",
+      "detail": "<コンテナ名>=<イメージ> の形で書きます。Deployment で変えると、新しいイメージの Pod に順に入れ替わるロールアウトが始まります。",
+      "usage": "kubectl set image (<種類> <名前> | <種類>/<名前>) <コンテナ名>=<イメージ> ... [オプション]",
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_set/kubectl_set_image/"
+    },
+    {
+      "id": "kubectl-port-forward",
+      "command": "kubectl port-forward",
+      "summary": "手元のポートを Pod のポートにつなぎます。",
+      "detail": "<手元のポート>:<Pod のポート> の形で書きます。Service を外に出さずに、手元から Pod に届くか試すときに使います。つないだ Pod が止まると転送も終わります。",
+      "usage": "kubectl port-forward <種類>/<名前> [<手元のポート>:]<Pod のポート> [オプション]",
+      "flags": [
+        {
+          "flags": [
+            "--address"
+          ],
+          "text": "手元で待ち受けるアドレス (既定は localhost。IP アドレスか localhost だけを書ける)"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_port-forward/"
+    },
+    {
+      "id": "kubectl-label",
+      "command": "kubectl label",
+      "summary": "リソースにラベルを付けたり、書き換えたりします。",
+      "detail": "<キー>=<値> の形で書き、キーの後ろに - を付けると外せます。すでにあるキーの値を変えるときは --overwrite が要ります。",
+      "usage": "kubectl label <種類> <名前> <キー>=<値> ... [オプション]",
+      "flags": [
+        {
+          "flags": [
+            "--overwrite"
+          ],
+          "text": "すでに付いているラベルの値を書き換えてよいとする (無いと書き換えはエラーになる)"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_label/"
+    },
+    {
+      "id": "kubectl-explain",
+      "command": "kubectl explain",
+      "summary": "リソースの項目の意味と構造を表示します。",
+      "detail": "pods.spec.containers のように . でたどって、その項目の説明と型を出します。API サーバーから取るので、今のクラスタの版に合った説明になります。マニフェストを書くときの辞書として使います。",
+      "usage": "kubectl explain <種類>[.<項目>...] [オプション]",
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_explain/"
+    },
+    {
+      "id": "kubectl-cluster-info",
+      "command": "kubectl cluster-info",
+      "summary": "コントロールプレーンと主なサービスのアドレスを表示します。",
+      "detail": "kubectl がどのクラスタにつながっているかを確かめるときに使います。もっと詳しく調べるときは kubectl cluster-info dump を使います。",
+      "usage": "kubectl cluster-info [オプション]",
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_cluster-info/"
+    },
+    {
+      "id": "kubectl-cluster-info-dump",
+      "command": "kubectl cluster-info dump",
+      "summary": "クラスタの状態とログをまとめて書き出します。",
+      "detail": "既定では画面に出します。調べる対象は既定で今の名前空間と kube-system で、Pod のログも含みます。障害の調査のために状態を丸ごと残したいときに使います。",
+      "usage": "kubectl cluster-info dump [オプション]",
+      "flags": [
+        {
+          "flags": [
+            "--output-directory"
+          ],
+          "text": "書き出すフォルダ。指定するとその中にファイルを分けて書き出す (省くと画面に出す)"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_cluster-info/kubectl_cluster-info_dump/"
+    },
+    {
+      "id": "kubectl-autoscale",
+      "command": "kubectl autoscale",
+      "summary": "Pod の数を自動で増減させる HorizontalPodAutoscaler を作ります。",
+      "detail": "Deployment などを指定し、最小・最大の数と目標の使用率を決めます。使用率は Pod の requests に対する割合なので、requests が無いと計算できません。",
+      "usage": "kubectl autoscale (<種類> <名前> | <種類>/<名前>) [--min=<最小>] --max=<最大> [--cpu=<目標>] [--memory=<目標>] [オプション]",
+      "flags": [
+        {
+          "flags": [
+            "--min"
+          ],
+          "text": "Pod の数の下限 (省くとサーバーの既定値)"
+        },
+        {
+          "flags": [
+            "--max"
+          ],
+          "text": "Pod の数の上限 (必ず指定する)"
+        },
+        {
+          "flags": [
+            "--cpu"
+          ],
+          "text": "CPU の目標。50% のように割合で書くと requests に対する平均の使用率、500m のように量で書くと平均の使用量を目標にする"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_autoscale/"
+    },
+    {
+      "id": "kubectl-scale",
+      "command": "kubectl scale",
+      "summary": "Deployment などの Pod の数 (replicas) を変えます。",
+      "detail": "その場で数を変えるだけなので、マニフェストのファイルの replicas は変わりません。0 にすると Deployment は残したまま Pod を全部止められます。",
+      "usage": "kubectl scale (<種類> <名前> | -f <ファイル>) --replicas=<数> [オプション]",
+      "flags": [
+        {
+          "flags": [
+            "--replicas"
+          ],
+          "text": "新しい Pod の数 (必ず指定する)"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_scale/"
+    },
+    {
+      "id": "kubectl-run",
+      "command": "kubectl run",
+      "summary": "イメージを指定して Pod を 1 つ作り、動かします。",
+      "detail": "Deployment ではなく Pod を 1 つだけ作ります。--rm と -it を付けると、使い捨ての Pod でクラスタの中から通信を試せます。",
+      "usage": "kubectl run <名前> --image=<イメージ> [オプション] [-- <コマンド> [引数...]]",
+      "flags": [
+        {
+          "flags": [
+            "--image"
+          ],
+          "text": "コンテナに使うイメージ"
+        },
+        {
+          "flags": [
+            "--rm"
+          ],
+          "text": "終わったら Pod を消す (-i などで画面につないでいるときだけ使える)"
+        },
+        {
+          "flags": [
+            "-it"
+          ],
+          "text": "-i (--stdin) と -t (--tty) をまとめた形。入力を開いたままにし、端末を割り当てて手で操作できるようにする"
+        },
+        {
+          "flags": [
+            "--restart"
+          ],
+          "text": "再起動の方針 (Always・OnFailure・Never。既定は Always)。Never で 1 回だけ動かす"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_run/"
+    },
+    {
+      "id": "kubectl-kustomize",
+      "command": "kubectl kustomize",
+      "summary": "kustomization.yaml を元に、マニフェストを組み立てて表示します。",
+      "detail": "組み立てた結果を出す (既定は画面、-o でファイル) だけで、クラスタには反映しません。反映するときは kubectl apply -k を使います。",
+      "usage": "kubectl kustomize <フォルダ> [オプション]",
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_kustomize/"
+    },
+    {
+      "id": "kubectl-expose",
+      "command": "kubectl expose",
+      "summary": "Deployment や Pod を、新しい Service として公開します。",
+      "detail": "元のリソースのセレクタをそのまま Service のセレクタに使います。--port は Service が受けるポート、--target-port は通信を渡すコンテナのポートです。",
+      "usage": "kubectl expose (<種類> <名前> | -f <ファイル>) [--port=<ポート>] [--target-port=<ポート>] [--type=<種類>] [オプション]",
+      "flags": [
+        {
+          "flags": [
+            "--port"
+          ],
+          "text": "Service が受けるポート (省くと元のリソースのポートを使う)"
+        },
+        {
+          "flags": [
+            "--target-port"
+          ],
+          "text": "通信を渡す先の、コンテナのポートの番号か名前"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_expose/"
+    },
+    {
+      "id": "kubectl-edit",
+      "command": "kubectl edit",
+      "summary": "クラスタにあるリソースを、エディタで開いて直接書き換えます。",
+      "detail": "保存するとすぐに反映されます。手元のマニフェストのファイルは変わらないので、ファイルと実物がずれる原因になります。",
+      "usage": "kubectl edit (<種類> <名前> | <種類>/<名前>) [オプション]",
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_edit/"
+    },
+    {
+      "id": "kubectl-drain",
+      "command": "kubectl drain",
+      "summary": "保守の前に、Node から Pod を退かせます。",
+      "detail": "Node に新しい Pod を置かない印を付けてから、Pod を退去させます。DaemonSet の Pod があると --ignore-daemonsets なしでは進みません。作業が終わったら kubectl uncordon で戻します。",
+      "usage": "kubectl drain <Node 名> [オプション]",
+      "flags": [
+        {
+          "flags": [
+            "--ignore-daemonsets"
+          ],
+          "text": "DaemonSet が管理する Pod は気にせず進める (それらの Pod は消さない)"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_drain/"
+    },
+    {
+      "id": "kubectl-diff",
+      "command": "kubectl diff",
+      "summary": "反映したら何が変わるかを、今の状態と比べて表示します。",
+      "detail": "kubectl apply の前に、変わるところを確かめるために使います。差が無ければ終了コード 0、差があれば 1 を返します。",
+      "usage": "kubectl diff -f <ファイルかフォルダ> [オプション]",
+      "flags": [
+        {
+          "flags": [
+            "-f",
+            "--filename"
+          ],
+          "text": "比べる設定のファイル・フォルダ・URL を指定する"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_diff/"
+    },
+    {
+      "id": "kubectl-config-use-context",
+      "command": "kubectl config use-context",
+      "summary": "kubectl が使うコンテキスト (接続先) を切り替えます。",
+      "detail": "kubeconfig の current-context を書き換えます。コンテキストはクラスタ・ユーザー・名前空間の組で、複数のクラスタを使い分けるときに使います。",
+      "usage": "kubectl config use-context <コンテキスト名>",
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_config/kubectl_config_use-context/"
+    },
+    {
+      "id": "kubectl-attach",
+      "command": "kubectl attach",
+      "summary": "コンテナの中ですでに動いているプロセスにつなぎます。",
+      "detail": "exec と違い、新しいコマンドは動かさず、今動いているメインのプロセスの入出力につなぎます。",
+      "usage": "kubectl attach (<Pod 名> | <種類>/<名前>) [-c <コンテナ名>] [オプション]",
+      "flags": [
+        {
+          "flags": [
+            "-it"
+          ],
+          "text": "-i (--stdin) と -t (--tty) をまとめた形。入力をコンテナに渡し、端末として扱う"
+        },
+        {
+          "flags": [
+            "-c",
+            "--container"
+          ],
+          "text": "つなぐコンテナの名前 (省くと既定のコンテナか最初のコンテナ)"
+        },
+        {
+          "flags": [
+            "--pod-running-timeout"
+          ],
+          "text": "Pod が動き出すまで待つ時間 (例: 2m。既定は 1 分)"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_attach/"
+    },
+    {
+      "id": "kubectl-api-resources",
+      "command": "kubectl api-resources",
+      "summary": "クラスタで使えるリソースの種類を一覧で表示します。",
+      "detail": "NAME (種類の名前)・SHORTNAMES (短い名前、po など)・APIVERSION (API グループと版、例: apps/v1)・NAMESPACED (名前空間に属するか)・KIND の列が出ます。get や explain に書く種類の名前を調べるときに使います。",
+      "usage": "kubectl api-resources [オプション]",
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_api-resources/",
+      "refs": [
+        {
+          "label": "kubectl の実装 (apiresources.go の列)",
+          "url": "https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/cmd/apiresources/apiresources.go"
+        }
+      ]
+    },
+    {
+      "id": "kubectl-rollout-status",
+      "command": "kubectl rollout status",
+      "summary": "ロールアウト (Pod の入れ替え) の進み具合を表示します。",
+      "detail": "既定では、最新のロールアウトが終わるまで見続けます。終わるのを待たないときは --watch=false を付けます。",
+      "usage": "kubectl rollout status (<種類> <名前> | <種類>/<名前>) [オプション]",
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_rollout/kubectl_rollout_status/"
+    },
+    {
+      "id": "kubectl-rollout-undo",
+      "command": "kubectl rollout undo",
+      "summary": "一つ前の版に戻します (ロールバック)。",
+      "detail": "新しい版で問題が出たときに使います。--to-revision で戻す版を選べます。戻すのも新しいロールアウトとして記録されます。",
+      "usage": "kubectl rollout undo (<種類> <名前> | <種類>/<名前>) [オプション]",
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_rollout/kubectl_rollout_undo/"
+    },
+    {
+      "id": "kubectl-rollout-restart",
+      "command": "kubectl rollout restart",
+      "summary": "Deployment などの Pod を、順に作り直します。",
+      "detail": "設定は変えずに Pod だけを入れ替えたいとき (ConfigMap を変えた後など) に使います。入れ替えはロールアウトとして記録され、rollout status で進み具合を見られます。",
+      "usage": "kubectl rollout restart <種類>/<名前> [オプション]",
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_rollout/kubectl_rollout_restart/"
+    },
+    {
+      "id": "helm-install",
+      "command": "helm install",
+      "summary": "チャートを入れて、新しいリリースを作ります。",
+      "detail": "リリース名とチャート (リポジトリのチャート・.tgz・展開したフォルダ・URL) を渡します。入れるとリビジョン 1 から履歴が始まります。既にあるリリースを変えるときは helm upgrade を使います。",
+      "usage": "helm install <リリース名> <チャート> [オプション]",
+      "source": "https://helm.sh/docs/helm/helm_install/"
+    },
+    {
+      "id": "helm-upgrade",
+      "command": "helm upgrade",
+      "summary": "リリースを新しい版のチャートや値に更新します。",
+      "detail": "既にあるリリースを、チャートや値を変えて入れ直します。更新するたびにリビジョンが 1 つ増え、helm history で見られます。リリースがまだ無いときは失敗するので、無ければ入れたいときは -i (--install) を付けます。",
+      "usage": "helm upgrade <リリース名> <チャート> [オプション]",
+      "flags": [
+        {
+          "flags": [
+            "-f",
+            "--values"
+          ],
+          "text": "値を書いた YAML のファイル (または URL) を渡す。複数渡すと後のものが優先"
+        }
+      ],
+      "source": "https://helm.sh/docs/helm/helm_upgrade/"
+    },
+    {
+      "id": "helm-rollback",
+      "command": "helm rollback",
+      "summary": "リリースを前のリビジョンに戻します。",
+      "detail": "戻したい先のリビジョン番号を渡します。番号を省くか 0 にすると、1 つ前のリビジョンに戻ります。戻す先の番号は helm history で調べます。",
+      "usage": "helm rollback <リリース名> [リビジョン] [オプション]",
+      "source": "https://helm.sh/docs/helm/helm_rollback/"
+    },
+    {
+      "id": "helm-history",
+      "command": "helm history",
+      "summary": "リリースのリビジョンの履歴を出します。",
+      "detail": "REVISION・UPDATED・STATUS・CHART・APP VERSION・DESCRIPTION の表が出ます。rollback で戻す先の番号を調べるときに使います。既定では最大 256 件までです。",
+      "usage": "helm history <リリース名> [オプション]",
+      "source": "https://helm.sh/docs/helm/helm_history/"
+    },
+    {
+      "id": "helm-template",
+      "command": "helm template",
+      "summary": "チャートを手元でマニフェストに展開して出します。",
+      "detail": "クラスターには何も入れず、値を当てたあとの YAML を画面に出します。入れる前に中身を確かめるときや、出力を別の道具に渡すときに使います。クラスターから引くはずの値は手元で仮の値になります。",
+      "usage": "helm template [リリース名] <チャート> [オプション]",
+      "flags": [
+        {
+          "flags": [
+            "-f",
+            "--values"
+          ],
+          "text": "値を書いた YAML のファイル (または URL) を渡す。複数渡すと後のものが優先"
+        }
+      ],
+      "source": "https://helm.sh/docs/helm/helm_template/"
+    },
+    {
+      "id": "helm-show-values",
+      "command": "helm show values",
+      "summary": "チャートの既定の値 (values.yaml) を出します。",
+      "detail": "チャート (フォルダ・ファイル・URL) の values.yaml の中身を出します。入れる前に、どの値を変えられるかを調べるときに使います。入れたあとのリリースの値は helm get values で見ます。",
+      "usage": "helm show values <チャート> [オプション]",
+      "source": "https://helm.sh/docs/helm/helm_show_values/"
+    },
+    {
+      "id": "helm-get-values",
+      "command": "helm get values",
+      "summary": "入れたリリースに渡した値を出します。",
+      "detail": "入れたあとのリリースの値を見るときに使います。-a (--all) を付けると、チャートの既定も含めて計算された全部の値が出ます。チャートの既定の値は helm show values で見ます。",
+      "usage": "helm get values <リリース名> [オプション]",
+      "source": "https://helm.sh/docs/helm/helm_get_values/"
+    },
+    {
+      "id": "helm-list",
+      "command": "helm list",
+      "summary": "名前空間にあるリリースの一覧を出します。",
+      "detail": "名前空間を指定しないと、今の文脈の名前空間だけを見ます。すべての名前空間を見るには -A (--all-namespaces) を付けます。",
+      "usage": "helm list [オプション]",
+      "source": "https://helm.sh/docs/helm/helm_list/"
+    },
+    {
+      "id": "helm-repo-add",
+      "command": "helm repo add",
+      "summary": "チャートのリポジトリを名前を付けて登録します。",
+      "detail": "名前と URL を渡すと、以後は <名前>/<チャート> の形でそのリポジトリのチャートを指せます。",
+      "usage": "helm repo add <名前> <URL> [オプション]",
+      "source": "https://helm.sh/docs/helm/helm_repo_add/"
+    },
+    {
+      "id": "docker-build",
+      "command": "docker build",
+      "summary": "Dockerfile からコンテナのイメージを作ります。",
+      "detail": "最後に渡すのはビルドのコンテキスト (材料を置いたフォルダ) で、. は今のフォルダです。Dockerfile は既定でコンテキストの中のものを使います。今の docker build は docker buildx build の別名で、BuildKit で作ります。",
+      "usage": "docker build [オプション] <コンテキストのパス | URL | ->",
+      "flags": [
+        {
+          "flags": [
+            "-t",
+            "--tag"
+          ],
+          "text": "作るイメージに名前とタグ ([レジストリ/]リポジトリ[:タグ]) を付ける。複数付けられる"
+        }
+      ],
+      "source": "https://docs.docker.com/reference/cli/docker/buildx/build/"
+    },
+    {
+      "id": "docker-save",
+      "command": "docker save",
+      "summary": "イメージを tar のアーカイブに書き出します。",
+      "detail": "イメージの全レイヤーとタグを 1 つの tar にまとめます。既定では標準出力に出すので、ファイルにするには -o (--output) を付けるかリダイレクトします。別のマシンや containerd にイメージを持っていくときに使います。docker save は docker image save の別名です。",
+      "usage": "docker save [オプション] <イメージ> [イメージ...]",
+      "source": "https://docs.docker.com/reference/cli/docker/image/save/"
+    },
+    {
+      "id": "k3s-crictl-ps",
+      "command": "k3s crictl ps",
+      "summary": "ノードで動いているコンテナを一覧します。",
+      "detail": "crictl は CRI のコンテナランタイム (k3s では containerd) を直接見る道具で、k3s には k3s crictl として同梱されています。ps は動いているコンテナを出し、止まったものも見るには -a を付けます。Pod の一覧は crictl pods、イメージは crictl images です。",
+      "usage": "k3s crictl ps [オプション]",
+      "source": "https://kubernetes.io/docs/tasks/debug/debug-cluster/crictl/"
+    },
+    {
+      "id": "k3s-crictl-images",
+      "command": "k3s crictl images",
+      "summary": "ノードのランタイムにあるイメージを一覧します。",
+      "detail": "IMAGE・TAG・IMAGE ID・SIZE の表が出ます。イメージがノードにあるかだけを示し、コンテナが動いているかは分かりません (それは crictl ps)。k3s crictl は k3s の containerd を見るので、同じマシンの Docker Engine に入れたイメージは出ません。",
+      "usage": "k3s crictl images [リポジトリ] [オプション]",
+      "source": "https://kubernetes.io/docs/tasks/debug/debug-cluster/crictl/"
+    },
+    {
+      "id": "etcdctl",
+      "command": "etcdctl",
+      "summary": "etcd を操作する、etcd に付属のコマンドです。",
+      "detail": "問題に出てくる etcdctl snapshot save <ファイル> は、動いているメンバーからその時点のデータのスナップショットをファイルに取ります。戻すときは etcdutl snapshot restore を使います (etcdctl の snapshot restore は v3.6 で除かれました)。v3.4 より前の版では v3 の API を使うために ETCDCTL_API=3 を付けます。",
+      "usage": "etcdctl [共通のオプション] <コマンド> [引数]",
+      "source": "https://etcd.io/docs/v3.7/op-guide/recovery/"
+    },
+    {
+      "id": "curl",
+      "command": "curl",
+      "summary": "URL を指定して、サーバーとデータをやり取りします。",
+      "detail": "k3s を入れるときは、curl で取った導入スクリプトをパイプで sh に渡して実行します。値を取らない短いオプションは -sfL のようにまとめて書けます。",
+      "usage": "curl [オプション] <URL>",
+      "flags": [
+        {
+          "flags": [
+            "-sfL"
+          ],
+          "text": "-s (進み具合やエラーを出さない)・-f (HTTP の 400 以上なら中身を出さず失敗する)・-L (移転先へたどる) をまとめた形"
+        }
+      ],
+      "source": "https://curl.se/docs/manpage.html"
+    },
+    {
+      "id": "nslookup",
+      "command": "nslookup",
+      "summary": "DNS に名前を問い合わせ、IP アドレスを引きます。",
+      "detail": "最初の引数に引きたい名前を渡すと、答えを 1 回出して終わります。2 つ目の引数で問い合わせる DNS サーバーを選べます。Pod の中で Service の名前が引けるかを確かめるときに使い、Server の行に答えた DNS (クラスターでは CoreDNS の Service) が出ます。",
+      "usage": "nslookup [-オプション] <名前> [DNS サーバー]",
+      "source": "https://bind9.readthedocs.io/en/latest/manpages.html#man-nslookup",
+      "refs": [
+        {
+          "label": "Debugging DNS Resolution (Server の行)",
+          "url": "https://kubernetes.io/docs/tasks/administer-cluster/dns-debugging-resolution/"
+        }
+      ]
+    },
+    {
+      "id": "kubectl-helm",
+      "command": "kubectl helm",
+      "summary": "kubectl に helm というサブコマンドはありません。",
+      "detail": "Helm は kubectl とは別の道具で、helm install のように helm コマンドで使います。kubectl が直接扱えるのは、マニフェストを組み立てる kubectl kustomize (apply -k) です。",
+      "usage": "kubectl helm という形は無い (Helm は helm <コマンド> [引数] で使う)",
+      "source": "https://helm.sh/docs/helm/helm/",
+      "absent": true
+    },
+    {
+      "id": "k3s-ctr-images-import",
+      "command": "k3s ctr images import",
+      "summary": "イメージの tar を k3s の containerd に取り込みます。",
+      "detail": "docker save などで作ったイメージの tar を読み、k3s のノードの containerd のイメージの置き場に入れます。ファイル名の代わりに - を渡すと標準入力から読むので、docker save の出力をパイプでそのまま渡せます。k3s ctr は既定で k3s の containerd の名前空間 k8s.io を使うので、取り込んだイメージは kubelet からも見えます。取り込むのはコマンドを打ったノードだけです。",
+      "usage": "k3s ctr images import [オプション] <tar のファイル | ->",
+      "source": "https://docs.k3s.io/cli",
+      "refs": [
+        {
+          "label": "K3s: Import Images",
+          "url": "https://docs.k3s.io/add-ons/import-images"
+        },
+        {
+          "label": "K3s: Embedded Registry Mirror (docker save の tar を ctr -n k8s.io image import で読み込む)",
+          "url": "https://docs.k3s.io/installation/registry-mirror"
+        },
+        {
+          "label": "containerd v2.3.7: cmd/ctr/commands/images/import.go (import の使い方と - の扱い)",
+          "url": "https://github.com/containerd/containerd/blob/v2.3.7/cmd/ctr/commands/images/import.go"
+        },
+        {
+          "label": "k3s v1.36.6+k3s1: pkg/ctr/main.go (k3s ctr の既定のソケットと名前空間)",
+          "url": "https://github.com/k3s-io/k3s/blob/v1.36.6%2Bk3s1/pkg/ctr/main.go"
+        }
+      ]
+    },
+    {
+      "id": "k3s-agent",
+      "command": "k3s agent",
+      "summary": "k3s のエージェントのノードとして動かします。",
+      "detail": "server のノードにつないでクラスターに加わり、containerd・Flannel・kube-router のネットワークポリシーのコントローラー・kubelet・kube-proxy を動かします。API サーバーやデータストアは動かしません。つなぐ先は --server (K3S_URL)、加わるための合言葉は --token (K3S_TOKEN) で渡します。導入スクリプトに K3S_URL を渡すと、この k3s agent をサービス (k3s-agent) として動かすように入ります。",
+      "usage": "k3s agent --server <server の URL> --token <トークン> [オプション]",
+      "source": "https://docs.k3s.io/cli/agent",
+      "refs": [
+        {
+          "label": "K3s: Architecture",
+          "url": "https://docs.k3s.io/architecture"
+        },
+        {
+          "label": "K3s: CLI Tools",
+          "url": "https://docs.k3s.io/cli"
+        },
+        {
+          "label": "K3s: Quick-Start Guide (K3S_URL と K3S_TOKEN で agent として入れる)",
+          "url": "https://docs.k3s.io/quick-start"
+        }
+      ]
+    }
+  ]
+}
