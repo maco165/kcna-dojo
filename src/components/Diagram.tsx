@@ -9,6 +9,8 @@ export type DiagramNode = {
   sub?: string;
   /** accent: 主役 / warn: 失敗・拒否 / muted: 補足 */
   tone?: 'accent' | 'warn' | 'muted';
+  /** 用語集の図で、この箱が表す用語の id (その用語を見ているときに強調する) */
+  term?: string;
 };
 export type DiagramGroup = { x: number; y: number; w: number; h: number; label: string };
 export type Side = 'top' | 'bottom' | 'left' | 'right';
@@ -64,7 +66,17 @@ function edgePoint(n: DiagramNode, toward: Pt, pad = 4): Pt {
   return { x: cx + dx * s, y: cy + dy * s };
 }
 
-export default function Diagram({ spec, id }: { spec: DiagramSpec; id: string }) {
+/**
+ * 箱の class。highlight の用語を表す箱は太い枠 (current) で示し、色の無い箱は主役の色にする。
+ * 失敗の箱 (warn) は赤のまま残す (色が意味を持つので、強調で消さない)
+ */
+function nodeClass(n: DiagramNode, highlight?: string): string {
+  const current = highlight !== undefined && n.term === highlight;
+  const tone = current && n.tone !== 'warn' ? 'accent' : n.tone;
+  return ['dg__node', tone && `dg__node--${tone}`, current && 'dg__node--current'].filter(Boolean).join(' ');
+}
+
+export default function Diagram({ spec, id, highlight }: { spec: DiagramSpec; id: string; highlight?: string }) {
   const marker = `arrow-${id}`;
   const edges = spec.edges.map((e) => ({ ...e, ...edgeEnds(spec, e) }));
   return (
@@ -90,7 +102,7 @@ export default function Diagram({ spec, id }: { spec: DiagramSpec; id: string })
           ))}
           {spec.nodes.map((n) => (
             <g key={n.id}>
-              <rect x={n.x} y={n.y} width={n.w} height={n.h} rx="8" className={`dg__node${n.tone ? ` dg__node--${n.tone}` : ''}`} />
+              <rect x={n.x} y={n.y} width={n.w} height={n.h} rx="8" className={nodeClass(n, highlight)} />
               <text x={n.x + n.w / 2} y={n.y + (n.sub ? n.h / 2 - 3 : n.h / 2 + 5)} textAnchor="middle" className="dg__label">
                 {n.label}
               </text>

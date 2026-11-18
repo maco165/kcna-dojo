@@ -635,6 +635,11 @@ async function run(browser, name, width, height) {
       await page.locator('#gloss-pane-term').waitFor();
       const ai = await page.locator('#gloss-pane').getByRole('link', { name: 'Claude' }).getAttribute('href');
       check(ai.startsWith('https://claude.ai/new?q=') && decodeURIComponent(ai.split('?q=')[1]).includes('「etcd」'), `${tag} 用語集の語から、語を入れた AI を開ける`);
+      // 用語の図: 見ている語の箱だけを主役の色にする
+      const fig = page.locator('#gloss-pane .gloss-detail__figure');
+      check(await fig.locator('svg').isVisible(), `${tag} 用語集の語に図が出る`);
+      const lit = await fig.locator('.dg__node--current').evaluateAll((els) => els.map((el) => el.parentElement.querySelector('.dg__label')?.textContent));
+      check(lit.length >= 1 && lit.every((t) => t === 'etcd'), `${tag} 図では見ている語 (etcd) の箱が強調される (${lit.join('・')})`);
     } else {
       const head = page.locator('#gloss-row-etcd button[aria-expanded]');
       await head.waitFor();
@@ -642,6 +647,8 @@ async function run(browser, name, width, height) {
       const box = await head.boundingBox();
       const vh = page.viewportSize().height;
       check((await head.getAttribute('aria-expanded')) === 'true' && box && box.y >= 0 && box.y < vh, `${tag} 用語集でその語 (etcd) が開いて画面の中に見える (y ${box?.y})`);
+      const figW = await page.locator('#gloss-row-etcd .gloss-detail__figure svg').evaluate((el) => el.getBoundingClientRect().width);
+      check(figW > 0 && figW <= page.viewportSize().width, `${tag} 用語の図は画面の幅に収まる (${Math.round(figW)}px)`);
       // 戻る・進むで来たときは、覚えた位置に戻す (その語へ送り直さない)
       const scrollTop = () => page.evaluate(() => (document.querySelector('.astryx-layout-content') ?? document.scrollingElement).scrollTop);
       await page.evaluate(() => ((document.querySelector('.astryx-layout-content') ?? document.scrollingElement).scrollTop = 1500));
