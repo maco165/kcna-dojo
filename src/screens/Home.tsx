@@ -90,7 +90,7 @@ function scrollToGoals(e: React.MouseEvent) {
 
 function Goals({ meta }: { meta: WeekMeta }) {
   return (
-    <List listStyle="decimal" header={<h2 className="h-sm" id="goals">この週で説明できるようにすること</h2>}>
+    <List listStyle="decimal" edge="flush" header={<h2 className="h-sm" id="goals">この週で説明できるようにすること</h2>}>
       {meta.goals.map((g) => (
         <ListItem key={g} label={g} />
       ))}

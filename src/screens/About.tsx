@@ -64,7 +64,7 @@ function Body() {
         </VStack>
       </Card>
 
-      <List hasDividers header={<h2 className="h-sm">知っておくこと</h2>}>
+      <List hasDividers edge="flush" header={<h2 className="h-sm">知っておくこと</h2>}>
         <ListItem label="記録の置き場所" description="進み具合はこのブラウザの localStorage (キー kcna.v1) にだけ残り、サーバーには送りません。" />
         <ListItem label="AI に聞く" description="問題文を入れた Claude / ChatGPT を新しいタブで開くだけで、送るかどうかは開いた先で決めます。" />
         <ListItem
