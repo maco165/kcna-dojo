@@ -6,7 +6,7 @@ import { shuffleChoices } from './shuffle';
 
 export const EXAM_QUESTIONS = 60;
 export const EXAM_MINUTES = 90;
-/** 合格の目安。公式で確かめられていないので、画面では「目安 (未確認)」と書く */
+/** 合格点。LF の多肢選択式試験に共通の記述 (KCNA と名指しではない)。正本の出典は content/guide.ts の EXAM_FACTS */
 export const PASS_MARK = 0.75;
 
 /** 試験の 4 分野の配点 (%)。正本は Linux Foundation の KCNA の試験のページ */

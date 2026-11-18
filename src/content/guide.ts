@@ -1,5 +1,6 @@
 // 説明のページ (#/guide) に載せる、公式の情報の写し。事実ごとに出典を持つ。
 // 確かめた日: 2026-11-18。数字を変えるときは出典を開き直し、CHECKED_AT も直す。
+import { EXAM_MINUTES, EXAM_QUESTIONS, PASS_MARK } from '../lib/exam';
 import type { Domain } from './types';
 
 export const CHECKED_AT = '2026-11-18';
@@ -8,6 +9,7 @@ export type Source = { label: string; url: string };
 
 export const SOURCES = {
   k8sOverview: { label: 'kubernetes.io の概要', url: 'https://kubernetes.io/ja/docs/concepts/overview/' },
+  k8sOverviewEn: { label: 'kubernetes.io の概要 (英語)', url: 'https://kubernetes.io/docs/concepts/overview/' },
   cncfK8s: { label: 'cncf.io の Kubernetes', url: 'https://www.cncf.io/projects/kubernetes/' },
   kcnaJp: { label: 'LF の KCNA-JP のページ', url: 'https://training.linuxfoundation.org/ja/certification/kubernetes-and-cloud-native-associate-kcna-jp/' },
   mcInstructions: { label: '多肢選択式試験の受験の注意', url: 'https://docs.linuxfoundation.org/tc-docs/certification/important-instructions-mc' },
@@ -19,14 +21,15 @@ export const SOURCES = {
 
 /** Kubernetes の名前と生まれ */
 export const ORIGIN = {
-  word: 'κυβερνήτης',
-  meaning: 'ギリシャ語で「操舵手」「パイロット」',
+  /** 英語版の概要の言い方 (meaning helmsman or pilot) */
+  word: 'helmsman / pilot',
+  meaning: 'ギリシャ語に由来し、操舵手やパイロットを意味する',
   milestones: [
     { year: '2014', text: 'Google がオープンソースに' },
     { year: '2016', text: 'CNCF のプロジェクトに' },
-    { year: '2018', text: 'Graduated (安定) に' },
+    { year: '2018', text: 'Graduated の段階に' },
   ],
-  sources: [SOURCES.k8sOverview, SOURCES.cncfK8s],
+  sources: [SOURCES.k8sOverview, SOURCES.k8sOverviewEn, SOURCES.cncfK8s],
 };
 
 /** 公式の定義 (kubernetes.io の概要の文をそのまま引く) */
@@ -44,14 +47,14 @@ export const PROVIDES: { name: string; text: string }[] = [
 ];
 
 /** KCNA-JP の形式。note は「KCNA と名指しの記述ではない」などの但し書き */
-export const EXAM_FACTS: { label: string; value: string; note?: string; source: Source }[] = [
-  { label: '形式', value: 'オンラインの監督付き・多肢選択式', source: SOURCES.kcnaJp },
-  { label: '時間', value: '90 分', source: SOURCES.kcnaJp },
-  { label: '問題数', value: '60 問', note: 'LF の多肢選択式試験に共通の記述', source: SOURCES.mcInstructions },
-  { label: '合格', value: '75% 以上', note: 'LF の多肢選択式試験に共通の記述', source: SOURCES.mcFaq },
-  { label: '言語', value: '問題は日本語、監督者は英語。日本語版として申し込む', source: SOURCES.language },
-  { label: '有効期間', value: '2 年', source: SOURCES.kcnaJp },
-  { label: '受験料', value: '$250 (再受験 1 回つき)', source: SOURCES.kcnaJp },
+export const EXAM_FACTS: { label: string; value: string; note?: string; sources: Source[] }[] = [
+  { label: '形式', value: 'オンラインの監督付き・多肢選択式', sources: [SOURCES.kcnaJp] },
+  { label: '時間', value: `${EXAM_MINUTES} 分`, sources: [SOURCES.kcnaJp, SOURCES.mcInstructions] },
+  { label: '問題数', value: `${EXAM_QUESTIONS} 問`, note: 'LF の多肢選択式試験に共通の記述', sources: [SOURCES.mcInstructions] },
+  { label: '合格', value: `${Math.round(PASS_MARK * 100)}% 以上`, note: 'LF の多肢選択式試験に共通の記述', sources: [SOURCES.mcFaq] },
+  { label: '言語', value: '問題は日本語。日本語版として申し込む。監督者は英語を話すが、試験のブラウザで日本語を選ぶと監督者・サポートとのやり取りは自動翻訳の日本語になる', sources: [SOURCES.kcnaJp, SOURCES.language] },
+  { label: '有効期間', value: '2 年', sources: [SOURCES.kcnaJp] },
+  { label: '受験料', value: '$250 (再受験 1 回つき)', sources: [SOURCES.kcnaJp] },
 ];
 
 export const EXAM_PURPOSE =
@@ -96,7 +99,7 @@ export const CURRICULUM: { domain: Domain; competencies: { en: string; ja: strin
     ],
   },
 ];
-export const CURRICULUM_VERSION = '2025-11-24 の版';
+export const CURRICULUM_VERSION = '2026-03-22 の版';
 
 /** 見本に出す問題 (実際の第 1 週の問題) */
 export const SAMPLE_QUESTION_ID = 'w1-l3-q1';

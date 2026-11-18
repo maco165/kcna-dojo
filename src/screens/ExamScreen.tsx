@@ -92,7 +92,7 @@ function Intro({ progress, onStart }: { progress: Progress; onStart: () => void 
               <ListItem key={d} label={d} endContent={<Text type="supporting">{`配点 ${EXAM_WEIGHTS[d]}% · ${counts[d]} 問`}</Text>} />
             ))}
           </List>
-          <Text type="supporting">合格の目安は {Math.round(PASS_MARK * 100)}% としています (公式では確かめられていない目安です)。答えて間違えた問題は復習に入ります。</Text>
+          <Text type="supporting">合格の目安は {Math.round(PASS_MARK * 100)}% としています (LF の多肢選択式試験に共通の合格点です)。答えて間違えた問題は復習に入ります。</Text>
           <div>
             <Button variant="primary" label="模擬試験を始める" onClick={onStart} />
           </div>
@@ -272,7 +272,7 @@ function Result({ items, answers, result, onRestart }: { items: BankItem[]; answ
       <Banner
         status={rate >= PASS_MARK ? 'success' : 'warning'}
         title={`${result.correct} / ${result.total} 問 (${pct(result.correct, result.total)}%)`}
-        description={rate >= PASS_MARK ? `合格の目安 ${Math.round(PASS_MARK * 100)}% (未確認) に届きました。` : `合格の目安 ${Math.round(PASS_MARK * 100)}% (未確認) まで、あと ${Math.ceil(PASS_MARK * result.total) - result.correct} 問です。`}
+        description={rate >= PASS_MARK ? `合格の目安 ${Math.round(PASS_MARK * 100)}% に届きました。` : `合格の目安 ${Math.round(PASS_MARK * 100)}% まで、あと ${Math.ceil(PASS_MARK * result.total) - result.correct} 問です。`}
         collapsible={false}
       />
       <Card padding={4}>

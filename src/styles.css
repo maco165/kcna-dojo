@@ -863,7 +863,8 @@ body {
 }
 
 .guide-sample__fb:empty {
-  display: none;
+  /* 読み上げの領域は消さずに残し、高さだけ 0 にする */
+  margin-top: -10px;
 }
 
 .guide-sample__fb--ok {
@@ -876,7 +877,10 @@ body {
 
 .guide-sample__more,
 .guide-origin a,
-.guide-src--dark a {
+.guide-origin a *,
+.guide-src--dark a,
+.guide-src--dark a * {
+  /* 暗い帯はテーマに関わらず暗い地なので、Link の中の文字まで薄い青 (#0a1317 の地で 11:1) */
   color: #afd7ff;
 }
 
@@ -962,7 +966,7 @@ body {
   margin: 0;
 }
 
-.guide-origin__word [lang='el'] {
+.guide-origin__word [lang='en'] {
   font-size: 18px;
   font-weight: 300;
   color: #ffffff;
@@ -1380,13 +1384,23 @@ body {
     max-width: 460px;
   }
 
+  /* 前景とアニメーションを重ねない: 768〜1099 は前景の下に、1100 以上は右の列に置く */
+  .guide-hero {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .guide-hero__fg {
+    order: 1;
+  }
+
   .guide-hero__bg {
-    left: auto;
-    right: 0;
-    top: 40px;
-    bottom: auto;
-    width: 52%;
-    height: 520px;
+    order: 2;
+    position: static;
+    width: 100%;
+    max-width: 560px;
+    height: 280px;
   }
 
   .guide-hero__title {
@@ -1402,6 +1416,27 @@ body {
   .guide-section--card {
     margin: 8px -40px;
     padding: 28px 40px 24px;
+  }
+}
+
+@media (min-width: 1100px) {
+  .guide-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 460px) minmax(0, 1fr);
+    column-gap: 40px;
+    align-items: start;
+  }
+
+  .guide-hero__fg {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .guide-hero__bg {
+    grid-column: 2;
+    grid-row: 1;
+    height: 420px;
+    margin-top: 60px;
   }
 }
 

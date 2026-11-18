@@ -40,11 +40,16 @@ describe('説明のページの事実', () => {
   });
   it('事実と出典はすべて https', () => {
     for (const s of Object.values(SOURCES)) expect(new URL(s.url).protocol).toBe('https:');
-    for (const f of EXAM_FACTS) expect(new URL(f.source.url).protocol).toBe('https:');
+    for (const f of EXAM_FACTS) for (const x of f.sources) expect(new URL(x.url).protocol).toBe('https:');
   });
 });
 
 describe('学習要領と情報源', () => {
+  it('細目の週は、その分野の週 (問題データの分野) に入っている', () => {
+    for (const c of CURRICULUM) {
+      for (const x of c.competencies) for (const w of x.weeks) expect(WEEKS.find((k) => k.week === w)?.domain, `${x.en} → 第 ${w} 週`).toBe(c.domain);
+    }
+  });
   it('学習要領の分野は配点の 4 分野と同じで、細目の週はすべて実在する', () => {
     expect(CURRICULUM.map((c) => c.domain).sort()).toEqual(Object.keys(EXAM_WEIGHTS).sort());
     const weeks = new Set(WEEKS.map((w) => w.week));

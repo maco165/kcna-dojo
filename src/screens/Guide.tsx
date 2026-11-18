@@ -172,7 +172,7 @@ function Sample() {
         ))}
       </div>
       <p role="status" className={ok ? 'guide-sample__fb guide-sample__fb--ok' : 'guide-sample__fb guide-sample__fb--ng'}>
-        {picked === null ? '' : ok ? `正解。${q.explanation}` : `${picked} は違います。もう一度選べます。`}
+        {picked === null ? '' : ok ? `正解。${q.explanation}` : `${picked} は違います。${q.wrongNotes?.[picked] ?? ''} もう一度選べます。`}
       </p>
       {picked !== null && (
         <a className="guide-sample__more" href={lessonHref(ref.lesson.id)}>
@@ -214,20 +214,20 @@ function Body() {
 
       <dl className="guide-stats" aria-label="このサイトの中身">
         <div>
-          <dd>{STATS.weeks}</dd>
           <dt>週</dt>
+          <dd>{STATS.weeks}</dd>
         </div>
         <div>
-          <dd>{STATS.lessons}</dd>
           <dt>レッスン</dt>
+          <dd>{STATS.lessons}</dd>
         </div>
         <div>
-          <dd>{STATS.questions}</dd>
           <dt>問</dt>
+          <dd>{STATS.questions}</dd>
         </div>
         <div>
-          <dd>{STATS.terms}</dd>
           <dt>語の用語集</dt>
+          <dd>{STATS.terms}</dd>
         </div>
       </dl>
 
@@ -242,7 +242,7 @@ function Body() {
             Kubernetes という名前
           </h2>
           <p className="guide-origin__word">
-            <span lang="el">{ORIGIN.word}</span> <span className="guide-origin__muted">{ORIGIN.meaning}</span>
+            <span lang="en">{ORIGIN.word}</span> <span className="guide-origin__muted">{ORIGIN.meaning}</span>
           </p>
           <p className="guide-origin__muted">
             <span className="guide-mono guide-accent">K8s</span> は K と s の間の 8 文字を数えた略語 ·{' '}
@@ -398,7 +398,7 @@ function Body() {
                   </div>
                 ))}
               </dl>
-              <Sources list={[SOURCES.kcnaJp, SOURCES.mcInstructions, SOURCES.mcFaq, SOURCES.language]} />
+              <Sources list={[...new Map(EXAM_FACTS.flatMap((f) => f.sources).map((x) => [x.url, x])).values()]} />
             </div>
             <div className="guide-col">
               <h3 className="guide-h3 guide-h3--top">出題範囲と配点</h3>
@@ -413,7 +413,7 @@ function Body() {
                       <span style={{ width: `${EXAM_WEIGHTS[c.domain]}%` }} />
                     </span>
                     <span className="guide-muted">
-                      {c.competencies.map((x) => x.ja).join('・')} → {weeksLabel(c.competencies.flatMap((x) => x.weeks))}
+                      {c.competencies.map((x) => x.ja).join('・')} → {weeksLabel(WEEKS.filter((w) => w.domain === c.domain).map((w) => w.week))}
                     </span>
                   </li>
                 ))}
