@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { WEEKS } from '../src/content/curriculum';
 import { CURRICULUM } from '../src/content/guide';
-import { APPENDIX, HANDBOOK, HANDBOOK_TOPICS, findTopic, topicByCompetency } from '../src/content/handbook';
+import { HANDBOOK, HANDBOOK_TOPICS, findTopic, isAppendixDomain, topicByCompetency } from '../src/content/handbook';
 import { validateHandbook } from '../src/lib/handbook';
 
 const domains = new Map(CURRICULUM.map((c) => [c.domain as string, c.competencies.map((x) => x.en)]));
@@ -80,17 +80,22 @@ describe('validateHandbook', () => {
     expect(validateHandbook([...HANDBOOK, { domain: HANDBOOK[0].domain, topics: [] }], domains, lessonIds).join()).toMatch(/2 つあります/);
   });
   it('付録は目次の最後に置き、細目とは照らさず、細目からは引き当てない', () => {
-    expect(HANDBOOK[HANDBOOK.length - 1].domain).toBe(APPENDIX);
-    expect(HANDBOOK_TOPICS.filter((t) => t.domain !== APPENDIX)).toHaveLength([...domains.values()].flat().length);
-    const app = HANDBOOK.find((d) => d.domain === APPENDIX)!;
+    // 付録の段はすべて 4 分野のあと
+    const firstApp = HANDBOOK.findIndex((d) => isAppendixDomain(d.domain));
+    expect(firstApp).toBeGreaterThan(0);
+    expect(HANDBOOK.slice(firstApp).every((d) => isAppendixDomain(d.domain))).toBe(true);
+    expect(HANDBOOK.slice(firstApp).map((d) => d.domain)).toEqual(['付録: Kubernetes をもっと知る', '付録: Linux とコンテナ', '付録: コミュニティ', '付録: 作って届ける', '付録: クラウド']);
+    expect(HANDBOOK_TOPICS.filter((t) => !isAppendixDomain(t.domain))).toHaveLength([...domains.values()].flat().length);
+    const app = HANDBOOK.find((d) => isAppendixDomain(d.domain))!;
     expect(topicByCompetency(app.topics[0].competency)).toBeUndefined();
-    const others = HANDBOOK.filter((d) => d.domain !== APPENDIX);
+    const others = HANDBOOK.filter((d) => !isAppendixDomain(d.domain));
     expect(validateHandbook(others, domains, lessonIds)).toEqual([]);
     const bad = structuredClone(app);
     bad.topics[0].competency = '';
     expect(validateHandbook([...others, bad], domains, lessonIds).join()).toMatch(/小見出し/);
     expect(validateHandbook([...others, { ...app, topics: [] }], domains, lessonIds).join()).toMatch(/1 つ以上/);
-    expect(validateHandbook([...others, app, { ...app, topics: [] }], domains, lessonIds).join()).toMatch(/付録 のファイルが 2 つあります/);
+    expect(validateHandbook([...others, app, { ...app, topics: [] }], domains, lessonIds).join()).toMatch(/付録: Kubernetes をもっと知る のファイルが 2 つあります/);
+    expect(validateHandbook([...others, { ...app, domain: '付録: ' }], domains, lessonIds).join()).toMatch(/段の名前/);
     const twin = structuredClone(app);
     twin.topics.push({ ...structuredClone(app.topics[0]), id: 'twin-topic' });
     expect(validateHandbook([...others, twin], domains, lessonIds).join()).toMatch(/competency .* のトピックが 2 つあります/);

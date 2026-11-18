@@ -223,6 +223,8 @@ function kubectlActions(tokens: string[], heredoc: string): Action[] {
       return [a('wait', '待つ', { kind: k.kind, name: k.name ?? pos[1] })];
     }
     case 'auth': {
+      // auth whoami: 認証で決まった自分の名前を確かめる (権限は見ない)
+      if (tokens[2] === 'whoami') return [{ op: 'read', verb: '名乗りを確かめる', tool: 'kubectl', kind: '自分のユーザー', where: 'クラスタ' }];
       // auth can-i <動詞> <種類>: 動詞と種類と場所を出す
       if (pos[0] !== 'can-i') return [a('read', '権限を確かめる', { kind: 'API' }, 'クラスタ')];
       const k = kindOf(pos[2]);
@@ -282,6 +284,10 @@ function other(tokens: string[]): Action[] {
   // k3s を消すスクリプト (インストールのときに /usr/local/bin に置かれる)
   if (/(^|\/)k3s-uninstall\.sh$/.test(tool)) return [{ op: 'delete', verb: '消す', tool: 'k3s', kind: 'k3s server', where: 'ノード' }];
   if (/(^|\/)k3s-agent-uninstall\.sh$/.test(tool)) return [{ op: 'delete', verb: '消す', tool: 'k3s', kind: 'k3s agent', where: 'ノード' }];
+  // ノードの上の Linux の様子を見るもの (Linux とコンテナの付録)
+  if (tool === 'stat' && tokens.includes('-fc')) return act('read', '見る', 'ファイルシステムの種類', tokens[tokens.length - 1], 'ノード');
+  if (tool === 'findmnt') return act('read', '見る', 'マウント', undefined, 'ノード');
+  if (tool === 'lsns') return act('read', '見る', 'namespace', undefined, 'ノード');
   // ノードの上で直に見るもの (k3s の付録)。デバッグ用コンテナの中の素の ps は飛ばす
   if (tool === 'ls' && sub?.startsWith('/')) return act('read', '見る', 'ファイル', sub, 'ノード');
   if (tool === 'ps' && sub?.startsWith('-')) return act('read', '見る', 'プロセス', undefined, 'ノード');

@@ -63,7 +63,8 @@ export async function buildPages(load) {
   const { parseRoute } = await load('/src/lib/route.ts');
   const titleOf = (p) => pageTitle(parseRoute(`${BASE}${p}`));
   const { WEEKS } = await load('/src/content/curriculum.ts');
-  const { HANDBOOK, HANDBOOK_TOPICS, APPENDIX } = await load('/src/content/handbook.ts');
+  const { HANDBOOK, HANDBOOK_TOPICS, isAppendixDomain, appendixGroup } = await load('/src/content/handbook.ts');
+  const sectionName = (d) => (isAppendixDomain(d) ? `範囲外${appendixGroup(d) ? `: ${appendixGroup(d)}` : ''} (資格の範囲の外)` : d);
   const { CURRICULUM, DEFINITION } = await load('/src/content/guide.ts');
   const glossary = (await load('/src/content/glossary.json')).default;
   const pages = [];
@@ -92,7 +93,7 @@ export async function buildPages(load) {
       '<h1>ハンドブック</h1>',
       ...HANDBOOK.map(
         (d) =>
-          `<h2>${esc(d.domain)}${d.domain === APPENDIX ? ' (資格の範囲の外)' : ''}</h2><ul>${d.topics.map((t) => `<li>${link(`handbook/${t.id}/`, t.title)}: ${esc(t.summary)}</li>`).join('')}</ul>`,
+          `<h2>${esc(sectionName(d.domain))}</h2><ul>${d.topics.map((t) => `<li>${link(`handbook/${t.id}/`, t.title)}: ${esc(t.summary)}</li>`).join('')}</ul>`,
       ),
     ].join('\n'),
   });
@@ -103,7 +104,7 @@ export async function buildPages(load) {
       title: t.title,
       description: clip(t.summary),
       body: [
-        `<p>${link('handbook/', 'ハンドブック')} / ${esc(t.domain)}</p>`,
+        `<p>${link('handbook/', 'ハンドブック')} / ${esc(sectionName(t.domain))}</p>`,
         `<h1>${esc(t.title)}</h1>`,
         `<p>${esc(t.summary)}</p>`,
         '<h2>全体の流れ</h2>',

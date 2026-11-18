@@ -9,7 +9,7 @@ import BottomTabs from '../components/BottomTabs';
 import RepoLink from '../components/RepoLink';
 import SiteLogo from '../components/SiteLogo';
 import { dueQuestions, findLesson } from '../content';
-import { APPENDIX, HANDBOOK, findTopic, type HandbookStep } from '../content/handbook';
+import { HANDBOOK, appendixGroup, isAppendixDomain, findTopic, type HandbookStep } from '../content/handbook';
 import { HANDBOOK_FIGURES } from '../content/handbookFigures';
 import { EXAM_WEIGHTS } from '../lib/exam';
 import { markHandbookSeen, setHandbookDone, type HandbookRecord, type Progress } from '../lib/progress';
@@ -63,6 +63,9 @@ function Step({ step, text }: { step: HandbookStep; text: TermPiece[] }) {
 }
 
 type Update = (fn: (p: Progress) => Progress) => void;
+
+/** 目次とパンくずに出す段の名前。付録は「範囲外: Linux とコンテナ」の形 */
+const sectionName = (d: string) => (isAppendixDomain(d) ? (appendixGroup(d) ? `範囲外: ${appendixGroup(d)}` : '範囲外') : d);
 
 /** 目次のカードに添える読んだ記録 */
 function readingLabel(rec: HandbookRecord | undefined, steps: number): string {
@@ -121,8 +124,8 @@ function Index({ progress }: { progress: Progress }) {
       {HANDBOOK.map((d) => (
         <section key={d.domain} className="hb-domain" aria-labelledby={`hb-${d.domain}`}>
           <h2 id={`hb-${d.domain}`} className="hb-domain__head">
-            <span>{d.domain}</span>
-            <span className="hb-muted">{d.domain === APPENDIX ? '資格の範囲の外' : `配点 ${EXAM_WEIGHTS[d.domain]}%`}</span>
+            <span>{sectionName(d.domain)}</span>
+            <span className="hb-muted">{isAppendixDomain(d.domain) ? '資格の範囲の外' : `配点 ${EXAM_WEIGHTS[d.domain]}%`}</span>
           </h2>
           <ul className="hb-topics">
             {d.topics.map((t) => (
@@ -133,7 +136,7 @@ function Index({ progress }: { progress: Progress }) {
                       <DiagramThumb spec={HANDBOOK_FIGURES[t.id]} />
                     </span>
                   )}
-                  <span className="hb-topic__en" lang={d.domain === APPENDIX ? undefined : 'en'}>
+                  <span className="hb-topic__en" lang={isAppendixDomain(d.domain) ? undefined : 'en'}>
                     {t.competency}
                   </span>
                   <span className="hb-topic__title">{t.title}</span>
@@ -180,12 +183,12 @@ function Topic({ id, progress, updateProgress }: { id: string; progress: Progres
           <li>
             <a href={handbookHref()}>ハンドブック</a>
           </li>
-          <li>{t.domain}</li>
+          <li>{sectionName(t.domain)}</li>
           <li aria-current="page">{t.title}</li>
         </ol>
       </nav>
       <div className="hb-head">
-        <span className="hb-topic__en" lang={t.domain === APPENDIX ? undefined : 'en'}>
+        <span className="hb-topic__en" lang={isAppendixDomain(t.domain) ? undefined : 'en'}>
           {t.competency}
         </span>
         <h1 id="hb-title" className="week-title">

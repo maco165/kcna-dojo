@@ -74,6 +74,10 @@ describe('ノードの上のコマンド (付録)', () => {
     expect(one('kubectl get pods && kubectl get nodes')).toHaveLength(2);
     expect(one('/usr/local/bin/k3s-uninstall.sh')).toEqual(['消す: k3s server (ノード)']);
     expect(one('/usr/local/bin/k3s-agent-uninstall.sh')).toEqual(['消す: k3s agent (ノード)']);
+    expect(one('stat -fc %T /sys/fs/cgroup/')).toEqual(['見る: ファイルシステムの種類 /sys/fs/cgroup/ (ノード)']);
+    expect(one('findmnt -t proc,cgroup2')).toEqual(['見る: マウント (ノード)']);
+    expect(one('lsns')).toEqual(['見る: namespace (ノード)']);
+    expect(one('kubectl auth whoami')).toEqual(['名乗りを確かめる: 自分のユーザー (クラスタ)']);
   });
 });
 

@@ -1,0 +1,561 @@
+{
+  "domain": "付録: Linux とコンテナ",
+  "topics": [
+    {
+      "id": "linux-history",
+      "competency": "付録: Linux の歴史",
+      "title": "Linux の歴史: UNIX・GNU・Linux カーネル・ディストリビューション",
+      "summary": "Linux は、1969 年に生まれた UNIX をまねて、1991 年に Linus Torvalds が一から書いたカーネル (OS の中心のプログラム) です。1983 年に始まった GNU プロジェクトの道具と組み合わさって、自由に使える OS がそろいました。カーネルと道具をまとめて配るものがディストリビューションです。Kubernetes のコントロールプレーンは Linux の上でしか動かず、コンテナも Linux のカーネルの機能で作られています。",
+      "flow": [
+        {
+          "text": "UNIX は、AT&T のベル研究所で生まれた OS です。作った一人の Dennis Ritchie の論文によると、UNIX は 1969 年に生まれ、1973 年に OS のカーネル (機械の資源を配り、ほかのプログラムを動かす中心のプログラム) が C 言語で書き直されました。論文は、このとき UNIX が (論文の書かれた当時の) 今の形になったと書いています。"
+        },
+        {
+          "text": "GNU プロジェクトは、1983 年 9 月 27 日に Richard Stallman が発表しました。発表文は「UNIX と互換のある完全なソフトウェアの仕組みを書き、使える人みんなに自由に配る」と書き、名前の GNU は「Gnu's Not Unix」の略です。実際の作業は 1984 年 1 月に始まりました。GNU の文書は、コンパイラーの GCC、C のライブラリー (glibc)、シェルの Bash などを GNU のソフトウェアとして挙げています。"
+        },
+        {
+          "text": "1991 年に、Linus Torvalds が UNIX と互換のあるカーネルを作り、Linux と名付けました。GNU プロジェクトの文書によると、Linux は初めは自由なソフトウェアではありませんでしたが、1992 年に自由なソフトウェアになり、まだ完成していなかった GNU のシステムと組み合わせることで、自由な OS がそろいました。カーネルの文書は、Linux を「UNIX の写しを一から書いたもの」と説明し、POSIX (UNIX の共通の決まり) に沿うことを目指すと書いています。カーネル全体の使用許諾は GPL のバージョン 2 (それより後の版は含みません) で、システムコールについての例外が付いています。ファイルごとには、GPL-2.0 と両立する別の許諾のものもあります。今のカーネルの版は /proc/version で読めます。",
+          "code": {
+            "language": "bash",
+            "text": "cat /proc/version"
+          },
+          "output": "Linux version 7.0.0-43-generic (buildd@lcy02-amd64-080) (x86_64-linux-gnu-gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0, GNU ld (GNU Binutils for Ubuntu) 2.46) #43-Ubuntu SMP PREEMPT_DYNAMIC ...",
+          "result": {
+            "text": "カーネルの版と、作るのに使った GNU の道具が出る",
+            "tone": "ok"
+          }
+        },
+        {
+          "text": "カーネルだけでは OS になりません。GNU プロジェクトの文書は、カーネルを「機械の資源をほかのプログラムに割り当てるプログラム」と説明し、カーネルは OS の欠かせない部分だが、それだけでは役に立たないと書いています。そのため GNU プロジェクトは、全体を GNU/Linux と呼ぶよう求めています。ふだん「Linux」と言うときは、カーネルを指す場合と、OS 全体を指す場合があります。"
+        },
+        {
+          "text": "ディストリビューション (配布版) は、カーネルと GNU の道具やほかのソフトウェアをまとめ、入れやすくして配るものです。たとえば Debian は、1993 年 8 月に Ian Murdock が「Linux と GNU の精神で、開かれた形で作る新しいディストリビューション」として始めました。Debian の説明では、OS の中心はカーネルで、Debian は Linux のカーネルか FreeBSD のカーネルを使います。どのディストリビューションかは /etc/os-release で読めます (出力の例は Ubuntu の場合の一部です)。",
+          "code": {
+            "language": "bash",
+            "text": "cat /etc/os-release"
+          },
+          "output": "PRETTY_NAME=\"Ubuntu 26.04.1 LTS\"\nNAME=\"Ubuntu\"\nVERSION_ID=\"26.04\"\nVERSION=\"26.04.1 LTS (Resolute Raccoon)\"\nID=ubuntu\nID_LIKE=debian\n...",
+          "result": {
+            "text": "ディストリビューションの名前と版が出る",
+            "tone": "ok"
+          }
+        },
+        {
+          "text": "カーネルの文書によると、Linux のカーネルは 1991 年に小さく始まり、小さな音楽プレーヤーからパソコン、いちばん大きなスーパーコンピューターまで動く部品になりました。Kubernetes でも Linux は中心にあります。kubernetes.io によると、コントロールプレーンは Linux の上でしか動かせず、ワーカーノードには Windows も Linux も使えます。コンテナを分ける namespaces と、使う量を制限する cgroups も Linux のカーネルの機能です (付録の「コンテナの仕組み」で説明します)。ノードの OS とカーネルの版は kubectl でも読めます。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl get nodes -o wide"
+          },
+          "output": "NAME    STATUS   ROLES           AGE   VERSION        INTERNAL-IP    EXTERNAL-IP   OS-IMAGE             KERNEL-VERSION     CONTAINER-RUNTIME\nnode1   Ready    control-plane   20d   v1.36.5+k3s1   192.168.0.10   <none>        Ubuntu 24.04.5 LTS   6.8.0-1065-raspi (arm64)   containerd://2.3.4-k3s1.36",
+          "result": {
+            "text": "OS-IMAGE と KERNEL-VERSION の列が出る",
+            "tone": "ok"
+          }
+        }
+      ],
+      "try": [
+        {
+          "goal": "手元の Linux のカーネルとディストリビューションを確かめたいなら",
+          "steps": [
+            {
+              "text": "この手順は読むだけで何も作らないので、名前空間 try-kcna は作らず、後片付けもありません。まずカーネルの版を読みます。/proc/version はファイルに見えますが、カーネルがその場で中身を返す特別なファイルです (付録の「Linux の内部」で説明します)。",
+              "code": {
+                "language": "bash",
+                "text": "cat /proc/version"
+              }
+            },
+            {
+              "text": "次にディストリビューションの名前と版を読みます。ID_LIKE の行があれば、どのディストリビューションに近いかが書かれています。",
+              "code": {
+                "language": "bash",
+                "text": "cat /etc/os-release"
+              }
+            }
+          ]
+        },
+        {
+          "goal": "クラスターのノードで動く Linux を確かめたいなら",
+          "steps": [
+            {
+              "text": "これも読むだけなので try-kcna は作りません。ノードごとのカーネルの版だけを取り出します。ノードが複数あれば、空白で区切って並びます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl get nodes -o jsonpath='{.items[*].status.nodeInfo.kernelVersion}'"
+              },
+              "output": "6.8.0-1065-raspi 6.8.0-1065-raspi"
+            }
+          ]
+        }
+      ],
+      "lessons": [
+        "w1-l1",
+        "w1-l4"
+      ],
+      "sources": [
+        {
+          "label": "Nokia Bell Labs の Dennis Ritchie「The Evolution of the Unix Time-sharing System」",
+          "url": "https://www.nokia.com/bell-labs/about/dennis-m-ritchie/hist.html"
+        },
+        {
+          "label": "gnu.org の Initial Announcement (GNU の最初の発表)",
+          "url": "https://www.gnu.org/gnu/initial-announcement.html"
+        },
+        {
+          "label": "gnu.org の The GNU Project",
+          "url": "https://www.gnu.org/gnu/thegnuproject.html"
+        },
+        {
+          "label": "gnu.org の Linux and the GNU System",
+          "url": "https://www.gnu.org/gnu/linux-and-gnu.html"
+        },
+        {
+          "label": "docs.kernel.org の The Linux kernel user's and administrator's guide (README)",
+          "url": "https://docs.kernel.org/admin-guide/README.html"
+        },
+        {
+          "label": "docs.kernel.org の Linux kernel licensing rules",
+          "url": "https://docs.kernel.org/process/license-rules.html"
+        },
+        {
+          "label": "docs.kernel.org の Introduction (開発の手引き)",
+          "url": "https://docs.kernel.org/process/1.Intro.html"
+        },
+        {
+          "label": "debian.org の About Debian",
+          "url": "https://www.debian.org/intro/about"
+        },
+        {
+          "label": "kubernetes.io の Windows containers in Kubernetes",
+          "url": "https://kubernetes.io/docs/concepts/windows/intro/"
+        }
+      ]
+    },
+    {
+      "id": "linux-internals",
+      "competency": "付録: Linux の内部構造",
+      "title": "Linux の内部: カーネル・システムコール・プロセス・/proc",
+      "summary": "Linux では、カーネルが機械の資源を受け持ち、アプリはその外のユーザー空間で動きます。アプリはシステムコールでカーネルに頼み、動いているプログラムはプロセスとして番号 (PID) で区別されます。/proc と /sys はカーネルの中の情報をファイルの形で見せる場所で、コンテナの namespaces と cgroups もここから読めます。",
+      "flow": [
+        {
+          "text": "Linux の OS は、カーネルとユーザー空間 (カーネルの外で、ふつうのアプリが動く側) に分かれます。Debian の説明では、カーネルはいちばん基本のプログラムで、裏方の仕事をすべて受け持ち、ほかのプログラムを起動させます。シェル・Web サーバー・kubelet なども、ユーザー空間で動くプログラムです。"
+        },
+        {
+          "text": "システムコールは、アプリとカーネルの間の基本の接続口です。ファイルを開く・読む、プロセスを作る、といった仕事は、システムコールでカーネルに頼みます。man ページによると、ふつうはシステムコールを直接呼ばず、glibc (GNU の C のライブラリー) などの包む関数から呼びます。コンテナの道具も、最後はシステムコールで namespaces や cgroups を作ります。"
+        },
+        {
+          "text": "プロセスは、動いているプログラムのことで、PID (プロセスの番号) で区別されます。fork はプロセスを複製して子のプロセスを作り、execve はそのプロセスが動かすプログラムを新しいものに置き換えます。そのため、プロセスは親子の木になります。いちばん上の PID 1 は、ps では親の PID (PPID) が 0 と出ます。ps で自分のシェルから出たプロセスを見ると、PID と親の PID (PPID) が読めます。",
+          "code": {
+            "language": "bash",
+            "text": "ps -o pid,ppid,comm"
+          },
+          "output": "    PID    PPID COMMAND\n   4821    4710 bash\n   4930    4821 ps",
+          "result": {
+            "text": "ps の親の PID が、シェルの PID になる",
+            "tone": "ok"
+          }
+        },
+        {
+          "text": "Linux のファイルは、/ から始まる 1 本の木に並びます。ディスクや特別なファイルシステムは、mount (マウント) でこの木のどこかのフォルダにつなぎます。どこに何がつながっているかは、自分のプロセスから見た一覧として /proc/self/mounts で読めます (出力の例は一部です)。",
+          "code": {
+            "language": "bash",
+            "text": "cat /proc/self/mounts"
+          },
+          "output": "proc /proc proc rw,nosuid,nodev,noexec,relatime 0 0\ncgroup2 /sys/fs/cgroup cgroup2 rw,nosuid,nodev,noexec,relatime,nsdelegate,memory_recursiveprot 0 0\n...",
+          "result": {
+            "text": "/proc と /sys/fs/cgroup の行が出る",
+            "tone": "ok"
+          }
+        },
+        {
+          "text": "/proc は、カーネルの中のデータを見せる疑似ファイルシステム (ディスクに無く、読んだときにカーネルが中身を返すもの) です。多くのファイルは読み取り専用です。プロセスごとに /proc/<PID> のフォルダがあり、/proc/self は読んだプロセス自身のフォルダを指す特別なリンクです。中には status (名前・PID・親の PID など)・cgroup・mounts・ns などがあります (出力の例は一部です)。",
+          "code": {
+            "language": "bash",
+            "text": "ls /proc/self"
+          },
+          "output": "cgroup  cmdline  cwd  environ  exe  fd  limits  mountinfo  mounts  ns  root  stat  status  ..."
+        },
+        {
+          "text": "/sys/fs/cgroup には cgroups (プロセスの組ごとに資源を制限し、使用量を測るカーネルの機能) がつながっています。man ページによると、cgroups はカーネルが用意する疑似ファイルシステムの cgroupfs で操作し、組はフォルダとして作ります。cgroup の版は 2 つあり、kubernetes.io はノードで次のコマンドを流して確かめる方法を書いています。cgroup v2 なら cgroup2fs、v1 なら tmpfs と出ます。Kubernetes は v1.35 で cgroup v1 を非推奨にし、kubelet は既定では cgroup v1 のノードで起動しなくなりました。",
+          "code": {
+            "language": "bash",
+            "text": "stat -fc %T /sys/fs/cgroup/"
+          },
+          "output": "cgroup2fs",
+          "result": {
+            "text": "cgroup v2 なら cgroup2fs と出る",
+            "tone": "ok"
+          }
+        },
+        {
+          "text": "プロセスが属する namespaces (プロセスから見える範囲を分けるカーネルの機能) は、/proc/<PID>/ns の下に種類ごとのリンクとして並びます。コンテナの中のプロセスも、ホストから見ればふつうのプロセスの 1 つで、主に違うのは、これらのリンクが指す namespace と、属する cgroup です。ほかに、capabilities や seccomp などで、できることも絞られます。",
+          "code": {
+            "language": "bash",
+            "text": "ls /proc/self/ns"
+          },
+          "output": "cgroup  ipc  mnt  net  pid  pid_for_children  time  time_for_children  user  uts",
+          "result": {
+            "text": "cgroup・ipc・mnt・net・pid・user・uts などが出る",
+            "tone": "ok"
+          }
+        }
+      ],
+      "try": [
+        {
+          "goal": "プロセスとその親子を確かめたいなら",
+          "steps": [
+            {
+              "text": "この手順は読むだけで何も作らないので、名前空間 try-kcna は作らず、後片付けもありません。自分のシェルから出たプロセスを、PID・親の PID・コマンドの名前の列で出します。",
+              "code": {
+                "language": "bash",
+                "text": "ps -o pid,ppid,comm"
+              }
+            },
+            {
+              "text": "/proc/self/status は、読んだプロセス (ここでは cat) 自身の情報です。Pid と PPid の行で、cat の親がシェルであることを確かめます (出力の例は一部です)。",
+              "code": {
+                "language": "bash",
+                "text": "cat /proc/self/status"
+              },
+              "output": "Name:\tcat\nUmask:\t0002\nState:\tR (running)\nTgid:\t4931\nNgid:\t0\nPid:\t4931\nPPid:\t4821\n..."
+            }
+          ]
+        },
+        {
+          "goal": "/proc と /sys からカーネルの情報を読みたいなら",
+          "steps": [
+            {
+              "text": "これも読むだけです。findmnt はつながっているファイルシステムを木の形で出す道具で、-t で種類を絞れます。proc と cgroup2 がどこにつながっているかを見ます。",
+              "code": {
+                "language": "bash",
+                "text": "findmnt -t proc,cgroup2"
+              },
+              "output": "TARGET         SOURCE  FSTYPE  OPTIONS\n/sys/fs/cgroup cgroup2 cgroup2 rw,nosuid,nodev,noexec,relatime,nsdelegate,memory_recursiveprot\n/proc          proc    proc    rw,nosuid,nodev,noexec,relatime"
+            },
+            {
+              "text": "cgroup v2 なら、cgroup.controllers に使える制御の種類 (コントローラー) が並びます。cpu と memory は、Pod の requests と limits を守らせるのに使われます。pids は、kubelet が Pod ごとのプロセスの数を制限するのに使えます。",
+              "code": {
+                "language": "bash",
+                "text": "cat /sys/fs/cgroup/cgroup.controllers"
+              },
+              "output": "cpuset cpu io memory hugetlb pids rdma misc"
+            }
+          ]
+        }
+      ],
+      "lessons": [
+        "w1-l1",
+        "w4-l2"
+      ],
+      "sources": [
+        {
+          "label": "debian.org の About Debian (OS とカーネル)",
+          "url": "https://www.debian.org/intro/about"
+        },
+        {
+          "label": "man7.org の syscalls(2)",
+          "url": "https://man7.org/linux/man-pages/man2/syscalls.2.html"
+        },
+        {
+          "label": "man7.org の intro(2)",
+          "url": "https://man7.org/linux/man-pages/man2/intro.2.html"
+        },
+        {
+          "label": "man7.org の fork(2)",
+          "url": "https://man7.org/linux/man-pages/man2/fork.2.html"
+        },
+        {
+          "label": "man7.org の execve(2)",
+          "url": "https://man7.org/linux/man-pages/man2/execve.2.html"
+        },
+        {
+          "label": "man7.org の mount(2)",
+          "url": "https://man7.org/linux/man-pages/man2/mount.2.html"
+        },
+        {
+          "label": "man7.org の proc(5)",
+          "url": "https://man7.org/linux/man-pages/man5/proc.5.html"
+        },
+        {
+          "label": "man7.org の proc_pid_mounts(5)",
+          "url": "https://man7.org/linux/man-pages/man5/proc_pid_mounts.5.html"
+        },
+        {
+          "label": "man7.org の findmnt(8)",
+          "url": "https://man7.org/linux/man-pages/man8/findmnt.8.html"
+        },
+        {
+          "label": "man7.org の proc_pid_status(5)",
+          "url": "https://man7.org/linux/man-pages/man5/proc_pid_status.5.html"
+        },
+        {
+          "label": "man7.org の cgroups(7)",
+          "url": "https://man7.org/linux/man-pages/man7/cgroups.7.html"
+        },
+        {
+          "label": "man7.org の namespaces(7)",
+          "url": "https://man7.org/linux/man-pages/man7/namespaces.7.html"
+        },
+        {
+          "label": "docs.kernel.org の Control Group v2",
+          "url": "https://docs.kernel.org/admin-guide/cgroup-v2.html"
+        },
+        {
+          "label": "kubernetes.io の About cgroup v2",
+          "url": "https://kubernetes.io/docs/concepts/architecture/cgroups/"
+        },
+        {
+          "label": "kubernetes.io の Process ID Limits And Reservations",
+          "url": "https://kubernetes.io/docs/concepts/policy/pid-limiting/"
+        },
+        {
+          "label": "docker.com の What is a Container?",
+          "url": "https://www.docker.com/resources/what-container/"
+        }
+      ]
+    },
+    {
+      "id": "container-internals",
+      "competency": "付録: コンテナの仕組み",
+      "title": "コンテナの仕組み: chroot から namespaces・cgroups、OCI、CRI まで",
+      "summary": "コンテナは、ホストのカーネルを分け合いながら、namespaces で見える範囲を、cgroups で使える資源の量を分けたプロセスです。chroot・FreeBSD の jail・LXC・Docker と仕組みが育ち、2015 年に OCI がイメージと動かし方の仕様を決めました。Kubernetes では kubelet が CRI で containerd などのランタイムに頼み、containerd は runc を通してカーネルの機能を使います。",
+      "flow": [
+        {
+          "text": "いちばん古い部品は chroot です。chroot は、呼んだプロセスのルートディレクトリ (/ の位置) を、指定したフォルダに変えます。子のプロセスにも引き継がれ、呼べるのは特権のあるプロセスだけです。man ページは、chroot が変えるのはパス名の解決だけで、安全のための仕組みではないと書いています。"
+        },
+        {
+          "text": "FreeBSD (UNIX の流れをくむ別の OS) の jail は、FreeBSD 4.X から使える仕組みです。FreeBSD のハンドブックによると、jail は chroot の考えの上に作られています。ハンドブックは、chroot ではプロセスが触れるファイルの範囲しか限れないと書き、jail はいくつかの点で chroot の考えを良くしたものだと説明しています。"
+        },
+        {
+          "text": "Linux では、namespaces と cgroups がコンテナの土台です。namespace は、カーネル全体の資源を包み、その中のプロセスには自分専用の資源があるように見せます。man ページの表の種類は、Cgroup (cgroup のルート)・IPC (プロセス間の通信)・Network (ネットワークの機器や番号)・Mount (マウントの一覧)・PID (プロセスの番号)・Time (起動からの時間などの時計)・User (ユーザーとグループの番号)・UTS (ホスト名) の 8 つです。新しい PID の namespace で最初に作られたプロセスは PID 1 になり、その namespace の init (最初のプロセス) になります。"
+        },
+        {
+          "text": "cgroups は、プロセスを組に分け、組ごとに資源の使い方を制限し、測る機能です。man ページによると、最初の実装は Linux 2.6.24 で入り、その問題を直す cgroup v2 が Linux 4.5 で正式になりました。kubernetes.io によると、Pod の limits は kubelet とコンテナランタイムがかけ、最後は Linux のカーネルが cgroups で守らせます。CPU は絞られ、メモリは超えると OOM (メモリ不足) で止められることがあります。自分の属する cgroup は /proc/self/cgroup で読めます。v2 では「0::」に続けて組のパスが出ます。",
+          "code": {
+            "language": "bash",
+            "text": "cat /proc/self/cgroup"
+          },
+          "output": "0::/user.slice/user-1000.slice/session-3.scope",
+          "result": {
+            "text": "0:: に続けて、属する cgroup のパスが出る",
+            "tone": "ok"
+          }
+        },
+        {
+          "text": "LXC (Linux Containers) は、これらのカーネルの機能をユーザー空間から使うための道具とライブラリーです。公式の説明では、LXC は namespaces (ipc・uts・mount・pid・network・user)・AppArmor と SELinux・seccomp・chroot (pivot_root)・カーネルの権限 (capabilities)・cgroups を使い、chroot と完全な VM の中間のものと考えられることが多い、と書いています。別のカーネルを持たずに、ふつうの Linux に近い環境を作るのが LXC のねらいです。"
+        },
+        {
+          "text": "Docker は 2013 年 3 月に公開されました。Docker の 0.9 (2014 年 3 月のブログ) では、libcontainer という新しい実行の部品を既定にし、LXC は選べる部品の 1 つになりました。ブログによると、libcontainer は LXC などに頼らずに、namespaces・cgroups・capabilities などを直接使います。Docker の説明では、コンテナはアプリのコードと依存をまとめたもので、同じ機械の OS のカーネルを分け合い、それぞれがユーザー空間の分けられたプロセスとして動きます。"
+        },
+        {
+          "text": "OCI (Open Container Initiative) は、コンテナの形式とランタイムの業界の標準を作るために、2015 年 6 月 22 日に Docker・CoreOS などが Linux Foundation の下で始めました。Docker は、コンテナの形式とランタイムの runC を OCI に寄付しました。runC は、libcontainer の中身を Docker から独立させたものです。"
+        },
+        {
+          "text": "OCI の仕様は 3 つです。Image Specification はイメージの形 (イメージのマニフェスト・任意のイメージのインデックス・ファイルシステムのレイヤー・設定) を、Runtime Specification はディスクに展開した「ファイルシステムのバンドル」(config.json とコンテナのルートのファイルシステム) の動かし方を、Distribution Specification はイメージを配る API を決めています。Runtime Specification は、ランタイムが state・create・start・kill・delete の操作を備えることを求めています。"
+        },
+        {
+          "text": "runc は、OCI の仕様に沿って Linux でコンテナを作って動かすコマンドの道具です。containerd は、README で自らを「業界の標準のコンテナランタイム」と説明しています。Linux と Windows でデーモン (常に動く裏方のプログラム) として動き、イメージの取得と保存から、コンテナの実行と見張りまで、コンテナの一生を受け持ちます。containerd の README によると、Linux のコンテナの機能とのやりとりは主に runc が受け持ちます。containerd は 2019 年 2 月 28 日に CNCF の Graduated (いちばん上の段階) のプロジェクトになりました。k3s は containerd を同梱しています。"
+        },
+        {
+          "text": "CRI (Container Runtime Interface) は、kubelet とコンテナランタイムの間の主な gRPC (通信の決まりの一種) の接続口です。Kubernetes 1.5 で Alpha として入り、v1.23 から Stable です。kubelet は CRI のクライアントとして、gRPC でランタイムにつなぎます。Docker Engine を直接つなぐ dockershim は v1.24 で Kubernetes から外されました。"
+        },
+        {
+          "text": "kubelet とランタイムは、cgroup を操作する方法 (cgroup のドライバー: cgroupfs か systemd) を同じにする必要があります。k3s のノードでは、CRI の道具の crictl で containerd の Pod を見られます (ふつうは sudo が要ります。出力の例の形は kubernetes.io の crictl の文書のもので、出力の例は一部です)。",
+          "code": {
+            "language": "bash",
+            "text": "sudo k3s crictl pods"
+          },
+          "output": "POD ID              CREATED        STATE   NAME                       NAMESPACE     ATTEMPT\n926f1b5a1d33a       20 days ago    Ready   coredns-6c7d8f9b5d-abcde   kube-system   0",
+          "result": {
+            "text": "containerd が動かす Pod の一覧が出る",
+            "tone": "ok"
+          }
+        },
+        {
+          "text": "まとめると、kubectl で Pod を作ると、API サーバーに Pod が書かれ、スケジューラーが動かすノードを決めます。そのノードの kubelet が Pod を見つけ、CRI で containerd に頼みます。OCI の説明では、実装はイメージを取ってきてファイルシステムのバンドルに展開し、OCI のランタイム (ここでは runc) がそれを動かします。runc はシステムコールでカーネルに namespaces と cgroups を作らせ、その中でコンテナのプロセスを起動します。動き出したコンテナは、ホストのカーネルの上のふつうのプロセスです。"
+        },
+        {
+          "text": "ただし、コンテナはホストのカーネルを分け合うので、VM ほど強くは分けられません。kubernetes.io は、コンテナは共有のカーネルの上のプロセスで、ホストの /sys や /proc もマウントするため、自分のカーネルを持つ VM の上のアプリより安全性が低いと書いています。seccomp・AppArmor・SELinux で強められますが、信頼できないコードを動かすときは、VM などのサンドボックスが勧められています。"
+        }
+      ],
+      "try": [
+        {
+          "goal": "自分のシェルの namespaces と cgroup を読みたいなら",
+          "steps": [
+            {
+              "text": "この手順は読むだけで何も作らないので、名前空間 try-kcna は作らず、後片付けもありません。lsns は、namespaces を種類ごとに一覧する道具です。man ページによると、lsns は /proc から読むので、特権の無いユーザーでは情報が欠けることがあります。NS の列は namespace の番号で、同じ番号なら同じ namespace です (出力の例は一部です)。",
+              "code": {
+                "language": "bash",
+                "text": "lsns"
+              },
+              "output": "        NS TYPE   NPROCS   PID USER COMMAND\n4026531832 mnt       112  1630 user /usr/bin/dbus-daemon --session ...\n4026531833 net       114  1630 user /usr/bin/dbus-daemon --session ...\n4026531836 pid       115  1630 user /usr/bin/dbus-daemon --session ..."
+            },
+            {
+              "text": "自分のシェルが属する cgroup を読みます。コンテナの中で同じファイルを読むと、cgroup の namespace のおかげで、ホストより短いパス (例: 0::/) が出ることがあります。",
+              "code": {
+                "language": "bash",
+                "text": "cat /proc/self/cgroup"
+              },
+              "output": "0::/user.slice/user-1000.slice/session-3.scope"
+            }
+          ]
+        },
+        {
+          "goal": "ノードの上で、コンテナがランタイムとプロセスとしてどう見えるかを確かめたいなら",
+          "steps": [
+            {
+              "text": "これも読むだけなので try-kcna は作りません。CoreDNS の Pod がどのノードで動いているかを、NODE の列で確かめます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl get pods -n kube-system -o wide"
+              }
+            },
+            {
+              "text": "その NODE のノードに入り、containerd が動かしているコンテナを crictl で一覧します。CRI の道具なので、kubectl を通さずにランタイムに直接たずねます。",
+              "code": {
+                "language": "bash",
+                "text": "sudo k3s crictl ps"
+              }
+            },
+            {
+              "text": "同じコンテナを、ホストのプロセスの一覧から探します。CoreDNS のコンテナは、ホストからは coredns を含む行の、ふつうのプロセスとして見えます (PID はホストの番号です)。",
+              "code": {
+                "language": "bash",
+                "text": "ps -ef | grep '[c]oredns'"
+              }
+            },
+            {
+              "text": "ノードの一覧の CONTAINER-RUNTIME の列で、kubelet が CRI でつないでいるランタイムを確かめます。k3s では containerd:// で始まります。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl get nodes -o wide"
+              }
+            }
+          ]
+        }
+      ],
+      "lessons": [
+        "w1-l1",
+        "w1-l2",
+        "w1-l3",
+        "w1-l4",
+        "w2-l2",
+        "w4-l2",
+        "w8-l4"
+      ],
+      "sources": [
+        {
+          "label": "man7.org の chroot(2)",
+          "url": "https://man7.org/linux/man-pages/man2/chroot.2.html"
+        },
+        {
+          "label": "FreeBSD Handbook の Jails and Containers",
+          "url": "https://docs.freebsd.org/en/books/handbook/jails/"
+        },
+        {
+          "label": "man7.org の namespaces(7)",
+          "url": "https://man7.org/linux/man-pages/man7/namespaces.7.html"
+        },
+        {
+          "label": "man7.org の pid_namespaces(7)",
+          "url": "https://man7.org/linux/man-pages/man7/pid_namespaces.7.html"
+        },
+        {
+          "label": "man7.org の cgroup_namespaces(7)",
+          "url": "https://man7.org/linux/man-pages/man7/cgroup_namespaces.7.html"
+        },
+        {
+          "label": "man7.org の cgroups(7)",
+          "url": "https://man7.org/linux/man-pages/man7/cgroups.7.html"
+        },
+        {
+          "label": "man7.org の lsns(8)",
+          "url": "https://man7.org/linux/man-pages/man8/lsns.8.html"
+        },
+        {
+          "label": "kubernetes.io の Resource Management for Pods and Containers",
+          "url": "https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/"
+        },
+        {
+          "label": "kubernetes.io の Multi-tenancy (コンテナと VM の分け方の強さ)",
+          "url": "https://kubernetes.io/docs/concepts/security/multi-tenancy/"
+        },
+        {
+          "label": "linuxcontainers.org の LXC Introduction",
+          "url": "https://linuxcontainers.org/lxc/introduction/"
+        },
+        {
+          "label": "docker.com のブログ Docker 0.9: Introducing Execution Drivers and libcontainer",
+          "url": "https://www.docker.com/blog/docker-0-9-introducing-execution-drivers-and-libcontainer/"
+        },
+        {
+          "label": "docker.com のブログ Open Container Project (2013 年 3 月の公開にもふれる)",
+          "url": "https://www.docker.com/blog/open-container-project-foundation/"
+        },
+        {
+          "label": "docker.com の What is a Container?",
+          "url": "https://www.docker.com/resources/what-container/"
+        },
+        {
+          "label": "opencontainers.org の About the OCI",
+          "url": "https://opencontainers.org/about/overview/"
+        },
+        {
+          "label": "OCI Image Format Specification",
+          "url": "https://github.com/opencontainers/image-spec/blob/main/spec.md"
+        },
+        {
+          "label": "OCI Runtime Specification の Filesystem Bundle",
+          "url": "https://github.com/opencontainers/runtime-spec/blob/main/bundle.md"
+        },
+        {
+          "label": "OCI Runtime Specification の Runtime and Lifecycle",
+          "url": "https://github.com/opencontainers/runtime-spec/blob/main/runtime.md"
+        },
+        {
+          "label": "github.com の opencontainers/runc",
+          "url": "https://github.com/opencontainers/runc"
+        },
+        {
+          "label": "github.com の containerd/containerd (README)",
+          "url": "https://github.com/containerd/containerd"
+        },
+        {
+          "label": "containerd.io (CNCF の Graduated)",
+          "url": "https://containerd.io/"
+        },
+        {
+          "label": "kubernetes.io の Container Runtime Interface (CRI)",
+          "url": "https://kubernetes.io/docs/concepts/architecture/cri/"
+        },
+        {
+          "label": "kubernetes.io の Kubernetes Scheduler",
+          "url": "https://kubernetes.io/docs/concepts/scheduling-eviction/kube-scheduler/"
+        },
+        {
+          "label": "kubernetes.io のブログ Introducing Container Runtime Interface (CRI) in Kubernetes",
+          "url": "https://kubernetes.io/blog/2016/12/container-runtime-interface-cri-in-kubernetes/"
+        },
+        {
+          "label": "kubernetes.io の Migrating from dockershim",
+          "url": "https://kubernetes.io/docs/tasks/administer-cluster/migrating-from-dockershim/"
+        },
+        {
+          "label": "kubernetes.io の Container Runtimes (cgroup のドライバー)",
+          "url": "https://kubernetes.io/docs/setup/production-environment/container-runtimes/"
+        },
+        {
+          "label": "kubernetes.io の Debugging Kubernetes nodes with crictl",
+          "url": "https://kubernetes.io/docs/tasks/debug/debug-cluster/crictl/"
+        },
+        {
+          "label": "docs.k3s.io のトップ (同梱の containerd)",
+          "url": "https://docs.k3s.io/"
+        },
+        {
+          "label": "docs.k3s.io の CLI Tools (k3s crictl)",
+          "url": "https://docs.k3s.io/cli"
+        }
+      ]
+    }
+  ]
+}
