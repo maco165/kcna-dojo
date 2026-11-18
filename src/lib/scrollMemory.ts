@@ -1,21 +1,22 @@
 // 戻る・進む操作で、そのページを離れたときのスクロールの位置に戻す。
-// 履歴の 1 件ごとに鍵 (history.state.kcnaKey) を付け、鍵ごとの位置を sessionStorage に残す。
+// 履歴の 1 件ごとに鍵 (history.state.kcnaKey) を付け、鍵ごとの位置を覚える。
 // 鍵の無い履歴は新しく開いたページなので先頭から出す
 const STORE = 'kcna.scroll';
 
-type Positions = Record<string, number>;
-
-function read(): Positions {
+function readStore(): Record<string, number> {
   try {
-    return JSON.parse(sessionStorage.getItem(STORE) ?? '{}') as Positions;
+    return JSON.parse(sessionStorage.getItem(STORE) ?? '{}') as Record<string, number>;
   } catch {
     return {};
   }
 }
 
-function write(p: Positions) {
+/** 主の置き場はこの Map。sessionStorage は再読み込みに備えた写し (使えなくても同じ画面の中では戻せる) */
+const positions = new Map<string, number>(Object.entries(readStore()));
+
+function writeStore() {
   try {
-    sessionStorage.setItem(STORE, JSON.stringify(p));
+    sessionStorage.setItem(STORE, JSON.stringify(Object.fromEntries(positions)));
   } catch {
     // 保存できなくても画面は動かす (プライベートモードなど)
   }
@@ -38,43 +39,34 @@ export function ensureKey(): { key: string; fresh: boolean } {
 }
 
 let current = '';
-let saving = 0;
+let started = false;
 
-function save() {
+/** 今のページの位置を覚える。ページを離れる直前 (前の画面がまだあるうち) と、閉じる・再読み込みの前に呼ぶ */
+export function savePosition() {
   if (!current) return;
-  const p = read();
-  p[current] = scroller().scrollTop;
-  write(p);
+  positions.set(current, scroller().scrollTop);
+  writeStore();
 }
 
-/** 画面が描かれるのを待ってから位置を戻す (長いページは描き終わるまで高さが足りない) */
-function restore(top: number, tries = 20) {
+/** 画面が描かれるのを待ってから位置を戻す (長いページは描き終わるまで高さが足りない)。1 秒まで試す */
+function restore(top: number, until = performance.now() + 1000) {
   requestAnimationFrame(() => {
     const el = scroller();
     el.scrollTop = top;
-    if (Math.abs(el.scrollTop - top) > 2 && tries > 0) restore(top, tries - 1);
+    if (Math.abs(el.scrollTop - top) > 2 && performance.now() < until) restore(top, until);
   });
 }
 
-/** 起動のときに 1 回だけ呼ぶ */
+/** 起動のときに呼ぶ (2 回呼ばれても 1 回だけ働く) */
 export function startScrollMemory() {
+  if (started) return;
+  started = true;
   if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
   current = ensureKey().key;
-  // 中の欄のスクロールも拾うため、capture で受ける
-  document.addEventListener(
-    'scroll',
-    () => {
-      if (saving) return;
-      saving = requestAnimationFrame(() => {
-        saving = 0;
-        save();
-      });
-    },
-    { capture: true, passive: true },
-  );
+  window.addEventListener('pagehide', savePosition);
 }
 
-/** 経路が変わったときに呼ぶ。戻る・進むなら元の位置へ、新しいページなら先頭へ */
+/** 経路が変わったあとに呼ぶ。戻る・進むなら元の位置へ、新しいページなら先頭へ */
 export function onRouteChanged() {
   const { key, fresh } = ensureKey();
   current = key;
@@ -83,5 +75,5 @@ export function onRouteChanged() {
     requestAnimationFrame(() => (scroller().scrollTop = 0));
     return;
   }
-  restore(read()[key] ?? 0);
+  restore(positions.get(key) ?? 0);
 }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { onRouteChanged, startScrollMemory } from './scrollMemory';
+import { onRouteChanged, savePosition, startScrollMemory } from './scrollMemory';
 
 // GitHub Pages ではサーバーで経路を振り分けられないので、URL の # の後ろで画面を決める。
 export type Route = { name: 'home'; week: number } | { name: 'lesson'; lessonId: string } | { name: 'about' } | { name: 'settings' } | { name: 'review' } | { name: 'progress' } | { name: 'exam' } | { name: 'glossary' } | { name: 'guide' } | { name: 'handbook'; topicId?: string };
@@ -40,6 +40,8 @@ export function useRoute(): Route {
   useEffect(() => {
     startScrollMemory();
     const onChange = () => {
+      // 前のページの画面がまだあるうちに、その位置を覚える
+      savePosition();
       setRoute(parseRoute(window.location.hash));
       onRouteChanged();
     };
