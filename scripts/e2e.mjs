@@ -434,6 +434,7 @@ async function run(browser, name, width, height) {
   await page.getByRole('heading', { name: '全体の流れ' }).waitFor();
   check(page.url().includes('#/handbook/debugging'), `${tag} 目次からトピックへ飛べる`);
   check((await page.locator('.hb-try').count()) >= 2 && (await page.locator('.hb-try[open]').count()) === 1, `${tag} 試す手順があり、最初の 1 つだけ開いている`);
+  check((await page.locator('.sv__result').count()) >= 1, `${tag} 手順の絵に、起きる結果が添えられる`);
   check((await page.locator('.sv__row').count()) >= 10 && (await page.locator('.sv__row[aria-label^="作る"]').count()) >= 1, `${tag} 手順に、コマンドで起きることの絵が付く`);
   await page.locator('.gloss-chip').first().click();
   await page.waitForURL(/#\/lesson\//);

@@ -4,7 +4,9 @@ import type { Domain } from './types';
 import { DOMAINS } from '../lib/lessonStatus';
 
 export type HandbookCode = { language: 'bash' | 'yaml'; text: string };
-export type HandbookStep = { text: string; code?: HandbookCode; output?: string };
+/** 手順のあとクラスタの中で起きること (本文に書いてある結果を短く)。ok は思いどおり、warn は失敗・止まる */
+export type HandbookResult = { text: string; tone: 'ok' | 'warn' };
+export type HandbookStep = { text: string; code?: HandbookCode; output?: string; result?: HandbookResult };
 export type HandbookTry = { goal: string; steps: HandbookStep[] };
 export type HandbookTopic = {
   id: string;

@@ -22,7 +22,7 @@ function Step({ step }: { step: HandbookStep }) {
   return (
     <div className="hb-step">
       <p className="hb-step__text">{step.text}</p>
-      {step.code && <StepVisual code={step.code.text} language={step.code.language} />}
+      {step.code && <StepVisual code={step.code.text} language={step.code.language} result={step.result} />}
       {step.code && <CodeBlock code={step.code.text} language={step.code.language} width="100%" size="sm" hasCopyButton />}
       {step.output && (
         <figure className="hb-output">

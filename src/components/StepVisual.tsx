@@ -1,5 +1,6 @@
 // 手順の絵: コマンドを打つ人 (kubectl など) → 操作 → 場所 (名前空間など) の中の対象。
 // 中身はコマンドから自動で読む (lib/commandVisual.ts)。文字なので読み上げにもそのまま載る
+import type { HandbookResult } from '../content/handbook';
 import { commandActions, describeAction, type Action } from '../lib/commandVisual';
 
 /** 1 つの手順で並べる行の数の上限 (多いときは「ほか n 件」) */
@@ -44,9 +45,9 @@ function Row({ a }: { a: Action }) {
   );
 }
 
-export default function StepVisual({ code, language }: { code: string; language: 'bash' | 'yaml' }) {
+export default function StepVisual({ code, language, result }: { code: string; language: 'bash' | 'yaml'; result?: HandbookResult }) {
   const actions = commandActions(code, language);
-  if (actions.length === 0) return null;
+  if (actions.length === 0 && !result) return null;
   const shown = actions.slice(0, MAX_ROWS);
   return (
     <ul className="sv" aria-label="このコマンドで起きること">
@@ -54,6 +55,15 @@ export default function StepVisual({ code, language }: { code: string; language:
         <Row key={i} a={a} />
       ))}
       {actions.length > MAX_ROWS && <li className="sv__more">ほか {actions.length - MAX_ROWS} 件</li>}
+      {result && (
+        <li className={`sv__result sv__result--${result.tone}`}>
+          <span className="sv__result-mark" aria-hidden="true">
+            {result.tone === 'ok' ? '↳' : '!'}
+          </span>
+          <span className="sv__result-label">結果</span>
+          <span>{result.text}</span>
+        </li>
+      )}
     </ul>
   );
 }

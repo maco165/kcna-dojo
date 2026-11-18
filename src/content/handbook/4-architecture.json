@@ -69,7 +69,11 @@
                 "language": "bash",
                 "text": "kubectl get pod crash -n try-kcna"
               },
-              "output": "NAME    READY   STATUS             RESTARTS      AGE\ncrash   0/1     CrashLoopBackOff   2 (15s ago)   45s"
+              "output": "NAME    READY   STATUS             RESTARTS      AGE\ncrash   0/1     CrashLoopBackOff   2 (15s ago)   45s",
+              "result": {
+                "text": "RESTARTS が増え、CrashLoopBackOff になる",
+                "tone": "warn"
+              }
             },
             {
               "text": "1 つ前のコンテナが書いたログを --previous で読み、この Pod に関わるイベントを並べます。",
@@ -285,7 +289,11 @@
                 "language": "bash",
                 "text": "kubectl get hpa php-apache -n try-kcna --watch"
               },
-              "output": "NAME         REFERENCE               TARGETS         MINPODS   MAXPODS   REPLICAS   AGE\nphp-apache   Deployment/php-apache   cpu: 250%/50%   1         10        1          3m\nphp-apache   Deployment/php-apache   cpu: 250%/50%   1         10        5          3m15s"
+              "output": "NAME         REFERENCE               TARGETS         MINPODS   MAXPODS   REPLICAS   AGE\nphp-apache   Deployment/php-apache   cpu: 250%/50%   1         10        1          3m\nphp-apache   Deployment/php-apache   cpu: 250%/50%   1         10        5          3m15s",
+              "result": {
+                "text": "使用率が上がり、HPA が REPLICAS を増やす",
+                "tone": "ok"
+              }
             },
             {
               "text": "後片付けをします。",
@@ -314,7 +322,11 @@
                 "language": "bash",
                 "text": "kubectl delete -n try-kcna $(kubectl get pods -n try-kcna -l app=web -o name | head -1)\nkubectl get pods -n try-kcna"
               },
-              "output": "pod \"web-6d4cf56db6-2xk8p\" deleted\nNAME                   READY   STATUS    RESTARTS   AGE\nweb-6d4cf56db6-9vq7m   1/1     Running   0          40s\nweb-6d4cf56db6-tz5lw   1/1     Running   0          40s\nweb-6d4cf56db6-xw2rd   1/1     Running   0          3s"
+              "output": "pod \"web-6d4cf56db6-2xk8p\" deleted\nNAME                   READY   STATUS    RESTARTS   AGE\nweb-6d4cf56db6-9vq7m   1/1     Running   0          40s\nweb-6d4cf56db6-tz5lw   1/1     Running   0          40s\nweb-6d4cf56db6-xw2rd   1/1     Running   0          3s",
+              "result": {
+                "text": "替わりの Pod が作られ、3 つに戻る",
+                "tone": "ok"
+              }
             },
             {
               "text": "後片付けをします。",
