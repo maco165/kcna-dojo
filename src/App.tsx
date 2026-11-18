@@ -40,6 +40,7 @@ export default function App() {
   let screen: ReactNode;
   if (lazyName && !Screen) screen = last.current;
   else if (Screen && route.name === 'handbook') screen = <Screen key={route.topicId ?? 'index'} progress={progress} updateProgress={updateProgress} topicId={route.topicId} />;
+  else if (Screen && route.name === 'compare') screen = <Screen key={route.tableId ?? 'index'} progress={progress} tableId={route.tableId} />;
   else if (Screen && route.name === 'glossary') screen = <Screen key={route.termId ?? 'index'} progress={progress} termId={route.termId} />;
   else if (Screen && (route.name === 'guide' || route.name === 'progress' || route.name === 'about')) screen = <Screen progress={progress} />;
   else if (Screen) screen = <Screen progress={progress} updateProgress={updateProgress} />;
