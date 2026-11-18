@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   colorMode,
+  markHandbookSeen,
   normalizeProgress,
   DEFAULT_EXAM_DATE,
   DEFAULT_GOAL_XP,
@@ -160,7 +161,9 @@ describe('設定と記録の書き出し・読み込み・消す', () => {
   it('記録を消すと進捗は空になり、目標と受験日は残る', () => {
     let p = completeLesson(emptyProgress(), 'w1-l1', score, 12, at('2026-11-23'));
     p = setProfile(p, { dailyGoalXp: 10 });
+    p = markHandbookSeen(p, 'storage', 3, at('2026-11-23'));
     const r = resetProgress(p);
+    expect(r.handbook).toBeUndefined();
     expect(r.lessons).toEqual({});
     expect(r.xp.total).toBe(0);
     expect(r.profile?.dailyGoalXp).toBe(10);

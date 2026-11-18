@@ -62,7 +62,6 @@ function Step({ step, text }: { step: HandbookStep; text: TermPiece[] }) {
   );
 }
 
-/** 目次: 分野ごとに細目のトピックを並べる */
 type Update = (fn: (p: Progress) => Progress) => void;
 
 /** 目次のカードに添える読んだ記録 */
@@ -99,6 +98,7 @@ function SeenTracker({ topicId, seen, updateProgress }: { topicId: string; seen:
   return null;
 }
 
+/** 目次: 分野ごとに細目のトピックを並べる */
 function Index({ progress }: { progress: Progress }) {
   const total = HANDBOOK.reduce((n, d) => n + d.topics.length, 0);
   const done = HANDBOOK.reduce((n, d) => n + d.topics.filter((t) => progress.handbook?.[t.id]?.done).length, 0);
@@ -194,7 +194,7 @@ function Topic({ id, progress, updateProgress }: { id: string; progress: Progres
         <p className="hb-lead">
           <Prose pieces={prose.summary} />
         </p>
-        {opened && !opened.done && opened.seen > 0 && opened.seen < t.flow.length && (
+        {opened && !opened.done && !rec?.done && opened.seen > 0 && opened.seen < t.flow.length && (
           <HStack gap={3} vAlign="center" className="hb-resume">
             <Text type="supporting">前回は全体の流れの {opened.seen} / {t.flow.length} 段まで読みました</Text>
             <Button
@@ -275,18 +275,19 @@ function Topic({ id, progress, updateProgress }: { id: string; progress: Progres
         <h2 id="hb-done" className="hb-h2">
           読んだ記録
         </h2>
-        {rec?.done ? (
-          <HStack gap={3} vAlign="center">
-            <StatusDot variant="success" label="確認済み" />
-            <Text>確認済み</Text>
-            <Button variant="secondary" size="sm" label="確認済みを取り消す" onClick={() => updateProgress((p) => setHandbookDone(p, t.id, false, new Date()))} />
-          </HStack>
-        ) : (
-          <HStack gap={3} vAlign="center">
-            <Text type="supporting">全体の流れ {Math.min(rec?.seen ?? 0, t.flow.length)} / {t.flow.length} 段まで読みました</Text>
-            <Button variant="primary" size="sm" label="確認済みにする" onClick={() => updateProgress((p) => setHandbookDone(p, t.id, true, new Date()))} />
-          </HStack>
-        )}
+        {/* ボタンは 1 つのまま名前だけ変える (押したボタンが消えてフォーカスを失わないように)。状態の文は読み上げで知らせる */}
+        <HStack gap={3} vAlign="center">
+          {rec?.done && <StatusDot variant="success" label="確認済み" />}
+          <Text type={rec?.done ? undefined : 'supporting'} aria-live="polite">
+            {rec?.done ? '確認済み' : `全体の流れ ${Math.min(rec?.seen ?? 0, t.flow.length)} / ${t.flow.length} 段まで読みました`}
+          </Text>
+          <Button
+            variant={rec?.done ? 'secondary' : 'primary'}
+            size="sm"
+            label={rec?.done ? '確認済みを取り消す' : '確認済みにする'}
+            onClick={() => updateProgress((p) => setHandbookDone(p, t.id, !rec?.done, new Date()))}
+          />
+        </HStack>
       </section>
       <SeenTracker topicId={t.id} seen={rec?.seen ?? 0} updateProgress={updateProgress} />
 

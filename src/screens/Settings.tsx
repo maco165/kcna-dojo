@@ -41,7 +41,8 @@ type Props = { progress: Progress; updateProgress: (fn: (p: Progress) => Progres
 function summary(p: Progress) {
   const lessons = Object.values(p.lessons).filter((l) => l.done).length;
   const answers = Object.keys(p.answers).length;
-  return `完了したレッスン ${lessons} · 答えた問題 ${answers} · 合計 ${p.xp.total} XP`;
+  const read = Object.values(p.handbook ?? {}).filter((h) => h.done).length;
+  return `完了したレッスン ${lessons} · 答えた問題 ${answers} · 合計 ${p.xp.total} XP · ハンドブックの確認済み ${read}`;
 }
 
 function Body({ progress, updateProgress }: Props) {
@@ -177,7 +178,7 @@ function Body({ progress, updateProgress }: Props) {
         isOpen={confirmReset}
         onOpenChange={setConfirmReset}
         title="記録を消しますか?"
-        description="完了したレッスン・XP・連続日数・問題ごとの正誤を消します。目標・受験日・画面の色の設定は残ります。消す前に書き出しておくと、あとで読み込んで戻せます。"
+        description="完了したレッスン・XP・連続日数・問題ごとの正誤・模擬試験の結果・ハンドブックの読んだ記録を消します。目標・受験日・画面の色の設定は残ります。消す前に書き出しておくと、あとで読み込んで戻せます。"
         actionLabel="消す"
         cancelLabel="やめる"
         onAction={() => {
