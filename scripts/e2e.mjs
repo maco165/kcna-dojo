@@ -72,10 +72,10 @@ async function run(browser, name, width, height) {
   await page.goto(BASE);
   await page.getByRole('heading', { name: 'コンテナの基礎' }).waitFor();
   const startLinks = page.getByRole('link', { name: '開始' });
-  const lessonLinks = await page.evaluate(() => [...new Set([...document.querySelectorAll('a[href^="#/lesson/"]')].map((a) => a.getAttribute('href')))]);
+  const lessonLinks = await page.evaluate(() => [...new Set([...document.querySelectorAll('a[href^="/kcna-dojo/lesson/"]')].map((a) => a.getAttribute('href')))]);
   check(lessonLinks.length === week1.lessons.length, `${tag} 空の記録でも全部のレッスンを開ける (${lessonLinks.length} / ${week1.lessons.length})`);
   check((await startLinks.count()) === 1, `${tag} ホームの「開始」は 1 つだけ`);
-  check((await startLinks.first().getAttribute('href')) === `#/lesson/${l1.id}`, `${tag} 「開始」は最初のレッスン`);
+  check((await startLinks.first().getAttribute('href')) === `/kcna-dojo/lesson/${l1.id}/`, `${tag} 「開始」は最初のレッスン`);
   check(await page.getByText('0 / 30 XP').isVisible(), `${tag} 今日の目標は 0 / 30 XP`);
   check((await page.title()).startsWith('クラネイ'), `${tag} ページの題がクラネイで始まる`);
   check(await page.getByText('クラネイ', { exact: true }).first().isVisible(), `${tag} サイト名クラネイが出る`);
@@ -114,7 +114,7 @@ async function run(browser, name, width, height) {
   const doneText = width >= 768 ? `${total - 1} / ${total}` : '完了';
   check(await page.getByText(doneText, { exact: true }).first().isVisible(), `${tag} 1 つ目が完了になる (${doneText})`);
   check(
-    (await page.getByRole('link', { name: '開始' }).first().getAttribute('href')) === `#/lesson/${l2.id}`,
+    (await page.getByRole('link', { name: '開始' }).first().getAttribute('href')) === `/kcna-dojo/lesson/${l2.id}/`,
     `${tag} 「開始」が 2 つ目に移る`,
   );
   check(await page.getByText(`${xp} / 30 XP`).isVisible(), `${tag} 今日の目標が ${xp} XP に増える`);
@@ -122,7 +122,7 @@ async function run(browser, name, width, height) {
   check(stored?.lessons?.[l1.id]?.done === true && stored?.streak?.count === 1, `${tag} localStorage の kcna.v1 に完了と連続 1 日が残る`);
 
   // 4. コマンドの穴埋め (打ち込んで Enter)
-  await page.goto(`${BASE}#/lesson/w1-l3`);
+  await page.goto(`${BASE}lesson/w1-l3/`);
   const input = page.getByRole('textbox', { name: '空欄' });
   await input.fill('get');
   await input.press('Enter');
@@ -139,7 +139,7 @@ async function run(browser, name, width, height) {
   await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur());
   await page.keyboard.press('Enter');
   check(await page.getByText(`${l3.title} · 2 / ${l3.questions.length} 問`).isVisible(), `${tag} 答えたあと Enter で次へ進む`);
-  await page.goto(`${BASE}#/lesson/w1-l3`);
+  await page.goto(`${BASE}lesson/w1-l3/`);
   await page.reload();
   await page.getByRole('textbox', { name: '空欄' }).fill('get');
   await page.getByRole('textbox', { name: '空欄' }).press('Enter');
@@ -168,7 +168,7 @@ async function run(browser, name, width, height) {
   check(claudeHref.startsWith('https://claude.ai/new?q=') && asked.includes(q4.prompt), `${tag} Claude のリンクに問題文が入る`);
   check(asked.includes('私の答えは get で不正解'), `${tag} 答えたあとのリンクには自分の答えが入る`);
   check(chatgptHref.startsWith('https://chatgpt.com/?q='), `${tag} ChatGPT のリンクがある`);
-  await page.goto(`${BASE}#/lesson/w1-l1`);
+  await page.goto(`${BASE}lesson/w1-l1/`);
   const before = new URL(await page.getByRole('link', { name: 'Claude' }).getAttribute('href')).searchParams.get('q') ?? '';
   check(before.includes(l1.questions[0].prompt) && !before.includes('正解は'), `${tag} 答える前のリンクには正解を入れない`);
 
@@ -182,7 +182,7 @@ async function run(browser, name, width, height) {
   check(await page.getByText(`${l1.title} · 1 / ${l1.questions.length} 問`).isVisible(), `${tag} やり直すと 1 問目から始まる`);
 
   // 6. 実習
-  await page.goto(`${BASE}#/lesson/${lab.id}`);
+  await page.goto(`${BASE}lesson/${lab.id}/`);
   const finish = page.getByRole('button', { name: '完了にする' });
   check(await finish.isDisabled(), `${tag} 実習は印を付けるまで完了にできない`);
   for (const box of await page.getByRole('checkbox').all()) await box.check();
@@ -196,7 +196,7 @@ async function run(browser, name, width, height) {
   await page.goto(BASE);
   const repoLinks = page.locator('a[href="https://github.com/maco165/kcna-dojo"]');
   check((await repoLinks.count()) >= 1, `${tag} ホームにリポジトリへのリンクがある`);
-  await page.goto(`${BASE}#/about`);
+  await page.goto(`${BASE}about/`);
   await page.getByRole('heading', { name: 'このサイトについて' }).waitFor();
   const repoButton = page.getByRole('link', { name: /GitHub のリポジトリを開く/ }).first();
   check((await repoButton.getAttribute('href')) === 'https://github.com/maco165/kcna-dojo', `${tag} このサイトについてにリポジトリへのボタンがある`);
@@ -214,7 +214,7 @@ async function run(browser, name, width, height) {
     p.answers = { ...(p.answers ?? {}), 'w1-l1-q1': { right: 0, wrong: 1, last: '', stage: 0, nextReview: today }, 'w1-l2-q4': { right: 0, wrong: 1, last: '', stage: 0, nextReview: today } };
     localStorage.setItem('kcna.v1', JSON.stringify(p));
   });
-  await page.goto(`${BASE}#/review`);
+  await page.goto(`${BASE}review/`);
   await page.reload();
   await page.getByRole('heading', { name: '今日の復習 2 問' }).waitFor();
   check(true, `${tag} 復習の画面に今日の 2 問が出る`);
@@ -262,11 +262,11 @@ async function run(browser, name, width, height) {
     await page.getByRole('button', { name: '確かめる' }).click();
     await page.getByRole('button', { name: /次へ|結果を見る/ }).waitFor();
     check((await countAnswers()) === before + 1, `${tag} ランダム出題で答えると記録に入る (${before} → ${await countAnswers()})`);
-    await page.goto(`${BASE}#/week/1`);
+    await page.goto(`${BASE}week/1/`);
   }
 
   // 9c. 進捗の画面
-  await page.goto(`${BASE}#/progress`);
+  await page.goto(`${BASE}progress/`);
   await page.getByRole('heading', { name: '進捗' }).waitFor();
   check(await page.getByText('分野ごとの正答率').isVisible() && await page.getByText('この 7 日の XP').isVisible(), `${tag} 進捗の画面に正答率と 7 日の XP が出る`);
   check((await page.getByRole('link', { name: /第 1 週 コンテナの基礎/ }).count()) === 1, `${tag} 進捗の画面に週ごとの進み具合が出る`);
@@ -275,7 +275,7 @@ async function run(browser, name, width, height) {
   await noHorizontalOverflow(page, width, `${tag} 進捗`);
 
   // 10. 設定: 目標を変える・書き出す・読み込む・記録を消す
-  await page.goto(`${BASE}#/settings`);
+  await page.goto(`${BASE}settings/`);
   await page.getByRole('heading', { name: '設定' }).waitFor();
   await page.getByRole('radio', { name: '10 XP' }).click();
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('kcna.v1') ?? 'null'));
@@ -298,7 +298,7 @@ async function run(browser, name, width, height) {
   await noHorizontalOverflow(page, width, `${tag} 設定`);
 
   // 11. 模擬試験: 60 問・90 分。1 問だけ答えて採点し、結果と記録と復習を見る
-  await page.goto(`${BASE}#/exam`);
+  await page.goto(`${BASE}exam/`);
   await page.getByRole('heading', { name: '模擬試験' }).waitFor();
   const answersBefore = await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('kcna.v1') ?? '{}').answers ?? {}).length);
   check((await page.getByRole('radio', { name: /^(第 [1-3] 回|ランダム)/ }).count()) === 4, `${tag} 模擬試験は第 1〜3 回とランダムから選べる`);
@@ -332,7 +332,7 @@ async function run(browser, name, width, height) {
   await page.getByRole('button', { name: 'やめる', exact: true }).click();
   await page.getByRole('button', { name: /を始める$/ }).waitFor();
   check(await page.getByText(/第 1 回 · \d+ \/ 60 \(\d+%\)/).first().isVisible(), `${tag} 模擬試験の画面にこれまでの結果が回の名前つきで出る`);
-  await page.goto(`${BASE}#/progress`);
+  await page.goto(`${BASE}progress/`);
   await page.getByRole('heading', { name: '進捗' }).waitFor();
   check(await page.getByText(/前回 \d+ \/ 60 問/).isVisible(), `${tag} 進捗の画面に模擬試験の前回の結果が出る`);
 
@@ -341,7 +341,7 @@ async function run(browser, name, width, height) {
     const tp = await context.newPage();
     tp.on('pageerror', (e) => errors.push(e.message));
     await tp.clock.install();
-    await tp.goto(`${BASE}#/exam`);
+    await tp.goto(`${BASE}exam/`);
     const before = await tp.evaluate(() => JSON.parse(localStorage.getItem('kcna.v1') ?? '{}').exams?.length ?? 0);
     await tp.getByRole('button', { name: /を始める$/ }).click();
     await tp.clock.fastForward('01:30:02');
@@ -355,7 +355,7 @@ async function run(browser, name, width, height) {
   }
 
   // 12. 用語集: 検索・分野で絞る・開く・レッスンへのリンク (スマホは閉じた一覧、PC は一覧と説明の 2 列)
-  await page.goto(`${BASE}#/glossary`);
+  await page.goto(`${BASE}glossary/`);
   await page.getByRole('heading', { name: '用語集', level: 1 }).waitFor();
   const isWide = width >= 768;
   const termButtons = isWide ? page.getByRole('navigation', { name: '用語の一覧' }).getByRole('button') : page.locator('.gloss-row__head');
@@ -377,15 +377,15 @@ async function run(browser, name, width, height) {
   await page.getByRole('searchbox', { name: '用語を探す' }).fill('etcd');
   if (!isWide) await page.locator('.gloss-row__head').first().click();
   await page.locator('.gloss-chip').first().click();
-  await page.waitForURL(/#\/lesson\//);
-  check(page.url().includes('#/lesson/'), `${tag} 用語集からレッスンへ飛べる`);
-  await page.goto(`${BASE}#/glossary`);
+  await page.waitForURL(/\/lesson\//);
+  check(page.url().includes('/lesson/'), `${tag} 用語集からレッスンへ飛べる`);
+  await page.goto(`${BASE}glossary/`);
   await noHorizontalOverflow(page, width, `${tag} 用語集`);
   if (isWide) {
     // 768〜1000 幅でも説明欄が一覧の横 (画面の中) に出る
     const narrow = await context.newPage();
     await narrow.setViewportSize({ width: 900, height: 700 });
-    await narrow.goto(`${BASE}#/glossary`);
+    await narrow.goto(`${BASE}glossary/`);
     await narrow.getByRole('navigation', { name: /用語の一覧/ }).getByRole('button').nth(5).click();
     const paneTop = await narrow.locator('.gloss-pane').evaluate((el) => el.getBoundingClientRect().top);
     check(paneTop < 700, `${tag} 900x700 でも説明欄が画面の中に出る (上端 ${Math.round(paneTop)})`);
@@ -404,7 +404,7 @@ async function run(browser, name, width, height) {
   await page.goto(BASE);
   await page.getByRole('link', { name: /Kubernetes とこのサイト/ }).first().click();
   await page.getByRole('heading', { name: /問題を解きながら根っこから/, level: 1 }).waitFor();
-  check(page.url().includes('#/guide'), `${tag} ホーム (左の一覧) から説明のページへ入れる`);
+  check(page.url().includes('/kcna-dojo/guide/'), `${tag} ホーム (左の一覧) から説明のページへ入れる`);
   await page.getByRole('button', { name: 'describe', exact: true }).click();
   check(await page.getByText('describe は違います').isVisible(), `${tag} 見本の問題で違う候補を選ぶと違うと出る`);
   await page.getByRole('button', { name: 'get', exact: true }).click();
@@ -420,7 +420,7 @@ async function run(browser, name, width, height) {
   await noHorizontalOverflow(page, width, `${tag} 説明のページ`);
 
   // 14. 画面の色: 設定で選ぶと、端末の設定に関わらずその色になり、記録に残る
-  await page.goto(`${BASE}#/settings`);
+  await page.goto(`${BASE}settings/`);
   await page.getByRole('heading', { name: '設定' }).waitFor();
   const bodyBg = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
   const bgBefore = await bodyBg();
@@ -442,7 +442,7 @@ async function run(browser, name, width, height) {
     const darkCtx = await browser.newContext({ viewport: { width, height }, colorScheme: 'dark' });
     const dp = await darkCtx.newPage();
     dp.on('pageerror', (e) => errors.push(e.message));
-    await dp.goto(`${BASE}#/settings`);
+    await dp.goto(`${BASE}settings/`);
     await dp.getByRole('heading', { name: '設定' }).waitFor();
     const bg = () => dp.evaluate(() => getComputedStyle(document.body).backgroundColor);
     check((await bg()) === 'rgb(17, 17, 18)', `${tag} 端末がダークで何も選ばなければ暗い地`);
@@ -462,32 +462,32 @@ async function run(browser, name, width, height) {
   }
 
   // 15. ハンドブック: 目次の 13 トピックと付録の 2 つ、1 トピックの流れ・試す手順・練習のレッスン、説明のページの学習要領から飛べる
-  await page.goto(`${BASE}#/handbook`);
+  await page.goto(`${BASE}handbook/`);
   await page.getByRole('heading', { name: 'ハンドブック', level: 1 }).waitFor();
   check((await page.locator('.hb-topic').count()) === 15, `${tag} ハンドブックの目次に学習要領の 13 トピックと付録の 2 つ`);
   check((await page.locator('.hb-domain').last().locator('.hb-domain__head').innerText()).includes('資格の範囲の外'), `${tag} 付録は目次の最後で、配点の代わりに範囲の外と出る`);
   check((await page.locator('.hb-topic .dg-thumb').count()) === 15, `${tag} 目次の 15 トピックすべてにサムネイルがある`);
   await page.locator('.hb-topic').filter({ hasText: 'Debugging' }).click();
   await page.getByRole('heading', { name: '全体の流れ' }).waitFor();
-  check(page.url().includes('#/handbook/debugging'), `${tag} 目次からトピックへ飛べる`);
+  check(page.url().includes('/handbook/debugging/'), `${tag} 目次からトピックへ飛べる`);
   check((await page.locator('.hb-try').count()) >= 2 && (await page.locator('.hb-try[open]').count()) === 1, `${tag} 試す手順があり、最初の 1 つだけ開いている`);
   check((await page.locator('.sv__result').count()) >= 1, `${tag} 手順の絵に、起きる結果が添えられる`);
   check((await page.locator('.sv__row').count()) >= 10 && (await page.locator('.sv__row[aria-label^="作る"]').count()) >= 1, `${tag} 手順に、コマンドで起きることの絵が付く`);
   await page.locator('.gloss-chip').first().click();
-  await page.waitForURL(/#\/lesson\//);
+  await page.waitForURL(/\/lesson\//);
   check(true, `${tag} ハンドブックから練習のレッスンへ飛べる`);
-  await page.goto(`${BASE}#/guide`);
+  await page.goto(`${BASE}guide/`);
   await page.getByRole('link', { name: 'Kubernetes Core Concepts' }).click();
-  await page.waitForURL(/#\/handbook\/core-concepts/);
+  await page.waitForURL(/\/handbook\/core-concepts\//);
   check(true, `${tag} 説明のページの学習要領の表からハンドブックへ飛べる`);
   // 15 トピックすべてを、試す手順を全部開いた形で、横にはみ出さないか測る
-  await page.goto(`${BASE}#/handbook`);
-  const allIds = await page.locator('.hb-topic').evaluateAll((els) => els.map((a) => a.getAttribute('href').split('/').pop()));
+  await page.goto(`${BASE}handbook/`);
+  const allIds = await page.locator('.hb-topic').evaluateAll((els) => els.map((a) => a.getAttribute('href').split('/').filter(Boolean).pop()));
   let widest = { id: '', w: 0 };
   const figureMissing = [];
   const figureScroll = [];
   for (const id of allIds) {
-    await page.goto(`${BASE}#/handbook/${id}`);
+    await page.goto(`${BASE}handbook/${id}/`);
     await page.getByRole('heading', { name: '全体の流れ' }).waitFor();
     await page.evaluate(() => document.querySelectorAll('details').forEach((d) => (d.open = true)));
     const w = await page.evaluate(() => document.documentElement.scrollWidth);
@@ -503,7 +503,7 @@ async function run(browser, name, width, height) {
   // 15c. ハンドブックの読んだ記録: 流れの段を画面に出すと記録され、目次に読みかけ、続きから・確認済みが使える
   {
     const hb = () => page.evaluate(() => JSON.parse(localStorage.getItem('kcna.v1') ?? '{}').handbook ?? {});
-    await page.goto(`${BASE}#/handbook/storage`);
+    await page.goto(`${BASE}handbook/storage/`);
     await page.getByRole('heading', { name: '全体の流れ' }).waitFor();
     const steps = await page.locator('[data-flow-step]').count();
     await page.waitForTimeout(300);
@@ -518,8 +518,10 @@ async function run(browser, name, width, height) {
     check(/読みかけ \d+ \/ \d+ 段/.test(await card.locator('.hb-topic__read').innerText()), `${tag} 目次のカードに読みかけと段の数が出る`);
     await card.click();
     await page.getByRole('button', { name: '続きから' }).click();
-    await page.waitForTimeout(800);
-    const top = await page.locator(`[data-flow-step="${seen}"]`).evaluate((el) => el.getBoundingClientRect().top - (document.querySelector('.astryx-layout-content')?.getBoundingClientRect().top ?? 0));
+    // なめらかなスクロールが止まるまで待つ (決まった時間ではなく、位置が落ち着くまで)
+    const stepTop = (n) => page.locator(`[data-flow-step="${n}"]`).evaluate((el) => el.getBoundingClientRect().top - (document.querySelector('.astryx-layout-content')?.getBoundingClientRect().top ?? 0));
+    await page.waitForFunction((n) => { const el = document.querySelector(`[data-flow-step="${n}"]`); const t = el.getBoundingClientRect().top - (document.querySelector('.astryx-layout-content')?.getBoundingClientRect().top ?? 0); return Math.abs(t) < 60; }, seen, { timeout: 5000 }).catch(() => {});
+    const top = await stepTop(seen);
     check(Math.abs(top) < 60, `${tag} 続きからで、前回の続きの段が画面の上に来る (${Math.round(top)})`);
     await page.locator(`[data-flow-step="${steps - 1}"]`).scrollIntoViewIfNeeded();
     await page.evaluate((n) => document.querySelector(`[data-flow-step="${n}"]`).scrollIntoView({ block: 'start' }), steps - 1);
@@ -537,7 +539,7 @@ async function run(browser, name, width, height) {
 
   // 15b. ハンドブックの本文の用語: 強調され、押すと用語集のその語が開く
   {
-    await page.goto(`${BASE}#/handbook/core-concepts`);
+    await page.goto(`${BASE}handbook/core-concepts/`);
     await page.getByRole('heading', { name: '全体の流れ' }).waitFor();
     const terms = page.locator('a.hb-term');
     check((await terms.count()) >= 10, `${tag} ハンドブックの本文の用語集の語がリンクになる (${await terms.count()} 語)`);
@@ -545,10 +547,12 @@ async function run(browser, name, width, height) {
     check(Number(weight) >= 600, `${tag} 用語のリンクは太字で強調される (${weight})`);
     const etcd = page.locator('a.hb-term', { hasText: /^etcd$/ });
     await etcd.first().click();
-    await page.waitForURL(/#\/glossary\/etcd$/);
+    await page.waitForURL(/\/glossary\/etcd\/$/);
     if (width >= 768) {
       await page.locator('#gloss-pane-term').waitFor();
       check((await page.locator('#gloss-pane-term').innerText()).trim() === 'etcd', `${tag} 用語集でその語 (etcd) の説明が開く`);
+      const ai = await page.locator('#gloss-pane').getByRole('link', { name: 'Claude' }).getAttribute('href');
+      check(ai.startsWith('https://claude.ai/new?q=') && decodeURIComponent(ai.split('?q=')[1]).includes('「etcd」'), `${tag} 用語集の語から、語を入れた AI を開ける`);
     } else {
       const head = page.locator('#gloss-row-etcd button[aria-expanded]');
       await head.waitFor();
@@ -561,7 +565,7 @@ async function run(browser, name, width, height) {
       await page.evaluate(() => ((document.querySelector('.astryx-layout-content') ?? document.scrollingElement).scrollTop = 1500));
       await page.waitForTimeout(200);
       const saved = await scrollTop();
-      await page.goto(`${BASE}#/about`);
+      await page.goto(`${BASE}about/`);
       await page.goBack();
       await page.waitForTimeout(600);
       check(Math.abs((await scrollTop()) - saved) <= 2, `${tag} 用語集へ戻ると覚えた位置 (${saved} → ${await scrollTop()})`);
@@ -572,7 +576,7 @@ async function run(browser, name, width, height) {
   {
     const scrollTop = () => page.evaluate(() => (document.querySelector('.astryx-layout-content') ?? document.scrollingElement).scrollTop);
     const scrollTo = (y) => page.evaluate((v) => ((document.querySelector('.astryx-layout-content') ?? document.scrollingElement).scrollTop = v), y);
-    await page.goto(`${BASE}#/handbook`);
+    await page.goto(`${BASE}handbook/`);
     await page.locator('.hb-topic').first().waitFor();
     // 人が見えているカードを押すのと同じく、カードを画面に入れてから押す (押す直前の位置を覚えているか)
     const card = page.locator('.hb-topic').nth(6);
@@ -602,6 +606,28 @@ async function run(browser, name, width, height) {
     await page.waitForTimeout(600);
     const fwd = await scrollTop();
     check(Math.abs(fwd - 500) < 5, `${tag} トピックを 500 まで送って戻り、進むと 500 (${fwd})`);
+  }
+
+  // 17. 検索に載る作り: # の無い URL で直接開ける・書き出した HTML に題名と本文がある・前の形の #/ は新しい URL へ・中のリンクは読み直さない
+  {
+    const res = await fetch(`${BASE}handbook/core-concepts/`);
+    const html = await res.text();
+    check(res.status === 200 && /<title>Kubernetes の中心の考え方 \| クラネイ/.test(html) && html.includes('<link rel="canonical" href="https://maco165.github.io/kcna-dojo/handbook/core-concepts/"') && html.includes('<h1>Kubernetes の中心の考え方</h1>'), `${tag} ハンドブックのトピックを直接開くと 200 で、書き出した HTML に題名・canonical・本文がある`);
+    const personal = await (await fetch(`${BASE}progress/`)).text();
+    check(personal.includes('<meta name="robots" content="noindex"'), `${tag} 個人の記録の画面は検索に載せない (noindex)`);
+    const map = await (await fetch(`${BASE}sitemap.xml`)).text();
+    check(map.includes('/kcna-dojo/handbook/core-concepts/</loc>') && map.includes('/kcna-dojo/glossary/</loc>') && !map.includes('/progress/'), `${tag} sitemap にハンドブックと用語集があり、個人の画面は無い`);
+    await page.goto(`${BASE}handbook/storage/`);
+    await page.getByRole('heading', { name: '全体の流れ' }).waitFor();
+    check(new URL(page.url()).pathname === '/kcna-dojo/handbook/storage/' && !page.url().includes('#'), `${tag} 前の形の #/... の URL は、同じページの新しい URL になる (${page.url()})`);
+    await page.evaluate(() => (window.__noReload = true));
+    await page.locator('a[href="/kcna-dojo/handbook/"]').first().click();
+    await page.getByRole('heading', { name: 'ハンドブック', level: 1 }).waitFor();
+    check((await page.evaluate(() => window.__noReload)) === true, `${tag} サイトの中のリンクは、ページを読み直さずに切り替わる`);
+    check((await page.title()).startsWith('ハンドブック | クラネイ'), `${tag} サイトの中で移ると、題名もそのページのものになる (${await page.title()})`);
+    await page.goBack();
+    await page.getByRole('heading', { name: '全体の流れ' }).waitFor();
+    check(new URL(page.url()).pathname === '/kcna-dojo/handbook/storage/', `${tag} 戻るで前のページに戻る`);
   }
 
   check(errors.length === 0, `${tag} ページのエラーが無い ${errors.length ? errors.join(' / ') : ''}`);

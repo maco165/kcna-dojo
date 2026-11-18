@@ -3,10 +3,27 @@ export type GlossaryTerm = {
   id: string;
   term: string;
   aliases?: string[];
+  /** 一覧の 1 行目に出す短い説明 (1〜2 文) */
   description: string;
+  /** 開いたときの詳しい説明 (初学者向け。何か・なぜ要るか・どう使うか・似た語との違い)。段落は空行で分ける */
+  detail?: string;
   source: string;
+  /** 詳しい説明の根拠 (source のほかに) */
+  sources?: { label: string; url: string }[];
+  /** 出てくるレッスン。試験の範囲の外の語は空で、代わりに topics を持つ */
   lessons: string[];
+  /** 説明しているハンドブックのトピックの id */
+  topics?: string[];
 };
+
+/** 語を AI に聞くときの文 (Claude / ChatGPT の入力欄に入れる) */
+export function termQuestion(t: Pick<GlossaryTerm, 'term' | 'description'>): string {
+  return [
+    'KCNA-JP (Kubernetes and Cloud Native Associate) の勉強をしている初学者です。',
+    `「${t.term}」について、用語集で次の説明を読みました: ${t.description}`,
+    'まだよく分からないので、身近なたとえと kubectl などの具体例を使って、日本語でやさしく説明してください。似た用語との違いもあれば教えてください。',
+  ].join('\n');
+}
 
 /**
  * 検索のための形にそろえる。大文字・小文字、全角・半角、ひらがな・カタカナの違いを無くし、
@@ -62,10 +79,10 @@ function isNonEmptyString(v: unknown): v is string {
   return typeof v === 'string' && v.trim() !== '';
 }
 
-const KEYS = new Set(['id', 'term', 'aliases', 'description', 'source', 'lessons']);
+const KEYS = new Set(['id', 'term', 'aliases', 'description', 'detail', 'source', 'sources', 'lessons', 'topics']);
 
 /** 用語集のデータの検査。違反を文で返す (空なら OK) */
-export function validateGlossary(data: unknown, knownLessonIds: Set<string>): string[] {
+export function validateGlossary(data: unknown, knownLessonIds: Set<string>, knownTopicIds: Set<string> = new Set()): string[] {
   const errors: string[] = [];
   const terms = (data as { terms?: unknown })?.terms;
   if (!Array.isArray(terms)) return ['terms の配列がありません'];
@@ -89,7 +106,27 @@ export function validateGlossary(data: unknown, knownLessonIds: Set<string>): st
     } catch {
       errors.push(`${where}: source は https の URL にします`);
     }
-    if (!Array.isArray(t?.lessons) || t.lessons.length === 0) errors.push(`${where}: lessons が空です`);
+    if (t?.detail !== undefined && !isNonEmptyString(t.detail)) errors.push(`${where}: detail は文字列にします`);
+    if (t?.sources !== undefined) {
+      if (!Array.isArray(t.sources)) errors.push(`${where}: sources は配列にします`);
+      else
+        for (const x of t.sources as { label?: unknown; url?: unknown }[]) {
+          let ok = isNonEmptyString(x?.label) && isNonEmptyString(x?.url);
+          try {
+            ok = ok && new URL(x.url as string).protocol === 'https:';
+          } catch {
+            ok = false;
+          }
+          if (!ok) errors.push(`${where}: sources は label と https の url を持ちます`);
+        }
+      if (Array.isArray(t.sources) && new Set((t.sources as { url?: unknown }[]).map((x) => x?.url)).size !== t.sources.length) errors.push(`${where}: sources に同じ URL が重なっています`);
+    }
+    const topics = Array.isArray(t?.topics) ? (t.topics as unknown[]) : [];
+    if (t?.topics !== undefined && !Array.isArray(t.topics)) errors.push(`${where}: topics は配列にします`);
+    for (const x of topics) if (!knownTopicIds.has(x as string)) errors.push(`${where}: topics の ${String(x)} というトピックはありません`);
+    if (new Set(topics).size !== topics.length) errors.push(`${where}: topics に同じトピックが重なっています`);
+    // 試験の範囲の語はレッスンで、範囲の外の語はハンドブックのトピックで、どこで出てくるかを示す
+    if (!Array.isArray(t?.lessons) || (t.lessons.length === 0 && topics.length === 0)) errors.push(`${where}: lessons が空です (範囲の外の語なら topics を付ける)`);
     else {
       for (const l of t.lessons) if (!knownLessonIds.has(l as string)) errors.push(`${where}: lessons の ${String(l)} というレッスンはありません`);
       if (new Set(t.lessons).size !== t.lessons.length) errors.push(`${where}: lessons に同じレッスンが重なっています`);
