@@ -9,7 +9,10 @@ const WORD_CHAR = /[A-Za-z0-9_.-]/;
 /** カタカナの語は、前後がカタカナでないときだけ当てる (コントロールの中のロール、データベースの中のベースに当てない) */
 const KATAKANA = /[\u30A1-\u30FA\u30FC]/;
 /** 本文ではふつうの言葉として使うことが多く、用語集の語の意味に限らない別名 (Service の「サービス」など) */
-const TOO_GENERAL = new Set(['サービス', 'リクエスト']);
+const TOO_GENERAL = new Set(['サービス', 'リクエスト', 'ロードバランサー']);
+/** 漢字で始まる語は、直前がカタカナか漢字なら当てない (ネットワーク名前空間は Linux の名前空間で、Namespace ではない) */
+const KANJI = /[\u4E00-\u9FFF]/;
+const KANA_OR_KANJI = /[\u30A1-\u30FA\u30FC\u4E00-\u9FFF]/;
 
 /**
  * 語と別名から、本文に当てる名前の一覧を作る。長い名前を先に試す (kube-controller-manager を controller より先に)。
@@ -46,6 +49,7 @@ export function makeTermLinker(names: { name: string; id: string }[]) {
         if (ASCII.test(name.charAt(0)) && WORD_CHAR.test(before)) continue;
         if (ASCII.test(name.charAt(name.length - 1)) && WORD_CHAR.test(after)) continue;
         if (KATAKANA.test(name.charAt(0)) && KATAKANA.test(before)) continue;
+        if (KANJI.test(name.charAt(0)) && KANA_OR_KANJI.test(before)) continue;
         if (KATAKANA.test(name.charAt(name.length - 1)) && KATAKANA.test(after)) continue;
         if (seen.has(id)) {
           // 2 回目からは文字のまま。長い名前ごと飛ばして、中の短い語に当たらないようにする

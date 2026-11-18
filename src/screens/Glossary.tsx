@@ -12,6 +12,7 @@ import SiteLogo from '../components/SiteLogo';
 import { dueQuestions, findLesson } from '../content';
 import glossary from '../content/glossary.json';
 import type { Domain } from '../content/types';
+import { isFreshVisit } from '../lib/scrollMemory';
 import { searchTerms, sortTerms, termDomain, type GlossaryTerm } from '../lib/glossary';
 import { DOMAINS } from '../lib/lessonStatus';
 import type { Progress } from '../lib/progress';
@@ -89,7 +90,8 @@ function PhoneList({ hits, initial }: { hits: Entry[]; initial?: string }) {
   // ほかのページの用語のリンクから来たときは、その語を開いて見える所へ送る
   useEffect(() => {
     // 経路が変わったときの「先頭へ戻す」(lib/scrollMemory) のあとに送る
-    if (initial) requestAnimationFrame(() => requestAnimationFrame(() => document.getElementById(`gloss-row-${initial}`)?.scrollIntoView({ block: 'start' })));
+    // 戻る・進むで来たときは、覚えた位置に戻すほうを優先する (送り直さない)
+    if (initial) requestAnimationFrame(() => requestAnimationFrame(() => isFreshVisit() && document.getElementById(`gloss-row-${initial}`)?.scrollIntoView({ block: 'start' })));
   }, [initial]);
   // 検索や絞り込みで消えた語は閉じたことにする (戻したときに勝手に開かない)
   useEffect(() => {
@@ -206,7 +208,12 @@ function DeskList({ hits, initial }: { hits: Entry[]; initial?: string }) {
 }
 
 function Body({ isWide, termId }: { isWide: boolean; termId?: string }) {
-  const initial = termId && TERMS.some((t) => t.id === termId) ? termId : undefined;
+  // リンクから来た語は、最初に一覧を出すときだけ開く (検索で一覧が出し直されても、もう一度は開かない)
+  const pending = useRef(termId && TERMS.some((t) => t.id === termId) ? termId : undefined);
+  useEffect(() => {
+    pending.current = undefined;
+  }, []);
+  const initial = pending.current;
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<Domain | 'all'>('all');
   const found = useMemo(() => searchTerms(TERMS, query), [query]);
@@ -239,9 +246,9 @@ function Body({ isWide, termId }: { isWide: boolean; termId?: string }) {
       {hits.length === 0 ? (
         <Text type="supporting">見つかりませんでした。別の言い方 (英語・略語) でも探せます。</Text>
       ) : isWide ? (
-        <DeskList key={initial} hits={hits} initial={initial} />
+        <DeskList hits={hits} initial={initial} />
       ) : (
-        <PhoneList key={initial} hits={hits} initial={initial} />
+        <PhoneList hits={hits} initial={initial} />
       )}
     </VStack>
   );

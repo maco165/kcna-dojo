@@ -501,7 +501,19 @@ async function run(browser, name, width, height) {
     } else {
       const head = page.locator('#gloss-row-etcd button[aria-expanded]');
       await head.waitFor();
-      check((await head.getAttribute('aria-expanded')) === 'true' && (await head.isVisible()), `${tag} 用語集でその語 (etcd) が開いて見える`);
+      await page.waitForTimeout(300);
+      const box = await head.boundingBox();
+      const vh = page.viewportSize().height;
+      check((await head.getAttribute('aria-expanded')) === 'true' && box && box.y >= 0 && box.y < vh, `${tag} 用語集でその語 (etcd) が開いて画面の中に見える (y ${box?.y})`);
+      // 戻る・進むで来たときは、覚えた位置に戻す (その語へ送り直さない)
+      const scrollTop = () => page.evaluate(() => (document.querySelector('.astryx-layout-content') ?? document.scrollingElement).scrollTop);
+      await page.evaluate(() => ((document.querySelector('.astryx-layout-content') ?? document.scrollingElement).scrollTop = 1500));
+      await page.waitForTimeout(200);
+      const saved = await scrollTop();
+      await page.goto(`${BASE}#/about`);
+      await page.goBack();
+      await page.waitForTimeout(600);
+      check(Math.abs((await scrollTop()) - saved) <= 2, `${tag} 用語集へ戻ると覚えた位置 (${saved} → ${await scrollTop()})`);
     }
   }
 

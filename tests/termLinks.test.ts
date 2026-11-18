@@ -11,12 +11,16 @@ const links = (text: string) => makeTermLinker(names)(text).filter((p) => typeof
 
 describe('本文の用語を用語集へのリンクにする', () => {
   it('長い名前を先に当てる (kube-controller-manager を controller より先に)', () => {
+    expect(links('Pod Security Standards')).toEqual([{ text: 'Pod Security Standards', id: 'pod-security-standards' }]);
+    // 並べ替えが逆でも同じ答えになる (termNames が長い順に並べる)
+    expect(termNames([...TERMS].reverse()).map((n) => n.name.length)).toEqual([...termNames(TERMS).map((n) => n.name.length)].sort((a, b) => b - a));
     expect(links('kube-controller-manager が動く')).toEqual([{ text: 'kube-controller-manager', id: 'kube-controller-manager' }]);
   });
   it('英数字の語は語の切れ目だけで当てる (Pods・PodSecurity・podman には当てない)', () => {
     expect(links('Pods と PodSecurity と podman')).toEqual([]);
     expect(links('Pod を作る')).toEqual([{ text: 'Pod', id: 'pod' }]);
     expect(links('(Pod)')).toHaveLength(1);
+    expect(links('imagePullSecret')).toEqual([]);
   });
   it('カタカナの語はカタカナの語の中に当てず、意味の広い別名は使わない', () => {
     expect(links('データベースとコントロールとロールアウト')).toEqual([]);
@@ -30,15 +34,20 @@ describe('本文の用語を用語集へのリンクにする', () => {
     const link2 = makeTermLinker(names);
     expect(link2('API サーバーと kube-apiserver').filter((p) => typeof p !== 'string')).toHaveLength(1);
   });
-  it('2 回目の長い語の中の短い語には当てない (2 回目の kube-proxy の中の Pod などを拾わない)', () => {
+  it('2 回目の長い語の中の短い語には当てない (2 回目のヘッドレス Service の中の Service を拾わない)', () => {
     const link = makeTermLinker(names);
-    link('ReplicaSet');
-    expect(link('ReplicaSet の Pod').filter((p) => typeof p !== 'string')).toEqual([{ text: 'Pod', id: 'pod' }]);
+    expect(link('ヘッドレス Service').filter((p) => typeof p !== 'string')).toHaveLength(1);
+    expect(link('ヘッドレス Service').filter((p) => typeof p !== 'string')).toEqual([]);
+  });
+  it('漢字の語は、カタカナや漢字に続くときは当てず、意味の広いロードバランサーも使わない', () => {
+    expect(links('ネットワーク名前空間を共有する')).toEqual([]);
+    expect(links('通信をロードバランサーで切り替える')).toEqual([]);
+    expect(links('既定の名前空間')).toHaveLength(1);
   });
   it('つなぎ直すと元の文に戻る (文字を落とさない・足さない)', () => {
     for (const t of HANDBOOK_TOPICS) {
       const link = makeTermLinker(names);
-      for (const text of [t.summary, ...t.flow.map((s) => s.text)]) {
+      for (const text of [t.summary, ...t.flow.map((s) => s.text), ...t.try.flatMap((x) => x.steps.map((s) => s.text))]) {
         expect(link(text).map((p) => (typeof p === 'string' ? p : p.text)).join('')).toBe(text);
       }
     }
@@ -51,7 +60,7 @@ describe('本文の用語を用語集へのリンクにする', () => {
   it('ハンドブックのどのトピックにも、用語集へのリンクが付く', () => {
     for (const t of HANDBOOK_TOPICS) {
       const link = makeTermLinker(names);
-      const n = [t.summary, ...t.flow.map((s) => s.text)].flatMap(link).filter((p) => typeof p !== 'string').length;
+      const n = [t.summary, ...t.flow.map((s) => s.text), ...t.try.flatMap((x) => x.steps.map((s) => s.text))].flatMap(link).filter((p) => typeof p !== 'string').length;
       expect(n, t.id).toBeGreaterThan(0);
     }
   });
