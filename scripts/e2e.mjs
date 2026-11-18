@@ -364,6 +364,25 @@ async function run(browser, name, width, height) {
     await narrow.close();
   }
 
+  // 13. 説明のページ: 見本の問題を解ける・数字が問題データと合う・左の一覧/ホームから入れる
+  await page.goto(BASE);
+  await page.getByRole('link', { name: /Kubernetes とこのサイト/ }).first().click();
+  await page.getByRole('heading', { name: /問題を解きながら根っこから/, level: 1 }).waitFor();
+  check(page.url().includes('#/guide'), `${tag} ホーム (左の一覧) から説明のページへ入れる`);
+  await page.getByRole('button', { name: 'describe', exact: true }).click();
+  check(await page.getByText('describe は違います').isVisible(), `${tag} 見本の問題で違う候補を選ぶと違うと出る`);
+  await page.getByRole('button', { name: 'get', exact: true }).click();
+  check(await page.getByText(/^正解。/).isVisible(), `${tag} 見本の問題で get を選ぶと正解と出る`);
+  const questionCount = [1, 2, 3, 4, 5, 6, 7, 8]
+    .map((n) => JSON.parse(readFileSync(new URL(`../src/content/week${n}.json`, import.meta.url), 'utf8')))
+    .flatMap((w) => w.lessons)
+    .reduce((s, l) => s + (l.questions?.length ?? 0), 0);
+  check(await page.getByLabel('このサイトの中身').getByText(String(questionCount), { exact: true }).isVisible(), `${tag} 説明のページの問題の数が問題データと合う (${questionCount})`);
+  check(await page.getByText('LF の多肢選択式試験に共通の記述').first().isVisible(), `${tag} 試験の数字に但し書きがある`);
+  check((await page.getByRole('table').count()) === 4 && (await page.getByRole('cell', { name: 'Cloud Native Community and Collaboration' }).count()) === 1, `${tag} 学習要領の 4 分野の表と細目が出る`);
+  check(await page.getByRole('link', { name: /Kubernetes の公式ドキュメント/ }).first().isVisible(), `${tag} 主な情報源に名前とリンクがある`);
+  await noHorizontalOverflow(page, width, `${tag} 説明のページ`);
+
   check(errors.length === 0, `${tag} ページのエラーが無い ${errors.length ? errors.join(' / ') : ''}`);
   await context.close();
 }

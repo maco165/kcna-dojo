@@ -1,25 +1,18 @@
 import { Badge } from '@astryxdesign/core/Badge';
 import { SideNav, SideNavHeading, SideNavItem, SideNavSection } from '@astryxdesign/core/SideNav';
 import { Text } from '@astryxdesign/core/Text';
-import {
-  AdjustmentsHorizontalIcon,
-  ArrowPathIcon,
-  BookOpenIcon,
-  ChartBarIcon,
-  InformationCircleIcon,
-  QueueListIcon,
-} from '@heroicons/react/24/outline';
+import { AcademicCapIcon, AdjustmentsHorizontalIcon, ArrowPathIcon, BookOpenIcon, ChartBarIcon, InformationCircleIcon, QueueListIcon } from '@heroicons/react/24/outline';
 import { WEEKS } from '../content/curriculum';
 import SiteLogo from './SiteLogo';
 import type { Progress } from '../lib/progress';
 import { dueQuestions } from '../content';
 import { REPO_URL } from '../lib/links';
 import { SITE_NAME, SITE_TAGLINE } from '../lib/site';
-import { aboutHref, examHref, glossaryHref, progressHref, reviewHref, settingsHref, weekHref } from '../lib/route';
+import { aboutHref, examHref, glossaryHref, guideHref, progressHref, reviewHref, settingsHref, weekHref } from '../lib/route';
 import { GitHubMark } from './RepoLink';
 
 /** PC の左の一覧 */
-export default function AppSideNav({ current, week, progress }: { current: 'learn' | 'about' | 'settings' | 'review' | 'progress' | 'exam' | 'glossary'; week?: number; progress: Progress }) {
+export default function AppSideNav({ current, week, progress }: { current: 'learn' | 'about' | 'settings' | 'review' | 'progress' | 'exam' | 'glossary' | 'guide'; week?: number; progress: Progress }) {
   const reviewCount = dueQuestions(progress, new Date()).length;
   return (
     <SideNav
@@ -41,8 +34,12 @@ export default function AppSideNav({ current, week, progress }: { current: 'lear
           endContent={reviewCount > 0 ? <Badge label={reviewCount} variant="info" /> : undefined}
         />
         <SideNavItem label="進捗" icon={ChartBarIcon} href={progressHref} isSelected={current === 'progress'} />
-        <SideNavItem label="用語集" icon={BookOpenIcon} href={glossaryHref} isSelected={current === 'glossary'} />
         <SideNavItem label="設定" icon={AdjustmentsHorizontalIcon} href={settingsHref} isSelected={current === 'settings'} />
+      </SideNavSection>
+      {/* 問題を解く前に読んで、足りないところを補うページ */}
+      <SideNavSection title="学ぶ前に・補う">
+        <SideNavItem label="Kubernetes とこのサイト" icon={AcademicCapIcon} href={guideHref} isSelected={current === 'guide'} />
+        <SideNavItem label="用語集" icon={BookOpenIcon} href={glossaryHref} isSelected={current === 'glossary'} />
       </SideNavSection>
       <SideNavSection title="週">
         {WEEKS.map((w) => {

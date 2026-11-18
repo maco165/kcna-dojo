@@ -718,3 +718,806 @@ body {
   font-weight: 600;
   line-height: 1.25;
 }
+
+/* 説明のページ (#/guide)。上の帯と名前の帯だけは、テーマに関わらず暗い地 (デザイン案のとおり) */
+.guide {
+  max-width: 880px;
+}
+
+.guide-hero {
+  position: relative;
+  overflow: hidden;
+  /* スマホは見本の問題の下にアニメーションが見えるだけの高さ */
+  min-height: 880px;
+  padding: 24px 20px 40px;
+  background: #0a1317;
+  color: #dfe2e5;
+}
+
+.guide-hero__bg {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 28px;
+  width: 100%;
+  height: 300px;
+}
+
+.guide-hero__fg {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 560px;
+}
+
+.guide-tags {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.guide-tags li {
+  padding: 2px 8px;
+  border-radius: 9999px;
+  border: 1px solid #3e9efb;
+  color: #afd7ff;
+  font-size: 11px;
+}
+
+.guide-hero__title {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: #ffffff;
+}
+
+.guide-hero__caption {
+  position: absolute;
+  left: 20px;
+  right: 20px;
+  bottom: 10px;
+  margin: 0;
+  font-size: 10px;
+  color: #8a9099;
+}
+
+.guide-sample {
+  padding: 14px;
+  border-radius: 12px;
+  background: #1f1f22;
+  border: 1px solid #f2f4f619;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.guide-sample__meta {
+  font-size: 11px;
+  color: #aaafb5;
+}
+
+.guide-sample__prompt {
+  margin: 0;
+  font-size: 14px;
+  color: #dfe2e5;
+}
+
+.guide-sample__code {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #111112;
+  color: #dfe2e5;
+  font-family: var(--font-family-code, 'SF Mono', Monaco, Consolas, monospace);
+  font-size: 13px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.guide-blank {
+  color: #aaafb5;
+  border-bottom: 2px solid #3e9efb;
+}
+
+.guide-blank--ok {
+  color: #a5f690;
+  border-color: #26a756;
+}
+
+.guide-blank--ng {
+  color: #ffb2b8;
+  border-color: #f5394f;
+}
+
+.guide-sample__choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.guide-choice {
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid #494d53;
+  background: transparent;
+  color: #dfe2e5;
+  font-family: var(--font-family-code, 'SF Mono', Monaco, Consolas, monospace);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.guide-choice[aria-pressed='true'] {
+  border-color: #3e9efb;
+  background: #0082fb3f;
+}
+
+.guide-sample__fb {
+  margin: 0;
+  font-size: 12px;
+}
+
+.guide-sample__fb:empty {
+  /* 読み上げの領域は消さずに残し、高さだけ 0 にする */
+  margin-top: -10px;
+}
+
+.guide-sample__fb--ok {
+  color: #a5f690;
+}
+
+.guide-sample__fb--ng {
+  color: #ffb2b8;
+}
+
+.guide-sample__more,
+.guide-origin a,
+.guide-origin a *,
+.guide-src--dark a,
+.guide-src--dark a * {
+  /* 暗い帯はテーマに関わらず暗い地なので、Link の中の文字まで薄い青 (#0a1317 の地で 11:1) */
+  color: #afd7ff;
+}
+
+.guide-sample__more {
+  font-size: 13px;
+}
+
+.guide-src a,
+.guide-src a * {
+  font-size: inherit;
+}
+
+.guide-cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  border-radius: 8px;
+  background: #0064e0;
+  color: #ffffff;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.guide-cta:hover {
+  background: #0050b3;
+}
+
+.guide-stats {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  background: var(--color-background-card);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.guide-stats div {
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+  padding: 12px 0;
+}
+
+.guide-stats div + div {
+  border-left: 1px solid var(--color-border);
+}
+
+.guide-stats dd {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.guide-stats dt {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+
+.guide-origin {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 20px;
+  background: #0a1317;
+  color: #dfe2e5;
+}
+
+.guide-origin__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.guide-origin__label {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: #aaafb5;
+}
+
+.guide-origin__word {
+  margin: 0;
+}
+
+.guide-origin__word [lang='en'] {
+  font-size: 18px;
+  font-weight: 300;
+  color: #ffffff;
+}
+
+.guide-origin__muted {
+  margin: 0;
+  font-size: 11px;
+  color: #aaafb5;
+}
+
+.guide-mono {
+  font-family: var(--font-family-code, 'SF Mono', Monaco, Consolas, monospace);
+}
+
+.guide-accent {
+  color: var(--color-text-accent);
+}
+
+.guide-origin .guide-accent {
+  color: #3e9efb;
+}
+
+.guide-src {
+  margin: 0;
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+
+.guide-src--dark {
+  color: #8a9099;
+}
+
+.guide-body {
+  padding: 8px 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.guide-section {
+  padding: 20px 0 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.guide-section p {
+  margin: 0;
+}
+
+.guide-section--card {
+  margin: 8px -20px;
+  padding: 24px 20px 20px;
+  background: var(--color-background-card);
+  border-top: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.guide-h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.guide-h3 {
+  margin: 8px 0 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.guide-kicker {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-accent);
+}
+
+.guide-muted {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+
+.guide-quote {
+  margin: 0;
+  padding-left: 14px;
+  border-left: 3px solid var(--color-accent);
+  font-size: 15px;
+}
+
+.guide-eras {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.guide-eras li {
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--color-background-card);
+  border: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.guide-eras__name {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+
+.guide-eras__now {
+  border-color: var(--color-accent) !important;
+}
+
+.guide-eras__now .guide-eras__name {
+  color: var(--color-text-accent);
+  font-weight: 600;
+}
+
+.guide-state {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 12px;
+  background: var(--color-background-card);
+  border: 1px solid var(--color-border);
+  color: var(--color-icon-accent);
+}
+
+.guide-state > span {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--color-text-primary);
+}
+
+.guide-rows,
+.guide-path,
+.guide-domains,
+.guide-hosts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.guide-rows {
+  background: var(--color-background-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-container);
+}
+
+.guide-rows li {
+  display: flex;
+  flex-direction: column;
+  padding: 10px 14px;
+}
+
+.guide-rows li + li,
+.guide-path li + li {
+  border-top: 1px solid var(--color-border);
+}
+
+.guide-rows__name {
+  font-weight: 600;
+}
+
+.guide-path li {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  column-gap: 10px;
+  padding: 8px 0;
+}
+
+.guide-path li .guide-muted {
+  grid-column: 2;
+}
+
+.guide-body .guide-path a {
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.guide-body a {
+  color: var(--color-text-accent);
+}
+
+.guide-facts {
+  margin: 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.guide-facts div {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr);
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.guide-facts dt {
+  color: var(--color-text-secondary);
+}
+
+.guide-facts dd {
+  margin: 0;
+}
+
+.guide-domains {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.guide-domains li {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.guide-domains__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.guide-bar {
+  height: 6px;
+  border-radius: 9999px;
+  background: var(--color-track);
+  overflow: hidden;
+}
+
+.guide-bar span {
+  display: block;
+  height: 100%;
+  background: var(--color-accent);
+}
+
+.guide-steps {
+  margin: 0;
+  padding-left: 1.4em;
+  list-style: decimal;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.guide-note {
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: var(--color-background-card);
+  border: 1px solid var(--color-border);
+  font-size: 13px;
+}
+
+.guide-split {
+  display: flex;
+  gap: 2px;
+  height: 10px;
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.guide-split__0 {
+  background: var(--color-accent);
+}
+
+.guide-split__1 {
+  background: var(--color-icon-blue);
+  opacity: 0.6;
+}
+
+.guide-split__2 {
+  background: var(--color-icon-blue);
+  opacity: 0.3;
+}
+
+.guide-split__rest {
+  flex-grow: 1;
+  background: var(--color-track);
+}
+
+.guide-hosts {
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+}
+
+.guide-hosts li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.guide-hosts li > :last-child {
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.guide-hosts--one li > :last-child {
+  flex-shrink: 1;
+  max-width: 45%;
+}
+
+.guide-outline {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+  gap: 16px;
+}
+
+.guide-outline__domain {
+  background: var(--color-background-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-container);
+  overflow: hidden;
+}
+
+.guide-outline__head {
+  margin: 0;
+  padding: 10px 14px;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.guide-outline__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.guide-outline__table th {
+  padding: 6px 14px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.guide-outline__table td {
+  padding: 8px 14px;
+  border-top: 1px solid var(--color-border);
+  vertical-align: top;
+}
+
+.guide-outline__table td:last-child {
+  white-space: nowrap;
+}
+
+.guide-foot {
+  margin: 12px 0 0;
+}
+
+.guide-cols {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.guide-col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* PC (デザイン案の PC): 本文を 2 列に。試験の説明と問題の作り方は、中を 2 列に分ける */
+@media (min-width: 1024px) {
+  .guide {
+    max-width: 1040px;
+  }
+
+  .guide-body {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 40px;
+  }
+
+  .guide-section--card,
+  .guide-section--wide,
+  .guide-foot {
+    grid-column: 1 / -1;
+  }
+
+  .guide-cols {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 24px 40px;
+  }
+
+  .guide-h3--top {
+    margin-top: 0;
+  }
+}
+
+@media (min-width: 768px) {
+  .guide-hero {
+    min-height: 620px;
+    padding: 40px 40px 48px;
+  }
+
+  .guide-hero__fg {
+    max-width: 460px;
+  }
+
+  /* 前景とアニメーションを重ねない: 768〜1099 は前景の下に、1100 以上は右の列に置く */
+  .guide-hero {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .guide-hero__fg {
+    order: 1;
+  }
+
+  .guide-hero__bg {
+    order: 2;
+    position: static;
+    width: 100%;
+    max-width: 560px;
+    height: 280px;
+  }
+
+  .guide-hero__title {
+    font-size: 32px;
+  }
+
+  .guide-origin,
+  .guide-body {
+    padding-left: 40px;
+    padding-right: 40px;
+  }
+
+  .guide-section--card {
+    margin: 8px -40px;
+    padding: 28px 40px 24px;
+  }
+}
+
+@media (min-width: 1100px) {
+  .guide-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 460px) minmax(0, 1fr);
+    column-gap: 40px;
+    align-items: start;
+  }
+
+  .guide-hero__fg {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .guide-hero__bg {
+    grid-column: 2;
+    grid-row: 1;
+    height: 420px;
+    margin-top: 60px;
+  }
+}
+
+/* 背景の動き: 位置と透明度だけ、10 秒で 1 周。動きを減らす設定では止める */
+.guide-pod {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.guide-pod--1 {
+  animation: guide-drop 10s ease-out infinite;
+}
+
+.guide-pod--2 {
+  animation: guide-drop 10s ease-out 0.4s infinite;
+}
+
+.guide-pod--3 {
+  animation: guide-fail 10s ease-in infinite;
+}
+
+.guide-pod--4 {
+  opacity: 0;
+  animation: guide-heal 10s ease-out infinite;
+}
+
+.guide-layers {
+  animation: guide-show 10s linear infinite;
+}
+
+.guide-now {
+  animation: guide-okay 10s steps(1) infinite;
+}
+
+.guide-now-bad {
+  opacity: 0;
+  animation: guide-bad 10s steps(1) infinite;
+}
+
+@keyframes guide-drop {
+  0% { opacity: 0; transform: translateY(-40px); }
+  8%, 100% { opacity: 1; transform: none; }
+}
+
+@keyframes guide-fail {
+  0% { opacity: 0; transform: translateY(-40px); }
+  10%, 45% { opacity: 1; transform: none; }
+  50% { opacity: 0.6; }
+  55%, 100% { opacity: 0; transform: scale(0.85); }
+}
+
+@keyframes guide-heal {
+  0%, 58% { opacity: 0; transform: translateY(-40px); }
+  68%, 100% { opacity: 1; transform: none; }
+}
+
+@keyframes guide-show {
+  0%, 12% { opacity: 0; }
+  18%, 40% { opacity: 1; }
+  46%, 100% { opacity: 0; }
+}
+
+@keyframes guide-okay {
+  0% { opacity: 1; }
+  50% { opacity: 0; }
+  68% { opacity: 1; }
+}
+
+@keyframes guide-bad {
+  0% { opacity: 0; }
+  50% { opacity: 1; }
+  68% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .guide-hero * {
+    animation: none !important;
+  }
+
+  .guide-pod--4,
+  .guide-now-bad {
+    opacity: 0;
+  }
+}
