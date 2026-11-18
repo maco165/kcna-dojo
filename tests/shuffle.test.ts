@@ -53,7 +53,7 @@ describe('shuffleChoices', () => {
     expect(t).toContain('私の答えは D で不正解でした (正解は A)');
   });
 
-  it('fixedOrder の 4 択と穴埋めはそのまま', () => {
+  it('fixedOrder の 4 択はそのまま。穴埋めは候補だけ混ぜる', () => {
     const fixed = { ...choice, fixedOrder: true };
     expect(shuffleChoices(fixed, seq(0, 0, 0))).toBe(fixed);
     const fill: FillQuestion = {
@@ -67,6 +67,11 @@ describe('shuffleChoices', () => {
       source: 'https://kubernetes.io/',
     };
     expect(shuffleChoices(fill, seq(0))).toBe(fill);
+    const withCandidates: FillQuestion = { ...fill, candidates: ['get', 'apply', 'delete', 'logs'] };
+    const s = shuffleChoices(withCandidates, seq(0, 0, 0));
+    expect(s.type === 'fill' && s.candidates).toEqual(['apply', 'delete', 'logs', 'get']);
+    expect(withCandidates.candidates).toEqual(['get', 'apply', 'delete', 'logs']);
+    expect(s.type === 'fill' && s.answers).toEqual(['get']);
   });
 
   it('何度も混ぜると、いろいろな並びが出る', () => {

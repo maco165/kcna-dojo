@@ -11,7 +11,12 @@ import AppSideNav from '../components/AppSideNav';
 import BottomTabs from '../components/BottomTabs';
 import RepoLink from '../components/RepoLink';
 import SiteLogo from '../components/SiteLogo';
-import { allQuestions, dueQuestions, isKnownQuestion, type QuestionRef } from '../content';
+import { allQuestions, dueQuestions, dueReviewCount, findQuestion, isKnownQuestion, type QuestionRef } from '../content';
+import { findExamQuestion } from '../content/examBank';
+
+/** 復習ではレッスンの問題と模擬試験用の問題の両方を引く */
+const findAny = (id: string) => findQuestion(id) ?? findExamQuestion(id);
+const isKnownAny = (id: string) => isKnownQuestion(id) || findExamQuestion(id) !== undefined;
 import { DOMAINS } from '../lib/lessonStatus';
 import { PRACTICE_SIZES, pickPractice, type PracticeDomain } from '../lib/practice';
 import { XP_PER_CORRECT } from '../lib/grade';
@@ -64,8 +69,8 @@ function RandomCard({ choice, onChange, onStart }: { choice: RandomChoice; onCha
 
 function Overview({ progress, onStart, random }: { progress: Progress; onStart: () => void; random: { choice: RandomChoice; onChange: (c: RandomChoice) => void; onStart: () => void } }) {
   const now = new Date();
-  const due = dueQuestions(progress, now);
-  const upcoming = upcomingReview(progress, now, isKnownQuestion);
+  const due = dueQuestions(progress, now, findAny);
+  const upcoming = upcomingReview(progress, now, isKnownAny);
   return (
     <VStack gap={6}>
       <VStack gap={1}>
@@ -97,7 +102,7 @@ function Overview({ progress, onStart, random }: { progress: Progress; onStart: 
       {due.length > 0 && (
         <List hasDividers edge="flush" header={<h2 className="h-sm">今日の問題</h2>}>
           {due.map((r) => (
-            <ListItem key={r.question.id} label={r.question.prompt} description={`第 ${r.week} 週 · ${r.lesson.title}`} />
+            <ListItem key={r.question.id} label={r.question.prompt} description={r.week === 0 ? '模擬試験の問題' : `第 ${r.week} 週 · ${r.lesson.title}`} />
           ))}
         </List>
       )}
@@ -138,7 +143,7 @@ export default function Review({ progress, updateProgress }: Props) {
       progress={progress}
       onStart={() => {
         setMode('review');
-        setRunning(dueQuestions(progress, new Date()));
+        setRunning(dueQuestions(progress, new Date(), findAny));
       }}
       random={{
         choice,
@@ -169,7 +174,7 @@ export default function Review({ progress, updateProgress }: Props) {
         <RepoLink />
       </header>
       <main className="page__section">{body}</main>
-      <BottomTabs current="review" reviewCount={dueQuestions(progress, new Date()).length} />
+      <BottomTabs current="review" reviewCount={dueReviewCount(progress, new Date())} />
     </div>
   );
 }

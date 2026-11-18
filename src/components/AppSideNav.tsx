@@ -5,7 +5,7 @@ import { AcademicCapIcon, AdjustmentsHorizontalIcon, ArrowPathIcon, BookOpenIcon
 import { WEEKS } from '../content/curriculum';
 import SiteLogo from './SiteLogo';
 import type { Progress } from '../lib/progress';
-import { dueQuestions } from '../content';
+import { dueReviewCount } from '../content';
 import { REPO_URL } from '../lib/links';
 import { SITE_NAME, SITE_TAGLINE } from '../lib/site';
 import { aboutHref, examHref, glossaryHref, guideHref, handbookHref, progressHref, reviewHref, settingsHref, weekHref } from '../lib/route';
@@ -13,7 +13,7 @@ import { GitHubMark } from './RepoLink';
 
 /** PC の左の一覧 */
 export default function AppSideNav({ current, week, progress }: { current: 'learn' | 'about' | 'settings' | 'review' | 'progress' | 'exam' | 'glossary' | 'guide' | 'handbook'; week?: number; progress: Progress }) {
-  const reviewCount = dueQuestions(progress, new Date()).length;
+  const reviewCount = dueReviewCount(progress, new Date());
   return (
     <SideNav
       header={<SideNavHeading heading={SITE_NAME} subheading={SITE_TAGLINE} icon={<SiteLogo />} headingHref={weekHref(1)} />}

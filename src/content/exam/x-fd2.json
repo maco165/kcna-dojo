@@ -1,0 +1,798 @@
+{
+  "week": 0,
+  "lessons": [
+    {
+      "id": "x-fd2",
+      "kind": "quiz",
+      "title": "模擬試験用 Fundamentals 2",
+      "summary": "模擬試験用",
+      "domain": "Kubernetes Fundamentals",
+      "questions": [
+        {
+          "id": "x-fd2-001",
+          "type": "fill",
+          "prompt": "Go のアプリを build という段階でコンパイルし、最後のイメージにはできた実行ファイルだけを入れたい (コンパイラは入れない)。空欄に入る指定は?",
+          "language": "dockerfile",
+          "code": "FROM golang:1.23 AS build\nWORKDIR /src\nCOPY . .\nRUN go build -o /bin/app .\n\nFROM alpine:3.20\nCOPY {{blank}} /bin/app /bin/app\nCMD [\"/bin/app\"]",
+          "answers": [
+            "--from=build"
+          ],
+          "candidates": [
+            "--chown=build",
+            "--from=build",
+            "--link",
+            "--parents"
+          ],
+          "explanation": "FROM を何回も書くマルチステージビルドでは、AS で段階に名前を付け、COPY --from=<名前> で前の段階のファイルだけを次の段階へ写せます。最後のイメージには写したものしか入らないので、コンパイラなどのビルドの道具が残らず、イメージが小さくなります。",
+          "wrongNotes": {
+            "--chown=build": "--chown は写したファイルの持ち主を決める指定で、どの段階から写すかは決めません。",
+            "--link": "--link はレイヤーの作り方を変える指定で、どの段階から写すかは決めません。",
+            "--parents": "--parents はフォルダの構造を保って写す指定で、どの段階から写すかは決めません。"
+          },
+          "source": "https://docs.docker.com/build/building/multi-stage/"
+        },
+        {
+          "id": "x-fd2-002",
+          "type": "choice",
+          "prompt": "あるイメージは ENTRYPOINT [\"/app/server\"] と CMD [\"--port=80\"] を持つ。次の Pod で、コンテナが起動したときに動くのはどれ?",
+          "code": {
+            "language": "yaml",
+            "text": "spec:\n  containers:\n  - name: web\n    image: registry.example.com/web:2.3.1\n    args: [\"--port=8080\"]"
+          },
+          "choices": [
+            {
+              "id": "a",
+              "text": "/app/server --port=8080",
+              "why": "args だけを書くと、イメージの ENTRYPOINT はそのまま使われ、CMD が args に置きかわります。"
+            },
+            {
+              "id": "b",
+              "text": "--port=8080 だけが実行され、起動に失敗する",
+              "why": "args だけを書いても ENTRYPOINT は消えません。--port=8080 は /app/server の引数になります。"
+            },
+            {
+              "id": "c",
+              "text": "/app/server --port=80 --port=8080",
+              "why": "args は CMD に足されるのではなく、CMD に置きかわります。"
+            },
+            {
+              "id": "d",
+              "text": "/app/server --port=80",
+              "why": "Pod に書いた args はイメージの CMD より優先されます。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "Pod の command はイメージの ENTRYPOINT に、args は CMD に当たります。command を書かずに args だけを書くと、イメージの既定のコマンドが、書いた引数で動きます。そのため /app/server が --port=8080 を受け取って動きます。",
+          "source": "https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/"
+        },
+        {
+          "id": "x-fd2-003",
+          "type": "choice",
+          "prompt": "Pod のコンテナに image: registry.example.com/shop/api:1.4.2 と書き、imagePullPolicy は書かなかった。imagePullPolicy に入る既定の値はどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "Always",
+              "why": "Always になるのは、タグが :latest のときと、タグを書かなかったときです。"
+            },
+            {
+              "id": "b",
+              "text": "IfNotPresent",
+              "why": "latest でないタグを書いたので、ノードにイメージが無いときだけ取得します。"
+            },
+            {
+              "id": "c",
+              "text": "Never",
+              "why": "Never は自分で書いたときだけ使われ、既定の値にはなりません。"
+            },
+            {
+              "id": "d",
+              "text": "OnFailure",
+              "why": "OnFailure は Pod の restartPolicy の値で、imagePullPolicy の値ではありません。"
+            }
+          ],
+          "answer": "b",
+          "explanation": "imagePullPolicy を書かないと、Kubernetes がイメージの書き方から値を決めます。:latest 以外のタグか digest を書いたときは IfNotPresent、:latest のときとタグが無いときは Always です。この値は Pod を作ったときに決まり、あとでタグを変えても変わりません。",
+          "source": "https://kubernetes.io/docs/concepts/containers/images/"
+        },
+        {
+          "id": "x-fd2-004",
+          "type": "choice",
+          "prompt": "レジストリで同じタグ 1.4.2 に別のイメージが上書きされても、Pod がいつも全く同じ中身のイメージを使うようにしたい。どう書くのがよい?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "imagePullPolicy: Always を付ける",
+              "why": "Always は毎回レジストリに問い合わせるので、タグが付け替えられると新しい中身を取ってきます。"
+            },
+            {
+              "id": "b",
+              "text": "タグを latest に変える",
+              "why": "latest は付け替えられることが前提のタグで、中身を固定できません。"
+            },
+            {
+              "id": "c",
+              "text": "image を digest (@sha256:…) で書く",
+              "why": "digest は中身から計算される値で変わらないため、同じ中身に固定できます。"
+            },
+            {
+              "id": "d",
+              "text": "Pod のラベルに version: 1.4.2 を付ける",
+              "why": "ラベルは Pod を選ぶための印で、どのイメージを取るかには関係しません。"
+            }
+          ],
+          "answer": "c",
+          "explanation": "タグは後から別のイメージに付け替えられますが、digest (sha256 の値) はイメージの中身ごとに決まり変わりません。image を <名前>@<digest> の形で書くと、Pod はいつも同じ中身のイメージを使います。タグと digest の両方を書いたときは、digest だけが取得に使われます。",
+          "source": "https://kubernetes.io/docs/concepts/containers/images/"
+        },
+        {
+          "id": "x-fd2-005",
+          "type": "choice",
+          "prompt": "Namespace web の Pod の imagePullSecrets に regcred を書いたが、イメージを取れず ErrImagePull になった。regcred は kubectl create secret docker-registry で、Namespace ci に作ってある。原因として最も考えられるのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "docker-registry の種類では取れず、generic で作り直す必要がある",
+              "why": "レジストリの認証には docker-registry (dockerconfigjson の形) の Secret を使います。"
+            },
+            {
+              "id": "b",
+              "text": "imagePullSecrets は Pod と同じ Namespace の Secret しか指せない",
+              "why": "regcred が Namespace ci にあるので、Namespace web の Pod からは使えません。"
+            },
+            {
+              "id": "c",
+              "text": "imagePullSecrets を書くときは imagePullPolicy: Never にする必要がある",
+              "why": "Never はイメージを取りに行かない設定で、認証とは関係ありません。"
+            },
+            {
+              "id": "d",
+              "text": "imagePullSecrets はノードの設定なので、Pod に書いても使われない",
+              "why": "imagePullSecrets は Pod の spec に書く欄で、kubelet はそれを使って取ります。"
+            }
+          ],
+          "answer": "b",
+          "explanation": "Pod の imagePullSecrets で指す Secret は、Pod と同じ Namespace になければなりません。この例では regcred が ci にあるので、web の Pod は認証できずにイメージを取れません。Namespace web にも同じ Secret を作り直せば取れるようになります。",
+          "source": "https://kubernetes.io/docs/concepts/containers/images/"
+        },
+        {
+          "id": "x-fd2-006",
+          "type": "choice",
+          "prompt": "手で作ったイメージ local/batch:0.3 を、ノード node1 にだけ取り込んだ (レジストリには置いていない)。Pod に imagePullPolicy: Never を付けたところ、Pod は node2 に置かれた。node2 で起きることはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "node2 には取り込んでいないのでレジストリから取りに行き、見つからずに取り直しをくり返す",
+              "why": "Never のときは、kubelet はイメージを取りに行きません。"
+            },
+            {
+              "id": "b",
+              "text": "kubelet が node1 からイメージを写してきて、コンテナを起動する",
+              "why": "kubelet はノードの間でイメージを写しません。"
+            },
+            {
+              "id": "c",
+              "text": "イメージを取りに行かず、ノードにイメージが無いのでコンテナの起動に失敗する",
+              "why": "Never はノードにあるイメージだけを使い、無ければ起動に失敗します。"
+            },
+            {
+              "id": "d",
+              "text": "スケジューラーがイメージの無いノードを避けるので、Pod は node1 に置き直される",
+              "why": "スケジューラーはイメージのあるノードに点を足すことはありますが (ImageLocality)、一度置いた Pod を別のノードに置き直すことはしません。"
+            }
+          ],
+          "answer": "c",
+          "explanation": "imagePullPolicy: Never のとき、kubelet はイメージを取りに行きません。ノードにイメージがあればコンテナを起動し、無ければ起動に失敗します。取り込んだイメージを Never で使うときは、Pod が置かれうるすべてのノードにイメージを入れておくか、そのノードに置くよう指定します。",
+          "source": "https://kubernetes.io/docs/concepts/containers/images/"
+        },
+        {
+          "id": "x-fd2-007",
+          "type": "choice",
+          "prompt": "Kubernetes のノードで、containerd の下でコンテナを実際に作って起動する runc の説明として正しいのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "kubelet とランタイムが話すための gRPC の取り決め (CRI) そのもの",
+              "why": "CRI は kubelet とランタイムの間の取り決めで、runc はその下で動く道具です。"
+            },
+            {
+              "id": "b",
+              "text": "コンテナイメージを置いておき、ノードへ配るためのレジストリ",
+              "why": "イメージを置いて配るのはレジストリで、runc はイメージを配りません。"
+            },
+            {
+              "id": "c",
+              "text": "Pod を置くノードを決める、ノードごとに動くスケジューラー",
+              "why": "置き場所を決めるのはコントロールプレーンの kube-scheduler です。"
+            },
+            {
+              "id": "d",
+              "text": "OCI の仕様に沿って Linux でコンテナを生成・実行する道具",
+              "why": "runc は OCI の仕様どおりに Linux でコンテナを生成して実行する CLI の道具です。"
+            }
+          ],
+          "answer": "d",
+          "explanation": "runc は、OCI の仕様に沿って Linux でコンテナを生成して実行する CLI の道具です。kubelet は CRI で containerd などの高レベルのランタイムに頼み、containerd が runc のような低レベルのランタイムを呼んでコンテナを起動します。",
+          "source": "https://github.com/opencontainers/runc"
+        },
+        {
+          "id": "x-fd2-008",
+          "type": "choice",
+          "prompt": "信頼できないコードを動かす一部の Pod だけを、ノードに用意した別のランタイムの設定 (例: 仮想化で強く分ける設定) で動かしたい。どの仕組みを使う?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "RuntimeClass を作り、Pod の runtimeClassName で指す",
+              "why": "RuntimeClass はランタイムの設定を選ぶ仕組みで、Pod ごとに選べます。"
+            },
+            {
+              "id": "b",
+              "text": "PriorityClass を作り、Pod の priorityClassName で指す",
+              "why": "PriorityClass は Pod の優先度を決めるもので、ランタイムは選べません。"
+            },
+            {
+              "id": "c",
+              "text": "StorageClass を作り、PVC の storageClassName で指す",
+              "why": "StorageClass はボリュームの作り方を選ぶもので、コンテナのランタイムとは関係しません。"
+            },
+            {
+              "id": "d",
+              "text": "IngressClass を作り、Ingress の ingressClassName で指す",
+              "why": "IngressClass はどの Ingress コントローラーを使うかを選ぶもので、ランタイムは選べません。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "RuntimeClass は、Pod のコンテナを動かすランタイムの設定を選ぶ仕組みです。RuntimeClass の handler にノードの CRI の設定の名前を書き、Pod の spec.runtimeClassName でその RuntimeClass を指します。Pod ごとに、性能と安全性の釣り合いを変えられます。",
+          "source": "https://kubernetes.io/docs/concepts/containers/runtime-class/"
+        },
+        {
+          "id": "x-fd2-009",
+          "type": "choice",
+          "prompt": "アプリがアップロードされたファイルを、コンテナの中の /data に書いている (ボリュームは付けていない)。コンテナが落ちて、kubelet がコンテナを再起動したあと、/data のファイルはどうなる?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "再起動の前と同じように残っている",
+              "why": "コンテナのファイルシステムの変更は保存されず、再起動すると元のイメージの状態に戻ります。"
+            },
+            {
+              "id": "b",
+              "text": "失われる。コンテナはまっさらな状態で再起動される",
+              "why": "コンテナの中のファイルは一時的なもので、残したいならボリュームを付けます。"
+            },
+            {
+              "id": "c",
+              "text": "kubelet がイメージのレイヤーとして自動で保存し、次の起動で戻す",
+              "why": "kubelet は動いているコンテナの変更をイメージに保存しません。"
+            },
+            {
+              "id": "d",
+              "text": "etcd に保存されていて、新しいコンテナに写される",
+              "why": "etcd が保存するのは API のオブジェクトで、コンテナの中のファイルは入りません。"
+            }
+          ],
+          "answer": "b",
+          "explanation": "コンテナのディスク上のファイルは一時的 (ephemeral) です。コンテナが落ちたり止まったりすると、動いていた間に作ったり変えたりしたファイルは失われ、kubelet はまっさらな状態でコンテナを再起動します。データを残したいときはボリュームを付けて、そこに書きます。",
+          "source": "https://kubernetes.io/docs/concepts/storage/volumes/"
+        },
+        {
+          "id": "x-fd2-010",
+          "type": "choice",
+          "prompt": "Pod web を kubectl delete で消した。コンテナには preStop フックがあり、terminationGracePeriodSeconds は書いていない (既定)。kubelet がコンテナを止める流れとして正しいのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "まず SIGKILL ですぐ止め、そのあと preStop フックで後片付けをする",
+              "why": "SIGKILL は猶予が過ぎても動いているときの最後の手段で、最初には送りません。"
+            },
+            {
+              "id": "b",
+              "text": "SIGTERM を送ってプロセスの終わりを待ち、そのあと preStop フックを動かす",
+              "why": "preStop フックは SIGTERM より先に動きます。"
+            },
+            {
+              "id": "c",
+              "text": "preStop を動かし、SIGTERM を送り、猶予 (既定 30 秒) 後に SIGKILL",
+              "why": "preStop → SIGTERM → 猶予が過ぎたら SIGKILL の順です。"
+            },
+            {
+              "id": "d",
+              "text": "preStop フックを動かし、猶予 (既定 30 秒) が過ぎるのを待ってから SIGTERM",
+              "why": "SIGTERM は猶予の初めに送ります。猶予が過ぎたときに送るのは SIGKILL です。"
+            }
+          ],
+          "answer": "c",
+          "explanation": "Pod を消すと、kubelet はまず preStop フックがあればそれを動かし、次に各コンテナのプロセス 1 番に SIGTERM を送ります。猶予の時間 (terminationGracePeriodSeconds、既定 30 秒) が過ぎてもまだ動いているコンテナには、SIGKILL を送って強制的に止めます。preStop に時間がかかるなら、terminationGracePeriodSeconds を延ばします。",
+          "source": "https://kubernetes.io/docs/concepts/workloads/pods/pod-termination/"
+        },
+        {
+          "id": "x-fd2-011",
+          "type": "choice",
+          "prompt": "同じノードで次の 3 つの Pod が動いている (どれもコンテナは 1 つ)。ノードのメモリが足りなくなり、kubelet が Pod を追い出すとき、先に追い出される順として正しいのはどれ?",
+          "code": {
+            "language": "yaml",
+            "text": "# pod-a\nresources:\n  requests: { cpu: 500m, memory: 256Mi }\n  limits:   { cpu: 500m, memory: 256Mi }\n# pod-b\nresources:\n  requests: { cpu: 250m }\n# pod-c\n# (resources を書いていない)"
+          },
+          "choices": [
+            {
+              "id": "a",
+              "text": "pod-a → pod-b → pod-c",
+              "why": "requests と limits が同じ pod-a は Guaranteed で、追い出されるのは最後です。"
+            },
+            {
+              "id": "b",
+              "text": "pod-b → pod-c → pod-a",
+              "why": "何も書いていない pod-c (BestEffort) が、pod-b (Burstable) より先です。"
+            },
+            {
+              "id": "c",
+              "text": "pod-a → pod-c → pod-b",
+              "why": "Guaranteed の pod-a がいちばん後まで残ります。"
+            },
+            {
+              "id": "d",
+              "text": "pod-c → pod-b → pod-a",
+              "why": "BestEffort → Burstable → Guaranteed の順です。"
+            }
+          ],
+          "answer": "d",
+          "explanation": "Kubernetes は requests と limits の書き方から、Pod に QoS クラスを付けます。すべてのコンテナで CPU とメモリの requests と limits が同じなら Guaranteed、どれかを書いていれば Burstable、何も書いていなければ BestEffort です。ノードの資源が足りなくなると、BestEffort、Burstable、Guaranteed の順に追い出されます (資源の圧迫による追い出しでは、requests より多く使っている Pod が候補になります)。",
+          "source": "https://kubernetes.io/docs/concepts/workloads/pods/pod-qos/"
+        },
+        {
+          "id": "x-fd2-012",
+          "type": "fill",
+          "prompt": "毎晩手で動かす Job report が、終わったあとも Pod ごと残り続けて一覧が見にくい。完了または失敗してから 1 時間たったら、Job を Pod ごと自動で消したい。空欄に入る欄は?",
+          "language": "yaml",
+          "code": "apiVersion: batch/v1\nkind: Job\nmetadata:\n  name: report\nspec:\n  {{blank}}: 3600\n  template:\n    spec:\n      containers:\n      - name: report\n        image: registry.example.com/report:1.0\n      restartPolicy: Never",
+          "answers": [
+            "ttlSecondsAfterFinished"
+          ],
+          "candidates": [
+            "activeDeadlineSeconds",
+            "ttlSecondsAfterFinished",
+            "backoffLimit",
+            "successfulJobsHistoryLimit"
+          ],
+          "explanation": "Job の .spec.ttlSecondsAfterFinished に秒数を書くと、Job が Complete か Failed になってからその秒数がたったとき、TTL-after-finished コントローラーが Job を消します。消すときはカスケードで、Job に従う Pod も一緒に消えます。この機能は v1.23 から stable です。",
+          "wrongNotes": {
+            "activeDeadlineSeconds": "activeDeadlineSeconds は Job が動いてよい時間の上限で、過ぎると Job を失敗にします。終わった Job は消しません。",
+            "backoffLimit": "backoffLimit は失敗とみなすまでのやり直しの回数です。",
+            "successfulJobsHistoryLimit": "successfulJobsHistoryLimit は CronJob の欄で、残しておく成功した Job の数を決めます。Job には書けません。"
+          },
+          "source": "https://kubernetes.io/docs/concepts/workloads/controllers/ttlafterfinished/"
+        },
+        {
+          "id": "x-fd2-013",
+          "type": "choice",
+          "prompt": "kubectl get pod web-6c9d8-x7k2q -o yaml の出力の一部です。ここから分かることはどれ?",
+          "code": {
+            "language": "yaml",
+            "text": "metadata:\n  name: web-6c9d8-x7k2q\n  ownerReferences:\n  - apiVersion: apps/v1\n    kind: ReplicaSet\n    name: web-6c9d8\n    controller: true\n    blockOwnerDeletion: true"
+          },
+          "choices": [
+            {
+              "id": "a",
+              "text": "持ち主は ReplicaSet web-6c9d8 で、それを消すと既定でこの Pod も消える",
+              "why": "ownerReferences は持ち主を示し、持ち主を消すと既定では従うものも消されます。"
+            },
+            {
+              "id": "b",
+              "text": "この Pod は ReplicaSet web-6c9d8 のラベルセレクターに合わないので、管理されていない",
+              "why": "ownerReferences があり controller: true なので、この ReplicaSet が管理しています。"
+            },
+            {
+              "id": "c",
+              "text": "この Pod を消すと、持ち主の ReplicaSet web-6c9d8 も一緒に消される",
+              "why": "持ち主の参照は従うものから持ち主へ向いており、Pod を消しても持ち主は消えません。"
+            },
+            {
+              "id": "d",
+              "text": "この Pod は別の Namespace にある ReplicaSet にも持たれている",
+              "why": "Namespace をまたぐ持ち主の参照は許されていません。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "metadata.ownerReferences は、そのオブジェクトの持ち主 (owner) を示します。Kubernetes はこの参照を使い、持ち主が消されたときに従うもの (dependent) を片付けます。既定は background のカスケード削除なので、ReplicaSet を消すとこの Pod も消されます。",
+          "source": "https://kubernetes.io/docs/concepts/architecture/garbage-collection/"
+        },
+        {
+          "id": "x-fd2-014",
+          "type": "choice",
+          "prompt": "次のコマンドで一覧に出る Pod の説明として正しいのはどれ?",
+          "code": {
+            "language": "bash",
+            "text": "kubectl get pods -l 'environment in (production, qa),tier=frontend'"
+          },
+          "choices": [
+            {
+              "id": "a",
+              "text": "environment が production か qa で、かつ tier が frontend の Pod",
+              "why": "in は値がどれかに当たること、カンマは「かつ (AND)」を表します。"
+            },
+            {
+              "id": "b",
+              "text": "environment が production か qa の Pod と、tier が frontend の Pod の全部",
+              "why": "カンマは「または (OR)」ではなく「かつ (AND)」です。ラベルの選び方に OR はありません。"
+            },
+            {
+              "id": "c",
+              "text": "environment が production でも qa でもなく、tier が frontend の Pod",
+              "why": "それは notin のときの意味です。in は値のどれかに当たるものを選びます。"
+            },
+            {
+              "id": "d",
+              "text": "environment のキーを持ち、値が文字列 \"production, qa\" と同じ Pod",
+              "why": "( ) の中は値の集合で、カンマで分けたどれかの値に当たれば選ばれます。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "environment in (production, qa) は、キー environment の値が production か qa のものを選ぶ、集合ベースの条件です。複数の条件をカンマでつなぐと、すべてを満たすもの (AND) だけが選ばれます。ラベルセレクターには OR の書き方はありません。",
+          "source": "https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/"
+        },
+        {
+          "id": "x-fd2-015",
+          "type": "choice",
+          "prompt": "Deployment web のイメージと resources の limits の両方を変えたい。変えるたびにロールアウトが始まらないよう、2 つの変更を 1 回のロールアウトにまとめたい。どうする?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "kubectl rollout undo で 1 つ前に戻してから、2 つを続けて変える",
+              "why": "undo は前のリビジョンに戻すコマンドで、変更をまとめる働きはありません。"
+            },
+            {
+              "id": "b",
+              "text": "replicas を 0 にしてから 2 つを変え、replicas を元の数に戻す",
+              "why": "Pod が全部止まるので、その間はアプリが使えなくなります。"
+            },
+            {
+              "id": "c",
+              "text": "strategy.type を Recreate に変えてから、2 つを続けて変える",
+              "why": "Recreate は Pod の入れ替え方を変えるだけで、変更ごとのロールアウトは止まりません。"
+            },
+            {
+              "id": "d",
+              "text": "rollout pause で止め、2 つを変えてから rollout resume",
+              "why": "止めている間の変更は、再開したときに 1 回のロールアウトで反映されます。"
+            }
+          ],
+          "answer": "d",
+          "explanation": "kubectl rollout pause で Deployment のロールアウトを止めると、その間に変えた中身は反映されず、今の Pod がそのまま動き続けます。kubectl rollout resume で再開すると、止めている間の変更がまとめて 1 回のロールアウトになります。止めている間は rollout undo で巻き戻せないので、先に再開します。",
+          "source": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"
+        },
+        {
+          "id": "x-fd2-016",
+          "type": "choice",
+          "prompt": "画像 5 枚の変換を Job で行う。成功して終わる Pod が 5 つになったら Job を完了にし、同時に動かす Pod は 2 つまでにしたい。正しい組み合わせはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "replicas: 5 と parallelism: 2",
+              "why": "Job に replicas の欄はありません。成功の回数は completions に書きます。"
+            },
+            {
+              "id": "b",
+              "text": "completions: 5 と parallelism: 2",
+              "why": "completions が成功の回数、parallelism が同時に動かす数です。"
+            },
+            {
+              "id": "c",
+              "text": "completions: 2 と parallelism: 5",
+              "why": "逆です。これだと 2 つ成功した時点で完了になります。"
+            },
+            {
+              "id": "d",
+              "text": "backoffLimit: 5 と parallelism: 2",
+              "why": "backoffLimit は失敗とみなすまでのやり直しの回数で、成功の回数ではありません。"
+            }
+          ],
+          "answer": "b",
+          "explanation": "決まった回数だけ成功させる Job では、.spec.completions に要る成功の数を書きます。.spec.parallelism は同時に動かす Pod の数の上限で、書かなければ 1 です。この 2 つで、2 つずつ並べて 5 つ成功したら完了、という Job になります。",
+          "source": "https://kubernetes.io/docs/concepts/workloads/controllers/job/"
+        },
+        {
+          "id": "x-fd2-017",
+          "type": "choice",
+          "prompt": "15 分ごとに動く CronJob のバックアップが、データが多い日は 15 分を超えて動き続ける。前の回が終わっていなければ、次の回は飛ばしたい。concurrencyPolicy に書く値はどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "Allow",
+              "why": "Allow は既定の値で、前の回が動いていても次の回を同時に動かします。"
+            },
+            {
+              "id": "b",
+              "text": "Replace",
+              "why": "Replace は動いている前の回を新しい回に取りかえるので、前の回が途中で止まります。"
+            },
+            {
+              "id": "c",
+              "text": "Forbid",
+              "why": "Forbid は前の回が終わっていなければ次の回を飛ばします。"
+            },
+            {
+              "id": "d",
+              "text": "Never",
+              "why": "Never は Pod の restartPolicy などの値で、concurrencyPolicy には書けません。"
+            }
+          ],
+          "answer": "c",
+          "explanation": "CronJob の .spec.concurrencyPolicy は、前の Job がまだ動いているときに次の Job をどうするかを決めます。Allow (既定) は同時に動かし、Forbid は次の回を飛ばし、Replace は前の回を新しい回に取りかえます。この決まりは同じ CronJob が作った Job どうしにだけ効きます。",
+          "source": "https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/"
+        },
+        {
+          "id": "x-fd2-018",
+          "type": "choice",
+          "prompt": "replicas: 10 の Deployment を、strategy の値をすべて既定のまま (RollingUpdate、maxSurge と maxUnavailable はともに 25%) で更新する。更新の途中の Pod の数として正しいのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "Pod は合わせて最大 12 個、使える Pod は最低 7 個",
+              "why": "25% の 2.5 を、maxSurge は切り上げ、maxUnavailable は切り捨てで数にします。"
+            },
+            {
+              "id": "b",
+              "text": "Pod は合わせて最大 13 個、使える Pod は最低 8 個",
+              "why": "maxSurge は 2.5 を切り上げて 3、maxUnavailable は 2.5 を切り捨てて 2 です。"
+            },
+            {
+              "id": "c",
+              "text": "Pod は合わせて最大 12 個、使える Pod は最低 8 個",
+              "why": "maxSurge は切り捨てではなく切り上げなので、3 個まで多く作れます。"
+            },
+            {
+              "id": "d",
+              "text": "Pod は合わせて最大 10 個、使える Pod は最低 10 個",
+              "why": "maxSurge と maxUnavailable が両方 0 なら更新が進まないので、その組み合わせは許されません。"
+            }
+          ],
+          "answer": "b",
+          "explanation": "maxSurge は replicas より多く作ってよい Pod の数で、割合から数にするときは切り上げます。maxUnavailable は使えなくなってよい Pod の数で、切り捨てます。10 の 25% は 2.5 なので、多く作ってよいのは 3 (合わせて 13 まで)、使えなくなってよいのは 2 (最低 8 は使える) です。",
+          "source": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"
+        },
+        {
+          "id": "x-fd2-019",
+          "type": "choice",
+          "prompt": "多くの Pod が読む ConfigMap feature-flags を、誤って書き換えられないようにし、kube-apiserver の監視 (watch) の負荷も減らしたい。どうする? また、あとで中身を変えたくなったらどうする?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "immutable: true を付ける。変えたくなったら immutable: false に戻してから書き換える",
+              "why": "一度 immutable にすると、元に戻すことはできません。"
+            },
+            {
+              "id": "b",
+              "text": "ConfigMap を Secret に作り直す。Secret は書き換えられない",
+              "why": "Secret もふつうは書き換えられます。書き換えを止めるのは immutable の欄です。"
+            },
+            {
+              "id": "c",
+              "text": "Namespace を kube-system に移す。kube-system のものは書き換えられない",
+              "why": "kube-system でも、権限があればオブジェクトは書き換えられます。"
+            },
+            {
+              "id": "d",
+              "text": "immutable: true を付ける。変えたくなったら消して作り直し、使っている Pod も作り直す",
+              "why": "immutable にした ConfigMap は、消して作り直すことしかできません。"
+            }
+          ],
+          "answer": "d",
+          "explanation": "ConfigMap に immutable: true を付けると、data と binaryData を変えられなくなり、誤った更新から守れます。immutable にした ConfigMap は見張り (watch) が閉じられるので、kube-apiserver の負荷が大きく減ります。一度付けると元に戻せず、変えるには消して作り直すしかありません。動いている Pod は消された ConfigMap を指したままなので、作り直すのが勧められます。",
+          "source": "https://kubernetes.io/docs/concepts/configuration/configmap/"
+        },
+        {
+          "id": "x-fd2-020",
+          "type": "choice",
+          "prompt": "アプリのログに、自分が動いている Pod の名前と Namespace を出したい。アプリから Kubernetes の API サーバーには問い合わせたくない。どうする?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "fieldRef で metadata.name と metadata.namespace を env に渡す",
+              "why": "Downward API で、Pod の欄の値を環境変数として受け取れます。"
+            },
+            {
+              "id": "b",
+              "text": "ConfigMap に Pod の名前を前もって書いておき、configMapKeyRef で環境変数に渡す",
+              "why": "Deployment の Pod の名前は作られるまで決まらないので、前もって ConfigMap に書けません。"
+            },
+            {
+              "id": "c",
+              "text": "コンテナの中で kubectl get pod を動かし、自分の Pod の名前を探して出す",
+              "why": "それは API サーバーへの問い合わせで、道具と権限も要ります。"
+            },
+            {
+              "id": "d",
+              "text": "Pod にラベル name を付けておくと、その値が自動で環境変数に入る",
+              "why": "ラベルは自動では環境変数になりません。ラベルを渡せるのは downwardAPI のボリュームです。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "Downward API を使うと、Pod やコンテナの欄の値を、環境変数か downwardAPI のボリュームのファイルとしてコンテナに渡せます。env の valueFrom.fieldRef に metadata.name や metadata.namespace、status.podIP などを書くと、その値が環境変数に入ります。アプリは API サーバーに問い合わせずに自分のことを知れます。",
+          "source": "https://kubernetes.io/docs/concepts/workloads/pods/downward-api/"
+        },
+        {
+          "id": "x-fd2-021",
+          "type": "choice",
+          "prompt": "Job のマニフェストの apiVersion: batch/v1 について正しいのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "batch は API グループ、v1 はその版で、/apis/batch/v1 で提供される",
+              "why": "名前付きのグループは /apis/<グループ>/<版> で提供され、apiVersion は <グループ>/<版> と書きます。"
+            },
+            {
+              "id": "b",
+              "text": "batch は Namespace の名前で、Job は Namespace batch に作られる",
+              "why": "apiVersion は Namespace を決めません。Namespace は metadata.namespace に書きます。"
+            },
+            {
+              "id": "c",
+              "text": "batch は kubectl のプラグインの名前で、入れないと Job を作れない",
+              "why": "batch は API サーバーに組み込まれた API グループで、プラグインではありません。"
+            },
+            {
+              "id": "d",
+              "text": "Pod の v1 と同じコアグループで、/api/batch/v1 で提供される",
+              "why": "コアグループは apiVersion: v1 と書き /api/v1 で提供されます。batch は名前付きのグループです。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "Kubernetes の API は、API グループと版に分けて提供されます。名前付きのグループは /apis/<グループ>/<版> で提供され、マニフェストでは apiVersion: <グループ>/<版> と書きます。Pod などのコア (legacy) グループだけは /api/v1 で提供され、apiVersion: v1 とグループ名を書きません。",
+          "source": "https://kubernetes.io/docs/reference/using-api/"
+        },
+        {
+          "id": "x-fd2-022",
+          "type": "choice",
+          "prompt": "使いたい機能の API が v1alpha1 でしか提供されていない。この版について正しいのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "本番で使ってよいほど試されており、既定で有効になっている",
+              "why": "それは stable (v1 など) の説明です。alpha は本番向けではありません。"
+            },
+            {
+              "id": "b",
+              "text": "既定では無効で、予告なく消されうるので、短期の試験用クラスターに向く",
+              "why": "alpha の版はこのとおりの扱いです。"
+            },
+            {
+              "id": "c",
+              "text": "一度提供されたら、同じメジャーバージョンの間は必ず提供され続ける",
+              "why": "その保証があるのは stable の版です。"
+            },
+            {
+              "id": "d",
+              "text": "beta と同じ扱いで、非推奨にしてから取り除くまでに最低 3 つのマイナーリリースを待つ",
+              "why": "beta には寿命の決まりがありますが、alpha はいつでも予告なく取り除かれえます。"
+            }
+          ],
+          "answer": "b",
+          "explanation": "API の版は、alpha・beta・stable の順に安定します。alpha (v1alpha1 など) は既定で無効で、明示して有効にする必要があり、いつでも予告なく取り除かれることがあります。そのため短期間の試験用のクラスターでだけ使うのが勧められます。stable (v1 など) は同じメジャーバージョンの間は提供され続けます。",
+          "source": "https://kubernetes.io/docs/reference/using-api/"
+        },
+        {
+          "id": "x-fd2-023",
+          "type": "choice",
+          "prompt": "古いマニフェストを、今のクラスター (v1.35) に kubectl apply したら、次のエラーが出た (抜粋)。原因と直し方として正しいのはどれ?",
+          "code": {
+            "language": "bash",
+            "text": "$ kubectl apply -f ingress.yaml\nerror: resource mapping not found for name: \"web\" namespace: \"\" from \"ingress.yaml\": no matches for kind \"Ingress\" in version \"extensions/v1beta1\""
+          },
+          "choices": [
+            {
+              "id": "a",
+              "text": "Ingress コントローラーがクラスターに入っていない。先にコントローラーを入れる",
+              "why": "コントローラーが無くても Ingress のオブジェクトは作れます。このエラーは API の版の問題です。"
+            },
+            {
+              "id": "b",
+              "text": "kubectl が古いので、kubectl を新しくすれば extensions/v1beta1 のまま作れる",
+              "why": "提供をやめたのは API サーバーの側なので、kubectl を新しくしても作れません。"
+            },
+            {
+              "id": "c",
+              "text": "Ingress の古い API の版が提供されていない。networking.k8s.io/v1 に書き直す",
+              "why": "v1.22 からは networking.k8s.io/v1 を使い、pathType なども新しい形で書きます。"
+            },
+            {
+              "id": "d",
+              "text": "Ingress は Namespace に属さないので、metadata.namespace を消す",
+              "why": "Ingress は Namespace に属するリソースです。エラーは版が見つからないことを言っています。"
+            }
+          ],
+          "answer": "c",
+          "explanation": "Ingress の extensions/v1beta1 と networking.k8s.io/v1beta1 の版は、v1.22 で提供が終わりました。マニフェストは v1.19 からある networking.k8s.io/v1 に書き直し、各 path に pathType を書くなど、変わった欄も直します。すでに保存されているオブジェクトは新しい版で読めます。",
+          "source": "https://kubernetes.io/docs/reference/using-api/deprecation-guide/#ingress-v122"
+        },
+        {
+          "id": "x-fd2-024",
+          "type": "choice",
+          "prompt": "StatefulSet で動かしている分散キャッシュは、Pod が順番に起動しなくても困らない。replicas を 3 から 10 に増やすとき、1 つずつ Ready を待たずに一度に作りたい。何を書く?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "spec.minReadySeconds: 0",
+              "why": "minReadySeconds は Ready とみなすまでの待ち時間で、1 つずつ作る順番は変わりません。"
+            },
+            {
+              "id": "b",
+              "text": "spec.podManagementPolicy: OrderedReady",
+              "why": "OrderedReady は既定の値で、1 つずつ順に作り、前の Pod の Ready を待ちます。"
+            },
+            {
+              "id": "c",
+              "text": "spec.podManagementPolicy: Parallel",
+              "why": "Parallel にすると、Pod を待たずに一度に作ったり止めたりします。"
+            },
+            {
+              "id": "d",
+              "text": "spec.updateStrategy.type: OnDelete",
+              "why": "updateStrategy は更新の仕方を決めるもので、増やすときの作り方は変わりません。"
+            }
+          ],
+          "answer": "c",
+          "explanation": "StatefulSet の .spec.podManagementPolicy は、Pod を作る・止めるときの順番の決まりです。既定の OrderedReady は 1 つずつ順に作り、前の Pod が Running かつ Ready になるのを待ちます。Parallel にすると、待たずにすべての Pod を一度に作ったり止めたりします。Pod の名前や識別の保証は変わりません。",
+          "source": "https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/"
+        },
+        {
+          "id": "x-fd2-025",
+          "type": "choice",
+          "prompt": "自作のプログラムで Deployment web を読み、replicas を変えて PUT で書き戻したら、409 Conflict が返った。応答の message は次のとおり。このとき起きたこととして正しいのはどれ?",
+          "code": {
+            "language": "bash",
+            "text": "Operation cannot be fulfilled on deployments.apps \"web\": the object has been modified; please apply your changes to the latest version and try again"
+          },
+          "choices": [
+            {
+              "id": "a",
+              "text": "読んでから書き戻すまでに、別の誰かが web を更新していた",
+              "why": "API サーバーは resourceVersion で、古い状態に基づく更新を見つけて拒みます。"
+            },
+            {
+              "id": "b",
+              "text": "このプログラムに Deployment を更新する権限が無かった",
+              "why": "権限が無いときは 403 Forbidden です。409 は競合を表します。"
+            },
+            {
+              "id": "c",
+              "text": "web が別の Namespace に移されて、見つからなかった",
+              "why": "見つからないときは 404 Not Found です。"
+            },
+            {
+              "id": "d",
+              "text": "replicas に書いた値が多すぎて、検証で拒まれた",
+              "why": "検証の失敗は 422 Unprocessable Entity などで、このメッセージにはなりません。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "オブジェクトには metadata.resourceVersion があり、変わるたびに新しくなります。PUT では読んだときの resourceVersion を送り、その間にオブジェクトが変わっていれば、API サーバーは更新が失われないように 409 Conflict で拒みます。直すには、もう一度読み直して変更をかけ直します。",
+          "source": "https://kubernetes.io/docs/reference/using-api/api-concepts/"
+        },
+        {
+          "id": "x-fd2-026",
+          "type": "fill",
+          "prompt": "web.yaml を、API サーバーの検証とアドミッションまで通して確かめたいが、クラスターには保存したくない。空欄に入る値は?",
+          "language": "bash",
+          "code": "kubectl apply -f web.yaml --dry-run={{blank}}",
+          "answers": [
+            "server"
+          ],
+          "candidates": [
+            "client",
+            "none",
+            "server",
+            "all"
+          ],
+          "output": "deployment.apps/web configured (server dry run)",
+          "explanation": "--dry-run=server は、API サーバーに dryRun=All の要求を送ります。既定値の補い、スキーマの検証、アドミッションコントローラーまで本番と同じように通りますが、最後の保存だけは行いません。client はクラスターに送らずに手元で組み立てるだけなので、サーバーの検証は通りません。",
+          "wrongNotes": {
+            "client": "client は手元でオブジェクトを組み立てるだけで、API サーバーの検証とアドミッションは通りません。",
+            "none": "none はドライランをしないという意味で、実際に保存されます。",
+            "all": "kubectl の --dry-run に all という値はありません (API の要求の dryRun=All とは別です)。"
+          },
+          "source": "https://kubernetes.io/docs/reference/using-api/api-concepts/"
+        }
+      ]
+    }
+  ]
+}
