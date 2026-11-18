@@ -317,4 +317,34 @@ export const HANDBOOK_FIGURES: Record<string, DiagramSpec> = {
     ],
   },
 
+  'k3s-vs-kubernetes': {
+    caption: 'どちらも同じ Kubernetes の API を出すので、kubectl の使い方は同じです。kubeadm で組む upstream の Kubernetes では部品が別々の static Pod として動き、CNI は自分で入れます。k3s では server の 1 つのプロセスにコントロールプレーンがまとまり、既定の保存先は SQLite で、containerd・Flannel・CoreDNS・Traefik などが同梱されています。agent は server に参加してワーカーになります。',
+    width: 720,
+    height: 420,
+    groups: [
+      { x: 16, y: 80, w: 330, h: 326, label: 'Kubernetes (kubeadm で組む)' },
+      { x: 374, y: 80, w: 330, h: 326, label: 'k3s' },
+    ],
+    nodes: [
+      { id: 'kubectl', x: 275, y: 14, w: 170, h: 44, label: 'kubectl', sub: '同じ API・同じマニフェスト', tone: 'muted' },
+      { id: 'u-api', x: 32, y: 116, w: 140, h: 52, label: 'kube-apiserver', sub: 'static Pod', tone: 'accent' },
+      { id: 'u-etcd', x: 190, y: 116, w: 140, h: 52, label: 'etcd', sub: 'static Pod' },
+      { id: 'u-ctl', x: 32, y: 190, w: 298, h: 52, label: 'scheduler・controller-manager', sub: 'それぞれ別の static Pod' },
+      { id: 'u-node', x: 32, y: 264, w: 298, h: 52, label: 'kubelet・kube-proxy・ランタイム', sub: 'ノードごとに入れる' },
+      { id: 'u-cni', x: 32, y: 338, w: 298, h: 52, label: 'CNI のアドオン', sub: '自分で入れる (入れるまで CoreDNS は起きない)', tone: 'warn' },
+      { id: 'k-server', x: 390, y: 116, w: 298, h: 52, label: 'k3s server', sub: 'コントロールプレーンを 1 つのプロセスに', tone: 'accent' },
+      { id: 'k-db', x: 390, y: 190, w: 298, h: 52, label: 'データストア', sub: '既定は SQLite・HA は組み込みの etcd など' },
+      { id: 'k-addons', x: 390, y: 264, w: 298, h: 52, label: '同梱の部品', sub: 'containerd・Flannel・CoreDNS・Traefik など' },
+      { id: 'k-agent', x: 390, y: 338, w: 298, h: 52, label: 'k3s agent', sub: 'kubelet・containerd・Flannel' },
+    ],
+    edges: [
+      { from: 'kubectl', to: 'u-api' },
+      { from: 'kubectl', to: 'k-server' },
+      { from: 'u-api', to: 'u-etcd' },
+      { from: 'u-node', to: 'u-api', fromSide: 'left', toSide: 'left' },
+      { from: 'u-cni', to: 'u-node' },
+      { from: 'k-server', to: 'k-db' },
+      { from: 'k-agent', to: 'k-server', fromSide: 'right', toSide: 'right', dashed: true },
+    ],
+  },
 };

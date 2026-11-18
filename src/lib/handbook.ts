@@ -7,6 +7,8 @@ export const RESULT_MAX = 40;
 const CODE_KEYS = new Set(['language', 'text']);
 const TRY_KEYS = new Set(['goal', 'steps']);
 const FILE_KEYS = new Set(['domain', 'topics']);
+/** 学習要領の外のトピックを置くファイルの domain (細目の原文とは照らさない) */
+export const APPENDIX_DOMAIN = '付録';
 
 function unknownKeys(obj: Record<string, unknown>, allowed: Set<string>, where: string, errors: string[]) {
   for (const k of Object.keys(obj)) if (!allowed.has(k)) errors.push(`${where}: ${k} という欄は使いません`);
@@ -50,14 +52,16 @@ export function validateHandbook(data: unknown[], domains: Map<string, string[]>
   const covered = new Set<string>();
   const seenDomains = new Set<string>();
   for (const [fi, file] of data.entries()) {
-    if (!isObj(file) || !domains.has(file.domain as string) || !Array.isArray(file.topics)) {
-      errors.push(`ファイル ${fi}: domain (4 分野のどれか) と topics の配列が要ります`);
+    const appendix = isObj(file) && file.domain === APPENDIX_DOMAIN;
+    if (!isObj(file) || !(appendix || domains.has(file.domain as string)) || !Array.isArray(file.topics)) {
+      errors.push(`ファイル ${fi}: domain (4 分野のどれかか ${APPENDIX_DOMAIN}) と topics の配列が要ります`);
       continue;
     }
     unknownKeys(file, FILE_KEYS, `ファイル ${fi}`, errors);
     if (seenDomains.has(file.domain as string)) errors.push(`ファイル ${fi}: ${file.domain} のファイルが 2 つあります`);
     seenDomains.add(file.domain as string);
-    const competencies = domains.get(file.domain as string)!;
+    const competencies = appendix ? [] : domains.get(file.domain as string)!;
+    if (appendix && file.topics.length === 0) errors.push(`${APPENDIX_DOMAIN}: トピックが 1 つ以上要ります`);
     for (const t of file.topics as unknown[]) {
       if (!isObj(t)) {
         errors.push(`${file.domain}: トピックがオブジェクトではありません`);
@@ -68,7 +72,12 @@ export function validateHandbook(data: unknown[], domains: Map<string, string[]>
       if (!isText(t.id) || !/^[a-z0-9-]+$/.test(t.id)) errors.push(`${id}: id は kebab-case にします`);
       else if (ids.has(t.id)) errors.push(`${id}: id が重複しています`);
       else ids.add(t.id);
-      if (!competencies.includes(t.competency as string)) errors.push(`${id}: competency が ${file.domain} の細目の原文と合いません`);
+      if (appendix) {
+        // 付録は学習要領の外なので、細目の原文ではなく見出しの短い文を competency に書く
+        if (!isText(t.competency)) errors.push(`${id}: competency (目次の小見出し) が要ります`);
+        else if (covered.has(t.competency as string)) errors.push(`${id}: competency ${t.competency} のトピックが 2 つあります`);
+        else covered.add(t.competency as string);
+      } else if (!competencies.includes(t.competency as string)) errors.push(`${id}: competency が ${file.domain} の細目の原文と合いません`);
       else if (covered.has(t.competency as string)) errors.push(`${id}: 細目 ${t.competency} のトピックが 2 つあります`);
       else covered.add(t.competency as string);
       if (!isText(t.title) || !isText(t.summary)) errors.push(`${id}: title と summary が要ります`);
@@ -96,7 +105,7 @@ export function validateHandbook(data: unknown[], domains: Map<string, string[]>
             errors.push(`${id}: sources の url が読めません`);
           }
         }
-        }
+      }
     }
   }
   for (const [domain, competencies] of domains) {

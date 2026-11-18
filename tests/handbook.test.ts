@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { WEEKS } from '../src/content/curriculum';
 import { CURRICULUM } from '../src/content/guide';
-import { HANDBOOK, HANDBOOK_TOPICS, findTopic, topicByCompetency } from '../src/content/handbook';
+import { APPENDIX, HANDBOOK, HANDBOOK_TOPICS, findTopic, topicByCompetency } from '../src/content/handbook';
 import { validateHandbook } from '../src/lib/handbook';
 
 const domains = new Map(CURRICULUM.map((c) => [c.domain as string, c.competencies.map((x) => x.en)]));
@@ -78,5 +78,18 @@ describe('validateHandbook', () => {
     expect(validateHandbook(missingTopic, domains, lessonIds).join()).toMatch(/トピックがありません/);
     expect(validateHandbook(HANDBOOK.slice(1), domains, lessonIds).join()).toMatch(/ファイルがありません/);
     expect(validateHandbook([...HANDBOOK, { domain: HANDBOOK[0].domain, topics: [] }], domains, lessonIds).join()).toMatch(/2 つあります/);
+  });
+  it('付録は目次の最後に置き、細目とは照らさず、細目からは引き当てない', () => {
+    expect(HANDBOOK[HANDBOOK.length - 1].domain).toBe(APPENDIX);
+    expect(HANDBOOK_TOPICS.filter((t) => t.domain !== APPENDIX)).toHaveLength([...domains.values()].flat().length);
+    const app = HANDBOOK.find((d) => d.domain === APPENDIX)!;
+    expect(topicByCompetency(app.topics[0].competency)).toBeUndefined();
+    const others = HANDBOOK.filter((d) => d.domain !== APPENDIX);
+    expect(validateHandbook(others, domains, lessonIds)).toEqual([]);
+    const bad = structuredClone(app);
+    bad.topics[0].competency = '';
+    expect(validateHandbook([...others, bad], domains, lessonIds).join()).toMatch(/小見出し/);
+    expect(validateHandbook([...others, { ...app, topics: [] }], domains, lessonIds).join()).toMatch(/1 つ以上/);
+    expect(validateHandbook([...others, app, app], domains, lessonIds).join()).toMatch(/2 つあります/);
   });
 });
