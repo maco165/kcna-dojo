@@ -182,6 +182,9 @@
           "label": "CNCF の k8s-conformance の k3s v1.34 の提出",
           "url": "https://github.com/cncf/k8s-conformance/tree/master/v1.34/k3s"
         }
+      ],
+      "noTermLinks": [
+        "linux-distribution"
       ]
     },
     {

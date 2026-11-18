@@ -93,4 +93,12 @@ describe('本文の用語を用語集へのリンクにする', () => {
     expect(ids).not.toContain('role');
     expect(ids).not.toContain('service');
   });
+  it('範囲外の語の別名を、意味の違う所でリンクにしない (k3s の「Kubernetes のディストリビューション」・IAM ロール・NLB の受け口)', () => {
+    const k3s = HANDBOOK_TOPICS.find((t) => t.id === 'k3s-vs-kubernetes')!;
+    const link = makeTermLinker(names, k3s.noTermLinks ?? []);
+    expect([k3s.summary, ...k3s.flow.map((s) => s.text)].flatMap(link).some((p) => typeof p !== 'string' && p.id === 'linux-distribution')).toBe(false);
+    const ids = (id: string) => linkDetail(names, TERMS.find((t) => t.id === id)!).flat().filter((p) => typeof p !== 'string').map((p) => p.id);
+    expect(ids('iam')).not.toContain('role');
+    expect(ids('nlb')).not.toContain('node');
+  });
 });
