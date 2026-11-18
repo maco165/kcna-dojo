@@ -538,6 +538,8 @@ async function run(browser, name, width, height) {
     if (width >= 768) {
       await page.locator('#gloss-pane-term').waitFor();
       check((await page.locator('#gloss-pane-term').innerText()).trim() === 'etcd', `${tag} 用語集でその語 (etcd) の説明が開く`);
+      const ai = await page.locator('#gloss-pane').getByRole('link', { name: 'Claude' }).getAttribute('href');
+      check(ai.startsWith('https://claude.ai/new?q=') && decodeURIComponent(ai.split('?q=')[1]).includes('「etcd」'), `${tag} 用語集の語から、語を入れた AI を開ける`);
     } else {
       const head = page.locator('#gloss-row-etcd button[aria-expanded]');
       await head.waitFor();

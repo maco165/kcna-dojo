@@ -13,10 +13,15 @@ import { dueQuestions, findLesson } from '../content';
 import glossary from '../content/glossary.json';
 import type { Domain } from '../content/types';
 import { isFreshVisit } from '../lib/scrollMemory';
-import { searchTerms, sortTerms, termDomain, type GlossaryTerm } from '../lib/glossary';
+import { searchTerms, sortTerms, termDomain, termQuestion, type GlossaryTerm } from '../lib/glossary';
+import { aiLinks } from '../lib/askAi';
+import { findTopic } from '../content/handbook';
+import { Button } from '@astryxdesign/core/Button';
+import { HStack } from '@astryxdesign/core/Stack';
+import { ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline';
 import { DOMAINS } from '../lib/lessonStatus';
 import type { Progress } from '../lib/progress';
-import { lessonHref } from '../lib/route';
+import { handbookHref, lessonHref } from '../lib/route';
 import { SITE_NAME } from '../lib/site';
 import { WIDE_QUERY, useMediaQuery } from '../lib/useMediaQuery';
 
@@ -43,12 +48,46 @@ function hostOf(url: string) {
   }
 }
 
-/** 説明・出てくるレッスン・出典 (開いた語の中身。スマホと PC で共通) */
+/** 用語集でも分からないときに、語と説明を入れた Claude / ChatGPT を開く (サイトからは何も送らない) */
+function AskTerm({ t }: { t: Entry }) {
+  const links = aiLinks(termQuestion(t));
+  const icon = <ChatBubbleLeftRightIcon width={16} height={16} />;
+  return (
+    <HStack gap={2} wrap="wrap" vAlign="center">
+      <Text type="supporting">まだ分からなければ AI に聞く</Text>
+      <Button size="sm" variant="ghost" icon={icon} label="Claude" href={links.claude} target="_blank" rel="noopener noreferrer" />
+      <Button size="sm" variant="ghost" icon={icon} label="ChatGPT" href={links.chatgpt} target="_blank" rel="noopener noreferrer" />
+    </HStack>
+  );
+}
+
+/** 説明・詳しい説明・出てくるレッスンとハンドブック・出典・AI に聞く (開いた語の中身。スマホと PC で共通) */
 function Detail({ t, large }: { t: Entry; large?: boolean }) {
   const lessons = t.lessons.map((id) => ({ id, found: findLesson(id) })).filter((l) => l.found);
+  const topics = (t.topics ?? []).map((id) => findTopic(id)?.topic).filter((x) => x !== undefined);
+  const sources = [{ label: hostOf(t.source), url: t.source }, ...(t.sources ?? []).filter((x) => x.url !== t.source)];
   return (
     <div className="gloss-detail">
       <p className={large ? 'gloss-detail__desc gloss-detail__desc--lg' : 'gloss-detail__desc'}>{t.description}</p>
+      {t.detail?.split(/\n\n+/).map((para, i) => (
+        <p key={i} className="gloss-detail__more">
+          {para}
+        </p>
+      ))}
+      {topics.length > 0 && (
+        <VStack gap={1.5}>
+          <h3 className="gloss-detail__label">ハンドブックで読む</h3>
+          <ul className="gloss-chips">
+            {topics.map((topic) => (
+              <li key={topic!.id}>
+                <a className="gloss-chip" href={handbookHref(topic!.id)}>
+                  {topic!.title}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </VStack>
+      )}
       {lessons.length > 0 && (
         <VStack gap={1.5}>
           <h3 className="gloss-detail__label">出てくるレッスン</h3>
@@ -63,10 +102,16 @@ function Detail({ t, large }: { t: Entry; large?: boolean }) {
       )}
       <Text type="supporting">
         出典:{' '}
-        <Link href={t.source} isExternalLink newTabLabel="(新しいタブで開きます)">
-          {hostOf(t.source)}
-        </Link>
+        {sources.map((x, i) => (
+          <span key={x.url}>
+            {i > 0 && '・'}
+            <Link href={x.url} isExternalLink newTabLabel="(新しいタブで開きます)">
+              {x.label}
+            </Link>
+          </span>
+        ))}
       </Text>
+      <AskTerm t={t} />
     </div>
   );
 }
@@ -147,7 +192,8 @@ function DeskList({ hits, initial }: { hits: Entry[]; initial?: string }) {
   const current = hits.find((t) => t.id === picked) ?? hits[0];
   const groups: { d: string; items: Entry[] }[] = ORDER.map((d) => ({ d: d as string, items: hits.filter((t) => t.domain === d) })).filter((g) => g.items.length > 0);
   const other = hits.filter((t) => !t.domain);
-  if (other.length) groups.push({ d: 'その他', items: other });
+  // 出てくるレッスンが無いのは、試験の範囲の外の語 (ハンドブックの範囲外の付録で説明している)
+  if (other.length) groups.push({ d: '範囲外', items: other });
   // 一覧はロービングタブインデックス: Tab で入るのは今の語だけ、上下の矢印・Home・End で移る
   const ordered = groups.flatMap((g) => g.items);
   const move = (e: React.KeyboardEvent, from: string) => {
@@ -224,7 +270,7 @@ function Body({ isWide, termId }: { isWide: boolean; termId?: string }) {
       <VStack gap={1}>
         <Text type="supporting">{SITE_NAME}</Text>
         <h1 className="week-title">用語集</h1>
-        <Text type="supporting">問題に出る {TERMS.length} 語の短い説明です。詳しくは出典 (公式の文書) を見てください。</Text>
+        <Text type="supporting">問題とハンドブックに出る {TERMS.length} 語の説明です。ハンドブックで分からない語を調べ、それでも分からなければ AI に聞けます。</Text>
       </VStack>
       <TextInput
         type="search"
