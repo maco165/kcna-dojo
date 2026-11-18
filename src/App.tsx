@@ -28,7 +28,7 @@ export default function App() {
       {route.name === 'exam' ? (
         <ExamScreen progress={progress} updateProgress={updateProgress} />
       ) : route.name === 'handbook' ? (
-        <Handbook key={route.topicId ?? 'index'} progress={progress} topicId={route.topicId} />
+        <Handbook key={route.topicId ?? 'index'} progress={progress} updateProgress={updateProgress} topicId={route.topicId} />
       ) : route.name === 'guide' ? (
         <Guide progress={progress} />
       ) : route.name === 'glossary' ? (

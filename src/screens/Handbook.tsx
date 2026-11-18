@@ -12,7 +12,11 @@ import { dueQuestions, findLesson } from '../content';
 import { APPENDIX, HANDBOOK, findTopic, type HandbookStep } from '../content/handbook';
 import { HANDBOOK_FIGURES } from '../content/handbookFigures';
 import { EXAM_WEIGHTS } from '../lib/exam';
-import type { Progress } from '../lib/progress';
+import { markHandbookSeen, setHandbookDone, type HandbookRecord, type Progress } from '../lib/progress';
+import { useEffect, useRef, useState } from 'react';
+import { Button } from '@astryxdesign/core/Button';
+import { HStack } from '@astryxdesign/core/Stack';
+import { StatusDot } from '@astryxdesign/core/StatusDot';
 import { glossaryTermHref, guideHref, handbookHref, lessonHref } from '../lib/route';
 import glossary from '../content/glossary.json';
 import type { GlossaryTerm } from '../lib/glossary';
@@ -59,7 +63,45 @@ function Step({ step, text }: { step: HandbookStep; text: TermPiece[] }) {
 }
 
 /** 目次: 分野ごとに細目のトピックを並べる */
-function Index() {
+type Update = (fn: (p: Progress) => Progress) => void;
+
+/** 目次のカードに添える読んだ記録 */
+function readingLabel(rec: HandbookRecord | undefined, steps: number): string {
+  if (rec?.done) return '確認済み';
+  if (rec && rec.seen > 0) return `読みかけ ${Math.min(rec.seen, steps)} / ${steps} 段`;
+  return '未読';
+}
+
+/**
+ * 「全体の流れ」の各段が画面に入ったら、何段目まで読んだかを記録する (前より進んだときだけ)。
+ * 画面には何も描かない
+ */
+function SeenTracker({ topicId, seen, updateProgress }: { topicId: string; seen: number; updateProgress: Update }) {
+  const furthest = useRef(seen);
+  useEffect(() => {
+    const items = [...document.querySelectorAll<HTMLElement>('[data-flow-step]')];
+    if (items.length === 0 || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        let n = furthest.current;
+        for (const e of entries) if (e.isIntersecting) n = Math.max(n, Number((e.target as HTMLElement).dataset.flowStep) + 1);
+        if (n > furthest.current) {
+          furthest.current = n;
+          updateProgress((p) => markHandbookSeen(p, topicId, n, new Date()));
+        }
+      },
+      // 画面の下の 2 割に入っただけでは読んだことにしない
+      { rootMargin: '0px 0px -20% 0px' },
+    );
+    items.forEach((el) => io.observe(el));
+    return () => io.disconnect();
+  }, [topicId, updateProgress]);
+  return null;
+}
+
+function Index({ progress }: { progress: Progress }) {
+  const total = HANDBOOK.reduce((n, d) => n + d.topics.length, 0);
+  const done = HANDBOOK.reduce((n, d) => n + d.topics.filter((t) => progress.handbook?.[t.id]?.done).length, 0);
   return (
     <div className="hb">
       <div className="hb-head">
@@ -71,6 +113,9 @@ function Index() {
         </p>
         <p className="hb-lead hb-muted">
           学習要領そのものと出典の考え方は <a href={guideHref}>Kubernetes とこのサイト</a> にあります。
+        </p>
+        <p className="hb-muted">
+          確認済み {done} / {total} トピック
         </p>
       </div>
       {HANDBOOK.map((d) => (
@@ -96,6 +141,7 @@ function Index() {
                   <span className="hb-muted">
                     流れ {t.flow.length} 段 · 試す手順 {t.try.length} つ
                   </span>
+                  <span className={progress.handbook?.[t.id]?.done ? 'hb-topic__read hb-topic__read--done' : 'hb-topic__read'}>{readingLabel(progress.handbook?.[t.id], t.flow.length)}</span>
                 </a>
               </li>
             ))}
@@ -106,7 +152,8 @@ function Index() {
   );
 }
 
-function Topic({ id }: { id: string }) {
+function Topic({ id, progress, updateProgress }: { id: string; progress: Progress; updateProgress: Update }) {
+  const [openedRecord] = useState(() => progress.handbook?.[id]);
   const found = findTopic(id);
   if (!found) {
     return (
@@ -122,6 +169,9 @@ function Topic({ id }: { id: string }) {
   const lessons = t.lessons.map((l) => findLesson(l)).filter((x) => x !== undefined);
   // 本文の順に、語ごとに最初の 1 回だけリンクにする (描く前にまとめて決めるので、何度描いても同じ)
   const link = makeTermLinker(TERM_NAMES);
+  const rec = progress.handbook?.[t.id];
+  // 続きからの案内は、開いたときの記録で出す (読み進めるたびに出し入れすると、本文がずれる)
+  const opened = openedRecord;
   const prose = { summary: link(t.summary), flow: t.flow.map((s) => link(s.text)), tries: t.try.map((x) => x.steps.map((s) => link(s.text))) };
   return (
     <article className="hb" aria-labelledby="hb-title">
@@ -144,6 +194,17 @@ function Topic({ id }: { id: string }) {
         <p className="hb-lead">
           <Prose pieces={prose.summary} />
         </p>
+        {opened && !opened.done && opened.seen > 0 && opened.seen < t.flow.length && (
+          <HStack gap={3} vAlign="center" className="hb-resume">
+            <Text type="supporting">前回は全体の流れの {opened.seen} / {t.flow.length} 段まで読みました</Text>
+            <Button
+              variant="secondary"
+              size="sm"
+              label="続きから"
+              onClick={() => document.querySelector(`[data-flow-step="${opened.seen}"]`)?.scrollIntoView({ block: 'start', behavior: 'smooth' })}
+            />
+          </HStack>
+        )}
       </div>
       {HANDBOOK_FIGURES[t.id] && <Diagram spec={HANDBOOK_FIGURES[t.id]} id={t.id} />}
 
@@ -154,7 +215,7 @@ function Topic({ id }: { id: string }) {
         <p className="hb-muted">流れのコードは説明のための例です。手元で試すときは、下の「試したいなら」の手順 (名前空間 try-kcna の中で試して後片付けまでする) を使ってください。</p>
         <ol className="hb-flow">
           {t.flow.map((s, i) => (
-            <li key={i}>
+            <li key={i} data-flow-step={i}>
               <Step step={s} text={prose.flow[i]} />
             </li>
           ))}
@@ -210,6 +271,25 @@ function Topic({ id }: { id: string }) {
         </ul>
       </section>
 
+      <section aria-labelledby="hb-done" className="hb-section hb-done">
+        <h2 id="hb-done" className="hb-h2">
+          読んだ記録
+        </h2>
+        {rec?.done ? (
+          <HStack gap={3} vAlign="center">
+            <StatusDot variant="success" label="確認済み" />
+            <Text>確認済み</Text>
+            <Button variant="secondary" size="sm" label="確認済みを取り消す" onClick={() => updateProgress((p) => setHandbookDone(p, t.id, false, new Date()))} />
+          </HStack>
+        ) : (
+          <HStack gap={3} vAlign="center">
+            <Text type="supporting">全体の流れ {Math.min(rec?.seen ?? 0, t.flow.length)} / {t.flow.length} 段まで読みました</Text>
+            <Button variant="primary" size="sm" label="確認済みにする" onClick={() => updateProgress((p) => setHandbookDone(p, t.id, true, new Date()))} />
+          </HStack>
+        )}
+      </section>
+      <SeenTracker topicId={t.id} seen={rec?.seen ?? 0} updateProgress={updateProgress} />
+
       <nav aria-label="前後のトピック" className="hb-pager">
         {prev ? (
           <a href={handbookHref(prev.id)}>
@@ -230,9 +310,9 @@ function Topic({ id }: { id: string }) {
   );
 }
 
-export default function Handbook({ progress, topicId }: { progress: Progress; topicId?: string }) {
+export default function Handbook({ progress, updateProgress, topicId }: { progress: Progress; updateProgress: Update; topicId?: string }) {
   const isWide = useMediaQuery(WIDE_QUERY);
-  const body = topicId ? <Topic id={topicId} /> : <Index />;
+  const body = topicId ? <Topic id={topicId} progress={progress} updateProgress={updateProgress} /> : <Index progress={progress} />;
   if (isWide) {
     return (
       <AppShell contentPadding={0} variant="section" sideNav={<AppSideNav current="handbook" progress={progress} />}>
