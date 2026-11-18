@@ -1772,3 +1772,97 @@ body {
   text-align: right;
   margin-left: auto;
 }
+
+/* ハンドブックの図 (components/Diagram.tsx)。色は token なのでライト・ダークに追従する */
+.dg {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dg__scroll {
+  overflow-x: auto;
+  border-radius: var(--radius-container);
+  border: 1px solid var(--color-border);
+  background: var(--color-background-card);
+}
+
+.dg__svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  font-family: var(--font-family-body, sans-serif);
+}
+
+.dg__group {
+  fill: var(--color-background-muted);
+  stroke: var(--color-border-emphasized);
+  stroke-dasharray: 4 4;
+}
+
+.dg__group-label {
+  font-size: 12px;
+  font-weight: 600;
+  fill: var(--color-text-secondary);
+}
+
+.dg__node {
+  fill: var(--color-background-card);
+  stroke: var(--color-border-emphasized);
+  stroke-width: 1.5;
+}
+
+.dg__node--accent {
+  fill: var(--color-accent-muted);
+  stroke: var(--color-accent);
+}
+
+.dg__node--warn {
+  fill: var(--color-error-muted);
+  stroke: var(--color-error);
+}
+
+.dg__node--muted {
+  fill: var(--color-background-muted);
+  stroke-dasharray: 4 3;
+}
+
+.dg__label {
+  font-size: 15px;
+  font-weight: 600;
+  fill: var(--color-text-primary);
+}
+
+.dg__sub {
+  font-size: 12px;
+  fill: var(--color-text-secondary);
+}
+
+.dg__edge {
+  stroke: var(--color-icon-secondary);
+  stroke-width: 1.6;
+}
+
+.dg__edge--dashed {
+  stroke-dasharray: 5 4;
+}
+
+.dg__head {
+  fill: var(--color-icon-secondary);
+}
+
+.dg__edge-label {
+  font-size: 11px;
+  fill: var(--color-text-secondary);
+  paint-order: stroke;
+  stroke: var(--color-background-card);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+
+.dg__caption {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--color-text-secondary);
+}
