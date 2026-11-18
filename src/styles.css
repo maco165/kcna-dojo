@@ -159,6 +159,18 @@ body {
 .desk {
   min-height: 100%;
   background: var(--color-background-body);
+  /*
+   * 左のメニューと本文の間。各画面の内側の余白 (32px) に足して、画面の幅に応じて 51〜64px にする (.desk は 768px 以上だけ)。
+   * 左だけに足す (右にも足すと本文の欄が狭くなり、ホームの右の欄が下に回る幅が広がる)
+   */
+  --desk-gutter: clamp(19px, 2.5vw, 32px);
+  padding-inline-start: var(--desk-gutter);
+  box-sizing: border-box;
+}
+
+/* 説明のページは暗い帯がメニューに接する作りなので、間を足さない */
+.desk:has(> .guide) {
+  padding-inline-start: 0;
 }
 
 .desk__head {
@@ -668,7 +680,8 @@ body {
 .gloss-desk {
   /* 折り返すと説明欄が一覧の下 (画面の外) に回るので、いつも 2 列 */
   display: grid;
-  grid-template-columns: minmax(12rem, 20rem) minmax(0, 1fr);
+  /* 一覧は幅の 3 割ほどで縮め、説明の欄を広く残す */
+  grid-template-columns: clamp(10rem, 32%, 20rem) minmax(0, 1fr);
   gap: var(--spacing-4);
   align-items: start;
 }
