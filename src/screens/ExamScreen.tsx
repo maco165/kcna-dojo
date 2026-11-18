@@ -356,7 +356,7 @@ function Result({ items, answers, result, onRestart }: { items: BankItem[]; answ
                   )}
                   {q.type === 'fill' && <CodeBlock code={q.code.replace('{{blank}}', '____')} width="100%" size="sm" hasCopyButton={false} />}
                   <Text type="supporting">あなたの答え: {mine}</Text>
-                  <Feedback correct={false} correctAnswer={correctAnswer} explanation={q.explanation} note={q.type === 'choice' ? q.choices.find((c) => c.id === answer)?.why : q.wrongNotes?.[normalizeAnswer(answer ?? '')]} source={q.source} />
+                  <Feedback correct={false} correctAnswer={correctAnswer} explanation={q.explanation} note={q.type === 'choice' ? q.choices.find((c) => c.id === answer)?.why : q.wrongNotes?.[normalizeAnswer(answer ?? '')]} source={q.source} question={q} />
                   <AskAi question={q} answered={isAnswered(answer) ? { picked: answer, correct: false } : undefined} />
                 </VStack>
               </Card>

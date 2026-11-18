@@ -155,6 +155,7 @@ export default function FillQuestionView({
               explanation={question.explanation}
               note={result ? undefined : question.wrongNotes?.[typed]}
               source={question.source}
+              question={question}
             />
             {result && question.output && (
               <CodeBlock code={question.output} title="実行結果の例 (列の一部)" width="100%" size="sm" hasCopyButton={false} />

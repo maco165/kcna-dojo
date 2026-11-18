@@ -66,6 +66,7 @@ export default function ChoiceQuestionView({
               explanation={question.explanation}
               note={result ? undefined : picked?.why}
               source={question.source}
+              question={question}
             />
             <PrimaryAction label={nextLabel} onClick={onNext} />
             <AskAi question={question} answered={{ picked: value, correct: result }} />
