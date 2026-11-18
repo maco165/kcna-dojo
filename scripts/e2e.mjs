@@ -234,6 +234,26 @@ async function run(browser, name, width, height) {
   await page.getByRole('heading', { name: '今日の復習 0 問' }).waitFor();
   check(await page.getByText(/今日の復習はありません。次は/).isVisible(), `${tag} 終えると今日の復習は 0 で、次の予定が出る`);
 
+  // 9b2. ランダム出題: 分野と数を選んで始め、1 問答えると記録に入る
+  {
+    // 答えた回数の合計 (前の手順で答えた問題が選ばれても 1 つ増える)
+    const countAnswers = () => page.evaluate(() => Object.values(JSON.parse(localStorage.getItem('kcna.v1') ?? '{}').answers ?? {}).reduce((n, a) => n + a.right + a.wrong, 0));
+    await page.getByRole('heading', { name: 'ランダム出題' }).waitFor();
+    await page.getByRole('radio', { name: /^Cloud Native Architecture \(\d+ 問\)/ }).check();
+    await page.getByRole('radio', { name: '20 問', exact: true }).click();
+    await page.getByRole('button', { name: '20 問を始める' }).click();
+    await page.getByRole('button', { name: '確かめる' }).waitFor();
+    check(await page.getByText('ランダム出題').first().isVisible(), `${tag} ランダム出題が始まる`);
+    const before = await countAnswers();
+    const box = page.getByRole('textbox', { name: '空欄' });
+    if (await box.count()) await box.fill('x');
+    else await page.getByRole('radio').first().check();
+    await page.getByRole('button', { name: '確かめる' }).click();
+    await page.getByRole('button', { name: /次へ|結果を見る/ }).waitFor();
+    check((await countAnswers()) === before + 1, `${tag} ランダム出題で答えると記録に入る (${before} → ${await countAnswers()})`);
+    await page.goto(`${BASE}#/week/1`);
+  }
+
   // 9c. 進捗の画面
   await page.goto(`${BASE}#/progress`);
   await page.getByRole('heading', { name: '進捗' }).waitFor();
@@ -425,12 +445,12 @@ async function run(browser, name, width, height) {
     await darkCtx.close();
   }
 
-  // 15. ハンドブック: 目次の 13 トピックと付録、1 トピックの流れ・試す手順・練習のレッスン、説明のページの学習要領から飛べる
+  // 15. ハンドブック: 目次の 13 トピックと付録の 2 つ、1 トピックの流れ・試す手順・練習のレッスン、説明のページの学習要領から飛べる
   await page.goto(`${BASE}#/handbook`);
   await page.getByRole('heading', { name: 'ハンドブック', level: 1 }).waitFor();
-  check((await page.locator('.hb-topic').count()) === 14, `${tag} ハンドブックの目次に学習要領の 13 トピックと付録の 1 つ`);
+  check((await page.locator('.hb-topic').count()) === 15, `${tag} ハンドブックの目次に学習要領の 13 トピックと付録の 2 つ`);
   check((await page.locator('.hb-domain').last().locator('.hb-domain__head').innerText()).includes('資格の範囲の外'), `${tag} 付録は目次の最後で、配点の代わりに範囲の外と出る`);
-  check((await page.locator('.hb-topic .dg-thumb').count()) === 14, `${tag} 目次の 14 トピックすべてにサムネイルがある`);
+  check((await page.locator('.hb-topic .dg-thumb').count()) === 15, `${tag} 目次の 15 トピックすべてにサムネイルがある`);
   await page.locator('.hb-topic').filter({ hasText: 'Debugging' }).click();
   await page.getByRole('heading', { name: '全体の流れ' }).waitFor();
   check(page.url().includes('#/handbook/debugging'), `${tag} 目次からトピックへ飛べる`);
@@ -444,7 +464,7 @@ async function run(browser, name, width, height) {
   await page.getByRole('link', { name: 'Kubernetes Core Concepts' }).click();
   await page.waitForURL(/#\/handbook\/core-concepts/);
   check(true, `${tag} 説明のページの学習要領の表からハンドブックへ飛べる`);
-  // 14 トピックすべてを、試す手順を全部開いた形で、横にはみ出さないか測る
+  // 15 トピックすべてを、試す手順を全部開いた形で、横にはみ出さないか測る
   await page.goto(`${BASE}#/handbook`);
   const allIds = await page.locator('.hb-topic').evaluateAll((els) => els.map((a) => a.getAttribute('href').split('/').pop()));
   let widest = { id: '', w: 0 };
@@ -461,8 +481,8 @@ async function run(browser, name, width, height) {
     if (w > widest.w) widest = { id, w };
   }
   check(figureScroll.length === 0, `${tag} 図が横にスクロールせず幅に収まる ${figureScroll.join(',')}`);
-  check(figureMissing.length === 0, `${tag} ハンドブックの 14 トピックすべてに図がある ${figureMissing.join(',')}`);
-  check(allIds.length === 14 && widest.w <= width, `${tag} ハンドブックの 14 トピックが横にはみ出さない (いちばん広い ${widest.id} ${widest.w} <= ${width})`);
+  check(figureMissing.length === 0, `${tag} ハンドブックの 15 トピックすべてに図がある ${figureMissing.join(',')}`);
+  check(allIds.length === 15 && widest.w <= width, `${tag} ハンドブックの 15 トピックが横にはみ出さない (いちばん広い ${widest.id} ${widest.w} <= ${width})`);
 
   // 15b. ハンドブックの本文の用語: 強調され、押すと用語集のその語が開く
   {
