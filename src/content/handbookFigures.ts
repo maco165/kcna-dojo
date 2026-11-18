@@ -1,5 +1,6 @@
 // ハンドブックのトピックごとの図。中身は各トピックの出典 (src/content/handbook/*.json の sources) に合わせる
 import type { DiagramSpec } from '../components/Diagram';
+import { APPENDIX_FIGURES } from './handbookFiguresAppendix';
 
 export const HANDBOOK_FIGURES: Record<string, DiagramSpec> = {
   'core-concepts': {
@@ -367,4 +368,5 @@ export const HANDBOOK_FIGURES: Record<string, DiagramSpec> = {
       { from: 'try', to: 'un', dashed: true },
     ],
   },
+  ...APPENDIX_FIGURES,
 };

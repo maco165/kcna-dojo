@@ -552,7 +552,7 @@ async function run(browser, name, width, height) {
     check(await page.evaluate(() => document.activeElement?.textContent?.includes('確認済みを取り消す')), `${tag} 確認済みにしてもフォーカスはボタンに残る`);
     check((await hb()).storage?.done === true, `${tag} 確認済みにすると記録に残る`);
     await page.goto(`${BASE}#/handbook`);
-    check((await card.locator('.hb-topic__read').innerText()) === '確認済み' && (await page.getByText(/確認済み 1 \/ 15 トピック/).isVisible()), `${tag} 目次に確認済みと、確認済みの数が出る`);
+    check((await card.locator('.hb-topic__read').innerText()) === '確認済み' && (await page.getByText(/確認済み 1 \/ 26 トピック/).isVisible()), `${tag} 目次に確認済みと、確認済みの数が出る`);
   }
 
   // 15b. ハンドブックの本文の用語: 強調され、押すと用語集のその語が開く
