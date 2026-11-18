@@ -111,8 +111,11 @@ function Detail({ t, large }: { t: Entry; large?: boolean }) {
   );
 }
 
-function Filters({ value, onChange, counts }: { value: Domain | 'all'; onChange: (v: Domain | 'all') => void; counts: Map<Domain | 'all', number> }) {
-  const items: [Domain | 'all', string][] = [['all', 'すべて'], ...ORDER.map((d) => [d, SHORT[d]] as [Domain, string])];
+/** 絞り込みの値。out は試験の範囲の外の語 (レッスンに出ず、ハンドブックの範囲外で説明している) */
+type Filter = Domain | 'all' | 'out';
+
+function Filters({ value, onChange, counts }: { value: Filter; onChange: (v: Filter) => void; counts: Map<Filter, number> }) {
+  const items: [Filter, string][] = [['all', 'すべて'], ...ORDER.map((d) => [d, SHORT[d]] as [Domain, string]), ['out', '範囲外']];
   return (
     <div role="group" aria-label="分野で絞る" className="gloss-filters">
       {items.map(([k, label]) => (
@@ -256,10 +259,10 @@ function Body({ isWide, termId }: { isWide: boolean; termId?: string }) {
   }, []);
   const initial = pending.current;
   const [query, setQuery] = useState('');
-  const [filter, setFilter] = useState<Domain | 'all'>('all');
+  const [filter, setFilter] = useState<Filter>('all');
   const found = useMemo(() => searchTerms(TERMS, query), [query]);
-  const hits = filter === 'all' ? found : found.filter((t) => t.domain === filter);
-  const counts = new Map<Domain | 'all', number>([['all', found.length], ...ORDER.map((d) => [d, found.filter((t) => t.domain === d).length] as [Domain, number])]);
+  const hits = filter === 'all' ? found : filter === 'out' ? found.filter((t) => !t.domain) : found.filter((t) => t.domain === filter);
+  const counts = new Map<Filter, number>([['all', found.length], ...ORDER.map((d) => [d, found.filter((t) => t.domain === d).length] as [Domain, number]), ['out', found.filter((t) => !t.domain).length]]);
   return (
     <VStack gap={4}>
       <VStack gap={1}>
