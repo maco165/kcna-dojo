@@ -26,10 +26,10 @@
           "output": "Waiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\ndeployment \"web\" successfully rolled out"
         },
         {
-          "text": "Deployment は入れ替えのたびにリビジョン (版の番号) を残します。kubectl rollout history で一覧を見て、kubectl rollout undo で 1 つ前に戻せます。--to-revision を付けると戻す先を選べます。CHANGE-CAUSE の欄には、アノテーション kubernetes.io/change-cause の値が写されます。",
+          "text": "Deployment は入れ替えのたびにリビジョン (版の番号) を残します。kubectl rollout history で一覧を見て、kubectl rollout undo で 1 つ前に戻せます。--to-revision を付けると、history に出ている番号から戻す先を選べます。CHANGE-CAUSE の欄には、アノテーション kubernetes.io/change-cause の値が写されます。",
           "code": {
             "language": "bash",
-            "text": "kubectl rollout history deployment/web\nkubectl rollout undo deployment/web\nkubectl rollout undo deployment/web --to-revision=1"
+            "text": "kubectl rollout history deployment/web\n# 1 つ前に戻す\nkubectl rollout undo deployment/web\n# または、history に出ている番号を選んで戻す\nkubectl rollout undo deployment/web --to-revision=2"
           },
           "output": "deployment.apps/web\nREVISION  CHANGE-CAUSE\n1         <none>\n2         <none>\n\ndeployment.apps/web rolled back"
         },
@@ -46,7 +46,7 @@
             "language": "bash",
             "text": "helm install web ./mychart -n try-kcna\nhelm upgrade web ./mychart -n try-kcna -f values-prod.yaml\nhelm history web -n try-kcna\nhelm rollback web 1 -n try-kcna"
           },
-          "output": "REVISION  STATUS      CHART          DESCRIPTION\n1         superseded  mychart-0.1.0  Install complete\n2         superseded  mychart-0.1.0  Upgrade complete\n3         deployed    mychart-0.1.0  Rollback to 1"
+          "output": "REVISION  UPDATED                   STATUS      CHART          APP VERSION  DESCRIPTION\n1         Mon Jan 11 10:27:17 2027  superseded  mychart-0.1.0  1.16.0       Install complete\n2         Mon Jan 11 10:28:40 2027  superseded  mychart-0.1.0  1.16.0       Upgrade complete\n3         Mon Jan 11 10:29:05 2027  deployed    mychart-0.1.0  1.16.0       Rollback to 1"
         },
         {
           "text": "GitOps では、システムの望ましい状態をファイルで宣言し、ふつうは Git などのバージョン管理を正本 (source of truth) にします。OpenGitOps の原則は、宣言的であること、版が残り変わらないこと、エージェントが正本から自動で取り込むこと、絶えず観て合わせ続けることの 4 つです。Argo CD は Git の状態 (target state) と動いている状態 (live state) を比べ、ずれると OutOfSync と出します。Flux は GitRepository などの Source から取ってきた状態にクラスタを合わせ続けます (Reconciliation)。"
@@ -64,7 +64,7 @@
           "goal": "ローリング更新と巻き戻しを確かめたいなら",
           "steps": [
             {
-              "text": "試す場所として名前空間 (namespace、クラスタの中を区切る名前の範囲) try-kcna を作ります。k3s で kubectl が設定ファイルを見つけられないときは、k3s が置く /etc/rancher/k3s/k3s.yaml を KUBECONFIG で指します (読むには root の権限が要ることがあります)。名前空間を作る権限が無い利用者では、この手順は失敗します。",
+              "text": "試す場所として名前空間 (namespace、クラスタの中を区切る名前の範囲) try-kcna を作ります。k3s で kubectl が設定ファイルを見つけられないときは、k3s が置く /etc/rancher/k3s/k3s.yaml を KUBECONFIG で指します (このファイルは既定では root が持ち主で、ほかの利用者は読めないので sudo が要ります)。名前空間を作る権限が無い利用者では、この手順は失敗します。",
               "code": {
                 "language": "bash",
                 "text": "# 必要なときだけ: export KUBECONFIG=/etc/rancher/k3s/k3s.yaml\nkubectl create namespace try-kcna"
@@ -109,7 +109,7 @@
           "goal": "Kustomize のベースとオーバーレイを確かめたいなら",
           "steps": [
             {
-              "text": "試す場所として名前空間 (namespace、クラスタの中を区切る名前の範囲) try-kcna を作ります。k3s で kubectl が設定ファイルを見つけられないときは、k3s が置く /etc/rancher/k3s/k3s.yaml を KUBECONFIG で指します (読むには root の権限が要ることがあります)。名前空間を作る権限が無い利用者では、この手順は失敗します。",
+              "text": "試す場所として名前空間 (namespace、クラスタの中を区切る名前の範囲) try-kcna を作ります。k3s で kubectl が設定ファイルを見つけられないときは、k3s が置く /etc/rancher/k3s/k3s.yaml を KUBECONFIG で指します (このファイルは既定では root が持ち主で、ほかの利用者は読めないので sudo が要ります)。名前空間を作る権限が無い利用者では、この手順は失敗します。",
               "code": {
                 "language": "bash",
                 "text": "# 必要なときだけ: export KUBECONFIG=/etc/rancher/k3s/k3s.yaml\nkubectl create namespace try-kcna"
@@ -142,7 +142,7 @@
               "text": "終わったら、試すために作った名前空間ごと片付けます。中のリソースもまとめて消えます。",
               "code": {
                 "language": "bash",
-                "text": "kubectl delete namespace try-kcna"
+                "text": "kubectl delete namespace try-kcna\nrm -r kust"
               },
               "output": "namespace \"try-kcna\" deleted"
             }
@@ -152,10 +152,10 @@
           "goal": "Helm のリリースとリビジョンを確かめたいなら",
           "steps": [
             {
-              "text": "helm を入れておきます (入れ方は helm.sh の Installing Helm にあります)。k3s では helm も kubectl と同じ設定ファイルを使うので、kubectl が動く端末で試します。見本のチャートのひな形を作ります。",
+              "text": "helm を入れておきます (入れ方は helm.sh の Installing Helm にあります)。k3s に付いてくる kubectl は /etc/rancher/k3s/k3s.yaml を既定で読みますが、別に入れた helm は読まないので、KUBECONFIG でこのファイルを指します (このファイルは既定では root が持ち主で、ほかの利用者は読めません。sudo で読める端末で試します)。見本のチャートのひな形を作ります。",
               "code": {
                 "language": "bash",
-                "text": "helm create hello"
+                "text": "export KUBECONFIG=/etc/rancher/k3s/k3s.yaml\nhelm create hello"
               },
               "output": "Creating hello"
             },
@@ -173,7 +173,7 @@
                 "language": "bash",
                 "text": "helm upgrade hello ./hello -n try-kcna --set replicaCount=2\nhelm rollback hello 1 -n try-kcna\nhelm history hello -n try-kcna"
               },
-              "output": "REVISION  STATUS      DESCRIPTION\n1         superseded  Install complete\n2         superseded  Upgrade complete\n3         deployed    Rollback to 1"
+              "output": "REVISION  UPDATED                   STATUS      CHART        APP VERSION  DESCRIPTION\n1         Mon Jan 11 10:27:17 2027  superseded  hello-0.1.0  1.16.0       Install complete\n2         Mon Jan 11 10:28:40 2027  superseded  hello-0.1.0  1.16.0       Upgrade complete\n3         Mon Jan 11 10:29:05 2027  deployed    hello-0.1.0  1.16.0       Rollback to 1"
             },
             {
               "text": "リリースを外してから、名前空間を片付けます。",
@@ -187,7 +187,7 @@
               "text": "終わったら、試すために作った名前空間ごと片付けます。中のリソースもまとめて消えます。",
               "code": {
                 "language": "bash",
-                "text": "kubectl delete namespace try-kcna"
+                "text": "kubectl delete namespace try-kcna\nrm -r hello"
               },
               "output": "namespace \"try-kcna\" deleted"
             }
@@ -198,7 +198,8 @@
         "w7-l1",
         "w7-l2",
         "w7-l3",
-        "w7-l4"
+        "w7-l4",
+        "w3-l2"
       ],
       "sources": [
         {
@@ -268,6 +269,14 @@
         {
           "label": "K3s: Cluster Access",
           "url": "https://docs.k3s.io/cluster-access"
+        },
+        {
+          "label": "K3s: server のオプション (kubeconfig の持ち主と権限)",
+          "url": "https://docs.k3s.io/cli/server"
+        },
+        {
+          "label": "Helm: helm history",
+          "url": "https://helm.sh/docs/helm/helm_history/"
         }
       ]
     },
@@ -302,7 +311,7 @@
           "output": "LAST SEEN   TYPE      REASON    OBJECT      MESSAGE\n20s         Warning   BackOff   Pod/crash   Back-off restarting failed container crash in pod crash_try-kcna(...)"
         },
         {
-          "text": "コンテナが動き出したあとの問題は、ログで調べます。kubectl logs はコンテナの出力を出し、再起動を繰り返しているときは --previous (-p) で落ちる前のコンテナのログを読みます。kubelet は落ちたコンテナを 10 秒、20 秒、40 秒…と間を延ばしながら再起動し、間は 300 秒 (5 分) で頭打ちになります。",
+          "text": "コンテナが動き出したあとの問題は、ログで調べます。kubectl logs はコンテナの出力を出し、再起動を繰り返しているときは --previous (-p) で落ちる前のコンテナのログを読みます。既定では、kubelet は落ちたコンテナを 10 秒、20 秒、40 秒…と間を延ばしながら再起動し、間は 300 秒 (5 分) で頭打ちになります。",
           "code": {
             "language": "bash",
             "text": "kubectl logs crash -n try-kcna --previous"
@@ -334,7 +343,7 @@
           "output": "Defaulting debug container name to debugger-8xzrl.\nIf you don't see a command prompt, try pressing enter.\n/ #"
         },
         {
-          "text": "Pod は動いているのに Service 経由でつながらないときは、Service のセレクターが Pod を選べているかを EndpointSlice で見ます。ENDPOINTS が <none> なら、Service の spec.selector と Pod の metadata.labels が合っているか (書き間違いが無いか) を確かめます。",
+          "text": "Pod は動いているのに Service 経由でつながらないときは、Service のセレクターが Pod を選べているかを EndpointSlice で見ます。ENDPOINTS が空 (<unset> と出ます。文書の例では <none> と書かれています) なら、Service の spec.selector と Pod の metadata.labels が合っているか (書き間違いが無いか) を確かめます。",
           "code": {
             "language": "bash",
             "text": "kubectl get endpointslices -n try-kcna -l kubernetes.io/service-name=web"
@@ -347,7 +356,7 @@
           "goal": "イメージが取れないとき (ImagePullBackOff) の読み方を確かめたいなら",
           "steps": [
             {
-              "text": "試す場所として名前空間 (namespace、クラスタの中を区切る名前の範囲) try-kcna を作ります。k3s で kubectl が設定ファイルを見つけられないときは、k3s が置く /etc/rancher/k3s/k3s.yaml を KUBECONFIG で指します (読むには root の権限が要ることがあります)。名前空間を作る権限が無い利用者では、この手順は失敗します。",
+              "text": "試す場所として名前空間 (namespace、クラスタの中を区切る名前の範囲) try-kcna を作ります。k3s で kubectl が設定ファイルを見つけられないときは、k3s が置く /etc/rancher/k3s/k3s.yaml を KUBECONFIG で指します (このファイルは既定では root が持ち主で、ほかの利用者は読めないので sudo が要ります)。名前空間を作る権限が無い利用者では、この手順は失敗します。",
               "code": {
                 "language": "bash",
                 "text": "# 必要なときだけ: export KUBECONFIG=/etc/rancher/k3s/k3s.yaml\nkubectl create namespace try-kcna"
@@ -392,7 +401,7 @@
           "goal": "落ちては再起動する Pod (CrashLoopBackOff) のログを確かめたいなら",
           "steps": [
             {
-              "text": "試す場所として名前空間 (namespace、クラスタの中を区切る名前の範囲) try-kcna を作ります。k3s で kubectl が設定ファイルを見つけられないときは、k3s が置く /etc/rancher/k3s/k3s.yaml を KUBECONFIG で指します (読むには root の権限が要ることがあります)。名前空間を作る権限が無い利用者では、この手順は失敗します。",
+              "text": "試す場所として名前空間 (namespace、クラスタの中を区切る名前の範囲) try-kcna を作ります。k3s で kubectl が設定ファイルを見つけられないときは、k3s が置く /etc/rancher/k3s/k3s.yaml を KUBECONFIG で指します (このファイルは既定では root が持ち主で、ほかの利用者は読めないので sudo が要ります)。名前空間を作る権限が無い利用者では、この手順は失敗します。",
               "code": {
                 "language": "bash",
                 "text": "# 必要なときだけ: export KUBECONFIG=/etc/rancher/k3s/k3s.yaml\nkubectl create namespace try-kcna"
@@ -437,7 +446,7 @@
           "goal": "置けない Pod (Pending) の理由を確かめたいなら",
           "steps": [
             {
-              "text": "試す場所として名前空間 (namespace、クラスタの中を区切る名前の範囲) try-kcna を作ります。k3s で kubectl が設定ファイルを見つけられないときは、k3s が置く /etc/rancher/k3s/k3s.yaml を KUBECONFIG で指します (読むには root の権限が要ることがあります)。名前空間を作る権限が無い利用者では、この手順は失敗します。",
+              "text": "試す場所として名前空間 (namespace、クラスタの中を区切る名前の範囲) try-kcna を作ります。k3s で kubectl が設定ファイルを見つけられないときは、k3s が置く /etc/rancher/k3s/k3s.yaml を KUBECONFIG で指します (このファイルは既定では root が持ち主で、ほかの利用者は読めないので sudo が要ります)。名前空間を作る権限が無い利用者では、この手順は失敗します。",
               "code": {
                 "language": "bash",
                 "text": "# 必要なときだけ: export KUBECONFIG=/etc/rancher/k3s/k3s.yaml\nkubectl create namespace try-kcna"
@@ -474,7 +483,7 @@
           "goal": "道具の無いイメージを kubectl debug で調べたいなら",
           "steps": [
             {
-              "text": "試す場所として名前空間 (namespace、クラスタの中を区切る名前の範囲) try-kcna を作ります。k3s で kubectl が設定ファイルを見つけられないときは、k3s が置く /etc/rancher/k3s/k3s.yaml を KUBECONFIG で指します (読むには root の権限が要ることがあります)。名前空間を作る権限が無い利用者では、この手順は失敗します。",
+              "text": "試す場所として名前空間 (namespace、クラスタの中を区切る名前の範囲) try-kcna を作ります。k3s で kubectl が設定ファイルを見つけられないときは、k3s が置く /etc/rancher/k3s/k3s.yaml を KUBECONFIG で指します (このファイルは既定では root が持ち主で、ほかの利用者は読めないので sudo が要ります)。名前空間を作る権限が無い利用者では、この手順は失敗します。",
               "code": {
                 "language": "bash",
                 "text": "# 必要なときだけ: export KUBECONFIG=/etc/rancher/k3s/k3s.yaml\nkubectl create namespace try-kcna"
@@ -485,9 +494,9 @@
               "text": "シェルなどの道具が入っていない pause のイメージで Pod を作ります。kubectl exec でシェルを開こうとしても、sh が無いので失敗します。",
               "code": {
                 "language": "bash",
-                "text": "kubectl run ephemeral-demo --image=registry.k8s.io/pause:3.1 --restart=Never -n try-kcna\nkubectl exec -it ephemeral-demo -n try-kcna -- sh"
+                "text": "kubectl run ephemeral-demo --image=registry.k8s.io/pause:3.1 --restart=Never -n try-kcna\nkubectl wait --for=condition=Ready pod/ephemeral-demo -n try-kcna --timeout=60s\nkubectl exec -it ephemeral-demo -n try-kcna -- sh"
               },
-              "output": "pod/ephemeral-demo created\nerror: ... exec: \"sh\": executable file not found in $PATH ..."
+              "output": "pod/ephemeral-demo created\npod/ephemeral-demo condition met\nerror: ... exec: \"sh\": executable file not found in $PATH ..."
             },
             {
               "text": "busybox のエフェメラルコンテナを足して入り、ps で調べたいコンテナのプロセス (/pause) が見えることを確かめます。exit で抜けます。--target はコンテナランタイムが対応している必要があり、対応していないと ps に他のコンテナのプロセスが見えないことがあります。エフェメラルコンテナを足す権限 (pods/ephemeralcontainers) は既定の admin・edit の ClusterRole に含まれないので、それだけの利用者では Forbidden で失敗します (k3s の管理者の設定ファイルなら足せます)。名前空間に Pod Security の baseline や restricted の決まりが付いていると、--profile で合う設定を選ぶ必要があります (try-kcna には付けていません)。",
@@ -560,6 +569,18 @@
         {
           "label": "kubectl set image",
           "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_set/kubectl_set_image/"
+        },
+        {
+          "label": "K3s: server のオプション (kubeconfig の持ち主と権限)",
+          "url": "https://docs.k3s.io/cli/server"
+        },
+        {
+          "label": "kubernetes.io: Pod のライフサイクル",
+          "url": "https://kubernetes.io/ja/docs/concepts/workloads/pods/pod-lifecycle/"
+        },
+        {
+          "label": "kubernetes.io: イメージ (ImagePullBackOff)",
+          "url": "https://kubernetes.io/ja/docs/concepts/containers/images/"
         }
       ]
     }

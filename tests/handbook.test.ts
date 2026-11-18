@@ -11,11 +11,14 @@ describe('ハンドブックのデータ', () => {
   it('検査を通る (形・細目の原文・id の重複・実在するレッスン・https の出典)', () => {
     expect(validateHandbook(HANDBOOK, domains, lessonIds)).toEqual([]);
   });
-  it('試す手順は名前空間 try-kcna を消して終わる', () => {
+  it('名前空間 try-kcna を作る試す手順は、それを消して終わる (読むだけの手順は何も作らない)', () => {
     for (const t of HANDBOOK_TOPICS) {
       for (const x of t.try) {
-        const last = x.steps[x.steps.length - 1];
-        expect(last.code?.text ?? '', `${t.id}: ${x.goal}`).toMatch(/kubectl delete (namespace|ns) try-kcna/);
+        const codes = x.steps.map((s) => s.code?.text ?? '');
+        const creates = codes.some((c) => /kubectl create (namespace|ns) try-kcna|-n try-kcna .*--create-namespace/.test(c));
+        const last = codes[codes.length - 1];
+        if (creates) expect(last, `${t.id}: ${x.goal}`).toMatch(/kubectl delete (namespace|ns) try-kcna/);
+        else expect(codes.join('\n'), `${t.id}: ${x.goal} (作らない手順は apply/create/delete をしない)`).not.toMatch(/kubectl (apply|create|delete|run|label|taint|patch|scale)\b/);
       }
     }
   });

@@ -425,6 +425,23 @@ async function run(browser, name, width, height) {
     await darkCtx.close();
   }
 
+  // 15. ハンドブック: 目次の 13 トピック、1 トピックの流れ・試す手順・練習のレッスン、説明のページの学習要領から飛べる
+  await page.goto(`${BASE}#/handbook`);
+  await page.getByRole('heading', { name: 'ハンドブック', level: 1 }).waitFor();
+  check((await page.locator('.hb-topic').count()) === 13, `${tag} ハンドブックの目次に学習要領の 13 トピック`);
+  await page.locator('.hb-topic').filter({ hasText: 'Debugging' }).click();
+  await page.getByRole('heading', { name: '全体の流れ' }).waitFor();
+  check(page.url().includes('#/handbook/debugging'), `${tag} 目次からトピックへ飛べる`);
+  check((await page.locator('.hb-try').count()) >= 2 && (await page.locator('.hb-try[open]').count()) === 1, `${tag} 試す手順があり、最初の 1 つだけ開いている`);
+  await page.locator('.gloss-chip').first().click();
+  await page.waitForURL(/#\/lesson\//);
+  check(true, `${tag} ハンドブックから練習のレッスンへ飛べる`);
+  await page.goto(`${BASE}#/guide`);
+  await page.getByRole('link', { name: 'Kubernetes Core Concepts' }).click();
+  await page.waitForURL(/#\/handbook\/core-concepts/);
+  check(true, `${tag} 説明のページの学習要領の表からハンドブックへ飛べる`);
+  await noHorizontalOverflow(page, width, `${tag} ハンドブックのトピック`);
+
   check(errors.length === 0, `${tag} ページのエラーが無い ${errors.length ? errors.join(' / ') : ''}`);
   await context.close();
 }

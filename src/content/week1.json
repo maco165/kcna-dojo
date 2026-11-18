@@ -236,7 +236,7 @@
             }
           ],
           "answer": "a",
-          "explanation": "ファイルを変える命令ごとに、その変更分が読み取り専用のレイヤーとして重なります。同じレイヤーは複数のイメージで共有され、変わっていない層はビルドのキャッシュも効きます。",
+          "explanation": "ファイルを変える命令ごとに、その変更分が読み取り専用のレイヤーとして重なります。同じレイヤーは複数のイメージで共有されます。ビルドのキャッシュは、変わった層より前の層に効きます (ある層が変わると、その後ろの層はすべて作り直されます)。",
           "source": "https://docs.docker.com/get-started/docker-concepts/building-images/understanding-image-layers/"
         },
         {

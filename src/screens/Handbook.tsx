@@ -106,6 +106,7 @@ function Topic({ id }: { id: string }) {
         <h2 id="hb-flow" className="hb-h2">
           全体の流れ
         </h2>
+        <p className="hb-muted">流れのコードは説明のための例です。手元で試すときは、下の「試したいなら」の手順 (名前空間 try-kcna の中で試して後片付けまでする) を使ってください。</p>
         <ol className="hb-flow">
           {t.flow.map((s, i) => (
             <li key={i}>
