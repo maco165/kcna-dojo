@@ -73,10 +73,10 @@ function checkFirstLoad() {
   const kb = Math.round(gz / 1024);
   check(kb <= 380, `最初に読む JS は gzip で 380KB まで (${kb}KB、${files.length} ファイル)`);
   // 名前だけでなく中身でも見る (静的に取り込まれて本体に混ざっても気づけるように)。それぞれのデータにしか無い文字で調べる
-  const marks = { ハンドブックのデータ: 'k3s-vs-kubernetes', 用語集のデータ: 'container-image', 説明のページ: '2026-03-22 の版', 模擬試験用の問題: 'のイメージを更新した直後に' };
+  const marks = { ハンドブックのデータ: 'k3s-vs-kubernetes', 用語集のデータ: 'container-image', 説明のページ: '2026-03-22 の版', 模擬試験用の問題: 'のイメージを更新した直後に', コマンドの説明: 'リソースの一覧や状態を表で表示します' };
   const text = files.map((f) => readFileSync(new URL(`../dist/assets/${f}`, import.meta.url), 'utf8')).join('\n');
   const found = Object.entries(marks).filter(([, m]) => text.includes(m)).map(([k]) => k);
-  check(found.length === 0, `ハンドブック・用語集・説明のページ・模擬試験用の問題は最初に読まない ${found.join(',')}`);
+  check(found.length === 0, `ハンドブック・用語集・説明のページ・模擬試験用の問題・コマンドの説明は最初に読まない ${found.join(',')}`);
   // 書き出したハンドブックの目次も、画面と同じ 2 部 (h2) と段 (h3) の組みにする
   const hbHtml = readFileSync(new URL('../dist/handbook/index.html', import.meta.url), 'utf8');
   const hbHeads = [...hbHtml.matchAll(/<h([23])>([^<]*)<\/h\1>/g)].map((m) => `${m[1]}:${m[2]}`);
@@ -170,8 +170,16 @@ async function run(browser, name, width, height) {
   check(await page.getByText(`${l3.title} · 2 / ${l3.questions.length} 問`).isVisible(), `${tag} 答えたあと Enter で次へ進む`);
   await page.goto(`${BASE}lesson/w1-l3/`);
   await page.reload();
+  check((await page.locator('.cmd-notes').count()) === 0, `${tag} 答える前には出てきたコマンドを出さない`);
   await page.getByRole('textbox', { name: '空欄' }).fill('get');
   await page.getByRole('textbox', { name: '空欄' }).press('Enter');
+  // 答えたあと、出てきたコマンド (kubectl get) の説明・使ったオプション・公式リファレンスが出る
+  const notes = page.locator('.cmd-notes');
+  await notes.waitFor({ timeout: 5000 }).catch(() => {});
+  check((await notes.locator('.cmd-note__name').allInnerTexts()).includes('kubectl get'), `${tag} 答えたあとに出てきたコマンドの説明が出る`);
+  check((await notes.locator('.cmd-note__flags dt').allInnerTexts()).some((t) => t.startsWith('-n')) && (await notes.locator('.cmd-note__flags dt').allInnerTexts()).some((t) => t.startsWith('-o')), `${tag} 問題で使ったオプション (-n・-o) の説明が出る`);
+  check((await notes.locator('a[href^="https://kubernetes.io/docs/reference/kubectl/generated/kubectl_get/"]').count()) === 1, `${tag} 公式リファレンスへのリンクがある`);
+  await noHorizontalOverflow(page, width, `${tag} 出てきたコマンド`);
 
   // 4b. 候補を押して不正解なら、なぜ違うかが出る (2 問目は describe が正解なので get を押す)
   await page.getByRole('button', { name: '次へ' }).click();
