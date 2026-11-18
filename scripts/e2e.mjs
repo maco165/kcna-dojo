@@ -695,6 +695,23 @@ async function run(browser, name, width, height) {
     }
   }
 
+  // 15c. 似た語の比較表: 一覧から表を開き、列の語から用語集へ、用語集から表へ行き来できる
+  {
+    await page.goto(`${BASE}compare/`);
+    await page.locator('.cmp-card').first().waitFor();
+    check((await page.locator('.cmp-card').count()) >= 10, `${tag} 比較表の一覧に表が並ぶ (${await page.locator('.cmp-card').count()})`);
+    await page.locator('.cmp-card', { hasText: 'StatefulSet' }).first().click();
+    await page.locator('.cmp-table').waitFor();
+    const cols = await page.locator('.cmp-table thead th').count();
+    const rowCells = await page.locator('.cmp-table tbody tr').first().locator('td').count();
+    check(cols - 1 === rowCells && rowCells >= 2, `${tag} 比較表は列と行のセルの数がそろう (${rowCells} 列)`);
+    check((await page.locator('.cmp-pitfalls li').count()) >= 1 && (await page.locator('.cmp-section pre, .cmp-section code').count()) >= 1, `${tag} 比較表に取り違えやすい点とコードがある`);
+    await noHorizontalOverflow(page, width, `${tag} 比較表`);
+    await page.goto(`${BASE}glossary/deployment/`);
+    await page.getByRole('heading', { name: '似た語と比べる' }).first().waitFor({ timeout: 5000 }).catch(() => {});
+    check((await page.locator('a.gloss-chip[href*="/compare/"]').count()) >= 1, `${tag} 用語集の語から、その語の比較表へ飛べる`);
+  }
+
   // 16. 戻る操作: 目次を下まで送ってトピックを開き、戻ると元の位置。新しく開いたページは先頭
   {
     const scrollTop = () => page.evaluate(() => (document.querySelector('.astryx-layout-content') ?? document.scrollingElement).scrollTop);
@@ -740,6 +757,9 @@ async function run(browser, name, width, height) {
     check(personal.includes('<meta name="robots" content="noindex"'), `${tag} 個人の記録の画面は検索に載せない (noindex)`);
     const map = await (await fetch(`${BASE}sitemap.xml`)).text();
     check(map.includes('/kcna-dojo/handbook/core-concepts/</loc>') && map.includes('/kcna-dojo/glossary/</loc>') && !map.includes('/progress/'), `${tag} sitemap にハンドブックと用語集があり、個人の画面は無い`);
+    // 比較表: 書き出した HTML に表まで入り、sitemap に載る
+    const cmpHtml = await (await fetch(`${BASE}compare/workloads/`)).text();
+    check(cmpHtml.includes('<table>') && cmpHtml.includes('<h2>取り違えやすい点</h2>') && map.includes('/kcna-dojo/compare/workloads/</loc>'), `${tag} 比較表のページは書き出した HTML に表まであり、sitemap に載る`);
     await page.goto(`${BASE}handbook/storage/`);
     await page.getByRole('heading', { name: '全体の流れ' }).waitFor();
     check(new URL(page.url()).pathname === '/kcna-dojo/handbook/storage/' && !page.url().includes('#'), `${tag} 前の形の #/... の URL は、同じページの新しい URL になる (${page.url()})`);

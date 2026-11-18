@@ -1,0 +1,1338 @@
+[
+  {
+    "id": "workloads",
+    "title": "Deployment・StatefulSet・DaemonSet・Job・CronJob の違い",
+    "lead": "どれも Pod を作って管理するワークロード (仕事の単位) のリソースですが、Pod をいくつ・どこで・いつまで動かすかが違います。試験では用途から正しいリソースを選ばせる問題がよく出ます。",
+    "columns": [
+      {
+        "name": "Deployment",
+        "term": "deployment"
+      },
+      {
+        "name": "StatefulSet",
+        "term": "statefulset"
+      },
+      {
+        "name": "DaemonSet",
+        "term": "daemonset"
+      },
+      {
+        "name": "Job",
+        "term": "job"
+      },
+      {
+        "name": "CronJob",
+        "term": "cronjob"
+      }
+    ],
+    "rows": [
+      {
+        "label": "何をするか",
+        "cells": [
+          "決めた数の Pod を保ち、更新を段階的に入れます",
+          "Pod ごとに固定の名前と保存先を持たせます",
+          "ノードごとに Pod を 1 つずつ動かします",
+          "Pod を最後まで実行させ、成功で終えます",
+          "決まった時刻に Job を作ります"
+        ]
+      },
+      {
+        "label": "向いている用途",
+        "cells": [
+          "状態を持たない Web アプリや API",
+          "データベースなど状態を持つアプリ",
+          "ログ収集・監視・ストレージのデーモン",
+          "一回きりのバッチ処理",
+          "定期のバックアップや集計"
+        ]
+      },
+      {
+        "label": "Pod の数の決め方",
+        "cells": [
+          "replicas で決めます",
+          "replicas で決め、0 番から順に作ります",
+          "対象のノードの台数で決まります",
+          "completions と parallelism で決めます",
+          "schedule のたびに Job を 1 つ作ります"
+        ]
+      },
+      {
+        "label": "Pod の名前",
+        "cells": [
+          "ReplicaSet 名 + 乱数で、作り直すと変わります",
+          "web-0, web-1 のような連番で固定です",
+          "ノードが増えると自動で Pod も増えます",
+          "完了した Pod はふつう消さずに残ります",
+          "Job 名は CronJob 名に 11 文字を足します"
+        ]
+      },
+      {
+        "label": "いつ終わるか",
+        "cells": [
+          "消すまで動き続けます",
+          "消すまで動き続けます",
+          "消すまで動き続けます",
+          "決めた数が成功すると完了します",
+          "消すまで時刻ごとに繰り返します"
+        ]
+      },
+      {
+        "label": "更新・失敗の扱い",
+        "cells": [
+          "既定は RollingUpdate (25% ずつ入れ替え)",
+          "大きい番号の Pod から 1 つずつ更新します",
+          "ノードを外すと Pod も片付けられます",
+          "既定で 6 回失敗すると Job は失敗です",
+          "既定は前の Job と同時に動かせます (Allow)"
+        ]
+      }
+    ],
+    "pitfalls": [
+      "StatefulSet を消せば保存先も消えると思いがちですが、実は既定ではスケールダウンや削除をしても PVC (ボリュームの要求) は残ります。",
+      "DaemonSet はどのノードにも必ず載ると思いがちですが、実は taint の付いた control plane のノードに載せるには、自分で toleration を足す必要があります。",
+      "CronJob が自分で Pod を動かすと思いがちですが、実は決まった時刻に Job を作り、その Job が Pod を作ります。",
+      "CronJob の時刻は UTC と思いがちですが、実は timeZone を書かないと kube-controller-manager のローカルの時刻で解釈されます。"
+    ],
+    "example": [
+      {
+        "language": "yaml",
+        "title": "StatefulSet だけが持つ項目 (serviceName と volumeClaimTemplates)",
+        "code": "apiVersion: apps/v1\nkind: StatefulSet\nmetadata:\n  name: web\nspec:\n  serviceName: \"nginx\"   # Pod の名前を引くための headless Service\n  replicas: 3            # web-0, web-1, web-2 ができる\n  selector:\n    matchLabels:\n      app: nginx\n  template:\n    metadata:\n      labels:\n        app: nginx\n    spec:\n      containers:\n      - name: nginx\n        image: registry.k8s.io/nginx-slim:0.24\n        volumeMounts:\n        - name: www\n          mountPath: /usr/share/nginx/html\n  volumeClaimTemplates:  # Pod ごとに PVC を 1 つずつ作る\n  - metadata:\n      name: www\n    spec:\n      accessModes: [ \"ReadWriteOnce\" ]\n      resources:\n        requests:\n          storage: 1Gi"
+      },
+      {
+        "language": "yaml",
+        "title": "CronJob は jobTemplate の中に Job を包む",
+        "code": "# Job: 1 回だけ動いて終わる\napiVersion: batch/v1\nkind: Job\nmetadata:\n  name: pi\nspec:\n  template:\n    spec:\n      containers:\n      - name: pi\n        image: perl:5.34.0\n        command: [\"perl\", \"-Mbignum=bpi\", \"-wle\", \"print bpi(2000)\"]\n      restartPolicy: Never   # Job では Never か OnFailure だけ\n  backoffLimit: 4\n---\n# CronJob: 時刻ごとに上と同じ形の Job を作る\napiVersion: batch/v1\nkind: CronJob\nmetadata:\n  name: hello\nspec:\n  schedule: \"* * * * *\"      # 毎分\n  timeZone: \"Etc/UTC\"        # 書かないと kube-controller-manager の時刻\n  jobTemplate:\n    spec:\n      template:\n        spec:\n          containers:\n          - name: hello\n            image: busybox:1.28\n            command: [\"/bin/sh\", \"-c\", \"date; echo Hello\"]\n          restartPolicy: OnFailure"
+      }
+    ],
+    "sources": [
+      {
+        "label": "Jobs",
+        "url": "https://kubernetes.io/docs/concepts/workloads/controllers/job/"
+      },
+      {
+        "label": "StatefulSets",
+        "url": "https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/"
+      },
+      {
+        "label": "DaemonSet",
+        "url": "https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/"
+      },
+      {
+        "label": "CronJob",
+        "url": "https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/"
+      }
+    ]
+  },
+  {
+    "id": "service-types",
+    "title": "Service の ClusterIP・NodePort・LoadBalancer・ExternalName の違い",
+    "lead": "Service は入れ替わる Pod の前に置く、変わらない入口です。type によって、どこから届くか (クラスタの中だけか、外からもか) が変わります。",
+    "columns": [
+      {
+        "name": "ClusterIP",
+        "term": "clusterip"
+      },
+      {
+        "name": "NodePort",
+        "term": "nodeport"
+      },
+      {
+        "name": "LoadBalancer",
+        "term": "loadbalancer"
+      },
+      {
+        "name": "ExternalName"
+      }
+    ],
+    "rows": [
+      {
+        "label": "届く範囲",
+        "cells": [
+          "クラスタの中からだけ届きます",
+          "各ノードの IP と決まったポートで外から届きます",
+          "外部のロードバランサー経由で外から届きます",
+          "クラスタの中から外の名前を引く別名です"
+        ]
+      },
+      {
+        "label": "割り当てるもの",
+        "cells": [
+          "クラスタの中の IP を 1 つ",
+          "ClusterIP に加え、既定で 30000-32767 のポート",
+          "NodePort と ClusterIP の上に外部の LB",
+          "IP もポートも割り当てません"
+        ]
+      },
+      {
+        "label": "通信の流れ",
+        "cells": [
+          "Service の IP から Pod へ振り分けます",
+          "どのノードのポートでも Ready な Pod へ転送します",
+          "LB からノードを通って Pod へ届きます",
+          "DNS が CNAME を返すだけで、転送しません"
+        ]
+      },
+      {
+        "label": "前提になるもの",
+        "cells": [
+          "type を書かないとこれになります",
+          "ClusterIP が自動で一緒に作られます",
+          "LB の部品はクラウドなどが用意します",
+          "selector を使わず externalName を書きます"
+        ]
+      },
+      {
+        "label": "使いどころ",
+        "cells": [
+          "アプリ同士の内部の通信",
+          "検証や、自前の LB をつなぐとき",
+          "クラウドで外部へ公開するとき",
+          "外部のデータベースを内部の名前で呼ぶとき"
+        ]
+      }
+    ],
+    "pitfalls": [
+      "ExternalName も Pod へ通信を転送すると思いがちですが、実は DNS が CNAME を返すだけで、プロキシは一切しません。",
+      "4 つの type はそれぞれ別物と思いがちですが、実は入れ子で、NodePort は ClusterIP を作り、LoadBalancer は既定で NodePort も作ります。",
+      "LoadBalancer を書けばどこでも外部の IP が付くと思いがちですが、実は Kubernetes は LB の部品を持たず、クラウドとの連携か自前の用意が要ります。"
+    ],
+    "example": [
+      {
+        "language": "yaml",
+        "title": "NodePort と ExternalName のマニフェストの差",
+        "code": "apiVersion: v1\nkind: Service\nmetadata:\n  name: my-service\nspec:\n  type: NodePort\n  selector:\n    app.kubernetes.io/name: MyApp\n  ports:\n    - port: 80\n      targetPort: 80\n      nodePort: 30007   # 省くと 30000-32767 から自動で選ばれる\n---\napiVersion: v1\nkind: Service\nmetadata:\n  name: my-service\n  namespace: prod\nspec:\n  type: ExternalName    # selector も ports も要らない\n  externalName: my.database.example.com"
+      }
+    ],
+    "sources": [
+      {
+        "label": "Service",
+        "url": "https://kubernetes.io/docs/concepts/services-networking/service/"
+      }
+    ]
+  },
+  {
+    "id": "service-ingress-gateway",
+    "title": "Service (LoadBalancer)・Ingress・Gateway API の違い",
+    "lead": "クラスタの外から通信を届ける方法は 3 つあります。何を見て振り分けるかと、Kubernetes に最初から入っているかが違います。",
+    "columns": [
+      {
+        "name": "Service (LoadBalancer)",
+        "term": "loadbalancer"
+      },
+      {
+        "name": "Ingress",
+        "term": "ingress"
+      },
+      {
+        "name": "Gateway API",
+        "term": "gateway-api"
+      }
+    ],
+    "rows": [
+      {
+        "label": "何か",
+        "cells": [
+          "Service の type の 1 つです",
+          "Service の type ではない、HTTP の入口のリソース",
+          "CRD で足す、拡張の API の集まりです"
+        ]
+      },
+      {
+        "label": "振り分けの手がかり",
+        "cells": [
+          "ポートに来た通信を Pod へ流します",
+          "ホスト名とパスで Service へ振り分けます",
+          "ホスト名・パス・ヘッダーなどで振り分けます"
+        ]
+      },
+      {
+        "label": "扱える通信",
+        "cells": [
+          "TCP・UDP・SCTP",
+          "HTTP と HTTPS だけです",
+          "HTTPRoute・GRPCRoute などの種類で扱います"
+        ]
+      },
+      {
+        "label": "動かすのに要るもの",
+        "cells": [
+          "クラウドなどの外部のロードバランサー",
+          "Ingress コントローラーを別に入れます",
+          "Gateway API の CRD と、実装するコントローラー"
+        ]
+      },
+      {
+        "label": "設定の分け方",
+        "cells": [
+          "Service ごとに設定します",
+          "1 つのリソースにルールをまとめます",
+          "基盤・クラスタ運用・アプリ開発の役割で分けます"
+        ]
+      },
+      {
+        "label": "今の位置付け",
+        "cells": [
+          "Kubernetes の基本の API です",
+          "API は凍結され、機能は増えません",
+          "Kubernetes プロジェクトのすすめる方式です"
+        ]
+      }
+    ],
+    "pitfalls": [
+      "Ingress は Service の type の 1 つと思いがちですが、実は別のリソースで、Ingress コントローラーが無いと何も起きません。",
+      "Ingress は廃止されると思いがちですが、実は API が凍結されただけで、Kubernetes から取り除く予定は無いと書かれています。",
+      "Gateway API は Kubernetes に最初から入っていると思いがちですが、実は CRD で足すアドオンです。",
+      "Ingress で TCP のデータベースも公開できると思いがちですが、実は HTTP と HTTPS 以外は NodePort か LoadBalancer の Service を使います。"
+    ],
+    "example": [
+      {
+        "language": "yaml",
+        "title": "同じ /login への振り分けを Ingress と HTTPRoute で書く",
+        "code": "# Ingress: ingressClassName でコントローラーを選ぶ\napiVersion: networking.k8s.io/v1\nkind: Ingress\nmetadata:\n  name: minimal-ingress\nspec:\n  ingressClassName: nginx-example\n  rules:\n  - http:\n      paths:\n      - path: /login\n        pathType: Prefix\n        backend:\n          service:\n            name: example-svc\n            port:\n              number: 8080\n---\n# Gateway API: parentRefs で Gateway にぶら下げる\napiVersion: gateway.networking.k8s.io/v1\nkind: HTTPRoute\nmetadata:\n  name: example-httproute\nspec:\n  parentRefs:\n  - name: example-gateway\n  hostnames:\n  - \"www.example.com\"\n  rules:\n  - matches:\n    - path:\n        type: PathPrefix\n        value: /login\n    backendRefs:\n    - name: example-svc\n      port: 8080"
+      }
+    ],
+    "sources": [
+      {
+        "label": "Ingress",
+        "url": "https://kubernetes.io/docs/concepts/services-networking/ingress/"
+      },
+      {
+        "label": "Gateway API",
+        "url": "https://kubernetes.io/docs/concepts/services-networking/gateway/"
+      },
+      {
+        "label": "Service",
+        "url": "https://kubernetes.io/docs/concepts/services-networking/service/"
+      }
+    ]
+  },
+  {
+    "id": "configmap-secret",
+    "title": "ConfigMap と Secret の違い",
+    "lead": "どちらも設定をイメージの外に出して Pod へ渡すためのリソースです。中身が秘密かどうかで使い分けますが、Secret も既定のままでは暗号化されない点がよく問われます。",
+    "columns": [
+      {
+        "name": "ConfigMap",
+        "term": "configmap"
+      },
+      {
+        "name": "Secret",
+        "term": "secret"
+      }
+    ],
+    "rows": [
+      {
+        "label": "入れるもの",
+        "cells": [
+          "秘密でない設定 (キーと値)",
+          "パスワードやトークンなどの秘密の値"
+        ]
+      },
+      {
+        "label": "守り方",
+        "cells": [
+          "秘密も暗号化も提供しません",
+          "既定では etcd に暗号化されずに置かれます"
+        ]
+      },
+      {
+        "label": "値の書き方",
+        "cells": [
+          "data に文字列、binaryData にバイナリ",
+          "data は base64、stringData なら平文で書けます"
+        ]
+      },
+      {
+        "label": "大きさの上限",
+        "cells": [
+          "1 MiB まで",
+          "1 つの Secret につき 1 MiB まで"
+        ]
+      },
+      {
+        "label": "Pod への渡し方",
+        "cells": [
+          "環境変数・コマンドの引数・ボリュームのファイル",
+          "環境変数・ボリュームのファイル・イメージ取得の認証"
+        ]
+      },
+      {
+        "label": "更新の伝わり方",
+        "cells": [
+          "ボリュームは自動で更新、環境変数は再起動が要ります",
+          "ボリュームは自動で更新、subPath では更新されません"
+        ]
+      }
+    ],
+    "pitfalls": [
+      "Secret は暗号化されていると思いがちですが、実は base64 は見えにくくするだけで、既定では etcd にも暗号化されずに置かれます。",
+      "Secret を読む権限が無ければ安全と思いがちですが、実は名前空間で Pod を作れる人は、その名前空間の Secret を Pod 経由で読めます。",
+      "ConfigMap を書き換えれば環境変数もすぐ変わると思いがちですが、実は環境変数で渡した値は Pod を再起動するまで変わりません。"
+    ],
+    "example": [
+      {
+        "language": "bash",
+        "title": "Secret の値は base64 で戻すだけで読める",
+        "code": "kubectl create configmap app-config --from-literal=LOG_LEVEL=debug\nkubectl create secret generic db-pass --from-literal=password='S3cr3t'\n\nkubectl get secret db-pass -o jsonpath='{.data.password}'\n# UzNjcjN0\nkubectl get secret db-pass -o jsonpath='{.data.password}' | base64 -d\n# S3cr3t"
+      }
+    ],
+    "sources": [
+      {
+        "label": "ConfigMaps",
+        "url": "https://kubernetes.io/docs/concepts/configuration/configmap/"
+      },
+      {
+        "label": "Secrets",
+        "url": "https://kubernetes.io/docs/concepts/configuration/secret/"
+      }
+    ]
+  },
+  {
+    "id": "probes",
+    "title": "liveness・readiness・startup プローブの違い",
+    "lead": "プローブ (健康診断) は kubelet がコンテナを定期的に確かめる仕組みです。3 種類は失敗したときの動きが違い、再起動するのか、通信を止めるだけなのかを取り違えやすいところです。",
+    "columns": [
+      {
+        "name": "startup プローブ"
+      },
+      {
+        "name": "liveness プローブ"
+      },
+      {
+        "name": "readiness プローブ"
+      }
+    ],
+    "rows": [
+      {
+        "label": "確かめること",
+        "cells": [
+          "アプリの起動が終わったか",
+          "動き続けられているか (固まっていないか)",
+          "通信を受けられる状態か"
+        ]
+      },
+      {
+        "label": "失敗したとき",
+        "cells": [
+          "コンテナを止め、再起動の方針に従います",
+          "kubelet がコンテナを再起動します",
+          "Service の振り分け先から Pod の IP を外します"
+        ]
+      },
+      {
+        "label": "いつ動くか",
+        "cells": [
+          "起動のときだけ。成功すると終わります",
+          "起動後、ずっと定期的に動きます",
+          "起動後、ずっと定期的に動きます"
+        ]
+      },
+      {
+        "label": "ほかとの関係",
+        "cells": [
+          "成功するまで liveness と readiness を止めます",
+          "readiness の成功を待ちません",
+          "liveness とは互いに独立です"
+        ]
+      },
+      {
+        "label": "向いている場面",
+        "cells": [
+          "起動に時間がかかるアプリ",
+          "デッドロックなど再起動でしか直らない故障",
+          "データの読み込み中や一時的な過負荷"
+        ]
+      },
+      {
+        "label": "既定の間隔と回数",
+        "cells": [
+          "どれも既定は 10 秒ごと、3 回続けて失敗で失敗",
+          "どれも既定は 10 秒ごと、3 回続けて失敗で失敗",
+          "どれも既定は 10 秒ごと、3 回続けて失敗で失敗"
+        ]
+      }
+    ],
+    "pitfalls": [
+      "readiness が失敗すると再起動されると思いがちですが、実は Service の振り分け先から外れるだけで、再起動はしません。",
+      "liveness は readiness が成功してから始まると思いがちですが、実は互いを待たないので、待たせるには initialDelaySeconds か startup プローブを使います。",
+      "起動が遅いアプリは liveness を緩めればよいと思いがちですが、実は startup プローブで起動の時間を稼ぎ、liveness は素早く反応させるのが公式のすすめです。"
+    ],
+    "example": [
+      {
+        "language": "yaml",
+        "title": "起動に最大 5 分かかるアプリ (30 回 × 10 秒)",
+        "code": "ports:\n- name: liveness-port\n  containerPort: 8080\n\nlivenessProbe:\n  httpGet:\n    path: /healthz\n    port: liveness-port\n  failureThreshold: 1\n  periodSeconds: 10\n\nstartupProbe:          # 成功するまで liveness は始まらない\n  httpGet:\n    path: /healthz\n    port: liveness-port\n  failureThreshold: 30\n  periodSeconds: 10"
+      }
+    ],
+    "sources": [
+      {
+        "label": "Liveness, Readiness, and Startup Probes",
+        "url": "https://kubernetes.io/docs/concepts/configuration/liveness-readiness-startup-probes/"
+      },
+      {
+        "label": "Configure Liveness, Readiness and Startup Probes",
+        "url": "https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/"
+      }
+    ]
+  },
+  {
+    "id": "rbac",
+    "title": "Role・ClusterRole・RoleBinding・ClusterRoleBinding の違い",
+    "lead": "RBAC (ロールに基づくアクセス制御) は、権限の中身 (Role) と、それを誰に渡すか (Binding) を分けて書きます。それぞれに名前空間の中だけのものとクラスタ全体のものがあり、4 つの組み合わせを取り違えやすいところです。",
+    "columns": [
+      {
+        "name": "Role",
+        "term": "role"
+      },
+      {
+        "name": "ClusterRole",
+        "term": "clusterrole"
+      },
+      {
+        "name": "RoleBinding",
+        "term": "rolebinding"
+      },
+      {
+        "name": "ClusterRoleBinding"
+      }
+    ],
+    "rows": [
+      {
+        "label": "何を表すか",
+        "cells": [
+          "権限の集まり (何ができるか)",
+          "権限の集まり (何ができるか)",
+          "権限を誰に渡すかの結び付け",
+          "権限を誰に渡すかの結び付け"
+        ]
+      },
+      {
+        "label": "効く範囲",
+        "cells": [
+          "1 つの名前空間の中",
+          "名前空間に属さず、クラスタで共通",
+          "その RoleBinding の名前空間の中",
+          "クラスタのすべての名前空間"
+        ]
+      },
+      {
+        "label": "扱えるもの",
+        "cells": [
+          "名前空間の中のリソース",
+          "nodes などクラスタ全体のリソースも",
+          "同じ名前空間の Role か、ClusterRole",
+          "ClusterRole をクラスタ全体に結びます"
+        ]
+      },
+      {
+        "label": "書く中身",
+        "cells": [
+          "rules (resources と verbs)",
+          "rules (resources と verbs)",
+          "subjects と roleRef",
+          "subjects と roleRef"
+        ]
+      },
+      {
+        "label": "公式の例",
+        "cells": [
+          "default の Pod を読む pod-reader",
+          "Secret を読む secret-reader",
+          "jane に default で pod-reader を渡す",
+          "manager グループに全体の Secret を読ませる"
+        ]
+      }
+    ],
+    "pitfalls": [
+      "ClusterRole を RoleBinding で結ぶとクラスタ全体に効くと思いがちですが、実は権限はその RoleBinding の名前空間の中だけに限られます。",
+      "RBAC で禁止のルールも書けると思いがちですが、実は権限は足し算だけで、deny のルールはありません。",
+      "結び付けた後で roleRef を書き換えられると思いがちですが、実は変更できず、Binding を消して作り直す必要があります。"
+    ],
+    "example": [
+      {
+        "language": "yaml",
+        "title": "同じ ClusterRole を RoleBinding と ClusterRoleBinding で結んだときの差",
+        "code": "# dave は development の Secret だけ読める\napiVersion: rbac.authorization.k8s.io/v1\nkind: RoleBinding\nmetadata:\n  name: read-secrets\n  namespace: development   # 効く範囲はここで決まる\nsubjects:\n- kind: User\n  name: dave\n  apiGroup: rbac.authorization.k8s.io\nroleRef:\n  kind: ClusterRole\n  name: secret-reader\n  apiGroup: rbac.authorization.k8s.io\n---\n# manager グループはすべての名前空間の Secret を読める\napiVersion: rbac.authorization.k8s.io/v1\nkind: ClusterRoleBinding\nmetadata:\n  name: read-secrets-global\nsubjects:\n- kind: Group\n  name: manager\n  apiGroup: rbac.authorization.k8s.io\nroleRef:\n  kind: ClusterRole\n  name: secret-reader\n  apiGroup: rbac.authorization.k8s.io"
+      }
+    ],
+    "sources": [
+      {
+        "label": "Using RBAC Authorization",
+        "url": "https://kubernetes.io/docs/reference/access-authn-authz/rbac/"
+      }
+    ]
+  },
+  {
+    "id": "autoscaling",
+    "title": "HPA・VPA・Cluster Autoscaler の違い",
+    "lead": "どれも負荷に合わせて自動で大きさを変える仕組みですが、増減させるものが Pod の数・Pod の大きさ・ノードの数と違います。",
+    "columns": [
+      {
+        "name": "HPA",
+        "term": "hpa"
+      },
+      {
+        "name": "VPA",
+        "term": "vpa"
+      },
+      {
+        "name": "Cluster Autoscaler",
+        "term": "cluster-autoscaler"
+      }
+    ],
+    "rows": [
+      {
+        "label": "増減させるもの",
+        "cells": [
+          "Pod の数 (レプリカ数)",
+          "Pod の CPU とメモリの requests と limits",
+          "ノードの数"
+        ]
+      },
+      {
+        "label": "向き",
+        "cells": [
+          "水平 (横) のスケーリング",
+          "垂直 (縦) のスケーリング",
+          "クラスタの基盤のスケーリング"
+        ]
+      },
+      {
+        "label": "判断の材料",
+        "cells": [
+          "CPU やメモリの使用率、カスタムや外部の指標",
+          "過去と今の使用量、OOM の記録",
+          "スケジュールできない Pod の requests"
+        ]
+      },
+      {
+        "label": "標準で入っているか",
+        "cells": [
+          "Kubernetes の標準の API です",
+          "別に入れるアドオン (CRD) です",
+          "別に入れる部品です。Karpenter も同じ役割です"
+        ]
+      },
+      {
+        "label": "必要なもの",
+        "cells": [
+          "使用率で動かすなら Metrics Server",
+          "Metrics Server",
+          "クラウドの API (VM を作って消す)"
+        ]
+      },
+      {
+        "label": "動き方",
+        "cells": [
+          "既定で 15 秒ごとに数を見直します",
+          "updateMode で Off・Initial・Recreate などを選びます",
+          "決めておいたノードグループに足し引きします"
+        ]
+      }
+    ],
+    "pitfalls": [
+      "HPA と同じく VPA も最初から使えると思いがちですが、実は VPA は別に入れるアドオンです。",
+      "Cluster Autoscaler は実際の CPU 使用率を見てノードを増やすと思いがちですが、実はスケジュールできない Pod の requests を見て増やします。",
+      "HPA は DaemonSet にも使えると思いがちですが、実は数を変えられない DaemonSet には使えません。",
+      "HPA は CPU の指標でも 0 台まで減らせると思いがちですが、実は 0 にできるのは object や外部の指標を使うときだけです (v1.37 でベータ)。"
+    ],
+    "example": [
+      {
+        "language": "bash",
+        "title": "HPA は kubectl autoscale で作れる",
+        "code": "# ReplicaSet foo を CPU 80% を目安に 2〜5 個で増減させる\nkubectl autoscale rs foo --min=2 --max=5 --cpu=80%\nkubectl get hpa"
+      },
+      {
+        "language": "yaml",
+        "title": "VPA は CRD のリソースとして書く (Off は推奨値を出すだけ)",
+        "code": "apiVersion: autoscaling.k8s.io/v1\nkind: VerticalPodAutoscaler\nmetadata:\n  name: my-app-vpa\nspec:\n  targetRef:\n    apiVersion: \"apps/v1\"\n    kind: Deployment\n    name: my-app\n  updatePolicy:\n    updateMode: \"Off\"   # Off, Initial, Recreate, InPlaceOrRecreate, InPlace"
+      }
+    ],
+    "sources": [
+      {
+        "label": "Horizontal Pod Autoscaling",
+        "url": "https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/"
+      },
+      {
+        "label": "Vertical Pod Autoscaling",
+        "url": "https://kubernetes.io/docs/concepts/workloads/autoscaling/vertical-pod-autoscale/"
+      },
+      {
+        "label": "Node Autoscaling",
+        "url": "https://kubernetes.io/docs/concepts/cluster-administration/node-autoscaling/"
+      },
+      {
+        "label": "Autoscaling Workloads",
+        "url": "https://kubernetes.io/docs/concepts/workloads/autoscaling/"
+      }
+    ]
+  },
+  {
+    "id": "storage",
+    "title": "PV・PVC・StorageClass の違い",
+    "lead": "永続ボリューム (Pod が消えても残る保存領域) は、実体 (PV)・要求 (PVC)・種類 (StorageClass) の 3 つに分かれています。誰が作り、何と結び付くかを押さえると取り違えなくなります。",
+    "columns": [
+      {
+        "name": "PV",
+        "term": "pv"
+      },
+      {
+        "name": "PVC",
+        "term": "pvc"
+      },
+      {
+        "name": "StorageClass",
+        "term": "storageclass"
+      }
+    ],
+    "rows": [
+      {
+        "label": "何か",
+        "cells": [
+          "クラスタに用意された保存領域の実体",
+          "利用者が出す保存領域の要求",
+          "保存領域の種類 (クラス) の定義"
+        ]
+      },
+      {
+        "label": "誰が作るか",
+        "cells": [
+          "管理者か、StorageClass による動的な作成",
+          "アプリを使う利用者",
+          "クラスタの管理者"
+        ]
+      },
+      {
+        "label": "置き場所",
+        "cells": [
+          "ノードと同じくクラスタのリソースです",
+          "名前空間に属し、使う Pod と同じ名前空間",
+          "PVC が storageClassName で名前を指します"
+        ]
+      },
+      {
+        "label": "主な項目",
+        "cells": [
+          "容量・アクセスモード・回収の方針",
+          "容量・アクセスモード・storageClassName",
+          "provisioner・reclaimPolicy・volumeBindingMode"
+        ]
+      },
+      {
+        "label": "つながり",
+        "cells": [
+          "PVC と 1 対 1 で結び付きます",
+          "Pod がボリュームとして PVC を指します",
+          "PVC の求めに応じて PV を作ります"
+        ]
+      },
+      {
+        "label": "消したとき",
+        "cells": [
+          "Retain なら手で回収、Delete なら実体も消します",
+          "結び付いた PV の回収の方針に従います",
+          "動的に作る PV の reclaimPolicy の既定は Delete"
+        ]
+      }
+    ],
+    "pitfalls": [
+      "Pod は PV を直接指すと思いがちですが、実は Pod は PVC をボリュームとして使い、その PVC が PV に結び付きます。",
+      "ReadWriteOnce なら 1 つの Pod しか使えないと思いがちですが、実は 1 つのノードの単位で、同じノードの複数の Pod は使えます。1 つの Pod に限るのは ReadWriteOncePod です。",
+      "動的に作られた PV は PVC を消しても残ると思いがちですが、実は StorageClass の reclaimPolicy の既定は Delete で、実体ごと消えます。",
+      "storageClassName を書かなければ StorageClass は使われないと思いがちですが、実は既定の StorageClass があればそれが使われ、使わないなら空の文字列 \"\" を書きます。"
+    ],
+    "example": [
+      {
+        "language": "yaml",
+        "title": "StorageClass と、それを指す PVC",
+        "code": "apiVersion: storage.k8s.io/v1\nkind: StorageClass\nmetadata:\n  name: low-latency\nprovisioner: csi-driver.example-vendor.example\nreclaimPolicy: Retain          # 書かないと Delete\nvolumeBindingMode: WaitForFirstConsumer\n---\napiVersion: v1\nkind: PersistentVolumeClaim\nmetadata:\n  name: myclaim\nspec:\n  accessModes:\n    - ReadWriteOnce            # 1 つのノードから読み書き\n  resources:\n    requests:\n      storage: 8Gi\n  storageClassName: low-latency"
+      }
+    ],
+    "sources": [
+      {
+        "label": "Persistent Volumes",
+        "url": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/"
+      },
+      {
+        "label": "Storage Classes",
+        "url": "https://kubernetes.io/docs/concepts/storage/storage-classes/"
+      }
+    ]
+  },
+  {
+    "id": "requests-limits-qos",
+    "title": "requests と limits と QoS クラスの違い",
+    "lead": "requests は確保する量、limits は使える上限です。2 つの書き方の組み合わせで Pod の QoS クラス (サービス品質の等級) が決まり、ノードが足りないときにどの Pod から退去させるかが変わります。",
+    "columns": [
+      {
+        "name": "requests",
+        "term": "requests-limits"
+      },
+      {
+        "name": "limits",
+        "term": "requests-limits"
+      },
+      {
+        "name": "QoS クラス"
+      }
+    ],
+    "rows": [
+      {
+        "label": "何を決めるか",
+        "cells": [
+          "コンテナに確保する CPU とメモリの量",
+          "コンテナが使える CPU とメモリの上限",
+          "Pod の扱いの等級 (3 つ)"
+        ]
+      },
+      {
+        "label": "誰が使うか",
+        "cells": [
+          "kube-scheduler がノード選びに使います",
+          "kubelet とカーネルが守らせます",
+          "ノードが足りないときの退去の順番"
+        ]
+      },
+      {
+        "label": "超えたとき",
+        "cells": [
+          "空きがあれば超えて使えます",
+          "CPU は絞られ、メモリは OOM で終了されます",
+          "BestEffort → Burstable → Guaranteed の順に退去"
+        ]
+      },
+      {
+        "label": "書かないと",
+        "cells": [
+          "limits だけ書くと limits と同じ値になります",
+          "上限はノードの容量と同じになります",
+          "どちらも書かないと BestEffort です"
+        ]
+      },
+      {
+        "label": "例",
+        "cells": [
+          "cpu: 250m, memory: 64Mi",
+          "cpu: 500m, memory: 128Mi",
+          "requests と limits が違うので Burstable"
+        ]
+      }
+    ],
+    "pitfalls": [
+      "スケジューラーは実際の使用量を見てノードを選ぶと思いがちですが、実は requests の合計で判断し、使用量が少なくても容量を超えるなら置きません。",
+      "メモリの limits を超えたらすぐ終了させられると思いがちですが、実はカーネルがメモリの逼迫を見つけたときに OOM で終了させるので、すぐとは限りません。",
+      "limits だけ書くと requests は 0 になると思いがちですが、実は既定を付ける仕組みが無ければ limits と同じ値が requests になります。",
+      "requests を書けば Guaranteed になると思いがちですが、実は全コンテナで CPU とメモリの requests と limits を同じ値にする必要があります。"
+    ],
+    "example": [
+      {
+        "language": "yaml",
+        "title": "requests と limits を書いた Pod (QoS は Burstable)",
+        "code": "apiVersion: v1\nkind: Pod\nmetadata:\n  name: frontend\nspec:\n  containers:\n  - name: app\n    image: images.my-company.example/app:v4\n    resources:\n      requests:          # スケジューラーが見る量\n        memory: \"64Mi\"\n        cpu: \"250m\"\n      limits:            # これを超えると CPU は絞られ、メモリは OOM の対象\n        memory: \"128Mi\"\n        cpu: \"500m\""
+      },
+      {
+        "language": "bash",
+        "title": "付いた QoS クラスを確かめる",
+        "code": "kubectl get pod frontend -o jsonpath='{.status.qosClass}'\n# Burstable"
+      }
+    ],
+    "sources": [
+      {
+        "label": "Resource Management for Pods and Containers",
+        "url": "https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/"
+      },
+      {
+        "label": "Pod Quality of Service Classes",
+        "url": "https://kubernetes.io/docs/concepts/workloads/pods/pod-qos/"
+      }
+    ]
+  },
+  {
+    "id": "scheduling-constraints",
+    "title": "taint/toleration・nodeSelector・node affinity・pod affinity の違い",
+    "lead": "どれも Pod をどのノードに置くかを左右しますが、ノードが Pod を遠ざけるのか、Pod がノードや他の Pod を選ぶのかが違います。",
+    "columns": [
+      {
+        "name": "taint",
+        "term": "taint"
+      },
+      {
+        "name": "toleration",
+        "term": "toleration"
+      },
+      {
+        "name": "nodeSelector",
+        "term": "nodeselector"
+      },
+      {
+        "name": "node affinity",
+        "term": "node-affinity"
+      },
+      {
+        "name": "pod affinity"
+      }
+    ],
+    "rows": [
+      {
+        "label": "付ける場所",
+        "cells": [
+          "ノード",
+          "Pod",
+          "Pod (ノードのラベルを書く)",
+          "Pod (ノードのラベルを条件に)",
+          "Pod (他の Pod のラベルを条件に)"
+        ]
+      },
+      {
+        "label": "働き",
+        "cells": [
+          "合わない Pod をノードから遠ざけます",
+          "合う taint のノードに載るのを許します",
+          "ラベルを全部持つノードだけに載せます",
+          "ラベルの条件でノードを選びます",
+          "ある Pod と同じ場所 (か別の場所) に載せます"
+        ]
+      },
+      {
+        "label": "強さの段階",
+        "cells": [
+          "NoSchedule・PreferNoSchedule・NoExecute",
+          "許すだけで、載る保証はしません",
+          "必ず守る条件だけです",
+          "必須 (required) と希望 (preferred)",
+          "必須と希望、逆の anti-affinity もあります"
+        ]
+      },
+      {
+        "label": "書き方",
+        "cells": [
+          "kubectl taint nodes で付けます",
+          "key・operator・value・effect",
+          "キーと値のラベルを並べます",
+          "nodeSelectorTerms と matchExpressions",
+          "labelSelector と topologyKey"
+        ]
+      },
+      {
+        "label": "注意",
+        "cells": [
+          "NoExecute は動いている Pod も追い出します",
+          "引き寄せはしないので他と組み合わせます",
+          "条件はラベルの完全な一致だけです",
+          "後でラベルが変わっても Pod は動き続けます",
+          "数百台を超えるクラスタには勧められません"
+        ]
+      }
+    ],
+    "pitfalls": [
+      "toleration を付ければそのノードに載ると思いがちですが、実は載ることを許すだけで、決めるのはスケジューラーです。",
+      "taint は Pod に付けると思いがちですが、実は taint はノードに、toleration は Pod に付けます。",
+      "node affinity と pod affinity は同じ仕組みと思いがちですが、実は pod affinity はノードのラベルでなく、すでに動いている Pod のラベルで置き場所を決めます。"
+    ],
+    "example": [
+      {
+        "language": "bash",
+        "title": "ノードに taint を付ける・外す",
+        "code": "kubectl taint nodes node1 key1=value1:NoSchedule\n# 末尾に - を付けると外れる\nkubectl taint nodes node1 key1=value1:NoSchedule-"
+      },
+      {
+        "language": "yaml",
+        "title": "Pod 側の toleration と node affinity",
+        "code": "spec:\n  tolerations:              # node1 の taint を許す (載せる約束ではない)\n  - key: \"key1\"\n    operator: \"Equal\"\n    value: \"value1\"\n    effect: \"NoSchedule\"\n  affinity:\n    nodeAffinity:           # ゾーンのラベルでノードを選ぶ\n      requiredDuringSchedulingIgnoredDuringExecution:\n        nodeSelectorTerms:\n        - matchExpressions:\n          - key: topology.kubernetes.io/zone\n            operator: In\n            values:\n            - antarctica-east1"
+      }
+    ],
+    "sources": [
+      {
+        "label": "Taints and Tolerations",
+        "url": "https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/"
+      },
+      {
+        "label": "Assigning Pods to Nodes",
+        "url": "https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/"
+      }
+    ]
+  },
+  {
+    "id": "container-pod-node-cluster",
+    "title": "コンテナ・Pod・ノード・クラスタの違い (大きさの順)",
+    "lead": "Kubernetes はコンテナを Pod に入れ、Pod をノードで動かし、ノードを束ねたものをクラスタと呼びます。入れ子の順番と、それぞれが何を共有するかを押さえます。",
+    "columns": [
+      {
+        "name": "コンテナ"
+      },
+      {
+        "name": "Pod",
+        "term": "pod"
+      },
+      {
+        "name": "ノード",
+        "term": "node"
+      },
+      {
+        "name": "クラスタ"
+      }
+    ],
+    "rows": [
+      {
+        "label": "何か",
+        "cells": [
+          "イメージから動かした、アプリの実行の単位",
+          "1 つ以上のコンテナの組。最小のデプロイ単位",
+          "Pod を動かす仮想か物理のマシン",
+          "control plane と 1 台以上のワーカーノード"
+        ]
+      },
+      {
+        "label": "中に入るもの",
+        "cells": [
+          "アプリと、動かすのに要るライブラリ",
+          "コンテナ・共有のストレージとネットワーク",
+          "kubelet・コンテナランタイム・kube-proxy",
+          "ノードと、API サーバーなどの control plane"
+        ]
+      },
+      {
+        "label": "IP アドレス",
+        "cells": [
+          "Pod の IP を共有し、localhost で話せます",
+          "Pod ごとに固有の IP を持ちます",
+          "ノードの IP (NodePort の入口になります)",
+          "Service に割り当てる IP の範囲を持ちます"
+        ]
+      },
+      {
+        "label": "寿命",
+        "cells": [
+          "変えずに作り直すもの (変更は新しいイメージで)",
+          "使い捨ての前提で、ふつう直接は作りません",
+          "長く使い、足したり外したりします",
+          "全体の土台として長く使います"
+        ]
+      },
+      {
+        "label": "面倒を見るもの",
+        "cells": [
+          "コンテナランタイム",
+          "ノードの kubelet",
+          "control plane",
+          "運用者が kubectl や API で操作します"
+        ]
+      }
+    ],
+    "pitfalls": [
+      "Pod とコンテナは同じものと思いがちですが、実は Pod は 1 つ以上のコンテナの組で、中のコンテナは IP とポートの空間を共有します。",
+      "Pod の中のコンテナは別々のノードに載ることもあると思いがちですが、実は Pod の中身はいつも同じノードに一緒に置かれます。",
+      "Pod は直接作って使うものと思いがちですが、実は使い捨ての前提で、ふつうは Deployment などのワークロードに作らせます。"
+    ],
+    "example": [
+      {
+        "language": "yaml",
+        "title": "1 つの Pod に 2 つのコンテナ (同じノードで動き、localhost で話せる)",
+        "code": "apiVersion: v1\nkind: Pod\nmetadata:\n  name: frontend\nspec:\n  containers:\n  - name: app\n    image: images.my-company.example/app:v4\n  - name: log-aggregator\n    image: images.my-company.example/log-aggregator:v6"
+      },
+      {
+        "language": "bash",
+        "title": "大きさの違いを kubectl で見る",
+        "code": "kubectl get nodes          # クラスタの中のノード\nkubectl get pods -o wide   # NODE の列で、Pod が載っているノードが分かる\nkubectl get pod frontend -o jsonpath='{.spec.containers[*].name}'\n# app log-aggregator"
+      }
+    ],
+    "sources": [
+      {
+        "label": "Pods",
+        "url": "https://kubernetes.io/docs/concepts/workloads/pods/"
+      },
+      {
+        "label": "Nodes",
+        "url": "https://kubernetes.io/docs/concepts/architecture/nodes/"
+      },
+      {
+        "label": "Containers",
+        "url": "https://kubernetes.io/docs/concepts/containers/"
+      },
+      {
+        "label": "Kubernetes Components",
+        "url": "https://kubernetes.io/docs/concepts/overview/components/"
+      }
+    ]
+  },
+  {
+    "id": "metrics-logs-traces",
+    "title": "メトリクス・ログ・トレースの違い",
+    "lead": "可観測性 (外から中の様子が分かること) の 3 本柱です。数値の傾向を見るのか、1 件の出来事を見るのか、1 つのリクエストの道筋を見るのかが違います。",
+    "columns": [
+      {
+        "name": "メトリクス",
+        "term": "metrics"
+      },
+      {
+        "name": "ログ"
+      },
+      {
+        "name": "トレース",
+        "term": "trace"
+      }
+    ],
+    "rows": [
+      {
+        "label": "何の記録か",
+        "cells": [
+          "実行時に測った数値",
+          "出来事 1 件ごとの記録",
+          "1 つのリクエストが通った道筋"
+        ]
+      },
+      {
+        "label": "分かること",
+        "cells": [
+          "使用率や件数など全体の傾向",
+          "そのとき何が起きたかの詳細",
+          "どのサービスのどこで時間を使ったか"
+        ]
+      },
+      {
+        "label": "Kubernetes での出どころ",
+        "cells": [
+          "各部品の /metrics (Prometheus 形式)",
+          "コンテナの stdout と stderr",
+          "部品が OTLP で送り出します (ベータ)"
+        ]
+      },
+      {
+        "label": "見る道具",
+        "cells": [
+          "kubectl top、Prometheus、Grafana",
+          "kubectl logs",
+          "OpenTelemetry Collector と保存先"
+        ]
+      },
+      {
+        "label": "保存",
+        "cells": [
+          "時系列のデータベース (例: Prometheus)",
+          "Kubernetes に保存の仕組みは無く、別に要ります",
+          "Collector から保存先へ送ります"
+        ]
+      }
+    ],
+    "pitfalls": [
+      "kubectl logs があればログの保存は済むと思いがちですが、実は Kubernetes はログの保存の仕組みを持たず、クラスタ全体のログには別の保存先が要ります。",
+      "kubectl top は Prometheus のデータを見ていると思いがちですが、実は Metrics Server などが提供する Metrics API を見ています。",
+      "遅い 1 件のリクエストの原因はメトリクスで追えると思いがちですが、実は道筋を追うのはトレースで、処理ごとのスパンに分かれています。"
+    ],
+    "example": [
+      {
+        "language": "bash",
+        "title": "3 つの信号を kubectl で見る入口",
+        "code": "kubectl top pods                 # メトリクス (Metrics Server が要る)\nkubectl logs counter             # ログ (今のコンテナ)\nkubectl logs counter --previous  # ログ (再起動する前のコンテナ)\n# トレースは kubectl では見られない。部品が OTLP (既定は 4317 番) で Collector へ送る"
+      }
+    ],
+    "sources": [
+      {
+        "label": "Observability",
+        "url": "https://kubernetes.io/docs/concepts/cluster-administration/observability/"
+      },
+      {
+        "label": "Logging Architecture",
+        "url": "https://kubernetes.io/docs/concepts/cluster-administration/logging/"
+      },
+      {
+        "label": "Traces For Kubernetes System Components",
+        "url": "https://kubernetes.io/docs/concepts/cluster-administration/system-traces/"
+      },
+      {
+        "label": "OpenTelemetry Signals",
+        "url": "https://opentelemetry.io/docs/concepts/signals/"
+      }
+    ]
+  },
+  {
+    "id": "ci-cd-gitops",
+    "title": "CI・CD・GitOps (push 型と pull 型) の違い",
+    "lead": "CI と CD はコードを作ってから届けるまでの流れで、GitOps はその届け方の 1 つです。届けるときに外からクラスタへ送り込む (push) か、クラスタの中から取りに行く (pull) かを取り違えやすいところです。",
+    "columns": [
+      {
+        "name": "CI",
+        "term": "ci"
+      },
+      {
+        "name": "CD",
+        "term": "cd"
+      },
+      {
+        "name": "push 型の配信"
+      },
+      {
+        "name": "GitOps (pull 型)",
+        "term": "gitops"
+      }
+    ],
+    "rows": [
+      {
+        "label": "何をするか",
+        "cells": [
+          "変更をこまめに統合し、テスト済みの成果物を作ります",
+          "テスト済みの変更を自動で環境へ届けます",
+          "パイプラインがクラスタへ変更を送り込みます",
+          "エージェントが Git から望む状態を取り込みます"
+        ]
+      },
+      {
+        "label": "始まりと終わり",
+        "cells": [
+          "コミットで始まり、成果物で終わります",
+          "成果物を受け入れの環境 (か本番) に出します",
+          "パイプラインを流したときだけ反映します",
+          "望む状態と実際を常に見比べ続けます"
+        ]
+      },
+      {
+        "label": "動く場所",
+        "cells": [
+          "CI のパイプライン",
+          "CD のパイプラインやツール",
+          "クラスタの外のパイプライン",
+          "クラスタの中のエージェント"
+        ]
+      },
+      {
+        "label": "手で変えた差",
+        "cells": [
+          "扱いません",
+          "配信の方式によります",
+          "次に流すまで残ります",
+          "望む状態へ自動で戻します"
+        ]
+      },
+      {
+        "label": "例",
+        "cells": [
+          "コミットごとのビルドとテスト",
+          "受け入れの環境への自動のデプロイ",
+          "CI から kubectl apply を実行",
+          "Argo CD・Flux"
+        ]
+      }
+    ],
+    "pitfalls": [
+      "CD は必ず本番まで自動で出すことと思いがちですが、実は CD (継続的デリバリー) は受け入れの環境まで自動で届けることで、本番まで自動にするものは継続的デプロイメントと呼びます。",
+      "Git にマニフェストを置いて CI から kubectl apply すれば GitOps と思いがちですが、実は OpenGitOps の原則では、エージェントが望む状態を自動で pull し、継続的に合わせ続けることが求められます。",
+      "GitOps のクラスタでも kubectl edit で直せば済むと思いがちですが、実は Flux は手で変えた差をすぐ元に戻すので、Git に変更を push するか、合わせるのを一時止めます。"
+    ],
+    "example": [
+      {
+        "language": "bash",
+        "title": "push 型と pull 型で、人やパイプラインがすること",
+        "code": "# push 型: パイプラインがクラスタに書き込む (クラスタへの書き込みの権限が外にある)\nkubectl apply -f k8s/\n\n# pull 型 (GitOps): Git を変えるだけ。クラスタの中の Argo CD や Flux が取り込む\ngit commit -am \"replicas を 3 に\"\ngit push"
+      }
+    ],
+    "sources": [
+      {
+        "label": "OpenGitOps (GitOps の原則)",
+        "url": "https://opengitops.dev/"
+      },
+      {
+        "label": "Continuous Delivery (CD)",
+        "url": "https://glossary.cncf.io/continuous-delivery/"
+      },
+      {
+        "label": "Continuous integration (CI)",
+        "url": "https://glossary.cncf.io/continuous-integration/"
+      },
+      {
+        "label": "Flux の Core Concepts",
+        "url": "https://fluxcd.io/flux/concepts/"
+      }
+    ]
+  },
+  {
+    "id": "helm-kustomize",
+    "title": "Helm と Kustomize の違い",
+    "lead": "どちらも環境ごとに少しずつ違うマニフェストをまとめて扱う道具ですが、テンプレートに値を流し込むのか、元の YAML に重ねて直すのかが違います。",
+    "columns": [
+      {
+        "name": "Helm",
+        "term": "helm"
+      },
+      {
+        "name": "Kustomize",
+        "term": "kustomize"
+      }
+    ],
+    "rows": [
+      {
+        "label": "何か",
+        "cells": [
+          "Kubernetes のパッケージマネージャー",
+          "kustomization ファイルで YAML を直す道具"
+        ]
+      },
+      {
+        "label": "作り方",
+        "cells": [
+          "templates/ のテンプレートに values を合わせます",
+          "元の YAML にパッチや名前の前置きを重ねます"
+        ]
+      },
+      {
+        "label": "まとまりの単位",
+        "cells": [
+          "チャート (パッケージ) と、入れた結果のリリース",
+          "base と、それを使う overlay"
+        ]
+      },
+      {
+        "label": "環境ごとの差",
+        "cells": [
+          "-f の values ファイルや --set で上書き",
+          "overlay ごとに namePrefix やパッチを変えます"
+        ]
+      },
+      {
+        "label": "使い方",
+        "cells": [
+          "helm install リリース名 チャート",
+          "kubectl apply -k ディレクトリ"
+        ]
+      },
+      {
+        "label": "kubectl との関係",
+        "cells": [
+          "別の helm コマンドを入れて使います",
+          "1.14 から kubectl に組み込まれています"
+        ]
+      }
+    ],
+    "pitfalls": [
+      "Kustomize を使うには別のツールを入れる必要があると思いがちですが、実は 1.14 から kubectl に組み込まれ、kubectl apply -k で使えます。",
+      "Helm のチャートはそのまま使えるマニフェストと思いがちですが、実は templates/ のテンプレートと values を合わせてマニフェストを作ります。",
+      "overlay が base を書き換えると思いがちですが、実は base は overlay を知らず、1 つの base を複数の overlay で使い回せます。"
+    ],
+    "example": [
+      {
+        "language": "bash",
+        "title": "Helm: 入れる・上書きして更新する・前の版へ戻す",
+        "code": "helm install happy-panda bitnami/wordpress\nhelm upgrade -f panda.yaml happy-panda bitnami/wordpress\nhelm rollback happy-panda 1"
+      },
+      {
+        "language": "bash",
+        "title": "Kustomize: 1 つの base を dev と prod の overlay で使い回す",
+        "code": "cat <<EOF > dev/kustomization.yaml\nresources:\n- ../base\nnamePrefix: dev-\nEOF\n\nkubectl kustomize dev/   # できあがる YAML を見る\nkubectl apply -k dev/    # 当てる"
+      }
+    ],
+    "sources": [
+      {
+        "label": "Using Helm",
+        "url": "https://helm.sh/docs/intro/using_helm/"
+      },
+      {
+        "label": "Charts",
+        "url": "https://helm.sh/docs/topics/charts/"
+      },
+      {
+        "label": "Declarative Management of Kubernetes Objects Using Kustomize",
+        "url": "https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/"
+      }
+    ]
+  }
+]
