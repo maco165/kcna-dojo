@@ -9,7 +9,7 @@ import BottomTabs from '../components/BottomTabs';
 import RepoLink from '../components/RepoLink';
 import SiteLogo from '../components/SiteLogo';
 import { dueQuestions, findLesson } from '../content';
-import { HANDBOOK, findTopic, type HandbookStep } from '../content/handbook';
+import { APPENDIX, HANDBOOK, findTopic, type HandbookStep } from '../content/handbook';
 import { HANDBOOK_FIGURES } from '../content/handbookFigures';
 import { EXAM_WEIGHTS } from '../lib/exam';
 import type { Progress } from '../lib/progress';
@@ -53,7 +53,7 @@ function Index() {
         <section key={d.domain} className="hb-domain" aria-labelledby={`hb-${d.domain}`}>
           <h2 id={`hb-${d.domain}`} className="hb-domain__head">
             <span>{d.domain}</span>
-            <span className="hb-muted">配点 {EXAM_WEIGHTS[d.domain]}%</span>
+            <span className="hb-muted">{d.domain === APPENDIX ? '資格の範囲の外' : `配点 ${EXAM_WEIGHTS[d.domain]}%`}</span>
           </h2>
           <ul className="hb-topics">
             {d.topics.map((t) => (
@@ -64,7 +64,7 @@ function Index() {
                       <DiagramThumb spec={HANDBOOK_FIGURES[t.id]} />
                     </span>
                   )}
-                  <span className="hb-topic__en" lang="en">
+                  <span className="hb-topic__en" lang={d.domain === APPENDIX ? undefined : 'en'}>
                     {t.competency}
                   </span>
                   <span className="hb-topic__title">{t.title}</span>
@@ -108,7 +108,7 @@ function Topic({ id }: { id: string }) {
         </ol>
       </nav>
       <div className="hb-head">
-        <span className="hb-topic__en" lang="en">
+        <span className="hb-topic__en" lang={t.domain === APPENDIX ? undefined : 'en'}>
           {t.competency}
         </span>
         <h1 id="hb-title" className="week-title">

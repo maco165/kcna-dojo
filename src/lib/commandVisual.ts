@@ -279,6 +279,13 @@ function other(tokens: string[]): Action[] {
     return [];
   }
   if (tool === 'ctr' && sub === 'images' && arg === 'import') return act('create', '取り込む', 'イメージ', undefined, 'ノード');
+  // ノードの上で直に見るもの (k3s の付録)。デバッグ用コンテナの中の素の ps は飛ばす
+  if (tool === 'ls' && sub?.startsWith('/')) return act('read', '見る', 'ファイル', sub, 'ノード');
+  if (tool === 'ps' && sub?.startsWith('-')) return act('read', '見る', 'プロセス', undefined, 'ノード');
+  if (tool === 'journalctl') {
+    const u = tokens.indexOf('-u');
+    return act('logs', '記録を見る', 'サービス', u >= 0 ? tokens[u + 1] : undefined, 'ノード');
+  }
   return [];
 }
 
@@ -312,7 +319,16 @@ export function commandActions(text: string, language: 'bash' | 'yaml'): Action[
         continue;
       }
     }
-    for (const seg of line.replace(/<<-?\s*'?\w+'?/, '').split(/\s*(?:&&|\|\||;|\|)\s*/)) {
+    // 公式のインストールスクリプト (curl ... | sh -)。K3S_URL を渡すと agent として参加する
+    if (/^curl\b.*get\.k3s\.io.*\|.*\bsh\b/.test(line)) {
+      out.push(/\bK3S_URL=/.test(line) ? { op: 'create', verb: '参加させる', tool: 'k3s', kind: 'agent のノード', where: 'クラスタ' } : { op: 'create', verb: '入れる', tool: 'k3s', kind: 'k3s server', where: 'ノード' });
+      continue;
+    }
+    const segs = line.replace(/<<-?\s*'?\w+'?/, '').split(/\s*(&&|\|\||;|\|)\s*/);
+    for (let j = 0; j < segs.length; j += 2) {
+      // a || b の b は a が失敗したときの代わりなので、同じことを 2 度描かない
+      if (segs[j - 1] === '||') continue;
+      const seg = segs[j];
       const tokens = seg
         .trim()
         .replace(/^sudo\s+/, '')

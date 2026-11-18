@@ -62,6 +62,19 @@ describe('レビューで見つかった読み違い', () => {
   });
 });
 
+describe('ノードの上のコマンド (付録)', () => {
+  it('ls・ps・journalctl・インストールスクリプトを読み、|| の代わりの手は描かない', () => {
+    expect(one('sudo ls /var/lib/rancher/k3s/server/manifests')).toEqual(['見る: ファイル /var/lib/rancher/k3s/server/manifests (ノード)']);
+    expect(one("ps -ef | grep -E '[k]3s (server|agent)'")).toEqual(['見る: プロセス (ノード)']);
+    expect(one('ps')).toEqual([]);
+    expect(one('sudo journalctl -u k3s -n 20 --no-pager')).toEqual(['記録を見る: サービス k3s (ノード)']);
+    expect(one('curl -sfL https://get.k3s.io | sh -')).toEqual(['入れる: k3s server (ノード)']);
+    expect(one('curl -sfL https://get.k3s.io | K3S_URL=https://myserver:6443 K3S_TOKEN=mynodetoken sh -')).toEqual(['参加させる: agent のノード (クラスタ)']);
+    expect(one('kubectl get storageclass || sudo k3s kubectl get storageclass')).toEqual(['見る: StorageClass (クラスタ)']);
+    expect(one('kubectl get pods && kubectl get nodes')).toHaveLength(2);
+  });
+});
+
 describe('ハンドブックの全手順', () => {
   const steps = HANDBOOK_TOPICS.flatMap((t) => [...t.flow, ...t.try.flatMap((x) => x.steps)].map((s) => ({ id: t.id, s })));
   it('bash のコードがある手順は、ほぼすべて絵になる (ならないものはファイル操作などだけ)', () => {

@@ -1,0 +1,188 @@
+{
+  "domain": "付録",
+  "topics": [
+    {
+      "id": "k3s-vs-kubernetes",
+      "competency": "付録: k3s と Kubernetes",
+      "title": "k3s と Kubernetes (upstream) の違い",
+      "summary": "k3s は CNCF の認定を受けた Kubernetes のディストリビューションで、コントロールプレーンの部品を 1 つのバイナリと 1 つのプロセスにまとめ、ランタイムやネットワークなどの部品を同梱しています。API とマニフェストは upstream の Kubernetes と同じなので、このサイトで学ぶ kubectl とマニフェストはそのまま使えます。違うのは、部品の動かし方・既定の保存先・最初から入っている部品・ファイルの置き場所です。",
+      "flow": [
+        {
+          "text": "k3s は Kubernetes のディストリビューション (Kubernetes を配りやすい形にまとめたもの) です。公式の文書は、k3s を「完全に準拠した Kubernetes のディストリビューション」「CNCF の認定を受けた Kubernetes のディストリビューション」と説明し、標準の Kubernetes のクラスターに求められることはすべてできる、より軽い版だと書いています。トップページには、メモリが半分で、100 MB より小さい 1 つのバイナリにまとまっていると書かれています。"
+        },
+        {
+          "text": "CNCF の認定 (Certified Kubernetes Conformance Program) は、各社や各プロジェクトの Kubernetes が、決められた API を備えていることを確かめる仕組みです。認定を受けたものは、誰でも同じ適合性テストを走らせて確かめられます。k3s も版ごとに適合性テストの結果を CNCF のリポジトリに出していて、たとえば v1.34.1+k3s1 の結果があります。そのため、Pod や Deployment のマニフェストと kubectl の使い方は、kubeadm で組んだクラスターと同じです。"
+        },
+        {
+          "text": "比べる相手の upstream の Kubernetes から見ます。kubernetes.io によると、クラスターはコントロールプレーンと 1 つ以上のワーカーノードでできています。コントロールプレーンの部品は kube-apiserver (HTTP API を出す)・etcd (API サーバーのデータを保存するキーバリューストア)・kube-scheduler (Pod をノードに割り当てる)・kube-controller-manager (コントローラーを動かす) と、任意の cloud-controller-manager です。ノードの部品は kubelet・kube-proxy (任意)・コンテナランタイムです。"
+        },
+        {
+          "text": "kubeadm (upstream の Kubernetes を組む公式の道具) では、これらの部品が別々に動きます。kubeadm は、kube-apiserver・kube-controller-manager・kube-scheduler の static Pod (kubelet がファイルから直接起こす Pod) と、外部の etcd を指定しなければ etcd の static Pod のマニフェストを /etc/kubernetes/manifests に書き、kubelet がそれを起こします。kube-proxy は DaemonSet として、DNS には CoreDNS が入ります。Pod 同士の通信には CNI (コンテナのネットワークの仕様) のネットワークアドオンを自分で入れる必要があり、入れるまで CoreDNS は起動しません。管理者の kubeconfig は /etc/kubernetes/admin.conf です。",
+          "code": {
+            "language": "bash",
+            "text": "ls /etc/kubernetes/manifests   # kubeadm のコントロールプレーンのノードで"
+          },
+          "output": "etcd.yaml  kube-apiserver.yaml  kube-controller-manager.yaml  kube-scheduler.yaml"
+        },
+        {
+          "text": "k3s では、k3s server のコマンドで動くホストを server ノード、k3s agent で動くホストを agent ノードと呼びます。k3s server は API サーバー・スケジューラー・コントローラーマネージャー・cloud-controller-manager とデータストアに加えて agent の部品も動かし、k3s agent は containerd・Flannel・kube-router のネットワークポリシーのコントローラーと、kubelet・kube-proxy を動かします。server も agent も kubelet・コンテナランタイム・CNI を動かしますが、agent にはコントロールプレーンもデータストアもありません。コントロールプレーンの部品が 1 つのプロセスの中にあるので、kube-system に kube-apiserver などの Pod は出てきません。",
+          "code": {
+            "language": "bash",
+            "text": "ps -ef | grep -E '[k]3s (server|agent)'"
+          },
+          "output": "root   812     1 12 Nov10 ?   10:31:07 /usr/local/bin/k3s server"
+        },
+        {
+          "text": "保存先 (データストア) も違います。upstream のコントロールプレーンは etcd に保存しますが、k3s は etcd 以外も選べます。何も設定しなければ組み込みの SQLite を使い、SQLite はサーバーが複数のクラスターでは使えません。HA (高可用性) の構成では、3 台以上の server と組み込みの etcd を使うか、2 台以上の server と外部のデータストア (MySQL・MariaDB・PostgreSQL・etcd) を使います。新しい etcd のクラスターを始めるよう設定したときなどは、組み込みの etcd が選ばれます。"
+        },
+        {
+          "text": "k3s には、すぐ使えるクラスターにするための部品が同梱されています。トップページの一覧は、containerd / cri-dockerd (CRI のランタイム)・Flannel (CNI)・CoreDNS (クラスターの DNS)・Traefik (Ingress コントローラー)・ServiceLB (LoadBalancer のコントローラー)・kube-router (ネットワークポリシーのコントローラー)・Local Path Provisioner (PV を作る)・Spegel (イメージのレジストリのミラー。既定では無効で、--embedded-registry で有効にします)・ホストの道具 (iptables・socat など) です。これらのうち CoreDNS・Traefik・Local Path Provisioner (local-storage) と、一覧に無い metrics-server の 4 つは、server の /var/lib/rancher/k3s/server/manifests から AddOn として入り、--disable=traefik のように指定すると入れずに済みます。upstream の Kubernetes は LoadBalancer の Service を作れても実装を持たないので、実装を入れるまで Pending のままですが、k3s では ServiceLB がノードのポート (hostPort) で受け、ノードの IP を Service の外部のアドレスとして書くので、クラウドが無くても使えます。",
+          "code": {
+            "language": "bash",
+            "text": "sudo ls /var/lib/rancher/k3s/server/manifests"
+          },
+          "output": "ccm.yaml  coredns.yaml  local-storage.yaml  metrics-server  rolebindings.yaml  runtimes.yaml  traefik.yaml"
+        },
+        {
+          "text": "ファイルの置き場所と道具も違います。k3s の管理者の kubeconfig は /etc/rancher/k3s/k3s.yaml で、k3s に付いている kubectl はここを読みます。別に入れた kubectl や helm を使うときは、KUBECONFIG の環境変数か --kubeconfig でこのファイルを指します。k3s のバイナリには kubectl・crictl (CRI のランタイムを見る道具)・ctr (containerd を直接操作する道具) が入っていて、k3s kubectl・k3s crictl・k3s ctr として使えます。このファイルは root だけが読める設定 (mode 600) で書かれるので、一般ユーザーで読むには sudo k3s kubectl を使うか、server を --write-kubeconfig-mode 644 で起こします。",
+          "code": {
+            "language": "bash",
+            "text": "export KUBECONFIG=/etc/rancher/k3s/k3s.yaml\nkubectl get nodes\nsudo k3s crictl ps"
+          },
+          "output": "NAME    STATUS   ROLES                  AGE   VERSION\nnode1   Ready    control-plane,master   20d   v1.34.1+k3s1"
+        },
+        {
+          "text": "手軽な入れ方は、公式のインストールスクリプトを流すことです。systemd か openrc のサービスとして入り、再起動やプロセスが落ちたときに自動で起き直します。kubectl・crictl・ctr・k3s-killall.sh・k3s-uninstall.sh も入ります。agent を足すときは K3S_URL と K3S_TOKEN を渡し、トークンは server の /var/lib/rancher/k3s/server/node-token にあります。今の文書の最低の要件は、server が 2 コア・2 GB、agent が 1 コア・512 MB で、アーキテクチャは x86_64・armhf・arm64/aarch64、OS は今の Linux の多くです。Windows には今のところ対応していません。ノードのホスト名は重ならないようにします。",
+          "code": {
+            "language": "bash",
+            "text": "# 説明のための例です。すでに k3s が入ったノードで流すと入れ直しになり、最初に付けた設定が消えます\ncurl -sfL https://get.k3s.io | sh -\n# agent を足すとき\ncurl -sfL https://get.k3s.io | K3S_URL=https://myserver:6443 K3S_TOKEN=mynodetoken sh -"
+          }
+        }
+      ],
+      "try": [
+        {
+          "goal": "どの部品が Pod として動き、どれが k3s のプロセスの中にあるかを確かめたいなら",
+          "steps": [
+            {
+              "text": "この手順は読むだけで何も作らないので、名前空間 try-kcna は作らず、後片付けもありません。まず kube-system の Pod を見ます。CoreDNS・Traefik・local-path-provisioner・metrics-server と、ServiceLB が LoadBalancer の Service ごとに作る、svclb- で始まる名前の Pod (例: svclb-traefik-…)、Traefik を入れる helm-install-traefik などの Pod (Completed) が出ます。kube-apiserver・kube-scheduler・kube-controller-manager・etcd・kube-proxy の Pod は出ません。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl get pods -n kube-system"
+              },
+              "output": "NAME                                      READY   STATUS      RESTARTS   AGE\ncoredns-6c7d8f9b5d-abcde                  1/1     Running     0          20d\nhelm-install-traefik-x7k2p                0/1     Completed   0          20d\nlocal-path-provisioner-5b8f7c6d4e-qrstu   1/1     Running     0          20d\nmetrics-server-7d9c6b5f8a-mnopq           1/1     Running     0          20d\nsvclb-traefik-a1b2c3d4-vwxyz              2/2     Running     0          20d\ntraefik-6f8d7c9b5e-hijkl                  1/1     Running     0          20d"
+            },
+            {
+              "text": "ノードの一覧を広く出し、ROLES の列で server (control-plane などと出る) と agent (<none>) を、VERSION の列で k3s の版 (+k3s が付く) を、CONTAINER-RUNTIME の列で同梱の containerd を確かめます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl get nodes -o wide"
+              },
+              "output": "NAME    STATUS   ROLES                  AGE   VERSION        INTERNAL-IP    ...   CONTAINER-RUNTIME\nnode1   Ready    control-plane,master   20d   v1.34.1+k3s1   192.168.0.10   ...   containerd://2.1.4-k3s2"
+            },
+            {
+              "text": "server ノードに入り、コントロールプレーンが 1 つの k3s server のプロセスとして動いていることを確かめます (agent ノードでは k3s agent が出ます)。systemd で入れた場合、そのログは journalctl -u k3s で読めます (読むには sudo が要ることがあります)。agent ノードでは journalctl -u k3s-agent です。",
+              "code": {
+                "language": "bash",
+                "text": "ps -ef | grep -E '[k]3s (server|agent)'\nsudo journalctl -u k3s -n 20 --no-pager"
+              }
+            }
+          ]
+        },
+        {
+          "goal": "同梱のストレージと Ingress の部品を確かめたいなら",
+          "steps": [
+            {
+              "text": "これも読むだけなので try-kcna は作りません。StorageClass と IngressClass はクラスター全体の資源なので、名前空間ごとの権限しか無い kubeconfig では Forbidden で失敗します。そのときは server ノードで管理者の kubeconfig を使う sudo k3s kubectl で見ます。StorageClass には Local Path Provisioner の local-path が出ます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl get storageclass || sudo k3s kubectl get storageclass"
+              },
+              "output": "NAME                   PROVISIONER             RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE\nlocal-path (default)   rancher.io/local-path   Delete          WaitForFirstConsumer   false                  20d"
+            },
+            {
+              "text": "IngressClass を見ると、同梱の Traefik の分が出ます (--disable=traefik で入れた場合は出ません)。local-path の PV の中身は、既定ではノードの /var/lib/rancher/k3s/storage の下に作られます。まだ PV を作っていなければ、このフォルダは無いか空です。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl get ingressclass || sudo k3s kubectl get ingressclass\nsudo ls /var/lib/rancher/k3s/storage"
+              }
+            }
+          ]
+        }
+      ],
+      "lessons": [
+        "w1-l4",
+        "w2-l3",
+        "w2-l4",
+        "w2-lab",
+        "w5-l1",
+        "w6-l3"
+      ],
+      "sources": [
+        {
+          "label": "docs.k3s.io のトップ (k3s とは・同梱の部品)",
+          "url": "https://docs.k3s.io/"
+        },
+        {
+          "label": "docs.k3s.io の FAQ (CNCF の認定・Windows・ログ)",
+          "url": "https://docs.k3s.io/faq"
+        },
+        {
+          "label": "docs.k3s.io の Architecture (server と agent・HA)",
+          "url": "https://docs.k3s.io/architecture"
+        },
+        {
+          "label": "docs.k3s.io の Cluster Datastore",
+          "url": "https://docs.k3s.io/datastore"
+        },
+        {
+          "label": "docs.k3s.io の Managing Packaged Components",
+          "url": "https://docs.k3s.io/installation/packaged-components"
+        },
+        {
+          "label": "docs.k3s.io の Networking Services (ServiceLB・Traefik・ネットワークポリシー)",
+          "url": "https://docs.k3s.io/networking/networking-services"
+        },
+        {
+          "label": "docs.k3s.io の Storage (Local Path Provisioner)",
+          "url": "https://docs.k3s.io/add-ons/storage"
+        },
+        {
+          "label": "docs.k3s.io の CLI Tools",
+          "url": "https://docs.k3s.io/cli"
+        },
+        {
+          "label": "docs.k3s.io の Cluster Access (kubeconfig)",
+          "url": "https://docs.k3s.io/cluster-access"
+        },
+        {
+          "label": "docs.k3s.io の Quick-Start Guide",
+          "url": "https://docs.k3s.io/quick-start"
+        },
+        {
+          "label": "docs.k3s.io の Requirements",
+          "url": "https://docs.k3s.io/installation/requirements"
+        },
+        {
+          "label": "kubernetes.io の Kubernetesのコンポーネント",
+          "url": "https://kubernetes.io/ja/docs/concepts/overview/components/"
+        },
+        {
+          "label": "kubernetes.io の kubeadmを使用したクラスターの作成",
+          "url": "https://kubernetes.io/ja/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/"
+        },
+        {
+          "label": "kubernetes.io の Implementation details (kubeadm の static Pod とアドオン)",
+          "url": "https://kubernetes.io/docs/reference/setup-tools/kubeadm/implementation-details/"
+        },
+        {
+          "label": "CNCF の Certified Kubernetes Software Conformance",
+          "url": "https://www.cncf.io/training/certification/software-conformance/"
+        },
+        {
+          "label": "CNCF の k8s-conformance の k3s v1.34 の提出",
+          "url": "https://github.com/cncf/k8s-conformance/tree/master/v1.34/k3s"
+        }
+      ]
+    }
+  ]
+}
