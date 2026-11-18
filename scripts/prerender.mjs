@@ -63,7 +63,7 @@ export async function buildPages(load) {
   const { parseRoute } = await load('/src/lib/route.ts');
   const titleOf = (p) => pageTitle(parseRoute(`${BASE}${p}`));
   const { WEEKS } = await load('/src/content/curriculum.ts');
-  const { HANDBOOK, HANDBOOK_TOPICS, isAppendixDomain, sectionName: shortName } = await load('/src/content/handbook.ts');
+  const { HANDBOOK_PARTS, HANDBOOK_TOPICS, isAppendixDomain, sectionName: shortName } = await load('/src/content/handbook.ts');
   const sectionName = (d) => (isAppendixDomain(d) ? `${shortName(d)} (資格の範囲の外)` : d);
   const { CURRICULUM, DEFINITION } = await load('/src/content/guide.ts');
   const glossary = (await load('/src/content/glossary.json')).default;
@@ -91,9 +91,12 @@ export async function buildPages(load) {
     description: 'KCNA の学習要領の細目ごとに、公式のドキュメントに沿って、kubectl のコマンドと出力の例で全体の流れを説明する参照ページ。k3s で試す手順と後片付けつき。',
     body: [
       '<h1>ハンドブック</h1>',
-      ...HANDBOOK.map(
-        (d) =>
-          `<h2>${esc(sectionName(d.domain))}</h2><ul>${d.topics.map((t) => `<li>${link(`handbook/${t.id}/`, t.title)}: ${esc(t.summary)}</li>`).join('')}</ul>`,
+      // 画面と同じく 2 部 (h2) に分け、段は h3 にする
+      ...HANDBOOK_PARTS.map(
+        (p) =>
+          `<section id="${p.id}"><h2>${esc(p.title)}</h2><p>${esc(p.lead)}</p>${p.domains
+            .map((d) => `<h3>${esc(sectionName(d.domain))}</h3><ul>${d.topics.map((t) => `<li>${link(`handbook/${t.id}/`, t.title)}: ${esc(t.summary)}</li>`).join('')}</ul>`)
+            .join('')}</section>`,
       ),
     ].join('\n'),
   });
