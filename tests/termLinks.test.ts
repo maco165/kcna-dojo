@@ -83,7 +83,7 @@ describe('本文の用語を用語集へのリンクにする', () => {
     const pss = TERMS.find((t) => t.id === 'pod-security-standards')!;
     const ids = linkDetail(names, pss).flat().filter((p) => typeof p !== 'string').map((p) => p.id);
     expect(ids).not.toContain('pod-security-standards');
-    // 87 語のどれでも、自分へのリンクは出ない
+    // どの語でも、自分へのリンクは出ない
     for (const t of TERMS) expect(linkDetail(names, t).flat().some((p) => typeof p !== 'string' && p.id === t.id), t.id).toBe(false);
   });
   it('トピックの noTermLinks の語は、そのトピックではリンクにしない (AWS の IAM のロールを Kubernetes の Role にしない)', () => {

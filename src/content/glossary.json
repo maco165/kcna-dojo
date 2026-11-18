@@ -1895,6 +1895,764 @@
         "w8-l4",
         "w8-lab"
       ]
+    },
+    {
+      "id": "linux-kernel",
+      "term": "Linux カーネル",
+      "aliases": [
+        "カーネル",
+        "Linux kernel",
+        "kernel"
+      ],
+      "description": "OS のいちばん中心にあり、裏方の仕事をすべて受け持って、ほかのプログラムを起動させるプログラムです。Linux は Linus Torvalds が UNIX の写しとして一から書いたカーネルです。",
+      "detail": "一言でいうと、OS のいちばん中心にあるプログラムです。Linux のカーネルは、Linus Torvalds がネットの向こうの仲間と、UNIX の写しとして一から書いたもので、POSIX などの UNIX の共通の決まりに沿うことを目指しています。\n\nDebian の説明では、カーネルはコンピューターでいちばん基本のプログラムで、裏方の仕事をすべて受け持ち、ほかのプログラムを起動させます。アプリがファイルを開く・プロセスを作るといった仕事は、カーネルへの入り口のシステムコールで頼みます。\n\nカーネルは OS の中心ですが、OS にはほかにも基本のプログラムや道具が要ります。カーネルにそれらを組み合わせて配るものがディストリビューションです。",
+      "source": "https://docs.kernel.org/admin-guide/README.html",
+      "sources": [
+        {
+          "label": "Debian: About Debian",
+          "url": "https://www.debian.org/intro/about"
+        },
+        {
+          "label": "man7.org: syscalls(2)",
+          "url": "https://man7.org/linux/man-pages/man2/syscalls.2.html"
+        }
+      ],
+      "lessons": [],
+      "topics": [
+        "linux-history",
+        "linux-internals"
+      ]
+    },
+    {
+      "id": "linux-distribution",
+      "term": "ディストリビューション (Linux)",
+      "aliases": [
+        "ディストリビューション",
+        "Linux ディストリビューション",
+        "distribution",
+        "ディストロ"
+      ],
+      "description": "Linux のカーネルに、GNU の道具やアプリをまとめ、入れやすくして配るものです。Debian が例です。",
+      "detail": "一言でいうと、Linux のカーネルと、その上で使う道具やソフトウェアをひとまとめにして配る「配布版」です。\n\nDebian の説明では、OS はコンピューターを動かす基本のプログラムと道具の集まりで、中心にカーネルがあります。基本の道具の多くは GNU プロジェクトのものなので、GNU/Linux という呼び方もあります。Debian は 7 万を超えるパッケージ (入れやすい形にまとめたソフトウェア) と、パッケージを管理する APT を配っています。\n\nDebian は 1993 年 8 月に Ian Murdock が始めました。使っている OS の名前や版は /etc/os-release に書かれています。k3s のように、Kubernetes を配りやすい形にまとめたものも「Kubernetes のディストリビューション」と呼びます。まとめて配るという意味は同じですが、中身は Kubernetes の部品です。",
+      "source": "https://www.debian.org/intro/about",
+      "sources": [
+        {
+          "label": "man7.org: os-release(5)",
+          "url": "https://man7.org/linux/man-pages/man5/os-release.5.html"
+        }
+      ],
+      "lessons": [],
+      "topics": [
+        "linux-history"
+      ]
+    },
+    {
+      "id": "system-call",
+      "term": "システムコール",
+      "aliases": [
+        "system call",
+        "syscall"
+      ],
+      "description": "アプリと Linux のカーネルの間の基本の接続口です。ファイルを開く・プロセスを作るといった仕事は、システムコールでカーネルに頼みます。",
+      "detail": "一言でいうと、アプリがカーネルに仕事を頼むための入り口です。man ページは、システムコールをアプリと Linux のカーネルの間の基本の接続口と説明しています。\n\nふつうはシステムコールを直接呼ばず、glibc などの C のライブラリーにある包む関数 (wrapper) を呼びます。包む関数は、引数とシステムコールの番号をカーネルが待つ場所に置き、カーネルのモードに切り替えてカーネルに仕事をさせ、エラーなら errno を設定します。そのため、呼ぶ側からはふつうの関数を呼ぶのと同じに見えます。\n\nコンテナの土台の namespaces も、clone・unshare・setns というシステムコールで作ったり入ったりします。",
+      "source": "https://man7.org/linux/man-pages/man2/syscalls.2.html",
+      "sources": [
+        {
+          "label": "man7.org: intro(2)",
+          "url": "https://man7.org/linux/man-pages/man2/intro.2.html"
+        },
+        {
+          "label": "man7.org: namespaces(7)",
+          "url": "https://man7.org/linux/man-pages/man7/namespaces.7.html"
+        }
+      ],
+      "lessons": [],
+      "topics": [
+        "linux-internals",
+        "container-internals"
+      ]
+    },
+    {
+      "id": "process-pid",
+      "term": "プロセスと PID",
+      "aliases": [
+        "プロセス",
+        "PID",
+        "プロセス ID"
+      ],
+      "description": "プロセスは動いているプログラムのことで、PID (プロセスの番号) で区別されます。新しいプロセスは fork などで今のプロセスを複製して作り、親子の木になります。",
+      "detail": "一言でいうと、プロセスは動いているプログラムの 1 つ 1 つ、PID はそれぞれに付く番号です。\n\nLinux では、新しいプロセスはふつう fork (や clone) で、呼んだプロセスを複製して作ります。作られた方を子、作った方を親と呼びます。子は自分だけの PID を持ち、子の親の PID (PPID) は親の PID と同じです。execve は、そのプロセスが動かすプログラムを新しいものに置き換えます。\n\nPID の namespace を新しく作ると、そこで最初に作られたプロセスは PID 1 になり、その namespace の init になります。プロセスは、自分が属する PID の namespace と、そこから親をたどった上の層の namespace から見え、その層ごとに 1 つずつ PID を持ちます。ホストの namespace はふつうその上の層にあたるので、コンテナの中のプロセスにもホストから見た PID があります。",
+      "source": "https://man7.org/linux/man-pages/man2/fork.2.html",
+      "sources": [
+        {
+          "label": "man7.org: execve(2)",
+          "url": "https://man7.org/linux/man-pages/man2/execve.2.html"
+        },
+        {
+          "label": "man7.org: pid_namespaces(7)",
+          "url": "https://man7.org/linux/man-pages/man7/pid_namespaces.7.html"
+        }
+      ],
+      "lessons": [],
+      "topics": [
+        "linux-internals",
+        "container-internals"
+      ]
+    },
+    {
+      "id": "procfs",
+      "term": "/proc",
+      "aliases": [
+        "proc ファイルシステム",
+        "procfs",
+        "proc filesystem"
+      ],
+      "description": "カーネルのデータ構造をファイルの形で見せる疑似ファイルシステムで、ふつう /proc にマウントされます。プロセスごとの /proc/<PID> のフォルダなどがあります。",
+      "detail": "一言でいうと、カーネルの中の情報を、ファイルとして読めるようにした場所です。ふつうのファイルではなく、カーネルのデータ構造への接続口になる疑似ファイルシステムで、ふつうは自動で /proc にマウントされます。\n\nプロセスごとに /proc/<PID> のフォルダがあり、/proc/self は読んだプロセス自身のフォルダを指す特別なリンクです。その下の ns には属する namespaces が、cgroup には属する cgroup が出ます。/proc の下のほかのファイルは、システム全体の情報を見せます。多くのファイルは読み取り専用ですが、書けるものもあり、カーネルの変数を変えられます。\n\ncgroups そのものの操作は /proc ではなく、cgroupfs という別の疑似ファイルシステムで行います。",
+      "source": "https://man7.org/linux/man-pages/man5/proc.5.html",
+      "sources": [
+        {
+          "label": "man7.org: namespaces(7)",
+          "url": "https://man7.org/linux/man-pages/man7/namespaces.7.html"
+        },
+        {
+          "label": "man7.org: cgroups(7)",
+          "url": "https://man7.org/linux/man-pages/man7/cgroups.7.html"
+        }
+      ],
+      "lessons": [],
+      "topics": [
+        "linux-internals",
+        "container-internals"
+      ]
+    },
+    {
+      "id": "linux-namespaces",
+      "term": "Linux の namespaces",
+      "aliases": [
+        "Linux namespaces",
+        "Linux の名前空間"
+      ],
+      "description": "プロセスの番号・ネットワーク・マウントなどのカーネルの資源を包み、中のプロセスに自分専用にあるように見せる Linux のカーネルの機能です。コンテナの土台の 1 つで、Kubernetes の Namespace とは別のものです。",
+      "detail": "一言でいうと、プロセスごとに「見える世界」を分けるカーネルの機能です。namespace はカーネル全体の資源を包み、その中のプロセスには自分専用の資源があるように見せます。資源への変更は、同じ namespace のプロセスにだけ見えます。\n\n種類は Cgroup・IPC・Network・Mount・PID・Time・User・UTS (ホスト名) の 8 つです。たとえば新しい PID の namespace で最初に作られたプロセスは PID 1 になります。man ページは、namespaces の使い道の 1 つにコンテナを挙げています。プロセスが属する namespace は /proc/<PID>/ns で見られます。\n\n名前の似た Kubernetes の Namespace は、1 つのクラスタの中でリソースの組を分ける仕組みで、カーネルの機能ではありません。",
+      "source": "https://man7.org/linux/man-pages/man7/namespaces.7.html",
+      "sources": [
+        {
+          "label": "man7.org: pid_namespaces(7)",
+          "url": "https://man7.org/linux/man-pages/man7/pid_namespaces.7.html"
+        },
+        {
+          "label": "Kubernetes docs: Namespaces",
+          "url": "https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/"
+        }
+      ],
+      "lessons": [],
+      "topics": [
+        "linux-internals",
+        "container-internals"
+      ]
+    },
+    {
+      "id": "cgroups",
+      "term": "cgroups",
+      "aliases": [
+        "cgroup",
+        "control groups",
+        "コントロールグループ",
+        "cgroup v2"
+      ],
+      "description": "プロセスを組に分け、組ごとに CPU やメモリなどの資源の使い方を制限し、測る Linux のカーネルの機能です。Pod の requests と limits もこれで守らせます。",
+      "detail": "一言でいうと、プロセスの組ごとに、使える資源の量を決めて見張るカーネルの機能です。プロセスは木の形の組 (cgroup) に分けられ、組ごとにメモリや CPU などの使い方を制限し、使った量を測れます。操作は cgroupfs という疑似ファイルシステムで行います。\n\n最初の実装は Linux 2.6.24 で入り、その問題を直す cgroup v2 が Linux 4.5 で正式になりました。Kubernetes では、kubelet とコンテナランタイムが cgroups を使い、Pod とコンテナの CPU とメモリの requests と limits を守らせます。Kubernetes は v1.35 で cgroup v1 を非推奨にし、kubelet は既定では cgroup v1 のノードで起動しません。\n\nnamespaces が「見える範囲」を分けるのに対し、cgroups は「使える量」を分けます。",
+      "source": "https://man7.org/linux/man-pages/man7/cgroups.7.html",
+      "sources": [
+        {
+          "label": "Kubernetes docs: About cgroup v2",
+          "url": "https://kubernetes.io/docs/concepts/architecture/cgroups/"
+        },
+        {
+          "label": "man7.org: namespaces(7)",
+          "url": "https://man7.org/linux/man-pages/man7/namespaces.7.html"
+        }
+      ],
+      "lessons": [],
+      "topics": [
+        "linux-internals",
+        "container-internals"
+      ]
+    },
+    {
+      "id": "chroot",
+      "term": "chroot",
+      "aliases": [
+        "change root",
+        "チェンジルート"
+      ],
+      "description": "呼んだプロセスのルートディレクトリ (/ の位置) を、指定したフォルダに変える Linux のシステムコールです。安全のための仕組みではありません。",
+      "detail": "一言でいうと、プロセスにとっての / の位置を、別のフォルダに付け替えるシステムコールです。\n\nchroot を呼ぶと、/ で始まるパス名は指定したフォルダから探されるようになります。この設定は子のプロセスにも引き継がれます。呼べるのは特権のあるプロセス (CAP_SYS_CHROOT を持つもの) だけです。\n\nman ページは、chroot が変えるのはパス名の解決の仕方だけで、ほかには何もしないと書いています。安全のための仕組みではなく、プロセスを完全に閉じ込めることも、ファイルのシステムコールを制限することも目的にしていません。LXC は、chroot (pivot_root を使うもの) に namespaces や cgroups などを組み合わせてコンテナを作り、chroot と完全な VM の中間のものと考えられることが多い、と説明しています。",
+      "source": "https://man7.org/linux/man-pages/man2/chroot.2.html",
+      "sources": [
+        {
+          "label": "Linux Containers: LXC - Introduction",
+          "url": "https://linuxcontainers.org/lxc/introduction/"
+        }
+      ],
+      "lessons": [],
+      "topics": [
+        "container-internals"
+      ]
+    },
+    {
+      "id": "runc",
+      "term": "runc",
+      "aliases": [
+        "runC"
+      ],
+      "description": "OCI の仕様に沿って、Linux でコンテナを作って動かすコマンドの道具です。containerd は、Linux のコンテナの機能とのやりとりの多くを runc に任せます。",
+      "detail": "一言でいうと、OCI の仕様に沿ってコンテナを起動する、低いレベルのコマンドの道具です。\n\nOCI は 2015 年 6 月に Docker や CoreOS などが始めた、コンテナの形式とランタイムの業界の標準を作る集まりです。Docker はそのとき、コンテナの形式とランタイムの runC を OCI に寄付しました。OCI の説明では、実装はイメージを取ってきて、ディスクの上の「ファイルシステムのバンドル」に展開し、それを OCI のランタイムが動かします。runc はその動かす役の道具です。\n\ncontainerd はイメージの取得と保存から、コンテナの実行と見張りまで、コンテナの一生を受け持つデーモンです。その README は、Linux のコンテナの機能とのやりとりのほとんどは runc などが受け持つと書いています。",
+      "source": "https://github.com/opencontainers/runc",
+      "sources": [
+        {
+          "label": "OCI: About the Open Container Initiative",
+          "url": "https://opencontainers.org/about/overview/"
+        },
+        {
+          "label": "GitHub: containerd/containerd",
+          "url": "https://github.com/containerd/containerd"
+        }
+      ],
+      "lessons": [],
+      "topics": [
+        "container-internals"
+      ]
+    },
+    {
+      "id": "systemd",
+      "term": "systemd",
+      "aliases": [
+        "システムディー"
+      ],
+      "description": "Linux のシステムとサービスを管理するプログラムです。起動のときに PID 1 として動き、init システムとしてサービスを立ち上げて保ちます。",
+      "detail": "一言でいうと、Linux の起動と、裏で動くサービスの面倒を見るプログラムです。起動のときに最初のプロセス (PID 1) として動くと、init システムとして、ユーザー空間のサービスを立ち上げて保ちます。k3s の公式のインストールスクリプトは、k3s を systemd か openrc のサービスとして入れます。\n\nsystemd は cgroups と深く結び付いていて、systemd の単位 (unit) ごとに cgroup を割り当て、cgroup の管理役になります。kubelet とコンテナランタイムの cgroup のドライバーには cgroupfs と systemd があり、両方を同じにする必要があります。kubernetes.io は、systemd を init にしたノードでは systemd のドライバーを使うよう勧め、cgroup v2 なら cgroupfs ではなく systemd のドライバーを使うよう書いています。",
+      "source": "https://man7.org/linux/man-pages/man1/systemd.1.html",
+      "sources": [
+        {
+          "label": "Kubernetes docs: Container Runtimes (cgroup drivers)",
+          "url": "https://kubernetes.io/docs/setup/production-environment/container-runtimes/"
+        },
+        {
+          "label": "K3s docs: Quick-Start Guide",
+          "url": "https://docs.k3s.io/quick-start"
+        }
+      ],
+      "lessons": [],
+      "topics": [
+        "container-internals",
+        "setup-k3s",
+        "k3s-vs-kubernetes"
+      ]
+    },
+    {
+      "id": "docker",
+      "term": "Docker",
+      "aliases": [
+        "ドッカー",
+        "Docker Engine"
+      ],
+      "description": "コンテナのイメージを作り、コンテナを動かす道具です。Linux のコンテナの使い方を広めましたが、Kubernetes は v1.24 で、Docker Engine を直接つなぐ dockershim を外しました。",
+      "detail": "一言でいうと、コンテナを作って動かすための道具で、Linux のコンテナの使い方を広めたものです。\n\nDocker の説明では、コンテナはコードとすべての依存をまとめたソフトウェアの単位です。同じ機械の上の複数のコンテナが OS のカーネルを分け合い、それぞれがユーザー空間の分けられたプロセスとして動きます。Docker は 2015 年に、コンテナの形式とランタイムの runC を OCI に寄付しました。\n\nDocker Engine は CRI を実装していないので、Kubernetes は橋渡しの dockershim を自分の中に持っていましたが、v1.24 で外しました。今も Docker Engine をランタイムにしたいときは、Mirantis と Docker が保守する cri-dockerd というアダプターで kubelet とつなぎます。docker build で作ったイメージは、どの CRI の実装でもそのまま動きます。",
+      "source": "https://www.docker.com/resources/what-container/",
+      "sources": [
+        {
+          "label": "Kubernetes Blog: Updated: Dockershim Removal FAQ",
+          "url": "https://kubernetes.io/blog/2022/02/17/dockershim-faq/"
+        },
+        {
+          "label": "OCI: About the Open Container Initiative",
+          "url": "https://opencontainers.org/about/overview/"
+        }
+      ],
+      "lessons": [],
+      "topics": [
+        "container-internals",
+        "kubernetes-history"
+      ]
+    },
+    {
+      "id": "authn-authz",
+      "term": "認証と認可",
+      "aliases": [
+        "認証",
+        "認可",
+        "authentication",
+        "authorization",
+        "authn",
+        "authz"
+      ],
+      "description": "認証は相手が「誰か」を確かめること、認可はその相手が「何をしてよいか」を決めることです。Kubernetes の API サーバーは、認証・認可・アドミッション制御の順に要求を通します。",
+      "detail": "一言でいうと、認証 (authentication) は「誰か」を、認可 (authorization) は「何をしてよいか」を決める、別々の段です。\n\nKubernetes の API サーバーでは、TLS でつながったあと、まず認証の段が要求を調べます。クライアント証明書やトークンなど、設定した方法を順に試し、どれでも確かめられなければ 401 で断ります。ただし資格情報を何も出さない要求は、匿名を許す設定 (既定) なら system:anonymous として扱われ、認可の段に進みます。確かめられればユーザー名が決まり、方法によってはグループも決まります。次の認可の段は、ユーザー名・したい操作・対象を見て、許す決まりがあれば通し、すべてが断れば 403 で断ります。認可の方法には ABAC・RBAC・Webhook などがあります。\n\nKubernetes はユーザー名を判断に使いますが、User というオブジェクトは持たず、ユーザーの情報を API に保存しません。",
+      "source": "https://kubernetes.io/docs/concepts/security/controlling-access/",
+      "sources": [
+        {
+          "label": "Kubernetes docs: Authenticating",
+          "url": "https://kubernetes.io/docs/reference/access-authn-authz/authentication/"
+        }
+      ],
+      "lessons": [],
+      "topics": [
+        "authn-authz-basics",
+        "kubectl-internals"
+      ]
+    },
+    {
+      "id": "tls",
+      "term": "TLS",
+      "aliases": [
+        "Transport Layer Security",
+        "mTLS",
+        "mutual TLS",
+        "相互 TLS"
+      ],
+      "description": "通信する二者の間に安全な通り道を作る決まりです。相手の確認・盗み見の防止・書き換えの検出を受け持ち、Kubernetes の部品どうしもこれでつながります。",
+      "detail": "一言でいうと、ネットワークの上に、二者だけの安全な通り道を作るための決まりです。TLS 1.3 は RFC 8446 (2018 年 8 月) で決められています。\n\nRFC 8446 は、TLS の通り道が持つべき性質に、相手の確認 (認証)・送ったデータを両端だけに見せること (秘匿)・書き換えを見つけること (完全性) を挙げています。サーバー側は必ず確かめられ、クライアント側の確認は任意です。クライアントも確かめる形は mutual TLS (相互 TLS) と呼ばれ、etcd はクライアントと仲間の確認にこれを使います。\n\nKubernetes は、TLS での認証に PKI (公開鍵と証明書で相手を確かめる仕組み) の証明書を使います。API サーバーは既定で 6443 番のポートで待ち、TLS で守られています。",
+      "source": "https://datatracker.ietf.org/doc/html/rfc8446",
+      "sources": [
+        {
+          "label": "Kubernetes docs: PKI certificates and requirements",
+          "url": "https://kubernetes.io/docs/setup/best-practices/certificates/"
+        },
+        {
+          "label": "Kubernetes docs: Controlling Access to the Kubernetes API",
+          "url": "https://kubernetes.io/docs/concepts/security/controlling-access/"
+        }
+      ],
+      "lessons": [],
+      "topics": [
+        "authn-authz-basics",
+        "kubectl-internals"
+      ]
+    },
+    {
+      "id": "x509-certificate",
+      "term": "X.509 証明書",
+      "aliases": [
+        "X.509",
+        "証明書",
+        "certificate",
+        "公開鍵証明書",
+        "クライアント証明書"
+      ],
+      "description": "公開鍵がどの持ち主のものかを、信頼された CA (認証局) の署名で示すデータです。TLS での相手の確認や、Kubernetes のクライアント証明書による認証に使います。",
+      "detail": "一言でいうと、「この公開鍵はこの持ち主のもの」と、信頼できる第三者が署名して示す証明書です。インターネットで使うときの形は、RFC 5280 (2008 年 5 月) が X.509 の第 3 版をもとに決めています。\n\n公開鍵を使う側は、対になる秘密鍵を本当にその相手が持っているかを確かめたいものです。証明書は公開鍵と持ち主 (subject) を結び付けるデータで、信頼された CA (認証局) がそれぞれに署名することで、その結び付きを示します。証明書には有効期間があります。\n\nKubernetes は、部品どうしの TLS の認証に証明書を使います。API サーバー・etcd・kubelet のサーバー証明書や、各部品が API サーバーに名乗るクライアント証明書があります。人がクライアント証明書で名乗ると、subject の common name (CN) がユーザー名に、organization (O) がグループになります。",
+      "source": "https://datatracker.ietf.org/doc/html/rfc5280",
+      "sources": [
+        {
+          "label": "Kubernetes docs: PKI certificates and requirements",
+          "url": "https://kubernetes.io/docs/setup/best-practices/certificates/"
+        },
+        {
+          "label": "Kubernetes docs: Authenticating",
+          "url": "https://kubernetes.io/docs/reference/access-authn-authz/authentication/"
+        }
+      ],
+      "lessons": [],
+      "topics": [
+        "authn-authz-basics"
+      ]
+    },
+    {
+      "id": "oauth2",
+      "term": "OAuth 2.0",
+      "aliases": [
+        "OAuth",
+        "OAuth2",
+        "オーオース"
+      ],
+      "description": "第三者のアプリが、HTTP のサービスへの限られたアクセスを得るための枠組みです。アクセストークンは「何をしてよいか」を表し、OAuth 2.0 そのものは認証の決まりではありません。",
+      "detail": "一言でいうと、持ち主の資格情報 (パスワードなど) をアプリに渡さずに、限られた権限だけを貸すための枠組みです。RFC 6749 (2012 年 10 月) で決められています。\n\n役は 4 つです。資源の持ち主 (resource owner)、資源を持つサーバー (resource server)、資源にアクセスするアプリ (client)、持ち主を確かめて許可を得たうえでアクセストークンを出す認可サーバー (authorization server) です。クライアントは持ち主の資格情報の代わりにアクセストークンを使います。トークンは、使える範囲 (scope) と期間などが決まった許可を表す文字列です。\n\noauth.net は、OAuth 2.0 は認証の決まりではないと強調しています。利用者が誰かを確かめるには、OAuth 2.0 の上に作られた OpenID Connect を使います。",
+      "source": "https://datatracker.ietf.org/doc/html/rfc6749",
+      "sources": [
+        {
+          "label": "oauth.net: User Authentication with OAuth 2.0",
+          "url": "https://oauth.net/articles/authentication/"
+        },
+        {
+          "label": "OpenID Connect Core 1.0",
+          "url": "https://openid.net/specs/openid-connect-core-1_0.html"
+        }
+      ],
+      "lessons": [],
+      "topics": [
+        "authn-authz-basics"
+      ]
+    },
+    {
+      "id": "oidc",
+      "term": "OpenID Connect",
+      "aliases": [
+        "OIDC",
+        "オープンアイディーコネクト"
+      ],
+      "description": "OAuth 2.0 の上に、利用者が「誰か」を確かめる層を足した決まりです。認証の結果を、JWT の形の ID トークンで受け渡します。",
+      "detail": "一言でいうと、OAuth 2.0 に「ログインした人が誰か」を伝える仕組みを足したものです。OpenID Connect Core 1.0 で決められています。\n\nOAuth 2.0 そのものは、利用者が誰かについて何も伝えません。OpenID Connect では、認可サーバーが行った認証をもとに、アプリが利用者を確かめ、基本のプロフィールも受け取れます。そのために足されるのが ID トークンです。ID トークンは利用者の認証についてのクレーム (主張) を持つトークンで、JWT の形です。\n\nKubernetes の API サーバーは、OIDC の ID トークンで人を認証できます。使うのは access_token ではなく id_token で、kubectl がそれを Authorization ヘッダーに載せて送ります。id_token は取り消せないので、数分の短い期限にするよう書かれています。",
+      "source": "https://openid.net/specs/openid-connect-core-1_0.html",
+      "sources": [
+        {
+          "label": "oauth.net: User Authentication with OAuth 2.0",
+          "url": "https://oauth.net/articles/authentication/"
+        },
+        {
+          "label": "Kubernetes docs: Authenticating",
+          "url": "https://kubernetes.io/docs/reference/access-authn-authz/authentication/"
+        }
+      ],
+      "lessons": [],
+      "topics": [
+        "authn-authz-basics",
+        "cicd-pipeline",
+        "cloud-aws-column"
+      ]
+    },
+    {
+      "id": "jwt",
+      "term": "JWT",
+      "aliases": [
+        "JSON Web Token",
+        "ジョット"
+      ],
+      "description": "二者の間で受け渡すクレーム (主張) を、小さな JSON の形で表す決まりです。ふつうは署名 (JWS) か暗号 (JWE) で守り、OIDC の ID トークンや ServiceAccount のトークンもこの形です。",
+      "detail": "一言でいうと、署名などで守った、小さな JSON の証票です。RFC 7519 (2015 年 5 月) で決められていて、読み方は英語の jot と同じとされています。\n\nJWT は、二者の間で受け渡すクレームを JSON で書き、JWS (署名の形) か JWE (暗号の形) で守ります。署名なら、受け取った側は中身が書き換えられていないかを確かめられます。形は、URL で使える部品をピリオド (.) でつないだもので、各部品は base64url (URL で使える文字だけで表す形) で符号化されています。発行者は iss、主体は sub、受け手は aud、期限は exp というクレームで表します。\n\nOpenID Connect の ID トークンも、Kubernetes の ServiceAccount のトークンも JWT です。",
+      "source": "https://datatracker.ietf.org/doc/html/rfc7519",
+      "sources": [
+        {
+          "label": "OpenID Connect Core 1.0",
+          "url": "https://openid.net/specs/openid-connect-core-1_0.html"
+        },
+        {
+          "label": "Kubernetes docs: Service Accounts",
+          "url": "https://kubernetes.io/docs/concepts/security/service-accounts/"
+        }
+      ],
+      "lessons": [],
+      "topics": [
+        "authn-authz-basics"
+      ]
+    },
+    {
+      "id": "serviceaccount-token",
+      "term": "ServiceAccount のトークン",
+      "aliases": [
+        "ServiceAccount トークン",
+        "サービスアカウントトークン",
+        "bound service account token",
+        "TokenRequest"
+      ],
+      "description": "Pod の中のプログラムが、ServiceAccount として API サーバーに名乗るための署名付きの JWT です。v1.22 からは、短い期限で自動で入れ替わるトークンが Pod に入ります。",
+      "detail": "一言でいうと、ServiceAccount の「身分証」にあたる、署名付きの JWT です。\n\nPod に ServiceAccount を割り当てると、v1.22 以降は TokenRequest API で短い期限の、自動で入れ替わるトークンを取り、projected volume (いくつかの情報を 1 つのフォルダにまとめて Pod に見せるボリューム) として Pod にマウントします。API サーバーは、届いたトークンの署名・期限・宛先 (audience) などを確かめます。TokenRequest のトークンは Pod などに結び付いた bound token で、そのオブジェクトがまだあるかも確かめます。\n\nSecret に入れる昔のトークンは期限が無く入れ替わらないので、今は勧められていません。自分のサービスで確かめるなら、Pod を消すとすぐ無効と分かる TokenReview API が勧められています。",
+      "source": "https://kubernetes.io/docs/concepts/security/service-accounts/",
+      "lessons": [],
+      "topics": [
+        "authn-authz-basics",
+        "kubectl-internals",
+        "cloud-aws-column"
+      ]
+    },
+    {
+      "id": "iac",
+      "term": "IaC",
+      "aliases": [
+        "Infrastructure as Code",
+        "インフラのコード",
+        "インフラストラクチャー アズ コード"
+      ],
+      "description": "サーバーやネットワークなどのインフラを、手で操作する代わりに、人が読める設定ファイルに書いて作り・変え・版を残すやり方です。Terraform や OpenTofu が道具の例です。",
+      "detail": "一言でいうと、インフラの形をファイルに書いて、そのファイルから作ったり直したりするやり方です。\n\nHashiCorp の文書は Terraform を IaC の道具とし、クラウドやオンプレミスの資源を、版を残し・使い回し・共有できる、人が読める設定ファイルで定義すると説明しています。ファイルなので Git などの版の管理に入れられます。Terraform の設定は宣言的で、手順ではなく、インフラの最後の形を書きます。\n\nKubernetes のマニフェストも、望ましい状態を書く宣言的なファイルです。ただしずれの直し方が違い、Kubernetes ではコントローラーが今の状態を見続けて望ましい状態に近づけます。Terraform は、操作のたびに状態を実物に合わせ (refresh)、設定との差を計算します。",
+      "source": "https://developer.hashicorp.com/terraform/intro",
+      "sources": [
+        {
+          "label": "HashiCorp Developer: State",
+          "url": "https://developer.hashicorp.com/terraform/language/state"
+        },
+        {
+          "label": "Kubernetes docs: Controllers",
+          "url": "https://kubernetes.io/docs/concepts/architecture/controller/"
+        }
+      ],
+      "lessons": [],
+      "topics": [
+        "infrastructure-as-code"
+      ]
+    },
+    {
+      "id": "terraform-opentofu",
+      "term": "Terraform と OpenTofu",
+      "aliases": [
+        "Terraform",
+        "OpenTofu",
+        "テラフォーム",
+        "tofu"
+      ],
+      "description": "設定ファイルに書いたインフラを、Write・Plan・Apply の流れで作って変える IaC の道具です。OpenTofu は Terraform から分かれたもので、2025 年 4 月 23 日に CNCF の Sandbox のプロジェクトになりました (CNCF は Linux Foundation の一部です)。",
+      "detail": "一言でいうと、クラウドなどの資源を設定ファイルから作って管理する IaC の道具です。\n\nTerraform の流れは 3 段です。Write で資源を定義し、Plan で今のインフラと設定を比べて、作る・変える・消すものの実行計画を出します。Apply では、承認された計画を、資源どうしの依存を守った正しい順に実行します。各サービスとのやりとりは、API ごとのプロバイダー (provider) が受け持ちます。\n\nOpenTofu は、HashiCorp が Terraform のライセンスをオープンソースから BUSL (Business Source License。使い方に条件の付く使用許諾) に変えたことを受けて始まった、Terraform のフォークです。今の使い方と設定をそのまま使える置き換え (drop-in replacement) をうたい、2025 年 4 月 23 日に CNCF の Sandbox のプロジェクトになりました。",
+      "source": "https://developer.hashicorp.com/terraform/intro",
+      "sources": [
+        {
+          "label": "OpenTofu",
+          "url": "https://opentofu.org/"
+        },
+        {
+          "label": "CNCF: OpenTofu",
+          "url": "https://www.cncf.io/projects/opentofu/"
+        },
+        {
+          "label": "OpenTofu: FAQ",
+          "url": "https://opentofu.org/faq/"
+        }
+      ],
+      "lessons": [],
+      "topics": [
+        "infrastructure-as-code"
+      ]
+    },
+    {
+      "id": "iac-state",
+      "term": "IaC の state",
+      "aliases": [
+        "Terraform の state",
+        "状態ファイル",
+        "terraform.tfstate",
+        "tfstate"
+      ],
+      "description": "Terraform や OpenTofu が、設定に書いた資源と実物の資源の結び付きを残しておく記録です。既定では terraform.tfstate というファイルに置きます。",
+      "detail": "一言でいうと、「設定のこの資源は、実物のどれか」を覚えておく台帳です。\n\nTerraform は、設定に書いた資源を実物の資源に結び付けるため、状態 (state) を保存します。資源を作ると、実物の ID を設定の資源に結び付けて記録し、後の変更や削除に使います。操作の前には refresh をして、状態を実物に合わせます。既定ではワークスペースごとに terraform.tfstate というローカルのファイルに置き、前の状態を terraform.tfstate.backup に残します。\n\n状態のファイルには秘密が入ることがあります。そのため、ロックと安全なアクセスの制御が無い版の管理の仕組み (Git など) には置かず、HCP Terraform か遠隔の保存先 (remote backend) に置くことが勧められています。",
+      "source": "https://developer.hashicorp.com/terraform/language/state",
+      "sources": [
+        {
+          "label": "HashiCorp Developer: What is Terraform?",
+          "url": "https://developer.hashicorp.com/terraform/intro"
+        }
+      ],
+      "lessons": [],
+      "topics": [
+        "infrastructure-as-code"
+      ]
+    },
+    {
+      "id": "region-az",
+      "term": "リージョンと AZ",
+      "aliases": [
+        "リージョン",
+        "アベイラビリティゾーン",
+        "AZ",
+        "Availability Zone",
+        "Region"
+      ],
+      "description": "AWS などのクラウドの場所の単位です。リージョンは地理的に分かれた地域、AZ (アベイラビリティゾーン) はリージョンの中の切り離された場所です。",
+      "detail": "一言でいうと、クラウドのデータセンターの「どこ」を表す 2 段の単位です。\n\nAWS の説明では、リージョンはそれぞれ別の地理的な地域で、ほかのリージョンから切り離されるように作られています。多くの AWS のサービスの資源はリージョンごとで、資源を見るときはリージョンを指定します。AZ はリージョンの中の切り離された場所で、それぞれが電源とネットワークを冗長に持つ 1 つ以上のデータセンターでできています。AZ どうしは低い遅延の回線でつながり、物理的に離れているので、まれに火事や洪水などが起きても、影響は 1 つの AZ に留まるように作られています。\n\n1 つの AZ が落ちてもアプリが使えるように、複数の AZ に分けて置くことが勧められています。",
+      "source": "https://docs.aws.amazon.com/global-infrastructure/latest/regions/aws-regions-availability-zones.html",
+      "lessons": [],
+      "topics": [
+        "cloud-aws-column",
+        "load-balancers"
+      ]
+    },
+    {
+      "id": "vpc",
+      "term": "VPC",
+      "aliases": [
+        "Amazon VPC",
+        "Virtual Private Cloud"
+      ],
+      "description": "AWS の中に自分で定めた、論理的に切り離された仮想のネットワークです。中を IP アドレスの範囲のサブネットに分け、サブネットは 1 つの AZ に属します。",
+      "detail": "一言でいうと、クラウドの中に作る、自分専用のネットワークです。\n\nAWS の説明では、Amazon VPC を使うと、自分で定めた論理的に切り離された仮想のネットワークの中で AWS の資源を動かせます。このネットワークは、自分のデータセンターで運用する昔ながらのネットワークによく似ています。VPC を作ったら、IP アドレスの範囲であるサブネットを足します。サブネットは 1 つの AZ に属します。通信の行き先はルートテーブルで決め、インターネットとつなぐにはインターネットゲートウェイを使います。\n\nTerraform の文書も、VPC のネットワークの上に仮想マシンとロードバランサーを置く設定を、IaC の例に挙げています。",
+      "source": "https://docs.aws.amazon.com/vpc/latest/userguide/what-is-amazon-vpc.html",
+      "sources": [
+        {
+          "label": "HashiCorp Developer: What is Terraform?",
+          "url": "https://developer.hashicorp.com/terraform/intro"
+        }
+      ],
+      "lessons": [],
+      "topics": [
+        "cloud-aws-column"
+      ]
+    },
+    {
+      "id": "iam",
+      "term": "IAM (AWS)",
+      "aliases": [
+        "IAM",
+        "AWS IAM",
+        "Identity and Access Management",
+        "IAM ロール"
+      ],
+      "description": "AWS の資源について、誰が認証され (サインインし)、何を許されているか (権限) を決めるサービスです。AWS のアカウントの認証と認可を受け持ちます。",
+      "detail": "一言でいうと、AWS の中の「誰が・何をしてよいか」を決めるサービスです。\n\nIAM では、誰が認証され (サインインし)、誰が資源を使う権限を持つか (認可) を決めます。AWS のアカウントを作ると、すべてに触れられるルートユーザーから始まりますが、毎日の作業には使わないよう強く勧められています。代わりに IAM で管理者や開発者などの ID を作り、要る資源への権限を与えます。サインインの資格情報は、IAM ユーザーや IAM ロールなどの主体 (principal) に照らして確かめられます。\n\nEKS では、IRSA (IAM roles for service accounts) で IAM のロールを Kubernetes の ServiceAccount に結び付け、Pod のアプリに AWS の資格情報を渡せます。",
+      "source": "https://docs.aws.amazon.com/IAM/latest/UserGuide/introduction.html",
+      "sources": [
+        {
+          "label": "AWS docs: IAM roles for service accounts",
+          "url": "https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html"
+        }
+      ],
+      "lessons": [],
+      "topics": [
+        "cloud-aws-column"
+      ]
+    },
+    {
+      "id": "eks",
+      "term": "EKS",
+      "aliases": [
+        "Amazon EKS",
+        "Amazon Elastic Kubernetes Service"
+      ],
+      "description": "AWS のマネージドの Kubernetes のサービスです。標準の EKS では、Kubernetes のコントロールプレーンを AWS が管理します。",
+      "detail": "一言でいうと、AWS が運用を受け持つ Kubernetes のサービスです。\n\n標準の EKS では、クラスターを作ると、Kubernetes のコントロールプレーンを AWS が管理します。EKS Auto Mode を使うと、ノード (データプレーン) の管理も EKS が受け持ちます。EKS は Kubernetes の適合性 (conformance) の認定を受けているので、Kubernetes 向けのアプリを書き直さずに動かせ、コミュニティの道具も使えます。\n\nこのサイトの実習で使う k3s では、コントロールプレーンも自分のマシンで動かし、そのデータも自分で守ります。LoadBalancer の Service や PV は、EKS ではクラウドのロードバランサーやディスクが受け持ち、使った分の料金がかかりますが、k3s では同梱の ServiceLB と Local Path Provisioner がノードの上で受け持ちます。",
+      "source": "https://docs.aws.amazon.com/eks/latest/userguide/what-is-eks.html",
+      "sources": [
+        {
+          "label": "K3s docs: K3s - Lightweight Kubernetes",
+          "url": "https://docs.k3s.io/"
+        }
+      ],
+      "lessons": [],
+      "topics": [
+        "cloud-aws-column",
+        "load-balancers"
+      ]
+    },
+    {
+      "id": "osi-l4-l7",
+      "term": "L4 と L7",
+      "aliases": [
+        "L4",
+        "L7",
+        "レイヤー 4",
+        "レイヤー 7",
+        "OSI 参照モデル",
+        "OSI model",
+        "トランスポート層",
+        "アプリケーション層"
+      ],
+      "description": "通信を 7 つの層に分ける OSI 参照モデルの、第 4 層 (トランスポート層) と第 7 層 (アプリケーション層) のことです。AWS の NLB は L4、ALB は L7 で動きます。",
+      "detail": "一言でいうと、ネットワークの通信を層に分けて考えたときの、4 番目と 7 番目の層です。\n\nOSI 参照モデルは、ネットワークの通信の働きを 7 つの層に分ける考え方の枠組みで、1984 年に ISO 7498 として最初に出版されました。L4 のトランスポート層は、データが正しい順で、欠けや誤りなく届くこと (または直せること) を主に受け持ちます。ここに当たる TCP は接続を作ってほぼ欠けなく届け、UDP は接続を作らず、欠けることがあります (動画の配信など、全部が届かなくてもよい通信に使います)。L7 のアプリケーション層は、アプリの種類ごとの決まった通信の仕方を受け持ち、HTTP や HTTPS がここに当たります。\n\nロードバランサーも、どの層で動くかで分けられます。AWS の NLB は第 4 層で接続を見て宛先を選び、ALB は第 7 層で要求の中身に応じてルールで振り分けます。",
+      "source": "https://aws.amazon.com/what-is/osi-model/",
+      "sources": [
+        {
+          "label": "AWS docs: What is a Network Load Balancer?",
+          "url": "https://docs.aws.amazon.com/elasticloadbalancing/latest/network/introduction.html"
+        },
+        {
+          "label": "AWS docs: What is an Application Load Balancer?",
+          "url": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/introduction.html"
+        }
+      ],
+      "lessons": [],
+      "topics": [
+        "load-balancers"
+      ]
+    },
+    {
+      "id": "alb",
+      "term": "ALB",
+      "aliases": [
+        "Application Load Balancer",
+        "アプリケーションロードバランサー"
+      ],
+      "description": "AWS の、OSI の第 7 層 (アプリケーション層) で動くロードバランサーです。ホストのヘッダーやパスなどの条件で、届いた要求を宛先の組に振り分けます。",
+      "detail": "一言でいうと、HTTP の中身を読んで行き先を決める、AWS のロードバランサーです。\n\nALB は、要求を受けると、リスナー (決めたプロトコルとポートで接続を待つ部分) のルールを優先順に調べ、当てはまったルールのターゲットグループ (宛先の集まり) から宛先を選びます。ルールの条件には、ホストのヘッダー・パス・HTTP のヘッダー・メソッド・クエリー文字列・送り元の IP などを使えます。ヘルスチェックはターゲットグループごとに設定します。振り分けの既定の方法はラウンドロビンです。\n\n第 4 層で動く NLB は、TCP では接続ごとにハッシュで宛先を 1 つ選びます。ALB は第 7 層で、要求の中身に応じて振り分けます。",
+      "source": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/introduction.html",
+      "sources": [
+        {
+          "label": "AWS docs: Condition types for listener rules",
+          "url": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/rule-condition-types.html"
+        },
+        {
+          "label": "AWS docs: What is a Network Load Balancer?",
+          "url": "https://docs.aws.amazon.com/elasticloadbalancing/latest/network/introduction.html"
+        }
+      ],
+      "lessons": [],
+      "topics": [
+        "load-balancers"
+      ]
+    },
+    {
+      "id": "nlb",
+      "term": "NLB",
+      "aliases": [
+        "Network Load Balancer",
+        "ネットワークロードバランサー"
+      ],
+      "description": "AWS の、OSI の第 4 層 (トランスポート層) で動くロードバランサーです。毎秒数百万の要求を扱え、TCP・UDP・TLS などの接続を振り分けます。",
+      "detail": "一言でいうと、接続の単位で行き先を決める、AWS のロードバランサーです。\n\nNLB は第 4 層で動き、毎秒数百万の要求を扱えます。ターゲットグループは TCP・UDP・TCP_UDP・TLS・QUIC・TCP_QUIC に対応します。TCP では、プロトコル・送り元と宛先の IP とポート・TCP のシーケンス番号から計算したハッシュで宛先を選び、1 つの接続は続く間ずっと同じ宛先に送られます。AZ を有効にするとその AZ にロードバランサーのノードができ、固定の IP アドレスを持ちます。インターネット向けなら、有効にしたサブネットごとに Elastic IP を 1 つ付けることもできます。\n\n第 7 層で動く ALB は、ホストのヘッダーやパスなどの条件で振り分けられます。",
+      "source": "https://docs.aws.amazon.com/elasticloadbalancing/latest/network/introduction.html",
+      "sources": [
+        {
+          "label": "AWS docs: What is an Application Load Balancer?",
+          "url": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/introduction.html"
+        },
+        {
+          "label": "AWS docs: Condition types for listener rules",
+          "url": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/rule-condition-types.html"
+        }
+      ],
+      "lessons": [],
+      "topics": [
+        "load-balancers"
+      ]
+    },
+    {
+      "id": "linux-foundation",
+      "term": "Linux Foundation",
+      "aliases": [
+        "LF",
+        "The Linux Foundation",
+        "リナックスファウンデーション"
+      ],
+      "description": "オープンな技術のプロジェクトに中立の置き場所を出す、米国の非営利の団体です。CNCF や OCI などがその下にあります。",
+      "detail": "一言でいうと、オープンソースのプロジェクトを預かって育てる、中立の非営利の団体です。米国の 501(c)(6) (税の決まりで業界団体に当たる形) の非営利の団体で、自分を「開発者がオープンな技術のプロジェクトを書き、管理し、大きくするための、中立で信頼できる拠点」と説明しています。\n\nLF は自分のやり方を「The Linux Foundation Method」と呼び、4 つを挙げます。コードと共同作業の中立の置き場所、生態系の整理とコミュニティ作り、企業でも使える形に育てる支え (開発者の支援・研修と認定・宣伝とイベントなど)、プロジェクトを管理する道具と分析です。\n\nCNCF は非営利の LF の一部です。コンテナの標準を作る OCI も、LF のもとで作られました。",
+      "source": "https://www.linuxfoundation.org/about",
+      "sources": [
+        {
+          "label": "CNCF: Who We Are",
+          "url": "https://www.cncf.io/about/who-we-are/"
+        },
+        {
+          "label": "OCI: About the Open Container Initiative",
+          "url": "https://opencontainers.org/about/overview/"
+        }
+      ],
+      "lessons": [],
+      "topics": [
+        "linux-foundation-cncf"
+      ]
+    },
+    {
+      "id": "cncf-toc",
+      "term": "TOC (CNCF)",
+      "aliases": [
+        "TOC",
+        "Technical Oversight Committee",
+        "技術監督委員会"
+      ],
+      "description": "CNCF の技術の面を治める委員会です。技術の方向を決め、Governing Board が決めた範囲の中で、新しいプロジェクトを受け入れて見守ります。",
+      "detail": "一言でいうと、CNCF の技術の舵取り役です。\n\nTOC (Technical Oversight Committee) は CNCF の技術を治める機関で、CNCF のすべてのプロジェクトを受け入れて見守ります。技術の方向と原則を決め、Governing Board (GB) が決めた範囲の中で新しいプロジェクトを認め、プロジェクトを外したりアーカイブしたりもします。2026 年 11 月の README の委員の一覧には 11 人が並び、ほかに投票権の無い代理 (Alternates) がいます。\n\nプロジェクトが段階を上がるときは、TOC の担当 (sponsor) が調べ (due diligence)、2 週間の公開の意見の受付のあと、TOC の 3 分の 2 以上の賛成で決まります。GB は宣伝などの事業の監督と予算を受け持ち、TOC と CNCF の範囲を決める以外の技術の判断はしません。",
+      "source": "https://github.com/cncf/toc",
+      "sources": [
+        {
+          "label": "GitHub: cncf/toc process/README.md",
+          "url": "https://github.com/cncf/toc/blob/main/process/README.md"
+        },
+        {
+          "label": "CNCF: Governing Board",
+          "url": "https://www.cncf.io/people/governing-board/"
+        }
+      ],
+      "lessons": [],
+      "topics": [
+        "linux-foundation-cncf"
+      ]
     }
   ]
 }

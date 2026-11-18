@@ -377,6 +377,13 @@ async function run(browser, name, width, height) {
   const isWide = width >= 768;
   const termButtons = isWide ? page.getByRole('navigation', { name: '用語の一覧' }).getByRole('button') : page.locator('.gloss-row__head');
   check((await termButtons.count()) >= 70, `${tag} 用語集に 70 語以上ある`);
+  {
+    // 範囲外の札で、試験の範囲の外の語 (レッスンに出ない語) だけに絞れる
+    await page.getByRole('button', { name: /^範囲外/ }).click();
+    const outCount = await termButtons.count();
+    check(outCount >= 20 && (await page.getByText('Linux の namespaces').first().isVisible()), `${tag} 範囲外の札で、範囲外の語に絞れる (${outCount} 語)`);
+    await page.getByRole('button', { name: /^すべて/ }).click();
+  }
   await page.getByRole('button', { name: /^設計 \d+/ }).click();
   check((await page.getByRole('button', { name: /^設計 \d+/ }).getAttribute('aria-pressed')) === 'true', `${tag} 押した分野の札が押された状態になる`);
   const designCount = await termButtons.count();
