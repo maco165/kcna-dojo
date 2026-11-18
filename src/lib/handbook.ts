@@ -1,0 +1,71 @@
+// ハンドブックのデータの検査。違反を文で返す (空なら OK)
+const TOPIC_KEYS = new Set(['id', 'competency', 'title', 'summary', 'flow', 'try', 'lessons', 'sources']);
+const LANGS = new Set(['bash', 'yaml']);
+
+const isText = (v: unknown): v is string => typeof v === 'string' && v.trim() !== '';
+const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+
+function checkSteps(steps: unknown, where: string, errors: string[], min: number) {
+  if (!Array.isArray(steps) || steps.length < min) {
+    errors.push(`${where}: ${min} 段以上が要ります`);
+    return;
+  }
+  steps.forEach((s, i) => {
+    const w = `${where}[${i}]`;
+    if (!isObj(s) || !isText(s.text)) return void errors.push(`${w}: text がありません`);
+    if (s.code !== undefined && !(isObj(s.code) && LANGS.has(s.code.language as string) && isText(s.code.text))) errors.push(`${w}: code は language (bash か yaml) と text を持ちます`);
+    if (s.output !== undefined && !isText(s.output)) errors.push(`${w}: output は文字列にします`);
+  });
+}
+
+/**
+ * @param data 分野ごとのファイルの中身の配列
+ * @param domains 分野ごとの細目の原文 (学習要領の正本 content/guide.ts の CURRICULUM から)
+ * @param lessonIds 実在するレッスンの id
+ */
+export function validateHandbook(data: unknown[], domains: Map<string, string[]>, lessonIds: Set<string>): string[] {
+  const errors: string[] = [];
+  const ids = new Set<string>();
+  const covered = new Set<string>();
+  for (const [fi, file] of data.entries()) {
+    if (!isObj(file) || !domains.has(file.domain as string) || !Array.isArray(file.topics)) {
+      errors.push(`ファイル ${fi}: domain (4 分野のどれか) と topics の配列が要ります`);
+      continue;
+    }
+    const competencies = domains.get(file.domain as string)!;
+    for (const t of file.topics as unknown[]) {
+      if (!isObj(t)) {
+        errors.push(`${file.domain}: トピックがオブジェクトではありません`);
+        continue;
+      }
+      const id = isText(t.id) ? t.id : '(id なし)';
+      for (const k of Object.keys(t)) if (!TOPIC_KEYS.has(k)) errors.push(`${id}: ${k} という欄は使いません`);
+      if (!isText(t.id) || !/^[a-z0-9-]+$/.test(t.id)) errors.push(`${id}: id は kebab-case にします`);
+      else if (ids.has(t.id)) errors.push(`${id}: id が重複しています`);
+      else ids.add(t.id);
+      if (!competencies.includes(t.competency as string)) errors.push(`${id}: competency が ${file.domain} の細目の原文と合いません`);
+      else if (covered.has(t.competency as string)) errors.push(`${id}: 細目 ${t.competency} のトピックが 2 つあります`);
+      else covered.add(t.competency as string);
+      if (!isText(t.title) || !isText(t.summary)) errors.push(`${id}: title と summary が要ります`);
+      checkSteps(t.flow, `${id}.flow`, errors, 3);
+      if (!Array.isArray(t.try)) errors.push(`${id}: try の配列が要ります`);
+      else
+        t.try.forEach((x, i) => {
+          if (!isObj(x) || !isText(x.goal)) return void errors.push(`${id}.try[${i}]: goal がありません`);
+          checkSteps(x.steps, `${id}.try[${i}].steps`, errors, 1);
+        });
+      if (!Array.isArray(t.lessons)) errors.push(`${id}: lessons の配列が要ります`);
+      else for (const l of t.lessons) if (!lessonIds.has(l as string)) errors.push(`${id}: lessons の ${String(l)} というレッスンはありません`);
+      if (!Array.isArray(t.sources) || t.sources.length === 0) errors.push(`${id}: sources が要ります`);
+      else
+        for (const s of t.sources) {
+          try {
+            if (!isObj(s) || !isText(s.label) || new URL(s.url as string).protocol !== 'https:') errors.push(`${id}: sources は label と https の url を持ちます`);
+          } catch {
+            errors.push(`${id}: sources の url が読めません`);
+          }
+        }
+    }
+  }
+  return errors;
+}

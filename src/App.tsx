@@ -10,6 +10,7 @@ import Home from './screens/Home';
 import ExamScreen from './screens/ExamScreen';
 import Glossary from './screens/Glossary';
 import Guide from './screens/Guide';
+import Handbook from './screens/Handbook';
 import ProgressScreen from './screens/ProgressScreen';
 import Review from './screens/Review';
 import Settings from './screens/Settings';
@@ -25,6 +26,8 @@ export default function App() {
     <Theme theme={kcnaTheme} mode="system">
       {route.name === 'exam' ? (
         <ExamScreen progress={progress} updateProgress={updateProgress} />
+      ) : route.name === 'handbook' ? (
+        <Handbook key={route.topicId ?? 'index'} progress={progress} topicId={route.topicId} />
       ) : route.name === 'guide' ? (
         <Guide progress={progress} />
       ) : route.name === 'glossary' ? (
