@@ -95,3 +95,24 @@ export default function Diagram({ spec, id }: { spec: DiagramSpec; id: string })
     </figure>
   );
 }
+
+/**
+ * 目次のカードに出す小さな絵。図の箱と矢印だけを描き、文字は省く (飾りなので読み上げない)。
+ * 図を直せばサムネイルも同じように変わる
+ */
+export function DiagramThumb({ spec }: { spec: DiagramSpec }) {
+  const byId = new Map(spec.nodes.map((n) => [n.id, n]));
+  return (
+    <svg viewBox={`0 0 ${spec.width} ${spec.height}`} className="dg-thumb" aria-hidden="true" focusable="false" preserveAspectRatio="xMidYMid meet">
+      {spec.groups?.map((g) => <rect key={g.label} x={g.x} y={g.y} width={g.w} height={g.h} rx="14" className="dg-thumb__group" />)}
+      {spec.edges.map((e, i) => {
+        const a = byId.get(e.from)!;
+        const b = byId.get(e.to)!;
+        return <line key={i} x1={a.x + a.w / 2} y1={a.y + a.h / 2} x2={b.x + b.w / 2} y2={b.y + b.h / 2} className={e.dashed ? 'dg-thumb__edge dg-thumb__edge--dashed' : 'dg-thumb__edge'} />;
+      })}
+      {spec.nodes.map((n) => (
+        <rect key={n.id} x={n.x} y={n.y} width={n.w} height={n.h} rx="10" className={`dg-thumb__node${n.tone ? ` dg-thumb__node--${n.tone}` : ''}`} />
+      ))}
+    </svg>
+  );
+}

@@ -429,6 +429,7 @@ async function run(browser, name, width, height) {
   await page.goto(`${BASE}#/handbook`);
   await page.getByRole('heading', { name: 'ハンドブック', level: 1 }).waitFor();
   check((await page.locator('.hb-topic').count()) === 13, `${tag} ハンドブックの目次に学習要領の 13 トピック`);
+  check((await page.locator('.hb-topic .dg-thumb').count()) === 13, `${tag} 目次の 13 トピックすべてにサムネイルがある`);
   await page.locator('.hb-topic').filter({ hasText: 'Debugging' }).click();
   await page.getByRole('heading', { name: '全体の流れ' }).waitFor();
   check(page.url().includes('#/handbook/debugging'), `${tag} 目次からトピックへ飛べる`);

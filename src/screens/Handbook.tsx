@@ -3,7 +3,7 @@ import { CodeBlock } from '@astryxdesign/core/CodeBlock';
 import { Link } from '@astryxdesign/core/Link';
 import { Text } from '@astryxdesign/core/Text';
 import AppSideNav from '../components/AppSideNav';
-import Diagram from '../components/Diagram';
+import Diagram, { DiagramThumb } from '../components/Diagram';
 import BottomTabs from '../components/BottomTabs';
 import RepoLink from '../components/RepoLink';
 import SiteLogo from '../components/SiteLogo';
@@ -57,6 +57,11 @@ function Index() {
             {d.topics.map((t) => (
               <li key={t.id}>
                 <a className="hb-topic" href={handbookHref(t.id)}>
+                  {HANDBOOK_FIGURES[t.id] && (
+                    <span className="hb-topic__thumb">
+                      <DiagramThumb spec={HANDBOOK_FIGURES[t.id]} />
+                    </span>
+                  )}
                   <span className="hb-topic__en" lang="en">
                     {t.competency}
                   </span>
