@@ -489,6 +489,41 @@ async function run(browser, name, width, height) {
   check(figureMissing.length === 0, `${tag} ハンドブックの 15 トピックすべてに図がある ${figureMissing.join(',')}`);
   check(allIds.length === 15 && widest.w <= width, `${tag} ハンドブックの 15 トピックが横にはみ出さない (いちばん広い ${widest.id} ${widest.w} <= ${width})`);
 
+  // 15c. ハンドブックの読んだ記録: 流れの段を画面に出すと記録され、目次に読みかけ、続きから・確認済みが使える
+  {
+    const hb = () => page.evaluate(() => JSON.parse(localStorage.getItem('kcna.v1') ?? '{}').handbook ?? {});
+    await page.goto(`${BASE}#/handbook/storage`);
+    await page.getByRole('heading', { name: '全体の流れ' }).waitFor();
+    const steps = await page.locator('[data-flow-step]').count();
+    await page.waitForTimeout(300);
+    check(((await hb()).storage?.seen ?? 0) < steps, `${tag} 開いた直後は全部を読んだことにならない`);
+    await page.locator('[data-flow-step="2"]').scrollIntoViewIfNeeded();
+    await page.evaluate(() => document.querySelector('[data-flow-step="2"]').scrollIntoView({ block: 'start' }));
+    await page.waitForTimeout(400);
+    const seen = (await hb()).storage?.seen ?? 0;
+    check(seen >= 3, `${tag} 流れの段を画面に出すと、何段目まで読んだかが記録される (${seen})`);
+    await page.goto(`${BASE}#/handbook`);
+    const card = page.locator('a.hb-topic', { has: page.locator('.hb-topic__en', { hasText: 'Storage' }) });
+    check(/読みかけ \d+ \/ \d+ 段/.test(await card.locator('.hb-topic__read').innerText()), `${tag} 目次のカードに読みかけと段の数が出る`);
+    await card.click();
+    await page.getByRole('button', { name: '続きから' }).click();
+    await page.waitForTimeout(800);
+    const top = await page.locator(`[data-flow-step="${seen}"]`).evaluate((el) => el.getBoundingClientRect().top - (document.querySelector('.astryx-layout-content')?.getBoundingClientRect().top ?? 0));
+    check(Math.abs(top) < 60, `${tag} 続きからで、前回の続きの段が画面の上に来る (${Math.round(top)})`);
+    await page.locator(`[data-flow-step="${steps - 1}"]`).scrollIntoViewIfNeeded();
+    await page.evaluate((n) => document.querySelector(`[data-flow-step="${n}"]`).scrollIntoView({ block: 'start' }), steps - 1);
+    await page.waitForTimeout(400);
+    check((await hb()).storage?.seen === steps, `${tag} 最後の段まで出すと、全部の段を読んだことになる (${steps})`);
+    const toggle = page.getByRole('button', { name: '確認済みにする' });
+    await toggle.focus();
+    await page.keyboard.press('Enter');
+    await page.getByRole('button', { name: '確認済みを取り消す' }).waitFor();
+    check(await page.evaluate(() => document.activeElement?.textContent?.includes('確認済みを取り消す')), `${tag} 確認済みにしてもフォーカスはボタンに残る`);
+    check((await hb()).storage?.done === true, `${tag} 確認済みにすると記録に残る`);
+    await page.goto(`${BASE}#/handbook`);
+    check((await card.locator('.hb-topic__read').innerText()) === '確認済み' && (await page.getByText(/確認済み 1 \/ 15 トピック/).isVisible()), `${tag} 目次に確認済みと、確認済みの数が出る`);
+  }
+
   // 15b. ハンドブックの本文の用語: 強調され、押すと用語集のその語が開く
   {
     await page.goto(`${BASE}handbook/core-concepts/`);

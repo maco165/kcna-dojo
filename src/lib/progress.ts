@@ -30,8 +30,12 @@ export const DEFAULT_EXAM_DATE = '2027-03-06';
 export type ExamRecord = { at: string; correct: number; total: number; set?: number };
 export const MAX_EXAM_RECORDS = 20;
 
+/** ハンドブックのトピックごとの読んだ記録。seen は「全体の流れ」の何段目までを画面に出したか、done は確認済み */
+export type HandbookRecord = { seen: number; done?: boolean; at: string };
+
 export type Progress = {
   v: 1;
+  handbook?: Record<string, HandbookRecord>;
   profile?: Profile;
   exams?: ExamRecord[];
   streak: { count: number; lastDay: string | null };
@@ -130,6 +134,11 @@ export function normalizeProgress(raw: unknown): Progress | null {
       .map((e) => ({ at: e.at as string, correct: e.correct as number, total: e.total as number, ...(Number.isInteger(e.set) && (e.set as number) >= 1 ? { set: e.set as number } : {}) }));
     out.exams = trimExamRecords(out.exams);
   }
+  const handbook = cleanRecords(raw.handbook, (v) =>
+    isCount(v.seen) || v.done === true ? { seen: isCount(v.seen) ? Math.floor(v.seen) : 0, ...(v.done === true ? { done: true } : {}), at: typeof v.at === 'string' ? v.at : '' } : null,
+  );
+  for (const k of Object.keys(handbook)) if (!/^[a-z0-9-]+$/.test(k)) delete handbook[k];
+  if (Object.keys(handbook).length > 0) out.handbook = handbook;
   if (profile) {
     out.profile = {
       dailyGoalXp: (GOAL_CHOICES as readonly number[]).includes(profile.dailyGoalXp as number) ? (profile.dailyGoalXp as number) : DEFAULT_GOAL_XP,
@@ -291,6 +300,21 @@ export function setProfile(p: Progress, change: Partial<Profile>): Progress {
   // 既定 (端末に合わせる) は持たない
   if (next.colorMode === 'system') delete next.colorMode;
   return { ...p, profile: next };
+}
+
+/** ハンドブックのトピックを n 段目まで読んだ (前より進んだときだけ書き換える) */
+export function markHandbookSeen(p: Progress, topicId: string, seen: number, now: Date): Progress {
+  const cur = p.handbook?.[topicId];
+  if (cur && cur.seen >= seen) return p;
+  return { ...p, handbook: { ...p.handbook, [topicId]: { ...cur, seen, at: now.toISOString() } } };
+}
+
+/** ハンドブックのトピックを確認済みにする・外す */
+export function setHandbookDone(p: Progress, topicId: string, done: boolean, now: Date): Progress {
+  const cur = p.handbook?.[topicId] ?? { seen: 0, at: '' };
+  const next: HandbookRecord = { seen: cur.seen, at: now.toISOString() };
+  if (done) next.done = true;
+  return { ...p, handbook: { ...p.handbook, [topicId]: next } };
 }
 
 /** 記録を消す。目標・受験日・画面の色の設定は残す */
