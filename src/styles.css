@@ -2627,8 +2627,10 @@ html[data-loading='true'] body::before {
   background: var(--color-background-muted);
 }
 
-.cmdp-title {
+.hb .cmdp-title {
   font-family: var(--font-family-code, 'SF Mono', Monaco, Consolas, monospace);
+  /* 見出しのコマンド名は見出しと同じ大きさ (code の小さい字にしない) */
+  font-size: 1em;
 }
 
 .cmdp-flags {

@@ -9,8 +9,9 @@ const DATA = commands as CommandData;
 const PRIVATE = /192\.168\.|slave-\d|pihole|keycloak|household|k3s-home|\/home\/maco/;
 
 describe('コマンドのページ', () => {
-  it('問題に出てくるコマンドのすべてにページがある', () => {
-    const missing = DATA.commands.map((c) => c.id).filter((id) => !findCommandPage(id));
+  it('問題に出てくるコマンドのすべてにページがある (無いコマンドを除く)', () => {
+    // 無いコマンド (誤りの選択肢の kubectl helm など) にはページを作らない
+    const missing = DATA.commands.filter((c) => !c.absent).map((c) => c.id).filter((id) => !findCommandPage(id));
     expect(missing).toEqual([]);
   });
   it('中で何が起きるかと実行の例があり、出典と実装の URL は https', () => {
