@@ -9,6 +9,7 @@ import { gradeFill, normalizeAnswer } from '../lib/grade';
 import AskAi from './AskAi';
 import Feedback from './Feedback';
 import { ActionArea, PrimaryAction, QuestionHead } from './QuestionFrame';
+import { preloadNotes } from '../lib/preloadNotes';
 
 const LANGUAGE_LABEL: Record<FillQuestion['language'], string> = {
   bash: 'bash',
@@ -38,6 +39,8 @@ export default function FillQuestionView({
   /** この問題を解いた記録の 1 行 (このレッスンを始めたときのもの) */
   history?: string;
 }) {
+  // 答えたあとに出すコマンドの説明を、問題を開いたときに先に読む (答えてから読むと「次へ」が下へずれる)
+  useEffect(preloadNotes, []);
   const [value, setValue] = useState('');
   const [result, setResult] = useState<boolean | null>(null);
   const checked = result !== null;
@@ -156,10 +159,8 @@ export default function FillQuestionView({
               note={result ? undefined : question.wrongNotes?.[typed]}
               source={question.source}
               question={question}
+              extra={result && question.output ? <CodeBlock code={question.output} title="実行結果の例 (列の一部)" width="100%" size="sm" hasCopyButton={false} /> : undefined}
             />
-            {result && question.output && (
-              <CodeBlock code={question.output} title="実行結果の例 (列の一部)" width="100%" size="sm" hasCopyButton={false} />
-            )}
             <PrimaryAction label={nextLabel} onClick={onNext} kbdHint="Enter で次へ" />
             <AskAi question={question} answered={{ picked: typed, correct: result }} />
           </>

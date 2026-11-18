@@ -170,6 +170,9 @@ async function run(browser, name, width, height) {
   check(await page.getByText(`${l3.title} · 2 / ${l3.questions.length} 問`).isVisible(), `${tag} 答えたあと Enter で次へ進む`);
   await page.goto(`${BASE}lesson/w1-l3/`);
   await page.reload();
+  // 説明の部品は問題を開いたときに先に読むので、読み込みが落ち着いてから数える (答える前には出さない)
+  await page.waitForLoadState('networkidle');
+  await page.waitForTimeout(500);
   check((await page.locator('.cmd-notes').count()) === 0, `${tag} 答える前には出てきたコマンドを出さない`);
   await page.getByRole('textbox', { name: '空欄' }).fill('get');
   await page.getByRole('textbox', { name: '空欄' }).press('Enter');
