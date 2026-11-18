@@ -1,0 +1,2039 @@
+[
+  {
+    "id": "ci-cd-pipeline",
+    "terms": [
+      "ci",
+      "cd"
+    ],
+    "spec": {
+      "caption": "コミットのたびに CI が統合とテストを自動で行い、どのコミットも「はっきり失敗」か「リリースの候補」になります。CD はその成果物を受け入れの環境へ自動で届け、本番まで自動で届けるものを継続的デプロイメントと呼びます。",
+      "width": 640,
+      "height": 290,
+      "nodes": [
+        {
+          "id": "commit",
+          "x": 16,
+          "y": 24,
+          "w": 130,
+          "h": 52,
+          "label": "コミット",
+          "sub": "Git に変更を入れる",
+          "tone": "muted"
+        },
+        {
+          "id": "ci",
+          "x": 176,
+          "y": 24,
+          "w": 150,
+          "h": 52,
+          "label": "CI",
+          "sub": "統合とテストを自動で",
+          "term": "ci"
+        },
+        {
+          "id": "artifact",
+          "x": 356,
+          "y": 24,
+          "w": 120,
+          "h": 52,
+          "label": "成果物",
+          "sub": "リリースの候補"
+        },
+        {
+          "id": "fail",
+          "x": 176,
+          "y": 130,
+          "w": 150,
+          "h": 52,
+          "label": "失敗",
+          "sub": "はっきり失敗した",
+          "tone": "warn"
+        },
+        {
+          "id": "cd",
+          "x": 500,
+          "y": 24,
+          "w": 124,
+          "h": 52,
+          "label": "CD",
+          "sub": "環境へ届ける",
+          "term": "cd"
+        },
+        {
+          "id": "accept",
+          "x": 500,
+          "y": 130,
+          "w": 124,
+          "h": 52,
+          "label": "受け入れの環境",
+          "sub": "テストの環境",
+          "term": "cd"
+        },
+        {
+          "id": "prod",
+          "x": 500,
+          "y": 226,
+          "w": 124,
+          "h": 52,
+          "label": "本番",
+          "sub": "継続的デプロイメント",
+          "tone": "muted"
+        }
+      ],
+      "edges": [
+        {
+          "from": "commit",
+          "to": "ci"
+        },
+        {
+          "from": "ci",
+          "to": "artifact"
+        },
+        {
+          "from": "ci",
+          "to": "fail",
+          "dashed": true,
+          "label": "通らない",
+          "fromSide": "bottom",
+          "toSide": "top"
+        },
+        {
+          "from": "artifact",
+          "to": "cd"
+        },
+        {
+          "from": "cd",
+          "to": "accept",
+          "label": "自動",
+          "fromSide": "bottom",
+          "toSide": "top"
+        },
+        {
+          "from": "accept",
+          "to": "prod",
+          "label": "自動なら",
+          "dashed": true,
+          "fromSide": "bottom",
+          "toSide": "top"
+        }
+      ]
+    }
+  },
+  {
+    "id": "gitops-loop",
+    "terms": [
+      "gitops"
+    ],
+    "spec": {
+      "caption": "望ましい状態は Git に宣言して置き、版の履歴が全部残ります。エージェントが Git から取りに行き (pull)、クラスタの実際の状態を見続けて合わせるので、手で変えたずれも自動で戻ります。",
+      "width": 640,
+      "height": 220,
+      "nodes": [
+        {
+          "id": "dev",
+          "x": 16,
+          "y": 30,
+          "w": 130,
+          "h": 52,
+          "label": "開発者",
+          "sub": "変更をコミット",
+          "tone": "muted"
+        },
+        {
+          "id": "git",
+          "x": 200,
+          "y": 30,
+          "w": 170,
+          "h": 52,
+          "label": "Git のリポジトリ",
+          "sub": "望ましい状態 (正本)",
+          "term": "gitops"
+        },
+        {
+          "id": "agent",
+          "x": 200,
+          "y": 150,
+          "w": 170,
+          "h": 52,
+          "label": "エージェント",
+          "sub": "Argo CD・Flux など",
+          "term": "gitops"
+        },
+        {
+          "id": "cluster",
+          "x": 480,
+          "y": 150,
+          "w": 140,
+          "h": 52,
+          "label": "クラスタ",
+          "sub": "実際の状態"
+        },
+        {
+          "id": "drift",
+          "x": 480,
+          "y": 30,
+          "w": 140,
+          "h": 52,
+          "label": "手で変えたずれ",
+          "sub": "自動で戻される",
+          "tone": "warn"
+        }
+      ],
+      "edges": [
+        {
+          "from": "dev",
+          "to": "git"
+        },
+        {
+          "from": "agent",
+          "to": "git",
+          "label": "取りに行く (pull)",
+          "fromSide": "top",
+          "toSide": "bottom"
+        },
+        {
+          "from": "agent",
+          "to": "cluster",
+          "label": "見て合わせ続ける"
+        },
+        {
+          "from": "drift",
+          "to": "cluster",
+          "dashed": true,
+          "fromSide": "bottom",
+          "toSide": "top"
+        }
+      ]
+    }
+  },
+  {
+    "id": "argo-cd-flux",
+    "terms": [
+      "argo-cd",
+      "flux"
+    ],
+    "spec": {
+      "caption": "どちらも Git を正本にしてクラスタを合わせます。Argo CD は Application ごとに Git と動いている状態を比べ、ずれを OutOfSync と示して Sync で戻します。Flux は GitRepository で置き場を写し取り、Kustomization がクラスタを合わせ続けます。",
+      "width": 640,
+      "height": 410,
+      "nodes": [
+        {
+          "id": "git",
+          "x": 235,
+          "y": 16,
+          "w": 170,
+          "h": 52,
+          "label": "Git のリポジトリ",
+          "sub": "YAML・Helm・Kustomize",
+          "tone": "muted"
+        },
+        {
+          "id": "argo",
+          "x": 16,
+          "y": 120,
+          "w": 190,
+          "h": 52,
+          "label": "Argo CD",
+          "sub": "Application (CRD) で管理",
+          "term": "argo-cd"
+        },
+        {
+          "id": "oos",
+          "x": 16,
+          "y": 230,
+          "w": 190,
+          "h": 52,
+          "label": "OutOfSync",
+          "sub": "Git と実際がずれた",
+          "tone": "warn"
+        },
+        {
+          "id": "gitrepo",
+          "x": 434,
+          "y": 120,
+          "w": 190,
+          "h": 52,
+          "label": "Flux: GitRepository",
+          "sub": "置き場を写し取る",
+          "term": "flux"
+        },
+        {
+          "id": "ks",
+          "x": 434,
+          "y": 230,
+          "w": 190,
+          "h": 52,
+          "label": "Kustomization",
+          "sub": "クラスタに同期",
+          "term": "flux"
+        },
+        {
+          "id": "cluster",
+          "x": 235,
+          "y": 340,
+          "w": 170,
+          "h": 52,
+          "label": "クラスタ",
+          "sub": "動いている状態 (live)"
+        }
+      ],
+      "edges": [
+        {
+          "from": "git",
+          "to": "argo"
+        },
+        {
+          "from": "git",
+          "to": "gitrepo"
+        },
+        {
+          "from": "argo",
+          "to": "oos",
+          "label": "比べる",
+          "fromSide": "bottom",
+          "toSide": "top"
+        },
+        {
+          "from": "oos",
+          "to": "cluster",
+          "label": "Sync で戻す"
+        },
+        {
+          "from": "gitrepo",
+          "to": "ks",
+          "fromSide": "bottom",
+          "toSide": "top"
+        },
+        {
+          "from": "ks",
+          "to": "cluster",
+          "label": "調整 (reconcile)"
+        }
+      ]
+    }
+  },
+  {
+    "id": "helm-chart-release",
+    "terms": [
+      "helm",
+      "helm-chart"
+    ],
+    "spec": {
+      "caption": "チャートは Chart.yaml・values.yaml・templates/ をまとめたディレクトリです。helm install で入れるとリリースになり、helm upgrade で版 (リビジョン) が上がり、helm rollback は前の版の中身を新しい版として戻します。",
+      "width": 640,
+      "height": 290,
+      "groups": [
+        {
+          "x": 16,
+          "y": 16,
+          "w": 200,
+          "h": 256,
+          "label": "チャート (ディレクトリ)"
+        }
+      ],
+      "nodes": [
+        {
+          "id": "chartyaml",
+          "x": 32,
+          "y": 52,
+          "w": 168,
+          "h": 52,
+          "label": "Chart.yaml",
+          "sub": "名前と版 (必須)",
+          "term": "helm-chart"
+        },
+        {
+          "id": "values",
+          "x": 32,
+          "y": 128,
+          "w": 168,
+          "h": 52,
+          "label": "values.yaml",
+          "sub": "既定の設定値",
+          "term": "helm-chart"
+        },
+        {
+          "id": "templates",
+          "x": 32,
+          "y": 204,
+          "w": 168,
+          "h": 52,
+          "label": "templates/",
+          "sub": "マニフェストの型",
+          "term": "helm-chart"
+        },
+        {
+          "id": "install",
+          "x": 260,
+          "y": 128,
+          "w": 150,
+          "h": 52,
+          "label": "helm install",
+          "sub": "名前を付けて入れる",
+          "term": "helm"
+        },
+        {
+          "id": "rev1",
+          "x": 460,
+          "y": 20,
+          "w": 164,
+          "h": 52,
+          "label": "リリース rev 1",
+          "sub": "クラスタで動く"
+        },
+        {
+          "id": "rev2",
+          "x": 460,
+          "y": 116,
+          "w": 164,
+          "h": 52,
+          "label": "rev 2",
+          "sub": "新しい版"
+        },
+        {
+          "id": "rev3",
+          "x": 460,
+          "y": 212,
+          "w": 164,
+          "h": 52,
+          "label": "rev 3",
+          "sub": "rev 1 の中身"
+        }
+      ],
+      "edges": [
+        {
+          "from": "chartyaml",
+          "to": "install"
+        },
+        {
+          "from": "values",
+          "to": "install"
+        },
+        {
+          "from": "templates",
+          "to": "install"
+        },
+        {
+          "from": "install",
+          "to": "rev1"
+        },
+        {
+          "from": "rev1",
+          "to": "rev2",
+          "label": "helm upgrade",
+          "fromSide": "bottom",
+          "toSide": "top"
+        },
+        {
+          "from": "rev2",
+          "to": "rev3",
+          "label": "helm rollback",
+          "fromSide": "bottom",
+          "toSide": "top"
+        }
+      ]
+    }
+  },
+  {
+    "id": "kustomize-base-overlay",
+    "terms": [
+      "kustomize",
+      "kustomize-overlay"
+    ],
+    "spec": {
+      "caption": "共通のマニフェストを base に置き、overlay は base を参照して環境ごとの差分 (ここでは namePrefix) を重ねます。kubectl apply -k で overlay ごとに組み立てると、同じ base から名前の違う 2 組のリソースができます。",
+      "width": 640,
+      "height": 410,
+      "nodes": [
+        {
+          "id": "base",
+          "x": 235,
+          "y": 16,
+          "w": 170,
+          "h": 52,
+          "label": "base",
+          "sub": "共通のマニフェスト",
+          "term": "kustomize-overlay"
+        },
+        {
+          "id": "dev",
+          "x": 60,
+          "y": 120,
+          "w": 200,
+          "h": 52,
+          "label": "overlay: dev",
+          "sub": "namePrefix: dev-",
+          "term": "kustomize-overlay"
+        },
+        {
+          "id": "prod",
+          "x": 380,
+          "y": 120,
+          "w": 200,
+          "h": 52,
+          "label": "overlay: prod",
+          "sub": "namePrefix: prod-",
+          "term": "kustomize-overlay"
+        },
+        {
+          "id": "apply",
+          "x": 220,
+          "y": 230,
+          "w": 200,
+          "h": 52,
+          "label": "kubectl apply -k",
+          "sub": "overlay ごとに組み立て",
+          "term": "kustomize"
+        },
+        {
+          "id": "devres",
+          "x": 60,
+          "y": 340,
+          "w": 200,
+          "h": 52,
+          "label": "dev-web",
+          "sub": "dev 用のリソース",
+          "tone": "muted"
+        },
+        {
+          "id": "prodres",
+          "x": 380,
+          "y": 340,
+          "w": 200,
+          "h": 52,
+          "label": "prod-web",
+          "sub": "prod 用のリソース",
+          "tone": "muted"
+        }
+      ],
+      "edges": [
+        {
+          "from": "base",
+          "to": "dev",
+          "dashed": true
+        },
+        {
+          "from": "base",
+          "to": "prod",
+          "dashed": true
+        },
+        {
+          "from": "dev",
+          "to": "apply"
+        },
+        {
+          "from": "prod",
+          "to": "apply"
+        },
+        {
+          "from": "apply",
+          "to": "devres"
+        },
+        {
+          "from": "apply",
+          "to": "prodres"
+        }
+      ]
+    }
+  },
+  {
+    "id": "canary-blue-green",
+    "terms": [
+      "canary",
+      "blue-green"
+    ],
+    "spec": {
+      "caption": "左のカナリアデプロイは、本番の通信を 1%、10% と少しずつ新しい版へ移し、問題があれば元に戻します。右のブルーグリーンデプロイは、試し終えたグリーンへ通信をまとめて切り替えます。",
+      "width": 640,
+      "height": 282,
+      "groups": [
+        {
+          "x": 16,
+          "y": 16,
+          "w": 300,
+          "h": 250,
+          "label": "カナリアデプロイ"
+        },
+        {
+          "x": 324,
+          "y": 16,
+          "w": 300,
+          "h": 250,
+          "label": "ブルーグリーンデプロイ"
+        }
+      ],
+      "nodes": [
+        {
+          "id": "router",
+          "x": 96,
+          "y": 52,
+          "w": 140,
+          "h": 52,
+          "label": "振り分け",
+          "sub": "1%→10%→100%",
+          "term": "canary"
+        },
+        {
+          "id": "v1",
+          "x": 32,
+          "y": 170,
+          "w": 120,
+          "h": 52,
+          "label": "今の版",
+          "sub": "大半の通信"
+        },
+        {
+          "id": "v2",
+          "x": 180,
+          "y": 170,
+          "w": 120,
+          "h": 52,
+          "label": "新しい版",
+          "sub": "少しずつ増やす",
+          "term": "canary"
+        },
+        {
+          "id": "lb",
+          "x": 404,
+          "y": 52,
+          "w": 140,
+          "h": 52,
+          "label": "ロードバランサー",
+          "sub": "まとめて切り替え",
+          "term": "blue-green"
+        },
+        {
+          "id": "blue",
+          "x": 340,
+          "y": 170,
+          "w": 120,
+          "h": 52,
+          "label": "ブルー",
+          "sub": "今の版"
+        },
+        {
+          "id": "green",
+          "x": 488,
+          "y": 170,
+          "w": 120,
+          "h": 52,
+          "label": "グリーン",
+          "sub": "試し終えた新しい版",
+          "term": "blue-green"
+        }
+      ],
+      "edges": [
+        {
+          "from": "router",
+          "to": "v1",
+          "label": "99%"
+        },
+        {
+          "from": "router",
+          "to": "v2",
+          "label": "1%"
+        },
+        {
+          "from": "lb",
+          "to": "blue",
+          "label": "切り替え前",
+          "dashed": true
+        },
+        {
+          "from": "lb",
+          "to": "green",
+          "label": "切り替え後"
+        }
+      ]
+    }
+  },
+  {
+    "id": "otel-signals",
+    "terms": [
+      "opentelemetry",
+      "metrics",
+      "trace"
+    ],
+    "spec": {
+      "caption": "アプリは OpenTelemetry の API と SDK でメトリクス・トレース・ログを作り、OTLP で Collector へ送ります。Collector は受けて加工し、保存と表示をするバックエンド (Prometheus や Jaeger など) へ送り出します。",
+      "width": 640,
+      "height": 410,
+      "nodes": [
+        {
+          "id": "app",
+          "x": 235,
+          "y": 16,
+          "w": 170,
+          "h": 52,
+          "label": "アプリ",
+          "sub": "OTel の API・SDK",
+          "term": "opentelemetry"
+        },
+        {
+          "id": "metrics",
+          "x": 16,
+          "y": 120,
+          "w": 190,
+          "h": 52,
+          "label": "メトリクス",
+          "sub": "集計した数値の時系列",
+          "term": "metrics"
+        },
+        {
+          "id": "trace",
+          "x": 225,
+          "y": 120,
+          "w": 190,
+          "h": 52,
+          "label": "トレース",
+          "sub": "1 件の道筋 (スパン)",
+          "term": "trace"
+        },
+        {
+          "id": "logs",
+          "x": 434,
+          "y": 120,
+          "w": 190,
+          "h": 52,
+          "label": "ログ",
+          "sub": "出来事の記録",
+          "tone": "muted"
+        },
+        {
+          "id": "collector",
+          "x": 225,
+          "y": 230,
+          "w": 190,
+          "h": 52,
+          "label": "Collector",
+          "sub": "受ける・加工・送る",
+          "term": "opentelemetry"
+        },
+        {
+          "id": "prom",
+          "x": 16,
+          "y": 340,
+          "w": 190,
+          "h": 52,
+          "label": "Prometheus など",
+          "sub": "メトリクスを保存",
+          "tone": "muted"
+        },
+        {
+          "id": "jaeger",
+          "x": 434,
+          "y": 340,
+          "w": 190,
+          "h": 52,
+          "label": "Jaeger など",
+          "sub": "トレースを保存",
+          "tone": "muted"
+        }
+      ],
+      "edges": [
+        {
+          "from": "app",
+          "to": "metrics"
+        },
+        {
+          "from": "app",
+          "to": "trace"
+        },
+        {
+          "from": "app",
+          "to": "logs"
+        },
+        {
+          "from": "metrics",
+          "to": "collector"
+        },
+        {
+          "from": "trace",
+          "to": "collector",
+          "label": "OTLP",
+          "fromSide": "bottom",
+          "toSide": "top"
+        },
+        {
+          "from": "logs",
+          "to": "collector"
+        },
+        {
+          "from": "collector",
+          "to": "prom",
+          "label": "OTLP など"
+        },
+        {
+          "from": "collector",
+          "to": "jaeger"
+        }
+      ]
+    }
+  },
+  {
+    "id": "prometheus-grafana",
+    "terms": [
+      "prometheus",
+      "grafana"
+    ],
+    "spec": {
+      "caption": "Prometheus は監視の対象へ HTTP で取りに行き (スクレイプ)、メトリクスを時系列で保存します。すぐ終わるジョブは Pushgateway へ push します。Grafana は PromQL で問い合わせてダッシュボードに見せ、Loki などほかのデータソースもつなげます。",
+      "width": 640,
+      "height": 350,
+      "nodes": [
+        {
+          "id": "target",
+          "x": 235,
+          "y": 20,
+          "w": 170,
+          "h": 52,
+          "label": "監視の対象",
+          "sub": "/metrics を出す"
+        },
+        {
+          "id": "push",
+          "x": 16,
+          "y": 150,
+          "w": 170,
+          "h": 52,
+          "label": "Pushgateway",
+          "sub": "push を受ける中継"
+        },
+        {
+          "id": "job",
+          "x": 16,
+          "y": 280,
+          "w": 170,
+          "h": 52,
+          "label": "すぐ終わるジョブ",
+          "sub": "バッチなど",
+          "tone": "muted"
+        },
+        {
+          "id": "prom",
+          "x": 235,
+          "y": 150,
+          "w": 170,
+          "h": 52,
+          "label": "Prometheus",
+          "sub": "時系列で保存",
+          "term": "prometheus"
+        },
+        {
+          "id": "am",
+          "x": 454,
+          "y": 150,
+          "w": 170,
+          "h": 52,
+          "label": "Alertmanager",
+          "sub": "通知を扱う"
+        },
+        {
+          "id": "grafana",
+          "x": 454,
+          "y": 280,
+          "w": 170,
+          "h": 52,
+          "label": "Grafana",
+          "sub": "ダッシュボードで見せる",
+          "term": "grafana"
+        },
+        {
+          "id": "loki",
+          "x": 235,
+          "y": 280,
+          "w": 170,
+          "h": 52,
+          "label": "Loki など",
+          "sub": "ログの置き場",
+          "tone": "muted"
+        }
+      ],
+      "edges": [
+        {
+          "from": "prom",
+          "to": "target",
+          "label": "スクレイプ (pull)",
+          "fromSide": "top",
+          "toSide": "bottom"
+        },
+        {
+          "from": "prom",
+          "to": "push"
+        },
+        {
+          "from": "job",
+          "to": "push",
+          "label": "push",
+          "fromSide": "top",
+          "toSide": "bottom"
+        },
+        {
+          "from": "prom",
+          "to": "am",
+          "label": "アラート"
+        },
+        {
+          "from": "grafana",
+          "to": "prom",
+          "label": "PromQL"
+        },
+        {
+          "from": "grafana",
+          "to": "loki"
+        }
+      ]
+    }
+  },
+  {
+    "id": "sli-slo-error-budget",
+    "terms": [
+      "sli",
+      "slo",
+      "error-budget"
+    ],
+    "spec": {
+      "caption": "SLI で測る量を決め、その目標が SLO です。1 から SLO を引いた量がエラーバジェットで、99.9% なら 100 万件のうち 1,000 件まで失敗が許されます。残っている間は新しい版を出し、使い切ったら修正のほかは止めます。",
+      "width": 640,
+      "height": 240,
+      "nodes": [
+        {
+          "id": "sli",
+          "x": 16,
+          "y": 30,
+          "w": 180,
+          "h": 52,
+          "label": "SLI",
+          "sub": "測る量 (遅延・エラー率)",
+          "term": "sli"
+        },
+        {
+          "id": "slo",
+          "x": 230,
+          "y": 30,
+          "w": 180,
+          "h": 52,
+          "label": "SLO",
+          "sub": "目標 (例: 99.9%)",
+          "term": "slo"
+        },
+        {
+          "id": "budget",
+          "x": 444,
+          "y": 30,
+          "w": 180,
+          "h": 52,
+          "label": "エラーバジェット",
+          "sub": "1 − SLO = 0.1%",
+          "term": "error-budget"
+        },
+        {
+          "id": "sla",
+          "x": 16,
+          "y": 170,
+          "w": 200,
+          "h": 52,
+          "label": "SLA",
+          "sub": "守れない時の結果も含む約束",
+          "tone": "muted"
+        },
+        {
+          "id": "remain",
+          "x": 330,
+          "y": 170,
+          "w": 140,
+          "h": 52,
+          "label": "残っている間",
+          "sub": "新しい版を出してよい"
+        },
+        {
+          "id": "out",
+          "x": 484,
+          "y": 170,
+          "w": 140,
+          "h": 52,
+          "label": "使い切ったら",
+          "sub": "修正のほかは止める",
+          "tone": "warn"
+        }
+      ],
+      "edges": [
+        {
+          "from": "sli",
+          "to": "slo"
+        },
+        {
+          "from": "slo",
+          "to": "budget"
+        },
+        {
+          "from": "slo",
+          "to": "sla",
+          "dashed": true
+        },
+        {
+          "from": "budget",
+          "to": "remain"
+        },
+        {
+          "from": "budget",
+          "to": "out"
+        }
+      ]
+    }
+  },
+  {
+    "id": "serverless-knative",
+    "terms": [
+      "serverless",
+      "knative"
+    ],
+    "spec": {
+      "caption": "サーバーレスでは、開発者はサーバーを管理せず、イベントをきっかけにコードが動きます。Knative は Kubernetes の上でこれを受け持ち、Serving が 0 から自動でスケールし、Eventing が CloudEvents を届け、Functions で関数を作って出します。",
+      "width": 640,
+      "height": 320,
+      "groups": [
+        {
+          "x": 200,
+          "y": 8,
+          "w": 432,
+          "h": 300,
+          "label": "Kubernetes のクラスタ"
+        }
+      ],
+      "nodes": [
+        {
+          "id": "event",
+          "x": 16,
+          "y": 40,
+          "w": 150,
+          "h": 52,
+          "label": "イベント",
+          "sub": "HTTP の要求など",
+          "tone": "muted"
+        },
+        {
+          "id": "dev",
+          "x": 16,
+          "y": 240,
+          "w": 170,
+          "h": 52,
+          "label": "開発者",
+          "sub": "サーバーを管理しない",
+          "term": "serverless"
+        },
+        {
+          "id": "serving",
+          "x": 220,
+          "y": 40,
+          "w": 190,
+          "h": 52,
+          "label": "Knative Serving",
+          "sub": "0 から自動でスケール",
+          "term": "knative"
+        },
+        {
+          "id": "eventing",
+          "x": 220,
+          "y": 140,
+          "w": 190,
+          "h": 52,
+          "label": "Knative Eventing",
+          "sub": "CloudEvents を届ける",
+          "term": "knative"
+        },
+        {
+          "id": "functions",
+          "x": 220,
+          "y": 240,
+          "w": 190,
+          "h": 52,
+          "label": "Knative Functions",
+          "sub": "関数を作って出す",
+          "term": "knative"
+        },
+        {
+          "id": "rev",
+          "x": 460,
+          "y": 40,
+          "w": 160,
+          "h": 52,
+          "label": "Revision",
+          "sub": "コードの版ごとの Pod",
+          "term": "serverless"
+        }
+      ],
+      "edges": [
+        {
+          "from": "event",
+          "to": "serving",
+          "label": "きっかけ"
+        },
+        {
+          "from": "event",
+          "to": "eventing"
+        },
+        {
+          "from": "serving",
+          "to": "rev"
+        },
+        {
+          "from": "eventing",
+          "to": "rev"
+        },
+        {
+          "from": "dev",
+          "to": "functions"
+        }
+      ]
+    }
+  },
+  {
+    "id": "cncf-governance",
+    "terms": [
+      "linux-foundation",
+      "cncf",
+      "cncf-toc",
+      "cncf-maturity"
+    ],
+    "spec": {
+      "caption": "CNCF は非営利の Linux Foundation の一部で、同じ LF のもとに OCI もあります。Governing Board が範囲と予算を決め、その中で TOC が技術の方向を決めてプロジェクトを審査し、Sandbox から Incubating、Graduated へと段階を上げます。",
+      "width": 640,
+      "height": 400,
+      "nodes": [
+        {
+          "id": "lf",
+          "x": 235,
+          "y": 16,
+          "w": 170,
+          "h": 52,
+          "label": "Linux Foundation",
+          "sub": "中立の非営利の団体",
+          "term": "linux-foundation"
+        },
+        {
+          "id": "cncf",
+          "x": 235,
+          "y": 110,
+          "w": 170,
+          "h": 52,
+          "label": "CNCF",
+          "sub": "LF の一部",
+          "term": "cncf"
+        },
+        {
+          "id": "oci",
+          "x": 460,
+          "y": 110,
+          "w": 150,
+          "h": 52,
+          "label": "OCI",
+          "sub": "コンテナの標準",
+          "tone": "muted"
+        },
+        {
+          "id": "gb",
+          "x": 16,
+          "y": 210,
+          "w": 140,
+          "h": 52,
+          "label": "Governing Board",
+          "sub": "事業の監督・予算"
+        },
+        {
+          "id": "toc",
+          "x": 235,
+          "y": 210,
+          "w": 170,
+          "h": 52,
+          "label": "TOC",
+          "sub": "技術の方向・審査",
+          "term": "cncf-toc"
+        },
+        {
+          "id": "sandbox",
+          "x": 30,
+          "y": 330,
+          "w": 170,
+          "h": 52,
+          "label": "Sandbox",
+          "sub": "試しの新しい考え",
+          "term": "cncf-maturity"
+        },
+        {
+          "id": "incubating",
+          "x": 235,
+          "y": 330,
+          "w": 170,
+          "h": 52,
+          "label": "Incubating",
+          "sub": "API が安定し始める",
+          "term": "cncf-maturity"
+        },
+        {
+          "id": "graduated",
+          "x": 440,
+          "y": 330,
+          "w": 170,
+          "h": 52,
+          "label": "Graduated",
+          "sub": "広く使われる (例: Flux)",
+          "term": "cncf-maturity"
+        }
+      ],
+      "edges": [
+        {
+          "from": "lf",
+          "to": "cncf"
+        },
+        {
+          "from": "lf",
+          "to": "oci"
+        },
+        {
+          "from": "cncf",
+          "to": "gb"
+        },
+        {
+          "from": "cncf",
+          "to": "toc"
+        },
+        {
+          "from": "gb",
+          "to": "toc",
+          "label": "範囲を決める",
+          "dashed": true
+        },
+        {
+          "from": "toc",
+          "to": "incubating",
+          "label": "段階を上げる審査",
+          "dashed": true,
+          "fromSide": "bottom",
+          "toSide": "top"
+        },
+        {
+          "from": "sandbox",
+          "to": "incubating"
+        },
+        {
+          "from": "incubating",
+          "to": "graduated"
+        }
+      ]
+    }
+  },
+  {
+    "id": "linux-syscall-layers",
+    "terms": [
+      "linux-kernel",
+      "system-call",
+      "linux-distribution"
+    ],
+    "spec": {
+      "caption": "アプリは glibc などの包む関数を呼び、包む関数がシステムコールでカーネルに仕事を頼みます。カーネルに GNU の道具やパッケージの管理を組み合わせて配るものがディストリビューションです。",
+      "width": 640,
+      "height": 360,
+      "nodes": [
+        {
+          "id": "app",
+          "x": 16,
+          "y": 20,
+          "w": 250,
+          "h": 52,
+          "label": "アプリ",
+          "sub": "ファイルを開きたい",
+          "tone": "muted"
+        },
+        {
+          "id": "libc",
+          "x": 16,
+          "y": 110,
+          "w": 250,
+          "h": 52,
+          "label": "C のライブラリー (glibc)",
+          "sub": "包む関数 (wrapper)"
+        },
+        {
+          "id": "syscall",
+          "x": 16,
+          "y": 200,
+          "w": 250,
+          "h": 52,
+          "label": "システムコール",
+          "sub": "open・clone など",
+          "term": "system-call"
+        },
+        {
+          "id": "kernel",
+          "x": 16,
+          "y": 290,
+          "w": 250,
+          "h": 52,
+          "label": "Linux カーネル",
+          "sub": "裏方の仕事をすべて",
+          "term": "linux-kernel"
+        },
+        {
+          "id": "tools",
+          "x": 360,
+          "y": 110,
+          "w": 264,
+          "h": 52,
+          "label": "GNU の道具・APT",
+          "sub": "基本の道具とパッケージ管理"
+        },
+        {
+          "id": "distro",
+          "x": 360,
+          "y": 290,
+          "w": 264,
+          "h": 52,
+          "label": "ディストリビューション",
+          "sub": "カーネルと道具をまとめて配る",
+          "term": "linux-distribution"
+        }
+      ],
+      "edges": [
+        {
+          "from": "app",
+          "to": "libc",
+          "label": "関数を呼ぶ",
+          "fromSide": "bottom",
+          "toSide": "top"
+        },
+        {
+          "from": "libc",
+          "to": "syscall",
+          "label": "番号と引数を渡す",
+          "fromSide": "bottom",
+          "toSide": "top"
+        },
+        {
+          "from": "syscall",
+          "to": "kernel",
+          "label": "カーネルのモードで実行",
+          "fromSide": "bottom",
+          "toSide": "top"
+        },
+        {
+          "from": "kernel",
+          "to": "distro",
+          "label": "まとめる",
+          "dashed": true
+        },
+        {
+          "from": "tools",
+          "to": "distro",
+          "label": "まとめる",
+          "dashed": true,
+          "fromSide": "bottom",
+          "toSide": "top"
+        }
+      ]
+    }
+  },
+  {
+    "id": "process-pid-tree",
+    "terms": [
+      "systemd",
+      "process-pid"
+    ],
+    "spec": {
+      "caption": "起動のとき systemd が PID 1 として動き、サービスを立ち上げます。プロセスは fork や clone で親を複製して作られ、子の PPID は親の PID です。新しい PID の namespace の最初のプロセスは中では PID 1 ですが、ホストからは別の PID で見えます (番号は例)。",
+      "width": 640,
+      "height": 320,
+      "groups": [
+        {
+          "x": 300,
+          "y": 200,
+          "w": 324,
+          "h": 108,
+          "label": "新しい PID の namespace"
+        }
+      ],
+      "nodes": [
+        {
+          "id": "systemd",
+          "x": 16,
+          "y": 20,
+          "w": 200,
+          "h": 52,
+          "label": "systemd",
+          "sub": "PID 1 (init)",
+          "term": "systemd"
+        },
+        {
+          "id": "svc",
+          "x": 16,
+          "y": 130,
+          "w": 200,
+          "h": 52,
+          "label": "k3s のサービス",
+          "sub": "PID 812・PPID 1",
+          "term": "process-pid"
+        },
+        {
+          "id": "child",
+          "x": 16,
+          "y": 240,
+          "w": 200,
+          "h": 52,
+          "label": "子のプロセス",
+          "sub": "PID 950・PPID 812",
+          "term": "process-pid"
+        },
+        {
+          "id": "ctr",
+          "x": 316,
+          "y": 240,
+          "w": 292,
+          "h": 52,
+          "label": "コンテナのプロセス",
+          "sub": "中では PID 1 (init)",
+          "term": "process-pid"
+        },
+        {
+          "id": "host",
+          "x": 316,
+          "y": 120,
+          "w": 292,
+          "h": 52,
+          "label": "ホストから見ると",
+          "sub": "同じプロセスが PID 1005",
+          "tone": "muted"
+        }
+      ],
+      "edges": [
+        {
+          "from": "systemd",
+          "to": "svc",
+          "label": "起動 (fork)",
+          "fromSide": "bottom",
+          "toSide": "top"
+        },
+        {
+          "from": "svc",
+          "to": "child",
+          "label": "fork・clone",
+          "fromSide": "bottom",
+          "toSide": "top"
+        },
+        {
+          "from": "child",
+          "to": "ctr",
+          "label": "clone"
+        },
+        {
+          "from": "ctr",
+          "to": "host",
+          "label": "上の層にも PID",
+          "dashed": true,
+          "fromSide": "top",
+          "toSide": "bottom"
+        }
+      ]
+    }
+  },
+  {
+    "id": "container-building-blocks",
+    "terms": [
+      "docker",
+      "runc",
+      "linux-namespaces",
+      "cgroups",
+      "chroot",
+      "procfs"
+    ],
+    "spec": {
+      "caption": "Docker は containerd を通し、OCI の仕様に沿う runc がコンテナを起動します。runc はカーネルの namespaces で見える範囲を、cgroups で使える量を分け、chroot (pivot_root) で / の位置を変えます。属する namespace と cgroup は /proc で見られます。",
+      "width": 640,
+      "height": 350,
+      "groups": [
+        {
+          "x": 8,
+          "y": 126,
+          "w": 624,
+          "h": 96,
+          "label": "Linux カーネルの機能"
+        }
+      ],
+      "nodes": [
+        {
+          "id": "docker",
+          "x": 16,
+          "y": 20,
+          "w": 180,
+          "h": 52,
+          "label": "Docker",
+          "sub": "イメージを作り動かす",
+          "term": "docker"
+        },
+        {
+          "id": "containerd",
+          "x": 230,
+          "y": 20,
+          "w": 180,
+          "h": 52,
+          "label": "containerd",
+          "sub": "コンテナの一生を管理",
+          "tone": "muted"
+        },
+        {
+          "id": "runc",
+          "x": 444,
+          "y": 20,
+          "w": 180,
+          "h": 52,
+          "label": "runc",
+          "sub": "OCI の仕様で起動",
+          "term": "runc"
+        },
+        {
+          "id": "ns",
+          "x": 16,
+          "y": 160,
+          "w": 190,
+          "h": 52,
+          "label": "namespaces",
+          "sub": "見える範囲を分ける",
+          "term": "linux-namespaces"
+        },
+        {
+          "id": "cg",
+          "x": 225,
+          "y": 160,
+          "w": 190,
+          "h": 52,
+          "label": "cgroups",
+          "sub": "使える量を分ける",
+          "term": "cgroups"
+        },
+        {
+          "id": "chroot",
+          "x": 434,
+          "y": 160,
+          "w": 190,
+          "h": 52,
+          "label": "chroot (pivot_root)",
+          "sub": "/ の位置を変える",
+          "term": "chroot"
+        },
+        {
+          "id": "proc",
+          "x": 16,
+          "y": 284,
+          "w": 190,
+          "h": 52,
+          "label": "/proc",
+          "sub": "/proc/<PID>/ns・cgroup",
+          "term": "procfs"
+        }
+      ],
+      "edges": [
+        {
+          "from": "docker",
+          "to": "containerd"
+        },
+        {
+          "from": "containerd",
+          "to": "runc"
+        },
+        {
+          "from": "runc",
+          "to": "ns"
+        },
+        {
+          "from": "runc",
+          "to": "cg"
+        },
+        {
+          "from": "runc",
+          "to": "chroot",
+          "fromSide": "bottom",
+          "toSide": "top"
+        },
+        {
+          "from": "proc",
+          "to": "ns",
+          "label": "属する ns を見る",
+          "dashed": true,
+          "fromSide": "top",
+          "toSide": "bottom"
+        },
+        {
+          "from": "proc",
+          "to": "cg",
+          "dashed": true
+        }
+      ]
+    }
+  },
+  {
+    "id": "iac-terraform-state",
+    "terms": [
+      "iac",
+      "terraform-opentofu",
+      "iac-state"
+    ],
+    "spec": {
+      "caption": "インフラの形を設定ファイルに宣言し (Write)、Plan で state と実物を設定と比べて計画を出し、Apply で承認した計画をプロバイダー経由で実行します。state は設定と実物の対応表で、秘密が入りうるので Git ではなく遠隔の保存先に置きます。OpenTofu も同じ流れです。",
+      "width": 640,
+      "height": 340,
+      "nodes": [
+        {
+          "id": "write",
+          "x": 16,
+          "y": 30,
+          "w": 180,
+          "h": 52,
+          "label": "Write: 設定ファイル",
+          "sub": "インフラの形を宣言",
+          "term": "iac"
+        },
+        {
+          "id": "plan",
+          "x": 230,
+          "y": 30,
+          "w": 180,
+          "h": 52,
+          "label": "Plan",
+          "sub": "実物と比べて計画",
+          "term": "terraform-opentofu"
+        },
+        {
+          "id": "apply",
+          "x": 444,
+          "y": 30,
+          "w": 180,
+          "h": 52,
+          "label": "Apply",
+          "sub": "承認した計画を実行",
+          "term": "terraform-opentofu"
+        },
+        {
+          "id": "provider",
+          "x": 444,
+          "y": 150,
+          "w": 180,
+          "h": 52,
+          "label": "プロバイダー",
+          "sub": "API ごとの橋渡し"
+        },
+        {
+          "id": "cloud",
+          "x": 444,
+          "y": 270,
+          "w": 180,
+          "h": 52,
+          "label": "クラウドの資源",
+          "sub": "VPC・VM など",
+          "tone": "muted"
+        },
+        {
+          "id": "state",
+          "x": 16,
+          "y": 270,
+          "w": 200,
+          "h": 52,
+          "label": "state (tfstate)",
+          "sub": "設定と実物の対応表",
+          "term": "iac-state"
+        }
+      ],
+      "edges": [
+        {
+          "from": "write",
+          "to": "plan"
+        },
+        {
+          "from": "plan",
+          "to": "apply"
+        },
+        {
+          "from": "apply",
+          "to": "provider",
+          "label": "呼ぶ",
+          "fromSide": "bottom",
+          "toSide": "top"
+        },
+        {
+          "from": "provider",
+          "to": "cloud",
+          "label": "作る・変える",
+          "fromSide": "bottom",
+          "toSide": "top"
+        },
+        {
+          "from": "state",
+          "to": "cloud",
+          "label": "実物と結び付ける",
+          "dashed": true
+        },
+        {
+          "from": "state",
+          "to": "plan",
+          "dashed": true
+        }
+      ]
+    }
+  },
+  {
+    "id": "aws-region-az-vpc",
+    "terms": [
+      "region-az",
+      "vpc"
+    ],
+    "spec": {
+      "caption": "リージョンは地理的に分かれた地域で、中に切り離された AZ が複数あります。VPC はリージョンの中に作る自分専用のネットワークで、サブネットに分け、各サブネットは 1 つの AZ に属します。",
+      "width": 640,
+      "height": 400,
+      "nodes": [
+        {
+          "id": "region",
+          "x": 235,
+          "y": 16,
+          "w": 170,
+          "h": 52,
+          "label": "リージョン",
+          "sub": "例: 東京 (ap-northeast-1)",
+          "term": "region-az"
+        },
+        {
+          "id": "aza",
+          "x": 60,
+          "y": 120,
+          "w": 200,
+          "h": 52,
+          "label": "AZ a",
+          "sub": "電源と回線が別",
+          "term": "region-az"
+        },
+        {
+          "id": "azc",
+          "x": 380,
+          "y": 120,
+          "w": 200,
+          "h": 52,
+          "label": "AZ c",
+          "sub": "低い遅延でつながる",
+          "term": "region-az"
+        },
+        {
+          "id": "vpc",
+          "x": 235,
+          "y": 230,
+          "w": 170,
+          "h": 52,
+          "label": "VPC",
+          "sub": "自分専用のネットワーク",
+          "term": "vpc"
+        },
+        {
+          "id": "suba",
+          "x": 60,
+          "y": 330,
+          "w": 200,
+          "h": 52,
+          "label": "サブネット a",
+          "sub": "IP アドレスの範囲"
+        },
+        {
+          "id": "subc",
+          "x": 380,
+          "y": 330,
+          "w": 200,
+          "h": 52,
+          "label": "サブネット c",
+          "sub": "IP アドレスの範囲"
+        }
+      ],
+      "edges": [
+        {
+          "from": "region",
+          "to": "aza"
+        },
+        {
+          "from": "region",
+          "to": "azc"
+        },
+        {
+          "from": "region",
+          "to": "vpc",
+          "label": "中に作る",
+          "fromSide": "bottom",
+          "toSide": "top"
+        },
+        {
+          "from": "vpc",
+          "to": "suba"
+        },
+        {
+          "from": "vpc",
+          "to": "subc"
+        },
+        {
+          "from": "suba",
+          "to": "aza",
+          "label": "属する",
+          "dashed": true,
+          "fromSide": "top",
+          "toSide": "bottom"
+        },
+        {
+          "from": "subc",
+          "to": "azc",
+          "label": "属する",
+          "dashed": true,
+          "fromSide": "top",
+          "toSide": "bottom"
+        }
+      ]
+    }
+  },
+  {
+    "id": "eks-iam-irsa",
+    "terms": [
+      "eks",
+      "iam"
+    ],
+    "spec": {
+      "caption": "標準の EKS ではコントロールプレーンを AWS が管理し、Auto Mode ならノードの管理も EKS が受け持ちます。IAM は誰が何をしてよいかを決め、IRSA で IAM ロールを ServiceAccount に結ぶと、Pod のアプリが AWS の資格情報を使えます。",
+      "width": 640,
+      "height": 400,
+      "groups": [
+        {
+          "x": 16,
+          "y": 16,
+          "w": 270,
+          "h": 110,
+          "label": "AWS が管理"
+        },
+        {
+          "x": 16,
+          "y": 160,
+          "w": 270,
+          "h": 130,
+          "label": "自分の VPC"
+        }
+      ],
+      "nodes": [
+        {
+          "id": "cp",
+          "x": 32,
+          "y": 52,
+          "w": 238,
+          "h": 52,
+          "label": "コントロールプレーン",
+          "sub": "標準の EKS で AWS が管理",
+          "term": "eks"
+        },
+        {
+          "id": "worker",
+          "x": 32,
+          "y": 196,
+          "w": 238,
+          "h": 52,
+          "label": "ノード (データプレーン)",
+          "sub": "Auto Mode なら EKS が管理",
+          "term": "eks"
+        },
+        {
+          "id": "iam",
+          "x": 350,
+          "y": 30,
+          "w": 274,
+          "h": 52,
+          "label": "IAM",
+          "sub": "誰が・何をしてよいか",
+          "term": "iam"
+        },
+        {
+          "id": "role",
+          "x": 350,
+          "y": 130,
+          "w": 274,
+          "h": 52,
+          "label": "IAM ロール",
+          "sub": "S3 を読んでよい など",
+          "term": "iam"
+        },
+        {
+          "id": "sa",
+          "x": 350,
+          "y": 230,
+          "w": 274,
+          "h": 52,
+          "label": "ServiceAccount",
+          "sub": "IRSA でロールと結ぶ"
+        },
+        {
+          "id": "pod",
+          "x": 350,
+          "y": 330,
+          "w": 274,
+          "h": 52,
+          "label": "Pod のアプリ",
+          "sub": "AWS の資格情報を使う"
+        }
+      ],
+      "edges": [
+        {
+          "from": "cp",
+          "to": "worker",
+          "fromSide": "bottom",
+          "toSide": "top"
+        },
+        {
+          "from": "iam",
+          "to": "role",
+          "fromSide": "bottom",
+          "toSide": "top"
+        },
+        {
+          "from": "role",
+          "to": "sa",
+          "label": "IRSA",
+          "dashed": true,
+          "fromSide": "bottom",
+          "toSide": "top"
+        },
+        {
+          "from": "sa",
+          "to": "pod",
+          "fromSide": "bottom",
+          "toSide": "top"
+        },
+        {
+          "from": "worker",
+          "to": "pod",
+          "label": "動く"
+        }
+      ]
+    }
+  },
+  {
+    "id": "alb-nlb-layers",
+    "terms": [
+      "osi-l4-l7",
+      "alb",
+      "nlb"
+    ],
+    "spec": {
+      "caption": "ALB は第 7 層 (アプリケーション層) で HTTP の中身を読み、パスなどのルールでターゲットグループへ振り分けます。NLB は第 4 層 (トランスポート層) で接続を見て、ハッシュで宛先を選び、同じ接続は同じ宛先へ送ります。",
+      "width": 640,
+      "height": 350,
+      "nodes": [
+        {
+          "id": "l7",
+          "x": 16,
+          "y": 20,
+          "w": 160,
+          "h": 52,
+          "label": "L7 アプリケーション層",
+          "sub": "HTTP・HTTPS",
+          "term": "osi-l4-l7"
+        },
+        {
+          "id": "client",
+          "x": 16,
+          "y": 150,
+          "w": 130,
+          "h": 52,
+          "label": "利用者",
+          "sub": "要求を送る",
+          "tone": "muted"
+        },
+        {
+          "id": "l4",
+          "x": 16,
+          "y": 280,
+          "w": 160,
+          "h": 52,
+          "label": "L4 トランスポート層",
+          "sub": "TCP・UDP",
+          "term": "osi-l4-l7"
+        },
+        {
+          "id": "alb",
+          "x": 200,
+          "y": 60,
+          "w": 180,
+          "h": 52,
+          "label": "ALB",
+          "sub": "L7: 中身で振り分け",
+          "term": "alb"
+        },
+        {
+          "id": "nlb",
+          "x": 200,
+          "y": 240,
+          "w": 180,
+          "h": 52,
+          "label": "NLB",
+          "sub": "L4: 接続で振り分け",
+          "term": "nlb"
+        },
+        {
+          "id": "tg1",
+          "x": 440,
+          "y": 20,
+          "w": 184,
+          "h": 52,
+          "label": "ターゲットグループ A",
+          "sub": "パス /api"
+        },
+        {
+          "id": "tg2",
+          "x": 440,
+          "y": 110,
+          "w": 184,
+          "h": 52,
+          "label": "ターゲットグループ B",
+          "sub": "パス / (それ以外)"
+        },
+        {
+          "id": "tg3",
+          "x": 440,
+          "y": 240,
+          "w": 184,
+          "h": 52,
+          "label": "ターゲットグループ C",
+          "sub": "接続ごとにハッシュ"
+        }
+      ],
+      "edges": [
+        {
+          "from": "client",
+          "to": "alb"
+        },
+        {
+          "from": "client",
+          "to": "nlb"
+        },
+        {
+          "from": "l7",
+          "to": "alb",
+          "dashed": true
+        },
+        {
+          "from": "l4",
+          "to": "nlb",
+          "dashed": true
+        },
+        {
+          "from": "alb",
+          "to": "tg1"
+        },
+        {
+          "from": "alb",
+          "to": "tg2"
+        },
+        {
+          "from": "nlb",
+          "to": "tg3"
+        }
+      ]
+    }
+  }
+]

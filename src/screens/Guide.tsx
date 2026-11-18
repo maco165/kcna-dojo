@@ -6,7 +6,7 @@ import AppSideNav from '../components/AppSideNav';
 import BottomTabs from '../components/BottomTabs';
 import RepoLink from '../components/RepoLink';
 import SiteLogo from '../components/SiteLogo';
-import { dueQuestions, findQuestion } from '../content';
+import { dueReviewCount, findQuestion } from '../content';
 import { WEEKS } from '../content/curriculum';
 import glossary from '../content/glossary.json';
 import {
@@ -537,7 +537,7 @@ export default function Guide({ progress }: { progress: Progress }) {
       <main>
         <Body />
       </main>
-      <BottomTabs current="guide" reviewCount={dueQuestions(progress, new Date()).length} />
+      <BottomTabs current="guide" reviewCount={dueReviewCount(progress, new Date())} />
     </div>
   );
 }

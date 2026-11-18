@@ -1933,6 +1933,11 @@ body {
   stroke: var(--color-error);
 }
 
+/* 用語集で見ている語の箱。色に加えて枠を太くし、赤の箱 (失敗) でも見ている語だと分かるようにする */
+.dg__node--current {
+  stroke-width: 3;
+}
+
 .dg__node--muted {
   fill: var(--color-background-muted);
   stroke-dasharray: 4 3;

@@ -1,0 +1,1032 @@
+{
+  "week": 0,
+  "lessons": [
+    {
+      "id": "x-ad",
+      "kind": "quiz",
+      "title": "模擬試験用 App Delivery",
+      "summary": "模擬試験用",
+      "domain": "Cloud Native Application Delivery",
+      "questions": [
+        {
+          "id": "x-ad-001",
+          "type": "choice",
+          "prompt": "CI のサービスに本番クラスタの認証情報を持たせたくない。それでも Git の変更をクラスタへ自動で届けたい。合うやり方はどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "CI の最後の工程で kubectl apply を打ち、クラスタへ送り込む",
+              "why": "外から送り込む (push の) やり方で、CI にクラスタの認証情報を持たせることになります。"
+            },
+            {
+              "id": "b",
+              "text": "クラスタの中のエージェントが Git を見に行き、差分を取り込む",
+              "why": "正しい選択肢です。GitOps の「自動で取り込む (pull)」形で、クラスタに当てるのはクラスタの中のエージェントです。"
+            },
+            {
+              "id": "c",
+              "text": "変更のたびに担当者がノードへ SSH し、マニフェストを置く",
+              "why": "手作業で、自動ではありません。誰が何を変えたかも Git に残りません。"
+            },
+            {
+              "id": "d",
+              "text": "CI がコンテナイメージの中にマニフェストを入れて配る",
+              "why": "イメージにマニフェストを入れても、クラスタへ当てる仕組みにはなりません。"
+            }
+          ],
+          "answer": "b",
+          "explanation": "OpenGitOps の原則 3 (Pulled Automatically) では、ソフトウェアのエージェントが正本から望ましい状態を自動で取りに行きます。エージェントはクラスタの中で動いて自分で当てるので、外の CI からクラスタへ書き込む必要がありません。",
+          "source": "https://opengitops.dev/"
+        },
+        {
+          "id": "x-ad-002",
+          "type": "choice",
+          "prompt": "GitOps で運用しているアプリに、間違った設定を入れてしまった。前の状態に戻す、GitOps らしいやり方はどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "kubectl edit でクラスタの設定を直接直し、Git はそのままにする",
+              "why": "Git が正本なので、エージェントが Git の内容に戻してしまいます。履歴も残りません。"
+            },
+            {
+              "id": "b",
+              "text": "クラスタの etcd をバックアップから戻す",
+              "why": "クラスタ全体を戻す重い手で、1 つのアプリの設定の戻し方としては合いません。"
+            },
+            {
+              "id": "c",
+              "text": "Git で間違えたコミットを打ち消すコミットを作り、エージェントに取り込ませる",
+              "why": "正しい選択肢です。Git の履歴に戻した記録が残り、エージェントがその状態にそろえます。"
+            },
+            {
+              "id": "d",
+              "text": "エージェントを止めて、古いマニフェストを手で当て直す",
+              "why": "エージェントを止めると、Git とクラスタの食い違いを誰も直さなくなります。"
+            }
+          ],
+          "answer": "c",
+          "explanation": "OpenGitOps では、望ましい状態は版を付けて変えられない形で残し (Versioned and Immutable)、変更の全履歴を持ちます。戻すときも Git に変更を足し、エージェントがその状態をクラスタに当てます。",
+          "source": "https://opengitops.dev/"
+        },
+        {
+          "id": "x-ad-003",
+          "type": "fill",
+          "prompt": "チャート ./mychart に values-prod.yaml を当てた結果のマニフェストを、クラスタに送らず手元で見たい。空欄に入るサブコマンドは?",
+          "language": "bash",
+          "code": "helm {{blank}} web ./mychart -f values-prod.yaml",
+          "answers": [
+            "template"
+          ],
+          "candidates": [
+            "install",
+            "template",
+            "upgrade",
+            "lint"
+          ],
+          "explanation": "helm template は、チャートのテンプレートに値を当てた結果を手元で組み立てて画面に出します。クラスタには何も作らないので、当てる前の確かめに使えます。",
+          "wrongNotes": {
+            "install": "install はクラスタにリリースを作ります。",
+            "upgrade": "upgrade はクラスタにある既存のリリースを更新します。",
+            "lint": "lint はチャートの書き方の誤りを調べるだけで、組み立てた YAML は出しません。"
+          },
+          "source": "https://helm.sh/docs/helm/helm_template/"
+        },
+        {
+          "id": "x-ad-004",
+          "type": "choice",
+          "prompt": "人が作った Helm のチャートを入れる前に、どの設定を値で変えられるのか、既定の値の一覧を見たい。使うのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "helm show values",
+              "why": "正しい選択肢です。チャートの values.yaml の中身 (既定の値) を出します。"
+            },
+            {
+              "id": "b",
+              "text": "helm get values",
+              "why": "クラスタに入れた後のリリースに当てた値を見るもので、入れる前のチャートには使えません。"
+            },
+            {
+              "id": "c",
+              "text": "helm history",
+              "why": "リリースのリビジョンの一覧を見るもので、値の一覧は出しません。"
+            },
+            {
+              "id": "d",
+              "text": "helm list",
+              "why": "クラスタにあるリリースの一覧を出すもので、チャートの値は出しません。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "helm show values は、チャートの既定の値 (values.yaml) を表示します。どの値を -f や --set で上書きできるかを、入れる前に確かめられます。",
+          "source": "https://helm.sh/docs/helm/helm_show_values/"
+        },
+        {
+          "id": "x-ad-005",
+          "type": "choice",
+          "prompt": "Kustomize の configMapGenerator で作る ConfigMap の名前に、ハッシュの付いた接尾辞 (例 app-config-8mbdf7882g) が付く。この仕組みで得られることはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "ConfigMap の中身が暗号化され、他の人に読まれなくなる",
+              "why": "接尾辞は名前に付くだけで、中身は暗号化されません。"
+            },
+            {
+              "id": "b",
+              "text": "同じ名前の ConfigMap を、複数の namespace に置けるようになる",
+              "why": "namespace が違えば、接尾辞が無くても同じ名前を使えます。"
+            },
+            {
+              "id": "c",
+              "text": "ConfigMap が一定の時間で自動的に消えるようになる",
+              "why": "接尾辞に有効期限の意味はありません。"
+            },
+            {
+              "id": "d",
+              "text": "中身を変えると名前も変わり、新しい名前の ConfigMap が作られる",
+              "why": "正しい選択肢です。中身から作ったハッシュなので、変えれば別の名前になり、参照も書き換わります。"
+            }
+          ],
+          "answer": "d",
+          "explanation": "Kustomize が作る ConfigMap と Secret には、中身から計算したハッシュが名前に付きます。中身を変えると新しい名前の ConfigMap が作られ、Deployment の Pod テンプレートの参照もその名前に書き換わります。Pod テンプレートが変わるので、当て直すと Deployment が新しい Pod に入れ替えます。",
+          "source": "https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/"
+        },
+        {
+          "id": "x-ad-006",
+          "type": "choice",
+          "prompt": "Service web (selector は app: web) への通信のうち、一部だけを新しい版に流したい (カナリア)。利用者は今のアドレスのまま使う。Deployment と Service だけでどうする?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "今の Deployment の maxSurge を大きくして、新版へ少しずつ更新する",
+              "why": "maxSurge は一度に足す Pod の数で、更新が終われば全部が新しい版になります。"
+            },
+            {
+              "id": "b",
+              "text": "新版の Deployment を少数で作り、app: web と track: canary を付ける",
+              "why": "正しい選択肢です。Service は両方の Pod に流し、レプリカの数の比で割合を調節できます。"
+            },
+            {
+              "id": "c",
+              "text": "新版用に別の Service を作り、試したい人に新しいアドレスを伝える",
+              "why": "利用者がアドレスを変えることになり、今のアドレスへの通信の一部を流すことにはなりません。"
+            },
+            {
+              "id": "d",
+              "text": "今の Deployment の strategy を Recreate にして、新版へ更新する",
+              "why": "Recreate は古い Pod を全部止めてから新しい Pod を作るので、全員が一度に新しい版になります。"
+            }
+          ],
+          "answer": "b",
+          "explanation": "Kubernetes の文書のカナリアの例では、安定版とカナリア版の 2 つの Deployment に共通のラベル (app) を付け、1 つの Service で両方に流します。track ラベルで 2 つを見分け、レプリカの数の比で流す割合を決めます。",
+          "source": "https://kubernetes.io/docs/concepts/workloads/management/"
+        },
+        {
+          "id": "x-ad-007",
+          "type": "choice",
+          "prompt": "本番の Deployment に image: myapp:latest と書いて運用している。Kubernetes の文書が挙げる困りごととして正しいのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "latest のタグは、Kubernetes が受け付けないので Pod を作れない",
+              "why": "latest のタグも受け付けます。Pod は作れます。"
+            },
+            {
+              "id": "b",
+              "text": "latest のイメージは、ノードに置いておける時間に限りがある",
+              "why": "タグによって、ノードに置いておける時間が変わることはありません。"
+            },
+            {
+              "id": "c",
+              "text": "どの版のイメージが動いているか追いにくく、きちんと戻すのも難しい",
+              "why": "正しい選択肢です。タグは別のイメージを指すように動かせるので、版が定まりません。"
+            },
+            {
+              "id": "d",
+              "text": "latest のイメージは、コンテナの中のネットワークを使えない",
+              "why": "タグはネットワークの使い方に関わりません。"
+            }
+          ],
+          "answer": "c",
+          "explanation": "Kubernetes の文書は、本番で :latest のタグを使うことを避けるよう勧めています。どの版が動いているか追いにくく、戻すのも難しくなるからです。代わりに v1.42.0 のような意味のあるタグやダイジェストを使います。",
+          "source": "https://kubernetes.io/docs/concepts/containers/images/"
+        },
+        {
+          "id": "x-ad-008",
+          "type": "choice",
+          "prompt": "Argo CD の自動同期を使っている。Git から Deployment の YAML を消したら、クラスタからもその Deployment を自動で消させたい。どうする?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "syncPolicy.automated に prune: true を書く",
+              "why": "正しい選択肢です。自動同期で、Git から消えたリソースもクラスタから消すようになります。"
+            },
+            {
+              "id": "b",
+              "text": "syncPolicy.automated に selfHeal: true を書く",
+              "why": "selfHeal は、クラスタで手で変えた分を Git の状態へ戻すものです。Git から消えたリソースは消しません。"
+            },
+            {
+              "id": "c",
+              "text": "何もしない。自動同期は既定で消えたものも消す",
+              "why": "既定の自動同期は、安全のため、Git から消えたリソースを消しません。"
+            },
+            {
+              "id": "d",
+              "text": "Deployment の replicas を 0 にして Git に push する",
+              "why": "Pod が 0 個になるだけで、Deployment そのものはクラスタに残ります。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "Argo CD の自動同期は、既定では Git に定義が無くなったリソースを消しません。誤って消すのを防ぐ安全の仕組みです。消させたいときは syncPolicy.automated に prune: true を書くか、argocd app set <APP> --auto-prune を使います。",
+          "source": "https://argo-cd.readthedocs.io/en/stable/user-guide/auto_sync/"
+        },
+        {
+          "id": "x-ad-009",
+          "type": "fill",
+          "prompt": "公開されているチャートのリポジトリ https://charts.example.com を、手元の helm に myrepo という名前で登録したい。空欄に入るサブコマンドは?",
+          "language": "bash",
+          "code": "helm repo {{blank}} myrepo https://charts.example.com",
+          "answers": [
+            "add"
+          ],
+          "candidates": [
+            "update",
+            "list",
+            "add",
+            "index"
+          ],
+          "explanation": "helm repo add は、チャートのリポジトリに名前を付けて手元の helm に登録します。登録した後は myrepo/<チャート名> の形でチャートを指せます。",
+          "wrongNotes": {
+            "update": "update は、登録済みのリポジトリからチャートの一覧を取り直すものです。",
+            "index": "index は、手元のフォルダのチャートからリポジトリ用の index.yaml を作るものです。",
+            "list": "list は、登録済みのリポジトリの一覧を出すものです。"
+          },
+          "source": "https://helm.sh/docs/helm/helm_repo_add/"
+        },
+        {
+          "id": "x-ad-010",
+          "type": "choice",
+          "prompt": "Argo CD の画面で、アプリが Synced と Degraded の両方で出ている。分かることとして正しいのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "Git にまだ取り込まれていない変更があり、これから当てられる",
+              "why": "それは OutOfSync のときです。Synced は Git とクラスタがそろっていることを表します。"
+            },
+            {
+              "id": "b",
+              "text": "クラスタは Git のとおりだが、アプリが正しく動いていない",
+              "why": "正しい選択肢です。同期の状態と健康の状態は別々に見られます。"
+            },
+            {
+              "id": "c",
+              "text": "Argo CD がクラスタに届かず、状態を読めていない",
+              "why": "状態を読めないときは Unknown になります。"
+            },
+            {
+              "id": "d",
+              "text": "アプリは正しく動いているが、Git の内容とは食い違っている",
+              "why": "食い違っていれば OutOfSync、正しく動いていれば Healthy と出ます。"
+            }
+          ],
+          "answer": "b",
+          "explanation": "Argo CD は 2 つの状態を分けて見せます。Sync status はクラスタが Git のとおりか、Health はアプリが正しく動いてリクエストに応えられるかです。Synced で Degraded なら、Git のとおりに当てたものの中身に問題があります。",
+          "source": "https://argo-cd.readthedocs.io/en/stable/core_concepts/"
+        },
+        {
+          "id": "x-ad-011",
+          "type": "choice",
+          "prompt": "起動に 2 分ほどかかるアプリの Pod が、起動しきる前に再起動を繰り返す。Events は次のとおり。直し方として正しいのはどれ?",
+          "code": {
+            "language": "plaintext",
+            "text": "  Warning  Unhealthy  20s (x3 over 40s)  kubelet  Liveness probe failed: Get \"http://10.42.0.15:8080/healthz\": dial tcp 10.42.0.15:8080: connect: connection refused\n  Normal   Killing    20s                kubelet  Container app failed liveness probe, will be restarted"
+          },
+          "choices": [
+            {
+              "id": "a",
+              "text": "起動にかかる時間を覆える startupProbe を足す",
+              "why": "正しい選択肢です。startupProbe が一度通るまでは、livenessProbe に代わって起動を待ちます。"
+            },
+            {
+              "id": "b",
+              "text": "Pod の memory の limits を大きくする",
+              "why": "メモリの使いすぎ (OOMKilled) ではなく、livenessProbe に通らないので止められています。"
+            },
+            {
+              "id": "c",
+              "text": "Service の selector を Pod のラベルに合わせる",
+              "why": "Service の selector は、livenessProbe の結果やコンテナの再起動に関わりません。"
+            },
+            {
+              "id": "d",
+              "text": "イメージのタグを latest に変えて取り直す",
+              "why": "イメージは取れて動き始めています。起動を待たずにプローブが失敗と見ているのが原因です。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "livenessProbe に通らないと、kubelet はコンテナを止めて再起動します。起動の遅いアプリには、failureThreshold × periodSeconds で起動にかかる時間を覆える startupProbe を足します。startupProbe が一度通ると、そこから livenessProbe が見張りを引き継ぎます。",
+          "source": "https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/"
+        },
+        {
+          "id": "x-ad-012",
+          "type": "choice",
+          "prompt": "落ちたコンテナのアプリは、終わる前に理由の文を /dev/termination-log に書く作りになっている。この理由の文を Kubernetes で読める場所として正しいのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "Pod の状態の lastState.terminated.message の欄",
+              "why": "正しい選択肢です。kubectl describe pod では、Last State の Message として出ます。"
+            },
+            {
+              "id": "b",
+              "text": "kube-apiserver の監査ログの、その Pod の行",
+              "why": "監査ログは API への操作の記録で、コンテナが書いた理由の文は入りません。"
+            },
+            {
+              "id": "c",
+              "text": "Deployment の状態の conditions の message の欄",
+              "why": "Deployment の更新の状態で、コンテナが書いた理由の文は入りません。"
+            },
+            {
+              "id": "d",
+              "text": "ノードの /etc/kubernetes の下に置かれたファイル",
+              "why": "設定のファイルの置き場で、理由の文は Pod の状態として API に載ります。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "Kubernetes は、コンテナの terminationMessagePath (既定は /dev/termination-log) のファイルから終了の理由の文を読み、Pod の状態の lastState.terminated.message に載せます。kubectl get pod -o go-template などで、この欄だけを取り出せます。",
+          "source": "https://kubernetes.io/docs/tasks/debug/debug-application/determine-reason-pod-failure/"
+        },
+        {
+          "id": "x-ad-013",
+          "type": "choice",
+          "prompt": "Pod web がいつまでも起動しない。次の出力から分かることと、次にやることの組み合わせとして正しいのはどれ?",
+          "code": {
+            "language": "plaintext",
+            "text": "$ kubectl get pod web\nNAME   READY   STATUS     RESTARTS   AGE\nweb    0/1     Init:0/1   0          4m"
+          },
+          "choices": [
+            {
+              "id": "a",
+              "text": "init コンテナが終わっていない。kubectl describe pod web で init コンテナの状態を見る",
+              "why": "正しい選択肢です。Init:0/1 は、1 つある init コンテナがまだ 1 つも終わっていないことを表します。"
+            },
+            {
+              "id": "b",
+              "text": "アプリのコンテナが落ち続けている。kubectl logs web --previous でログを読む",
+              "why": "アプリのコンテナが落ちていれば CrashLoopBackOff と出ます。init コンテナが終わるまで、アプリのコンテナは始まりません。"
+            },
+            {
+              "id": "c",
+              "text": "Pod を置けるノードが無い。kubectl describe node で各ノードの空きを見る",
+              "why": "置けるノードが無ければ、STATUS は Pending のままです。"
+            },
+            {
+              "id": "d",
+              "text": "Service が Pod を選べていない。Service の selector とラベルを見比べる",
+              "why": "Service が選べるかどうかは、Pod の起動には関わりません。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "STATUS の Init:N/M は、M 個の init コンテナのうち N 個が終わったことを表します。init コンテナがすべて終わるまでアプリのコンテナは始まらないので、describe で init コンテナの状態と終了コードを見ます。",
+          "source": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-init-containers/"
+        },
+        {
+          "id": "x-ad-014",
+          "type": "choice",
+          "prompt": "Pod myapp のコンテナが起動してすぐ落ち続けるので、中に入って調べられない。元の Pod はそのままで、コマンドだけをシェルに変えた写しを作って調べたい。合うのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "kubectl debug myapp -it --copy-to=myapp-debug --container=myapp -- sh",
+              "why": "正しい選択肢です。myapp を写した Pod myapp-debug を作り、コンテナのコマンドを sh に変えます。"
+            },
+            {
+              "id": "b",
+              "text": "kubectl exec -it myapp --container=myapp -- sh -c 'ls -la /app'",
+              "why": "exec は動いているコンテナの中でコマンドを動かすもので、落ち続けるコンテナには入れません。"
+            },
+            {
+              "id": "c",
+              "text": "kubectl attach -it myapp --container=myapp --pod-running-timeout=2m",
+              "why": "attach は動いているコンテナの入出力につなぐだけで、コマンドは変えられません。"
+            },
+            {
+              "id": "d",
+              "text": "kubectl logs myapp --container=myapp --previous --timestamps=true",
+              "why": "落ちる前のログを読むだけで、中に入って調べることはできません。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "kubectl debug の --copy-to は、元の Pod を写した新しい Pod を作ります。--container で選んだコンテナのコマンドを -- の後ろ (sh) に変えるので、落ちずにシェルが動き、ファイルを見たりコマンドを手で動かしたりできます。終わったら写しの Pod も消します。",
+          "source": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-running-pod/"
+        },
+        {
+          "id": "x-ad-015",
+          "type": "choice",
+          "prompt": "シェルの入っていない distroless のイメージで動く Pod の中を調べたい。kubectl exec -it app -- sh は executable file not found で失敗した。次に使うのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "kubectl logs app --previous --timestamps",
+              "why": "落ちる前のコンテナのログを読むもので、Pod の中で調べものはできません。"
+            },
+            {
+              "id": "b",
+              "text": "kubectl debug -it app --image=busybox:1.28 --target=app",
+              "why": "正しい選択肢です。道具の入ったエフェメラルコンテナを Pod に足して調べられます。"
+            },
+            {
+              "id": "c",
+              "text": "kubectl port-forward pod/app 8080:80 --address 127.0.0.1",
+              "why": "手元のポートを Pod につなぐだけで、Pod の中に入って調べることはできません。"
+            },
+            {
+              "id": "d",
+              "text": "kubectl rollout restart deployment/app -n default",
+              "why": "Pod を作り直すだけで、中を調べる道具は増えません。"
+            }
+          ],
+          "answer": "b",
+          "explanation": "エフェメラルコンテナは、イメージに調べる道具が入っていないときや、コンテナが落ちたときのために使います。kubectl debug で道具の入ったイメージのコンテナを動いている Pod に足し、--target で調べたいコンテナのプロセスを見られるようにします。",
+          "source": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-running-pod/"
+        },
+        {
+          "id": "x-ad-016",
+          "type": "fill",
+          "prompt": "Pod web-7d9f8c6b5-k2x4p には、app と log-agent の 2 つのコンテナがある。log-agent のコンテナのログだけを読みたい。空欄に入るフラグは?",
+          "language": "bash",
+          "code": "kubectl logs web-7d9f8c6b5-k2x4p {{blank}} log-agent",
+          "answers": [
+            "-c",
+            "--container"
+          ],
+          "candidates": [
+            "-p",
+            "-c",
+            "-f",
+            "-l"
+          ],
+          "explanation": "コンテナが複数ある Pod では、-c (--container) でログを読むコンテナを名前で選びます。",
+          "wrongNotes": {
+            "-p": "-p (--previous) は、落ちる前のコンテナのログを読むフラグです。",
+            "-f": "-f (--follow) は、新しく出るログを流し続けて見るフラグです。",
+            "-l": "-l はラベルで Pod を選ぶフラグで、コンテナは選べません。"
+          },
+          "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_logs/"
+        },
+        {
+          "id": "x-ad-017",
+          "type": "choice",
+          "prompt": "クラスタの中だけで使う Service の Web 画面を、外に公開せずに、手元のブラウザで一時的に確かめたい。合うのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "Service の type を LoadBalancer に変える",
+              "why": "外から届くアドレスが付き、外に公開することになります。"
+            },
+            {
+              "id": "b",
+              "text": "Ingress を作って、名前で届くようにする",
+              "why": "Ingress も外からの通信を Service に流す仕組みで、公開することになります。"
+            },
+            {
+              "id": "c",
+              "text": "kubectl port-forward で、Service のポートへ一時的につなぐ",
+              "why": "正しい選択肢です。手元の PC からだけ届く、一時的なつなぎです。"
+            },
+            {
+              "id": "d",
+              "text": "Pod に hostNetwork: true を付けて作り直す",
+              "why": "ノードのネットワークを直接使うことになり、確かめのために変える設定ではありません。"
+            }
+          ],
+          "answer": "c",
+          "explanation": "kubectl port-forward は、手元のポートをクラスタの中の Pod や Service のポートにつなぎます。Service を外に公開せずに、手元から一時的に確かめるのに使えます。",
+          "source": "https://kubernetes.io/docs/tasks/access-application-cluster/port-forward-access-application-cluster/"
+        },
+        {
+          "id": "x-ad-018",
+          "type": "choice",
+          "prompt": "昨日の夜に起きた Pod の失敗の原因を、今朝 kubectl get events で調べようとしたが、その頃のイベントが出てこない。理由として考えられるのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "イベントは、その Pod の中のコンテナにしか残らない",
+              "why": "イベントは API サーバーに置かれるオブジェクトで、コンテナの中には残りません。"
+            },
+            {
+              "id": "b",
+              "text": "イベントは、kubectl logs を打ったときにしか作られない",
+              "why": "イベントはコンポーネントが自動で作ります。kubectl logs とは関わりません。"
+            },
+            {
+              "id": "c",
+              "text": "イベントは、Warning のものしか記録されない",
+              "why": "Normal のイベントも記録されます。"
+            },
+            {
+              "id": "d",
+              "text": "イベントは既定では 1 時間しか残らず、消えている",
+              "why": "正しい選択肢です。kube-apiserver の --event-ttl の既定値は 1 時間です。"
+            }
+          ],
+          "answer": "d",
+          "explanation": "kube-apiserver はイベントを --event-ttl の間だけ残し、既定値は 1 時間 (1h0m0s) です。後から原因を追えるように、ログやメトリクスはクラスタの外の仕組みにも集めておきます。",
+          "source": "https://kubernetes.io/docs/reference/command-line-tools-reference/kube-apiserver/"
+        },
+        {
+          "id": "x-ad-019",
+          "type": "choice",
+          "prompt": "新しく作った Pod が起動しない。kubectl describe pod の Events に次のように出ている。直し方として正しいのはどれ?",
+          "code": {
+            "language": "plaintext",
+            "text": "  Warning  Failed  10s (x3 over 40s)  kubelet  Error: secret \"db-pass\" not found"
+          },
+          "choices": [
+            {
+              "id": "a",
+              "text": "Pod を一度消して、まったく同じ定義のまま作り直す",
+              "why": "Secret が無いままなので、作り直しても同じところで止まります。"
+            },
+            {
+              "id": "b",
+              "text": "同じ namespace に Secret db-pass を作る",
+              "why": "正しい選択肢です。kubelet は繰り返し試すので、Secret ができれば起動します。"
+            },
+            {
+              "id": "c",
+              "text": "ノードを足して、Pod を別のノードに置き直させる",
+              "why": "Secret が無いことは、どのノードに置いても変わりません。"
+            },
+            {
+              "id": "d",
+              "text": "コンテナのイメージを、別のレジストリから取るように変える",
+              "why": "Secret の名前で探して見つからないエラーで、イメージとは関わりません。"
+            }
+          ],
+          "answer": "b",
+          "explanation": "Pod が参照する Secret を取れないとき、kubelet は Pod の起動を繰り返し試し、問題をイベントに出します。Secret は既定で必須なので、作られるまでコンテナは起動しません。参照している名前の Secret を同じ namespace に作ります。",
+          "source": "https://kubernetes.io/docs/concepts/configuration/secret/"
+        },
+        {
+          "id": "x-ad-020",
+          "type": "choice",
+          "prompt": "イメージを新しくした Deployment web を kubectl describe deployment で見たら、次のように出ていた。正しいのはどれ?",
+          "code": {
+            "language": "plaintext",
+            "text": "Conditions:\n  Type           Status  Reason\n  ----           ------  ------\n  Available      True    MinimumReplicasAvailable\n  Progressing    False   ProgressDeadlineExceeded"
+          },
+          "choices": [
+            {
+              "id": "a",
+              "text": "更新が期限内に終わらず、Kubernetes が自動で前の版に戻した",
+              "why": "Kubernetes は状態を報告するだけで、自動では戻しません。"
+            },
+            {
+              "id": "b",
+              "text": "更新はすべて終わり、新しい版の Pod がそろっている",
+              "why": "更新が終わっていれば、Progressing は True で NewReplicaSetAvailable と出ます。"
+            },
+            {
+              "id": "c",
+              "text": "更新が期限内に進まず止まった。前の版には戻っていない",
+              "why": "正しい選択肢です。期限 (既定で 600 秒) を過ぎると、この状態が付くだけです。"
+            },
+            {
+              "id": "d",
+              "text": "Deployment を置けるノードが無いので、古い Pod も止まっている",
+              "why": "Available が True なので、使える Pod は最低限の数だけ動いています。"
+            }
+          ],
+          "answer": "c",
+          "explanation": "progressDeadlineSeconds (既定で 600 秒) の間に更新が進まないと、Progressing が False、理由が ProgressDeadlineExceeded になります。Kubernetes はこの状態を報告するだけで、戻すのは人か上の仕組みの役目です。",
+          "source": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"
+        }
+      ]
+    },
+    {
+      "id": "x-ar",
+      "kind": "quiz",
+      "title": "模擬試験用 Architecture",
+      "summary": "模擬試験用",
+      "domain": "Cloud Native Architecture",
+      "questions": [
+        {
+          "id": "x-ar-001",
+          "type": "choice",
+          "prompt": "カウンタ http_requests_total から、直近 5 分の平均で 1 秒あたりのリクエスト数を出したい。合う PromQL はどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "http_requests_total[5m]",
+              "why": "5 分の間の値の並びを取り出すだけで、1 秒あたりの数にはなりません。"
+            },
+            {
+              "id": "b",
+              "text": "rate(http_requests_total[5m])",
+              "why": "正しい選択肢です。カウンタの 5 分の窓での 1 秒あたりの平均の増え方を出します。"
+            },
+            {
+              "id": "c",
+              "text": "sum(http_requests_total)",
+              "why": "始まってからの合計を足し合わせるだけで、1 秒あたりの数にはなりません。"
+            },
+            {
+              "id": "d",
+              "text": "max_over_time(http_requests_total[5m])",
+              "why": "5 分の間でいちばん大きい値で、増え方の速さにはなりません。"
+            }
+          ],
+          "answer": "b",
+          "explanation": "rate() は、範囲の中のカウンタの増え方を 1 秒あたりの平均にして出します。カウンタは増え続ける値なので、そのままではなく rate() で速さに直して見ます。",
+          "source": "https://prometheus.io/docs/prometheus/latest/querying/functions/"
+        },
+        {
+          "id": "x-ar-002",
+          "type": "choice",
+          "prompt": "API の応答時間について、「95% のリクエストが何秒以内に返ったか」を、複数の Pod の分を合わせて出したい。Prometheus のメトリクスの種類で合うのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "Gauge",
+              "why": "Gauge は今の値を 1 つ持つだけで、応答時間の分布は持てません。"
+            },
+            {
+              "id": "b",
+              "text": "Counter",
+              "why": "Counter は増えるだけの数で、それだけではパーセンタイルを出せません。"
+            },
+            {
+              "id": "c",
+              "text": "Histogram",
+              "why": "正しい選択肢です。区間ごとの件数を持つので、histogram_quantile() で合わせて計算できます。"
+            },
+            {
+              "id": "d",
+              "text": "Summary",
+              "why": "Summary は Pod ごとに分位数を計算して出すもので、出した分位数は Pod をまたいで合わせられません。"
+            }
+          ],
+          "answer": "c",
+          "explanation": "Histogram は、値を区間 (bucket) ごとに数えます。区間の件数は Pod をまたいで足せるので、histogram_quantile() で全体の 95 パーセンタイルを出せます。Summary の分位数は合わせられないので、複数の Pod の分を合わせるなら Histogram を使います。",
+          "source": "https://prometheus.io/docs/practices/histograms/"
+        },
+        {
+          "id": "x-ar-003",
+          "type": "choice",
+          "prompt": "メトリクス http_requests_total に、利用者ごとに数を分けたいので user_id のラベルを足そうとしている。Prometheus の文書の考え方として正しいのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "ラベルの値がとても多く、時系列の数が増えすぎるので避ける",
+              "why": "正しい選択肢です。値の種類が多いもの (利用者の ID やメールアドレス) はラベルにしません。"
+            },
+            {
+              "id": "b",
+              "text": "ラベルは何個足しても負荷が変わらないので、気にせず足す",
+              "why": "ラベルの値の組ごとに時系列が 1 本増えるので、負荷は増えます。"
+            },
+            {
+              "id": "c",
+              "text": "ラベルには数字を入れられないので、ID は名前にして入れる",
+              "why": "ラベルの値は文字列で、数字の並びも入れられます。問題は値の種類の多さです。"
+            },
+            {
+              "id": "d",
+              "text": "利用者ごとに数えるなら、メトリクスの名前に ID を入れる",
+              "why": "名前に ID を入れても時系列が増えるのは同じで、集計もしにくくなります。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "Prometheus では、ラベルの値の組み合わせごとに別の時系列ができます。利用者の ID のように値の種類がとても多いものをラベルにすると、時系列が増えすぎて重くなるので避けます。",
+          "source": "https://prometheus.io/docs/practices/naming/"
+        },
+        {
+          "id": "x-ar-004",
+          "type": "choice",
+          "prompt": "1 つの障害で同じ種類のアラートが 100 件出て、担当者に 100 通の通知が届いてしまう。これを 1 通にまとめ、宛先も決めて送りたい。受け持つのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "Prometheus サーバーの scrape の設定",
+              "why": "scrape の設定はメトリクスの集め方を決めるもので、通知はまとめません。"
+            },
+            {
+              "id": "b",
+              "text": "Grafana のダッシュボード",
+              "why": "ダッシュボードはデータを図にして見せるものです。"
+            },
+            {
+              "id": "c",
+              "text": "OpenTelemetry Collector の exporter",
+              "why": "exporter はテレメトリーのデータを送り先へ渡す部品で、アラートの通知はまとめません。"
+            },
+            {
+              "id": "d",
+              "text": "Alertmanager",
+              "why": "正しい選択肢です。アラートの重複を除き、まとめて、宛先に送ります。"
+            }
+          ],
+          "answer": "d",
+          "explanation": "Prometheus はアラートの条件を調べ、当てはまったものを Alertmanager に送ります。Alertmanager は重複を除き、似たものを 1 つの通知にまとめ (grouping)、メールやチャットなどの宛先へ送ります。一時的に止める (silence) こともできます。",
+          "source": "https://prometheus.io/docs/alerting/latest/alertmanager/"
+        },
+        {
+          "id": "x-ar-005",
+          "type": "fill",
+          "prompt": "Prometheus のアラートのルールで、エラー率が高い状態が 10 分続いたときだけ発火させ、一瞬の山では発火させたくない。空欄に入る欄は?",
+          "language": "yaml",
+          "code": "groups:\n- name: web\n  rules:\n  - alert: HighErrorRate\n    expr: job:request_errors:ratio5m{job=\"web\"} > 0.05\n    {{blank}}: 10m\n    labels:\n      severity: page",
+          "answers": [
+            "for"
+          ],
+          "candidates": [
+            "interval",
+            "expr",
+            "for",
+            "annotations"
+          ],
+          "explanation": "for を書くと、Prometheus は条件に当てはまってから、その時間だけ当てはまり続けるのを待ってから発火させます。待っている間のアラートは pending の状態です。",
+          "wrongNotes": {
+            "interval": "interval はルールのグループを調べる間隔で、グループに書く欄です。続いた時間の条件にはなりません。",
+            "expr": "expr はアラートの条件の式で、すでに上の行に書いてあります。",
+            "annotations": "annotations は説明の文など、アラートに添える情報を書く欄です。"
+          },
+          "source": "https://prometheus.io/docs/prometheus/latest/configuration/alerting_rules/"
+        },
+        {
+          "id": "x-ar-006",
+          "type": "choice",
+          "prompt": "動いているサーバーに SSH で入って直すのをやめ、直すときは新しいイメージを作って入れ替えることにした。このやり方を表す言葉はどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "イミュータブルインフラストラクチャ",
+              "why": "正しい選択肢です。一度置いたものは変えず、変えるときは新しく作って入れ替えます。"
+            },
+            {
+              "id": "b",
+              "text": "サービスメッシュ",
+              "why": "サービスの間の通信を受け持つ仕組みで、サーバーの直し方の考え方ではありません。"
+            },
+            {
+              "id": "c",
+              "text": "水平スケーリング (スケールアウト)",
+              "why": "Pod やサーバーの数を増やして負荷を分けることで、直し方の考え方ではありません。"
+            },
+            {
+              "id": "d",
+              "text": "コンフィギュレーションドリフト",
+              "why": "手で直し続けた結果、サーバーごとに設定がずれていく状態のことで、むしろ避けたいものです。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "イミュータブルインフラストラクチャでは、置いたサーバーやコンテナを後から変えません。変えるときは新しい版を作るか、イメージから作り直します。勝手な変更が起きないので運用しやすく、バージョン管理と組めば変更の記録も残ります。",
+          "source": "https://glossary.cncf.io/immutable-infrastructure/"
+        },
+        {
+          "id": "x-ar-007",
+          "type": "choice",
+          "prompt": "夜中にノードが 1 台止まったが、人が何もしないうちに、そこにいた Pod が別のノードで動き直していた。このような性質を表す言葉はどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "自己修復 (セルフヒーリング)",
+              "why": "正しい選択肢です。ある種の障害から、人の手を借りずに元の状態へ戻ります。"
+            },
+            {
+              "id": "b",
+              "text": "疎結合 (ルースカップリング)",
+              "why": "部品どうしが互いに強く頼らない作り方のことで、壊れたものを自動で戻す性質ではありません。"
+            },
+            {
+              "id": "c",
+              "text": "垂直スケーリング (スケールアップ)",
+              "why": "1 台に割り当てる CPU やメモリを増やすことで、障害から戻る性質ではありません。"
+            },
+            {
+              "id": "d",
+              "text": "ベンダーロックイン (業者の囲い込み)",
+              "why": "特定の業者の製品から離れにくくなる状態のことです。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "自己修復のシステムは、ある種の障害から人の手を借りずに戻ります。Kubernetes ではコントローラが望ましい状態と今の状態を比べ続け、足りなくなった Pod を別のノードに作り直します。",
+          "source": "https://glossary.cncf.io/self-healing/"
+        },
+        {
+          "id": "x-ar-008",
+          "type": "choice",
+          "prompt": "1 つの大きなアプリを、機能ごとの小さなサービス (マイクロサービス) に分けることにした。分けることで得られることとして正しいのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "サービスの間の通信が無くなり、ネットワークの障害を気にしなくてよくなる",
+              "why": "分けるとサービスの間の通信は増えます。ネットワークの障害への備えがより要ります。"
+            },
+            {
+              "id": "b",
+              "text": "全部を 1 つのデータベースと 1 つの版にそろえるので、管理が単純になる",
+              "why": "それは 1 つにまとめたアプリの特徴です。分けると動く部品が増えます。"
+            },
+            {
+              "id": "c",
+              "text": "機能ごとに別々に更新し、負荷の多い機能だけを増やせる",
+              "why": "正しい選択肢です。サービスごとに独立して出せて、増やせます。"
+            },
+            {
+              "id": "d",
+              "text": "負荷が増えると、アプリ全体をまとめて増やすしかなくなる",
+              "why": "それは 1 つにまとめたアプリのやり方です。分ければ、負荷の多い機能だけを増やせます。"
+            }
+          ],
+          "answer": "c",
+          "explanation": "マイクロサービスでは、機能ごとのサービスを別々に作り、出し、増やせます。代わりにサービスの間の通信が増えるので、ネットワークの障害への備えや、全体を見渡す仕組み (可観測性) が大事になります。",
+          "source": "https://glossary.cncf.io/microservices-architecture/"
+        },
+        {
+          "id": "x-ar-009",
+          "type": "choice",
+          "prompt": "「特権のコンテナは作らせない」のような決まりをコードで書き、Kubernetes にマニフェストが入る時点で外れたものを拒みたい。合う CNCF の Graduated のプロジェクトはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "Open Policy Agent (OPA)",
+              "why": "正しい選択肢です。汎用のポリシーのエンジンで、Gatekeeper と組んで Kubernetes で使えます。"
+            },
+            {
+              "id": "b",
+              "text": "OpenTelemetry",
+              "why": "トレース・メトリクス・ログを集めて送るための仕様と道具で、決まりは調べません。"
+            },
+            {
+              "id": "c",
+              "text": "Cloud Native Buildpacks",
+              "why": "ソースコードからコンテナのイメージを作るためのもので、マニフェストは拒みません。"
+            },
+            {
+              "id": "d",
+              "text": "Harbor",
+              "why": "コンテナのイメージを置いておくレジストリのプロジェクトです。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "Open Policy Agent (OPA) は CNCF の Graduated の、汎用のポリシーのエンジンです。決まりをコード (Rego) で書き、Kubernetes ではアドミッションの段階でマニフェストを調べて、外れたものを拒むのに使えます。",
+          "source": "https://www.cncf.io/projects/open-policy-agent-opa/"
+        },
+        {
+          "id": "x-ar-010",
+          "type": "choice",
+          "prompt": "手元では docker build でイメージを作っている。ノードのコンテナランタイムが containerd のクラスタで、このイメージは動く?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "動かない。containerd 用の形にイメージを作り直す必要がある",
+              "why": "作り直す必要はありません。同じイメージの形を使います。"
+            },
+            {
+              "id": "b",
+              "text": "動く。docker build で作るイメージは、どの CRI の実装でも動く",
+              "why": "正しい選択肢です。イメージの形は OCI の仕様で決まっていて、共通です。"
+            },
+            {
+              "id": "c",
+              "text": "ノードに Docker Engine も入れておけば、そのまま動く",
+              "why": "Docker Engine は要りません。containerd がそのままイメージを取って動かします。"
+            },
+            {
+              "id": "d",
+              "text": "動くが、ノードの OS が Windows のときに限られる",
+              "why": "OS で決まることではありません。Linux のノードでも動きます。"
+            }
+          ],
+          "answer": "b",
+          "explanation": "Kubernetes の dockershim の FAQ は、docker build で作ったイメージはすべての CRI の実装で動くと答えています。イメージの形が OCI の仕様にそろっているので、containerd や CRI-O でもそのまま使えます。",
+          "source": "https://kubernetes.io/blog/2022/02/17/dockershim-faq/"
+        },
+        {
+          "id": "x-ar-011",
+          "type": "choice",
+          "prompt": "Kubernetes に、大きな新しい機能を足したい。設計を話し合い、進み具合を追うための提案は、どこにどの形で出す?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "CNCF の TOC に、新しいプロジェクトの申し込みとして出す",
+              "why": "TOC への申し込みは、プロジェクトを CNCF に入れるためのものです。"
+            },
+            {
+              "id": "b",
+              "text": "Kubernetes の公式ブログに、紹介の記事として出す",
+              "why": "ブログはお知らせの場で、設計を話し合って進み具合を追う場ではありません。"
+            },
+            {
+              "id": "c",
+              "text": "kubernetes/kubernetes に、完成したコードの PR だけを出す",
+              "why": "大きな機能は先に設計の合意が要ります。PR だけでは話し合いと追跡の記録になりません。"
+            },
+            {
+              "id": "d",
+              "text": "kubernetes/enhancements に、KEP として出す",
+              "why": "正しい選択肢です。大きな変更の提案と追跡は KEP で行います。"
+            }
+          ],
+          "answer": "d",
+          "explanation": "Kubernetes の大きな変更は、KEP (Kubernetes Enhancement Proposal) として kubernetes/enhancements のリポジトリで提案します。KEP に動機や設計、alpha から GA までの段階を書き、担当の SIG と話し合いながら進みます。",
+          "source": "https://github.com/kubernetes/enhancements"
+        },
+        {
+          "id": "x-ar-012",
+          "type": "choice",
+          "prompt": "Kubernetes プロジェクトで、複数の SIG にまたがる課題を話し合うために作り、課題が片付けば解散する集まりはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "Steering Committee",
+              "why": "プロジェクト全体の運営を受け持つ、常設の委員会です。"
+            },
+            {
+              "id": "b",
+              "text": "Working Group (WG)",
+              "why": "正しい選択肢です。SIG をまたぐ話題や短い期間の話題を扱います。"
+            },
+            {
+              "id": "c",
+              "text": "Special Interest Group (SIG)",
+              "why": "SIG はプロジェクトを分ける主な単位で、自分の受け持ちの部分を常に持ちます。"
+            },
+            {
+              "id": "d",
+              "text": "CNCF の Graduated プロジェクト",
+              "why": "成熟の段階の名前で、話し合いの集まりではありません。"
+            }
+          ],
+          "answer": "b",
+          "explanation": "Kubernetes の運営の文書では、SIG がプロジェクトの各部分を受け持ちます。Working Group は、SIG をまたぐ話題や短い期間の話題を話し合うための集まりで、作り方と解散の決まりがあります。",
+          "source": "https://github.com/kubernetes/community/blob/master/governance.md"
+        },
+        {
+          "id": "x-ar-013",
+          "type": "choice",
+          "prompt": "初めて Kubernetes のリポジトリにコードの PR を出したら、ボットが署名を求めてきた。この署名は何?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "CNCF の CLA (貢献者のライセンスの同意書)",
+              "why": "正しい選択肢です。Kubernetes は CLA に署名した人のコードだけを受け入れます。"
+            },
+            {
+              "id": "b",
+              "text": "CKA や KCNA などの資格を持っていることの証明書",
+              "why": "資格は貢献の条件ではありません。誰でも貢献できます。"
+            },
+            {
+              "id": "c",
+              "text": "SIG の chair (まとめ役) になるための申し込みの書類",
+              "why": "まとめ役は貢献を重ねた人が SIG の中で決まるもので、最初の PR では求められません。"
+            },
+            {
+              "id": "d",
+              "text": "有料の CNCF の会員になるための申し込みの書類",
+              "why": "会社などの会員は貢献の条件ではありません。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "Kubernetes は、CNCF が決めた CLA (Contributor License Agreement) に署名した人のコードだけを受け入れます。最初の PR で EasyCLA のボットが状態と署名のリンクを返すので、個人か会社として署名します。",
+          "source": "https://github.com/kubernetes/community/blob/master/CLA.md"
+        },
+        {
+          "id": "x-ar-014",
+          "type": "choice",
+          "prompt": "社内のクラスタを、どのくらいの間隔で Kubernetes のマイナー版を上げるか決めたい。Kubernetes プロジェクトのパッチの出し方として正しいのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "どの版にも、出てから 5 年の間パッチが出続ける",
+              "why": "1.19 以降の版のパッチはおよそ 1 年です。"
+            },
+            {
+              "id": "b",
+              "text": "パッチが出るのは、いちばん新しいマイナー版だけ",
+              "why": "新しいほうから 3 つのマイナー版にパッチが出ます。"
+            },
+            {
+              "id": "c",
+              "text": "新しい 3 つのマイナー版に、それぞれ約 1 年パッチが出る",
+              "why": "正しい選択肢です。保守を外れる前に上げる計画が要ります。"
+            },
+            {
+              "id": "d",
+              "text": "パッチは無く、利用者が自分で直して使う決まり",
+              "why": "プロジェクトがリリースのブランチを保守し、パッチを出しています。"
+            }
+          ],
+          "answer": "c",
+          "explanation": "Kubernetes プロジェクトは、新しいほうから 3 つのマイナー版のリリースのブランチを保守します。1.19 以降の版にはおよそ 1 年パッチが出るので、保守を外れる前に版を上げる計画を立てます。",
+          "source": "https://kubernetes.io/releases/"
+        }
+      ]
+    }
+  ]
+}

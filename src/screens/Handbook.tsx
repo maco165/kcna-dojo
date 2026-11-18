@@ -8,7 +8,7 @@ import StepVisual from '../components/StepVisual';
 import BottomTabs from '../components/BottomTabs';
 import RepoLink from '../components/RepoLink';
 import SiteLogo from '../components/SiteLogo';
-import { dueQuestions, findLesson } from '../content';
+import { dueReviewCount, findLesson } from '../content';
 import { HANDBOOK, isAppendixDomain, sectionName, findTopic, type HandbookStep } from '../content/handbook';
 import { HANDBOOK_FIGURES } from '../content/handbookFigures';
 import { EXAM_WEIGHTS } from '../lib/exam';
@@ -386,7 +386,7 @@ export default function Handbook({ progress, updateProgress, topicId }: { progre
         <RepoLink />
       </header>
       <main className="page__section">{body}</main>
-      <BottomTabs current="handbook" reviewCount={dueQuestions(progress, new Date()).length} />
+      <BottomTabs current="handbook" reviewCount={dueReviewCount(progress, new Date())} />
     </div>
   );
 }

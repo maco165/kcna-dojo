@@ -155,7 +155,7 @@ try {
   await shoot('review-phone', phone, `${BASE}#/review`);
   await shoot('progress-phone', phone, `${BASE}#/progress`);
   await shoot('exam-phone', phone, `${BASE}#/exam`, async (page) => {
-    await page.getByRole('button', { name: '模擬試験を始める' }).click();
+    await page.getByRole('button', { name: /^第 \d+ 回を始める$/ }).click();
     await page.getByRole('radio').first().check().catch(() => {});
   });
   await shoot('glossary-phone', phone, `${BASE}#/glossary`, async (page) => {

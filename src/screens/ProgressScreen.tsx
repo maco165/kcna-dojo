@@ -9,7 +9,7 @@ import AppSideNav from '../components/AppSideNav';
 import BottomTabs from '../components/BottomTabs';
 import RepoLink from '../components/RepoLink';
 import SiteLogo from '../components/SiteLogo';
-import { dueQuestions } from '../content';
+import { dueReviewCount } from '../content';
 import { WEEKS } from '../content/curriculum';
 import { DOMAINS, domainAccuracy, planStatus, weeklyXp } from '../lib/lessonStatus';
 import { currentStreak, dayKey, daysBetween, examDate, type Progress } from '../lib/progress';
@@ -26,7 +26,7 @@ function Body({ progress }: { progress: Progress }) {
   const accuracy = domainAccuracy(progress);
   const days = weeklyXp(progress, now);
   const maxXp = Math.max(1, ...days.map((d) => d.xp));
-  const due = dueQuestions(progress, now).length;
+  const due = dueReviewCount(progress, now);
   const labsNote = plan.labsLeft > 0 ? ` (実習 ${plan.labsLeft} つ残り)` : '';
   const planText =
     plan.expected === 0 ? 'これから' : plan.done >= plan.expected ? `予定どおり${labsNote}` : `${plan.expected - plan.done} レッスン遅れ${labsNote}`;
@@ -169,7 +169,7 @@ export default function ProgressScreen({ progress }: { progress: Progress }) {
       <main className="page__section">
         <Body progress={progress} />
       </main>
-      <BottomTabs current="stats" reviewCount={dueQuestions(progress, new Date()).length} />
+      <BottomTabs current="stats" reviewCount={dueReviewCount(progress, new Date())} />
     </div>
   );
 }

@@ -13,7 +13,7 @@ import SiteLogo from '../components/SiteLogo';
 import { NEW_ISSUE_URL, REPO_URL } from '../lib/links';
 import { guideHref } from '../lib/route';
 import type { Progress } from '../lib/progress';
-import { dueQuestions } from '../content';
+import { dueReviewCount } from '../content';
 import { SITE_NAME, SITE_TAGLINE } from '../lib/site';
 import { WIDE_QUERY, useMediaQuery } from '../lib/useMediaQuery';
 
@@ -117,7 +117,7 @@ export default function About({ progress }: { progress: Progress }) {
       <main className="page__section">
         <Body />
       </main>
-      <BottomTabs current="about" reviewCount={dueQuestions(progress, new Date()).length} />
+      <BottomTabs current="about" reviewCount={dueReviewCount(progress, new Date())} />
     </div>
   );
 }

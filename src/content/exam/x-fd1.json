@@ -1,0 +1,787 @@
+{
+  "week": 0,
+  "lessons": [
+    {
+      "id": "x-fd1",
+      "kind": "quiz",
+      "title": "模擬試験用 Fundamentals 1",
+      "summary": "模擬試験用",
+      "domain": "Kubernetes Fundamentals",
+      "questions": [
+        {
+          "id": "x-fd1-001",
+          "type": "choice",
+          "prompt": "Deployment web のイメージを更新した直後に、Deployment の一覧を出した。読み取れることとして正しいのはどれ?",
+          "code": {
+            "language": "bash",
+            "text": "$ kubectl get deployment web\nNAME   READY   UP-TO-DATE   AVAILABLE   AGE\nweb    2/3     3            2           5m"
+          },
+          "choices": [
+            {
+              "id": "a",
+              "text": "望む数は 3 で、新しい版の Pod は 3 つあり、使えるのは 2 つ",
+              "why": "READY の分母 3 が望む数、UP-TO-DATE 3 が新しい版の Pod の数、AVAILABLE 2 が使える Pod の数です。"
+            },
+            {
+              "id": "b",
+              "text": "Pod はまだ 2 つしか作られておらず、3 つ目を作る順番を待っている",
+              "why": "UP-TO-DATE が 3 なので、新しい版の Pod はすでに 3 つあります。"
+            },
+            {
+              "id": "c",
+              "text": "誰かが replicas を 3 から 2 に減らし、その途中である",
+              "why": "READY の分母は望む数で、3 のままです。減らしたなら分母が 2 になります。"
+            },
+            {
+              "id": "d",
+              "text": "更新に失敗したので、Deployment が自動で前の版に戻した",
+              "why": "Deployment は失敗しても自動では戻しません。戻すのは人が kubectl rollout undo で行います。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "READY は「使える Pod の数 / 望む数」、UP-TO-DATE は新しいテンプレートで作られた Pod の数、AVAILABLE は使える状態になった Pod の数です。更新の直後は、新しい Pod が全部そろっても、準備ができるまで AVAILABLE が望む数に届かないことがあります。",
+          "source": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"
+        },
+        {
+          "id": "x-fd1-002",
+          "type": "choice",
+          "prompt": "Deployment web は消したいが、それが作った Pod は止めずに残しておきたい (あとで別の仕組みに引き継ぐ)。使うコマンドはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "kubectl delete deployment web --cascade=orphan",
+              "why": "orphan は持ち主だけを消し、ReplicaSet と Pod を残します。"
+            },
+            {
+              "id": "b",
+              "text": "kubectl delete deployment web --cascade=foreground",
+              "why": "foreground は先に ReplicaSet と Pod を消してから Deployment を消します。Pod は残りません。"
+            },
+            {
+              "id": "c",
+              "text": "kubectl scale deployment web --replicas=0",
+              "why": "replicas を 0 にすると Pod がすべて止まり、Deployment は残ります。望みと逆です。"
+            },
+            {
+              "id": "d",
+              "text": "kubectl delete deployment web",
+              "why": "何も付けないと background の連鎖削除になり、ガベージコレクタが ReplicaSet と Pod も消します。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "Deployment が作った ReplicaSet と Pod は、持ち主 (ownerReferences) を持つ従属オブジェクトです。ふつうに消すと持ち主と一緒に消されますが、--cascade=orphan を付けると持ち主だけが消え、従属オブジェクトは孤児として残ります。",
+          "source": "https://kubernetes.io/docs/tasks/administer-cluster/use-cascading-deletion/"
+        },
+        {
+          "id": "x-fd1-003",
+          "type": "choice",
+          "prompt": "検証用の Namespace dev を kubectl delete namespace dev で消した。dev の中にあった Deployment・Service・ConfigMap はどうなる?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "Namespace と一緒に、中のオブジェクトもすべて消される",
+              "why": "Namespace を消すと、その中のリソースは全部消されます。"
+            },
+            {
+              "id": "b",
+              "text": "中のオブジェクトは default の Namespace へ自動で移される",
+              "why": "別の Namespace へ移す仕組みはありません。"
+            },
+            {
+              "id": "c",
+              "text": "Namespace だけが消え、中のオブジェクトは持ち主の無いまま残る",
+              "why": "Namespace に属するオブジェクトは、Namespace が無くなると残れません。"
+            },
+            {
+              "id": "d",
+              "text": "動いている Pod がある間は、Namespace の削除そのものが拒否される",
+              "why": "拒否はされません。Namespace は Terminating になり、中身を消し終えてから消えます。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "Namespace を消すと、その中にある Namespace 付きのリソースはすべて消されます。削除は非同期なので、しばらく Terminating と表示されます。誤って消すと取り戻せないので、本番の Namespace を消すときは注意します。",
+          "source": "https://kubernetes.io/docs/tasks/administer-cluster/namespaces/"
+        },
+        {
+          "id": "x-fd1-004",
+          "type": "choice",
+          "prompt": "アプリのコンテナが起動する前に、データベースの Service の名前が引けるようになるまで待つ処理を、アプリとは別のコンテナで走らせたい。どこに書く?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "initContainers に、待つ処理のコンテナを書く",
+              "why": "初期化コンテナは順に最後まで動き、全部が成功してからアプリのコンテナが起動します。"
+            },
+            {
+              "id": "b",
+              "text": "Pod の containers に、2 つ目のコンテナとして書く",
+              "why": "containers のコンテナは一緒に起動するので、アプリより先に終わる保証がありません。"
+            },
+            {
+              "id": "c",
+              "text": "待つ処理を別の Job にして、Pod とは別に作る",
+              "why": "Job は Pod の起動とは結び付かないので、アプリの起動を待たせられません。"
+            },
+            {
+              "id": "d",
+              "text": "アプリのコンテナに readinessProbe を付ける",
+              "why": "readinessProbe はトラフィックを流すかを決めるだけで、コンテナの起動は遅らせません。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "initContainers に書いたコンテナは、アプリのコンテナより前に 1 つずつ順に動き、成功して終わるまで次へ進みません。失敗すれば restartPolicy に従ってやり直されます。準備の処理をアプリのイメージから切り離せるのも利点です。",
+          "source": "https://kubernetes.io/docs/concepts/workloads/pods/init-containers/"
+        },
+        {
+          "id": "x-fd1-005",
+          "type": "fill",
+          "prompt": "ログを送る補助のコンテナを、アプリのコンテナより先に起動し、Pod が動いている間ずっと動かし続けたい (ネイティブのサイドカーコンテナ)。initContainers に書いたこのコンテナの空欄に入る値は?",
+          "language": "yaml",
+          "code": "spec:\n  initContainers:\n  - name: logshipper\n    image: alpine:latest\n    restartPolicy: {{blank}}\n    command: ['sh', '-c', 'tail -F /opt/logs.txt']\n  containers:\n  - name: app\n    image: alpine:latest",
+          "answers": [
+            "Always"
+          ],
+          "candidates": [
+            "OnFailure",
+            "Never",
+            "Always",
+            "IfNotPresent"
+          ],
+          "explanation": "initContainers のコンテナに restartPolicy: Always を付けると、サイドカーコンテナとして扱われます。起動の順番はアプリより先で、終わるのを待たずに次へ進み、Pod が動いている間は動き続けます。この機能は v1.33 で安定版になりました。",
+          "wrongNotes": {
+            "OnFailure": "OnFailure を付けた初期化コンテナは、失敗したときだけやり直すふつうの初期化コンテナです。終わるまでアプリは起動しません。",
+            "Never": "Never を付けた初期化コンテナは、1 回だけ動くふつうの初期化コンテナです。終わるまでアプリは起動しません。",
+            "IfNotPresent": "IfNotPresent はイメージを取りに行くかを決める imagePullPolicy の値です。"
+          },
+          "source": "https://kubernetes.io/docs/concepts/workloads/pods/sidecar-containers/"
+        },
+        {
+          "id": "x-fd1-006",
+          "type": "choice",
+          "prompt": "restartPolicy: Never の Pod で、ただ 1 つのコンテナが処理を終え、終了コード 0 で終わった。この Pod の status.phase はどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "Succeeded",
+              "why": "すべてのコンテナが成功して終わり、もう再起動しないときの phase です。"
+            },
+            {
+              "id": "b",
+              "text": "Completed",
+              "why": "Completed は kubectl get pods の STATUS 列に出る表示で、phase の値ではありません。"
+            },
+            {
+              "id": "c",
+              "text": "Failed",
+              "why": "Failed は、少なくとも 1 つのコンテナが失敗 (0 以外の終了コードなど) で終わったときです。"
+            },
+            {
+              "id": "d",
+              "text": "Unknown",
+              "why": "Unknown は、ノードと通信できず Pod の状態が取れないときです。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "Pod の phase は Pending・Running・Succeeded・Failed・Unknown の 5 つです。すべてのコンテナが成功して終わり、再起動もされないなら Succeeded になります。kubectl の STATUS 列は phase をそのまま出すとは限らず、この場面では Completed と表示されます。",
+          "source": "https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/"
+        },
+        {
+          "id": "x-fd1-007",
+          "type": "choice",
+          "prompt": "作ったばかりの Pod web を kubectl describe pod で見た。コンテナの欄の一部が次のとき、このコンテナについて正しいのはどれ?",
+          "code": {
+            "language": "plaintext",
+            "text": "Containers:\n  app:\n    Image:          registry.example.com/web:2.1\n    State:          Waiting\n      Reason:       ContainerCreating\n    Ready:          False\n    Restart Count:  0"
+          },
+          "choices": [
+            {
+              "id": "a",
+              "text": "起動に要る準備 (イメージの取得など) の途中で、まだ動き始めていない",
+              "why": "Waiting は Running でも Terminated でもない状態で、起動の準備の途中を表します。"
+            },
+            {
+              "id": "b",
+              "text": "アプリはもう動いているが、readinessProbe にまだ通っていない",
+              "why": "動いていれば State は Running になり、動き始めた時刻 (Started) が出ます。"
+            },
+            {
+              "id": "c",
+              "text": "一度動いてから失敗で終わり、再起動の順番を待っている",
+              "why": "一度動いて終わったなら Restart Count が増え、Last State に Terminated が出ます。"
+            },
+            {
+              "id": "d",
+              "text": "Pod はまだノードに置かれず、スケジューラの判断を待っている",
+              "why": "コンテナが作られ始めるのは、ノードに置かれて kubelet が受け持ってからです。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "Kubernetes はコンテナごとに Waiting・Running・Terminated の 3 つの状態を持ちます。Waiting は起動を終えるのに要る作業 (イメージの取得や Secret のデータの適用など) の途中で、Reason にその理由が出ます。Running なら動き始めた時刻が、Terminated なら理由・終了コード・始まりと終わりの時刻が出ます。",
+          "source": "https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/"
+        },
+        {
+          "id": "x-fd1-008",
+          "type": "choice",
+          "prompt": "クラスターに Backup という独自の種類のリソースを足し、kubectl get backups で一覧できるようにしたい。最初に作るものはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "Backup を定義する CustomResourceDefinition",
+              "why": "CRD を作ると、API サーバーが新しい種類のリソースを扱えるようになります。"
+            },
+            {
+              "id": "b",
+              "text": "Backup の定義を data に書いた ConfigMap",
+              "why": "ConfigMap は設定の値を入れておく入れ物で、新しい種類のリソースは増えません。"
+            },
+            {
+              "id": "c",
+              "text": "backups という名前の新しい Namespace",
+              "why": "Namespace はリソースを分ける区切りで、リソースの種類は増えません。"
+            },
+            {
+              "id": "d",
+              "text": "Backup を組み込んで作り直した kube-apiserver のイメージ",
+              "why": "CRD を使えば、API サーバーを作り直さずに種類を足せます。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "CustomResourceDefinition (CRD) を作ると、API サーバーにカスタムリソースの新しい種類が加わり、kubectl でも組み込みのリソースと同じように扱えます。実際に中身を動かすには、そのリソースを見て働くコントローラー (オペレーター) を別に用意します。",
+          "source": "https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/"
+        },
+        {
+          "id": "x-fd1-009",
+          "type": "choice",
+          "prompt": "Deployment の Pod に、ConfigMap app-config の値を env の configMapKeyRef で渡している。ConfigMap の値を書き換えたが、動いている Pod の環境変数は古いまま。正しい説明と対処はどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "環境変数は起動時に読まれるだけなので、Pod を作り直すと新しい値になる",
+              "why": "ConfigMap を環境変数で使う場合は自動で更新されず、Pod の再起動が要ります。"
+            },
+            {
+              "id": "b",
+              "text": "kubelet が定期的に同期するので、しばらく待てば環境変数も新しくなる",
+              "why": "定期的に同期されるのは、ボリュームとしてマウントしたファイルのほうです。"
+            },
+            {
+              "id": "c",
+              "text": "ConfigMap に immutable: true を付けると、次からはすぐに反映される",
+              "why": "immutable: true は値を変えられなくする設定で、反映を早めるものではありません。"
+            },
+            {
+              "id": "d",
+              "text": "同じ値を Secret に移せば、環境変数も自動で更新される",
+              "why": "Secret を環境変数で使う場合も、起動時に読まれるだけで自動では更新されません。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "ConfigMap を環境変数として使うと、値はコンテナの起動時に読み込まれるだけです。書き換えを反映するには、kubectl rollout restart deployment などで Pod を作り直します。ボリュームとしてマウントした場合は、kubelet の同期で少し遅れてファイルが更新されます。",
+          "source": "https://kubernetes.io/docs/concepts/configuration/configmap/"
+        },
+        {
+          "id": "x-fd1-010",
+          "type": "choice",
+          "prompt": "kubectl delete で消した PersistentVolumeClaim data が、Terminating のまま消えない。kubectl get pvc data -o yaml の一部が次のとき、消えない理由として最も考えられるのはどれ?",
+          "code": {
+            "language": "yaml",
+            "text": "metadata:\n  name: data\n  deletionTimestamp: \"2026-11-18T01:02:03Z\"\n  finalizers:\n  - kubernetes.io/pvc-protection"
+          },
+          "choices": [
+            {
+              "id": "a",
+              "text": "finalizers が残り、PVC を使う Pod がいる間は消されない",
+              "why": "pvc-protection のファイナライザーは、Pod が使っている間は PVC を消させません。"
+            },
+            {
+              "id": "b",
+              "text": "deletionTimestamp に書かれた時刻になるまで、削除を待っている",
+              "why": "PVC には猶予の時間が無いので、この時刻は削除を頼んだときのもので、すでに過ぎています。消えないのは finalizers が残っているからです。"
+            },
+            {
+              "id": "c",
+              "text": "PVC は kubectl では消せず、ノードの上でファイルを消す必要がある",
+              "why": "PVC は API のオブジェクトなので kubectl で消します。止めているのはファイナライザーです。"
+            },
+            {
+              "id": "d",
+              "text": "etcd が壊れていて、削除の結果を書き込めていない",
+              "why": "etcd が壊れていれば deletionTimestamp も書き込めません。削除の受け付けはできています。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "ファイナライザーは、オブジェクトを消す前に済ませる後始末の印です。削除を頼むと deletionTimestamp が付いて Terminating になり、finalizers が空になるまで実際には消えません。kubernetes.io/pvc-protection は、Pod が使っている PVC が消されてデータを失うのを防ぎます。",
+          "source": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/"
+        },
+        {
+          "id": "x-fd1-011",
+          "type": "choice",
+          "prompt": "あるノードの kubelet が、ノードの /etc/kubernetes/manifests にある YAML から直接動かしている static Pod がある。この Pod を kubectl delete pod で消すとどうなる?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "消えてもすぐに同じ Pod が現れる。止めるにはノードの YAML を消す",
+              "why": "API に見えているのは写し (ミラー Pod) で、kubelet が YAML のとおりに動かし続けます。"
+            },
+            {
+              "id": "b",
+              "text": "Pod は消え、kubelet も YAML を消して二度と動かさない",
+              "why": "kubelet はノードのファイルを消しません。API から消しても、YAML がある限り動きます。"
+            },
+            {
+              "id": "c",
+              "text": "static Pod は API に見えないので、kubectl delete はできない",
+              "why": "API サーバーにはミラー Pod が見えるので、一覧も削除の命令もできます。"
+            },
+            {
+              "id": "d",
+              "text": "Deployment コントローラーが、別のノードに作り直す",
+              "why": "static Pod はコントローラーではなく、そのノードの kubelet だけが管理します。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "static Pod は API サーバーを通さず、ノードの kubelet がマニフェストのファイルから直接動かす Pod です。kubelet は API サーバーに写し (ミラー Pod) を作るので kubectl で見えますが、消しても kubelet がまた作ります。止めるには、ノードからマニフェストのファイルを取り除きます。",
+          "source": "https://kubernetes.io/docs/tasks/configure-pod-container/static-pod/"
+        },
+        {
+          "id": "x-fd1-012",
+          "type": "fill",
+          "prompt": "ノード node1 のカーネルを更新する。新しい Pod を置かないようにしたうえで、動いている Pod を PodDisruptionBudget を守りながら追い出したい。空欄に入るサブコマンドは?",
+          "language": "bash",
+          "code": "kubectl {{blank}} node1 --ignore-daemonsets",
+          "answers": [
+            "drain"
+          ],
+          "candidates": [
+            "cordon",
+            "taint",
+            "drain",
+            "delete"
+          ],
+          "output": "node/node1 cordoned\nevicting pod default/web-7d4b9c8f6d-x2k9p\npod/web-7d4b9c8f6d-x2k9p evicted\nnode/node1 drained",
+          "explanation": "drain はノードをスケジュール不可にしてから、Pod を退避 (eviction) で追い出します。退避は PodDisruptionBudget を守り、コンテナを正しく終わらせます。保守が終わったら kubectl uncordon node1 で戻します。",
+          "wrongNotes": {
+            "cordon": "cordon はスケジュール不可にするだけで、動いている Pod は追い出しません。",
+            "taint": "taint は印を付けるだけで、退避は PodDisruptionBudget を見ません。",
+            "delete": "kubectl delete node はノードをクラスターから外す操作で、Pod を順に退避させるものではありません。"
+          },
+          "source": "https://kubernetes.io/docs/tasks/administer-cluster/safely-drain-node/"
+        },
+        {
+          "id": "x-fd1-013",
+          "type": "choice",
+          "prompt": "保守の準備中のクラスターでノードの一覧を出した。node1 の状態について正しいのはどれ?",
+          "code": {
+            "language": "bash",
+            "text": "$ kubectl get nodes\nNAME    STATUS                     ROLES           AGE   VERSION\nnode1   Ready,SchedulingDisabled   control-plane   30d   v1.35.0\nnode2   Ready                      <none>          30d   v1.35.0"
+          },
+          "choices": [
+            {
+              "id": "a",
+              "text": "スケジュール不可になっており、ふつうの新しい Pod は node1 に置かれない",
+              "why": "cordon (drain も最初に cordon します) で spec.unschedulable が付いたときの表示です。"
+            },
+            {
+              "id": "b",
+              "text": "node1 の Pod はすべて追い出され、DaemonSet の Pod も残っていない",
+              "why": "SchedulingDisabled だけでは、Pod が追い出されたかどうかは分かりません。"
+            },
+            {
+              "id": "c",
+              "text": "kubelet が止まり、コントロールプレーンと通信できていない",
+              "why": "通信できていなければ STATUS は NotReady になります。node1 は Ready です。"
+            },
+            {
+              "id": "d",
+              "text": "control-plane の役のノードには、いつもこの表示が出る",
+              "why": "役とは関係ありません。cordon などでスケジュール不可にしたときの表示です。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "SchedulingDisabled は、ノードがスケジュール不可 (spec.unschedulable) になっている印で、kubectl cordon で付き、kubectl drain も最初に cordon します。ふつうの新しい Pod は置かれませんが、動いている Pod が追い出されたかどうかはこの表示では分かりません (cordon だけなら残り、drain なら退避されます)。kubectl uncordon node1 で元に戻せます。",
+          "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_cordon/"
+        },
+        {
+          "id": "x-fd1-014",
+          "type": "choice",
+          "prompt": "3 つのレプリカで動く API サーバーがある。ノードの保守で drain するとき、同時に 2 つ以上の Pod が止められないようにしたい。どれを作る?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "minAvailable: 2 の PodDisruptionBudget",
+              "why": "PDB は自発的な中断 (drain による退避など) で、同時に止めてよい数を制限します。"
+            },
+            {
+              "id": "b",
+              "text": "requests.cpu を決めた ResourceQuota",
+              "why": "ResourceQuota は Namespace の資源の合計を抑えるもので、退避は止めません。"
+            },
+            {
+              "id": "c",
+              "text": "minReplicas: 3 の HorizontalPodAutoscaler",
+              "why": "HPA は Pod の数を増減させるだけで、退避で止められる数は制限しません。"
+            },
+            {
+              "id": "d",
+              "text": "値を大きくした PriorityClass",
+              "why": "PriorityClass はスケジュールとプリエンプションの順番を決めるもので、drain は止めません。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "PodDisruptionBudget (PDB) は、drain のような自発的な中断で、同時に使えなくなってよい Pod の数を決めます。minAvailable: 2 なら、使える Pod が 2 つを下回る退避は断られ、drain は待たされます。ノードの故障のような非自発的な中断は防げません。",
+          "source": "https://kubernetes.io/docs/concepts/workloads/pods/disruptions/"
+        },
+        {
+          "id": "x-fd1-015",
+          "type": "choice",
+          "prompt": "チーム A の Namespace team-a で、すべての Pod の CPU の requests の合計を 10 コアまでに抑えたい。どれを使う?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "requests.cpu: \"10\" の ResourceQuota を作る",
+              "why": "ResourceQuota は Namespace の中の資源の合計に上限を付けます。"
+            },
+            {
+              "id": "b",
+              "text": "team-a に max の cpu を決めた LimitRange を作る",
+              "why": "LimitRange は 1 つのコンテナや Pod ごとの上限で、合計は抑えません。"
+            },
+            {
+              "id": "c",
+              "text": "各コンテナの resources.limits に cpu: 1 を書く",
+              "why": "1 つずつの上限で、Pod の数が増えれば合計は 10 コアを超えます。"
+            },
+            {
+              "id": "d",
+              "text": "team-a の Pod に nodeSelector で小さいノードを選ばせる",
+              "why": "置き場所を決めるだけで、合計の使用量の上限にはなりません。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "ResourceQuota は Namespace ごとに、資源の合計やオブジェクトの数に上限を付けます。requests.cpu の上限を決めると、合計を超える Pod の作成は拒否され、CPU の requests を書かない Pod も拒否されます (LimitRange で既定値を入れれば作れます)。",
+          "source": "https://kubernetes.io/docs/concepts/policy/resource-quotas/"
+        },
+        {
+          "id": "x-fd1-016",
+          "type": "choice",
+          "prompt": "Namespace dev で、resources を書き忘れたコンテナに CPU の requests と limits の既定値を自動で入れたい。そのために LimitRange を作ったときの説明として正しいのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "これから作る Pod にだけ既定値が入り、動いている Pod は変わらない",
+              "why": "LimitRange が効くのは Pod を受け付けるときだけです。"
+            },
+            {
+              "id": "b",
+              "text": "すでに動いている Pod も含め、dev の全部の Pod にすぐ既定値が入る",
+              "why": "LimitRange を足しても変えても、動いている Pod には影響しません。"
+            },
+            {
+              "id": "c",
+              "text": "dev の合計の上限を決めるもので、個々のコンテナには値を入れない",
+              "why": "合計の上限は ResourceQuota の役目です。LimitRange は個々に既定値を入れます。"
+            },
+            {
+              "id": "d",
+              "text": "既定値は各ノードの kubelet に配られ、全部の Namespace に効く",
+              "why": "LimitRange は Namespace のオブジェクトで、作った Namespace の中だけに効きます。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "LimitRange は Namespace の中で、コンテナや Pod ごとの最小・最大と、書かれていないときの既定値 (default と defaultRequest) を決めます。値が入るのは Pod を受け付ける (アドミッション) ときなので、すでに動いている Pod は変わりません。",
+          "source": "https://kubernetes.io/docs/concepts/policy/limit-range/"
+        },
+        {
+          "id": "x-fd1-017",
+          "type": "choice",
+          "prompt": "kube-apiserver が 1.35 のクラスターに、ノードを足したい。版のずれの方針 (version skew policy) で認められている kubelet の版はどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "1.32",
+              "why": "kubelet は kube-apiserver より 3 つ前のマイナー版まで認められます。"
+            },
+            {
+              "id": "b",
+              "text": "1.36",
+              "why": "kubelet は kube-apiserver より新しくしてはいけません。"
+            },
+            {
+              "id": "c",
+              "text": "1.31",
+              "why": "4 つ前のマイナー版で、認められる幅 (3 つ前まで) を超えています。"
+            },
+            {
+              "id": "d",
+              "text": "1.29",
+              "why": "6 つ前のマイナー版で、認められる幅を大きく超えています。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "kubelet は kube-apiserver より新しくしてはならず、古いほうは 3 つ前のマイナー版まで認められます。そのため更新は、コントロールプレーンを先に上げてから kubelet を上げる順に行います。",
+          "source": "https://kubernetes.io/releases/version-skew-policy/"
+        },
+        {
+          "id": "x-fd1-018",
+          "type": "choice",
+          "prompt": "kubectl top pods を打つと、Metrics API not available というエラーが出た。まず確かめることとして正しいのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "metrics-server がクラスターで動いているか",
+              "why": "kubectl top は metrics-server が出す Metrics API の値を読みます。"
+            },
+            {
+              "id": "b",
+              "text": "調べたい Pod のコンテナに、resources.limits が書かれているか",
+              "why": "limits が無くても、使用量は測れて kubectl top で出せます。"
+            },
+            {
+              "id": "c",
+              "text": "kubeconfig の current-context が default という名前か",
+              "why": "コンテキストの名前は関係ありません。API サーバーにはつながっています。"
+            },
+            {
+              "id": "d",
+              "text": "etcd のスナップショットが最近取れているか",
+              "why": "スナップショットはバックアップの話で、使用量の表示とは関係ありません。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "kubectl top が出す CPU とメモリの使用量は、Metrics API から読みます。Metrics API は metrics-server などの部品が kubelet から集めて提供するもので、入っていないか動いていないとこのエラーになります。",
+          "source": "https://kubernetes.io/docs/tasks/debug/debug-cluster/resource-metrics-pipeline/"
+        },
+        {
+          "id": "x-fd1-019",
+          "type": "fill",
+          "prompt": "Running ではない Pod を、全部の Namespace から絞り込んで探したい。空欄に入るオプションは?",
+          "language": "bash",
+          "code": "kubectl get pods -A --{{blank}} status.phase!=Running",
+          "answers": [
+            "field-selector"
+          ],
+          "candidates": [
+            "selector",
+            "sort-by",
+            "show-labels",
+            "field-selector"
+          ],
+          "explanation": "--field-selector は、ラベルではなくリソースの欄の値で絞り込みます。=・==・!= が使え、status.phase は Pod で使える欄です。metadata.name と metadata.namespace はどのリソースでも使えます。",
+          "wrongNotes": {
+            "selector": "--selector (-l) はラベルで絞り込むオプションで、status.phase のような欄は指定できません。",
+            "sort-by": "--sort-by は並べる順を決めるだけで、絞り込みはしません。",
+            "show-labels": "--show-labels はラベルを列に足して出すだけです。"
+          },
+          "source": "https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors/"
+        },
+        {
+          "id": "x-fd1-020",
+          "type": "choice",
+          "prompt": "replicas: 3 の Deployment の Pod が同じノードに集まると、そのノードが落ちたときに全部止まってしまう。同じラベルの Pod どうしを別のノードに分けたい。合う書き方はどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "podAntiAffinity で、同じラベルの Pod がいるノードを避ける",
+              "why": "ノード (hostname) ごとに、同じラベルの Pod がいるノードを避けて置きます。"
+            },
+            {
+              "id": "b",
+              "text": "nodeSelector に、3 つのノードの名前のラベルを並べて書く",
+              "why": "nodeSelector の条件はすべてを満たすノードを選ぶもので、Pod を散らすことはできません。"
+            },
+            {
+              "id": "c",
+              "text": "podAffinity で、同じラベルの Pod がいるノードに寄せる",
+              "why": "podAffinity は同じノードに引き寄せるので、望みと逆になります。"
+            },
+            {
+              "id": "d",
+              "text": "すべてのノードに taint を付け、Pod に toleration を書く",
+              "why": "taint は Pod を締め出す仕組みで、Pod どうしを離して置くものではありません。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "Pod 間のアンチアフィニティは、すでに動いている Pod のラベルを見て、その Pod がいる場所を避けます。topologyKey に kubernetes.io/hostname を使うと、場所の単位がノードになり、同じアプリの Pod が別々のノードに分かれます。",
+          "source": "https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/"
+        },
+        {
+          "id": "x-fd1-021",
+          "type": "choice",
+          "prompt": "app=web の Pod にこの制約を書いた。ゾーンは zone-a と zone-b の 2 つだけで、今は zone-a に app=web の Pod が 2 つ、zone-b に 1 つある。次の app=web の Pod はどうなる?",
+          "code": {
+            "language": "yaml",
+            "text": "topologySpreadConstraints:\n- maxSkew: 1\n  topologyKey: topology.kubernetes.io/zone\n  whenUnsatisfiable: DoNotSchedule\n  labelSelector:\n    matchLabels:\n      app: web"
+          },
+          "choices": [
+            {
+              "id": "a",
+              "text": "zone-b のノードに置かれる",
+              "why": "zone-b に置くと 2 と 2 で差が 0 になり、maxSkew の 1 以内です。"
+            },
+            {
+              "id": "b",
+              "text": "zone-a のノードに置かれる",
+              "why": "zone-a に置くと 3 と 1 で差が 2 になり、maxSkew の 1 を超えます。"
+            },
+            {
+              "id": "c",
+              "text": "どちらに置いても制約に反するので Pending になる",
+              "why": "zone-b に置けば制約を満たすので、Pending にはなりません。"
+            },
+            {
+              "id": "d",
+              "text": "スケジューラが既存の Pod を動かし、先に数をならす",
+              "why": "スケジューラは新しい Pod の置き場所を決めるだけで、動いている Pod は動かしません。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "topologySpreadConstraints は、ゾーンなどの単位ごとの Pod の数の差 (skew) を maxSkew 以内に保つように置き場所を選びます。whenUnsatisfiable: DoNotSchedule なので、差が 1 を超える zone-a は選ばれず、zone-b に置かれます。",
+          "source": "https://kubernetes.io/docs/concepts/scheduling-eviction/topology-spread-constraints/"
+        },
+        {
+          "id": "x-fd1-022",
+          "type": "choice",
+          "prompt": "Pod の spec.nodeName に node2 と書いて作った。正しい説明はどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "スケジューラを通らず、node2 の kubelet が直接動かす",
+              "why": "nodeName が書かれた Pod はスケジューラが扱わず、そのノードの kubelet が受け持ちます。"
+            },
+            {
+              "id": "b",
+              "text": "kube-scheduler が node2 の点数を上げ、ほかのノードより選ばれやすくする",
+              "why": "点数で優先するのは preferred のノードアフィニティです。nodeName は点数を使いません。"
+            },
+            {
+              "id": "c",
+              "text": "node2 に資源が足りなければ、kube-scheduler が別のノードに置き直す",
+              "why": "置き直しはされません。資源が足りなければ、その Pod は動けずに失敗します。"
+            },
+            {
+              "id": "d",
+              "text": "node2 という値のラベルを付けたノードを探して置かれる",
+              "why": "nodeName はノードの名前そのものを指定するもので、ラベルでは選びません。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "nodeName は、ノードを選ぶ方法の中でいちばん直接的なものです。書かれているとスケジューラはその Pod を扱わず、指定したノードの kubelet が動かそうとします。そのノードが無い、資源が足りないなどのときは動けないので、ふつうは nodeSelector やアフィニティを使います。",
+          "source": "https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/"
+        },
+        {
+          "id": "x-fd1-023",
+          "type": "choice",
+          "prompt": "値の大きい PriorityClass を付けた Pod が、どのノードにも空きが無くて Pending になっている。kube-scheduler が次にしうることとして正しいのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "優先度の低い Pod を追い出し、空いたノードにこの Pod を置こうとする",
+              "why": "これがプリエンプション (横取り) です。"
+            },
+            {
+              "id": "b",
+              "text": "この Pod の requests を小さく書き換え、空いているノードに置く",
+              "why": "スケジューラは Pod の requests を書き換えません。"
+            },
+            {
+              "id": "c",
+              "text": "新しいノードを作ってクラスターに足し、そこに置く",
+              "why": "ノードを足すのはクラスターのオートスケーラーなどの役目で、スケジューラはしません。"
+            },
+            {
+              "id": "d",
+              "text": "優先度は見ず、先に作られた Pod から順に空きを待たせる",
+              "why": "PriorityClass の値が大きい Pod は、待ち行列でも先に扱われます。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "Pod の優先度が高いと、置けないときにスケジューラは優先度の低い Pod を追い出して場所を空けようとします (プリエンプション)。追い出しを始めたノードの名前は Pod の status.nominatedNodeName に書かれますが、必ずそのノードに置かれるとは限りません。PodDisruptionBudget はできるだけ守られますが、必ずではありません。",
+          "source": "https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/"
+        },
+        {
+          "id": "x-fd1-024",
+          "type": "choice",
+          "prompt": "CPU を 2 コア割り当てられる (allocatable) ノードが 1 台だけある。そこには CPU の requests の合計が 1500m の Pod が動いているが、実際の使用量は 200m ほど。優先度の設定は無い。ここに requests の cpu が 600m の Pod を作るとどうなる?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "requests の合計が 2 コアを超え、Pending になる",
+              "why": "スケジューラは実際の使用量ではなく、requests の合計で空きを計算します。"
+            },
+            {
+              "id": "b",
+              "text": "実際の使用量は 200m と少ないので、そのノードに置かれる",
+              "why": "実際の使用量が少なくても、requests の合計が allocatable を超えるノードには置きません。"
+            },
+            {
+              "id": "c",
+              "text": "ノードに置かれ、CPU を絞られながら遅く動く",
+              "why": "CPU を絞られるのは limits を超えて使ったときで、置くかどうかの判断とは別です。"
+            },
+            {
+              "id": "d",
+              "text": "動いている Pod が 1 つ追い出され、代わりに置かれる",
+              "why": "優先度の差が無ければプリエンプションは起きません。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "スケジューラは、ノードの allocatable から、すでに置かれた Pod の requests の合計を引いた残りで、置けるかを判断します。1500m に 600m を足すと 2100m で 2000m を超えるため、実際の使用量が少なくても置けず、Pending になります。",
+          "source": "https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/"
+        },
+        {
+          "id": "x-fd1-025",
+          "type": "choice",
+          "prompt": "ノード node2 の電源が落ちた。node2 で動いていた Deployment の Pod が、ほかのノードで作り直されるまでに約 5 分かかった。この待ち時間を決めているものはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "Pod に自動で付く toleration の tolerationSeconds",
+              "why": "自動で付く toleration の tolerationSeconds は 300 秒 (5 分) です。"
+            },
+            {
+              "id": "b",
+              "text": "Deployment の progressDeadlineSeconds の値",
+              "why": "更新が進まないと判断するまでの時間で、ノードの故障とは関係ありません。"
+            },
+            {
+              "id": "c",
+              "text": "Pod の terminationGracePeriodSeconds の値",
+              "why": "コンテナを止めるときの猶予 (既定は 30 秒) で、退避を始める時刻は決めません。"
+            },
+            {
+              "id": "d",
+              "text": "コンテナの livenessProbe の failureThreshold と periodSeconds",
+              "why": "livenessProbe は kubelet が行うので、ノードが落ちると検査自体が行われません。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "ノードに届かなくなると、node.kubernetes.io/unreachable の NoExecute の taint が付きます。Pod には tolerationSeconds=300 のこの toleration が自動で付くので、Pod は 5 分の間ノードに残り、その後に追い出されて作り直されます。この秒数は Pod に自分で toleration を書けば変えられます。",
+          "source": "https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/"
+        },
+        {
+          "id": "x-fd1-026",
+          "type": "fill",
+          "prompt": "クラスターで、既定のスケジューラとは別に my-scheduler という名前のスケジューラを動かしている。この Pod だけを my-scheduler に置かせたい。空欄に入る欄の名前は?",
+          "language": "yaml",
+          "code": "apiVersion: v1\nkind: Pod\nmetadata:\n  name: batch-worker\nspec:\n  {{blank}}: my-scheduler\n  containers:\n  - name: worker\n    image: registry.k8s.io/pause:3.10",
+          "answers": [
+            "schedulerName"
+          ],
+          "candidates": [
+            "nodeName",
+            "schedulerName",
+            "priorityClassName",
+            "serviceAccountName"
+          ],
+          "explanation": "spec.schedulerName に名前を書くと、その名前のスケジューラだけがこの Pod を扱います。書かなければ default-scheduler が使われます。複数のスケジューラを並べて動かし、Pod ごとに使い分けられます。",
+          "wrongNotes": {
+            "nodeName": "nodeName はノードの名前を書く欄で、書くとスケジューラを通らずにそのノードへ置かれます。",
+            "priorityClassName": "priorityClassName は Pod の優先度を決める欄で、どのスケジューラを使うかは決めません。",
+            "serviceAccountName": "serviceAccountName は Pod が API に使う身元を決める欄です。"
+          },
+          "source": "https://kubernetes.io/docs/tasks/extend-kubernetes/configure-multiple-schedulers/"
+        }
+      ]
+    }
+  ]
+}

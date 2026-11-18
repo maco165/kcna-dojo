@@ -1,0 +1,1449 @@
+[
+  {
+    "id": "service-discovery",
+    "terms": [
+      "service",
+      "coredns",
+      "endpointslice"
+    ],
+    "spec": {
+      "caption": "呼ぶ側の Pod は CoreDNS で Service の名前を引き、その ClusterIP の 80 番へ送ります。Service はセレクターで選んだ Pod の 9376 番へ届け、Pod の IP とポートの一覧は EndpointSlice に入ります。",
+      "width": 600,
+      "height": 280,
+      "nodes": [
+        {
+          "id": "client",
+          "x": 16,
+          "y": 30,
+          "w": 140,
+          "h": 52,
+          "label": "呼ぶ側の Pod",
+          "tone": "muted"
+        },
+        {
+          "id": "dns",
+          "x": 16,
+          "y": 200,
+          "w": 150,
+          "h": 52,
+          "label": "CoreDNS",
+          "sub": "名前 → ClusterIP",
+          "term": "coredns"
+        },
+        {
+          "id": "svc",
+          "x": 230,
+          "y": 30,
+          "w": 170,
+          "h": 52,
+          "label": "Service",
+          "sub": "selector で Pod を選ぶ",
+          "term": "service"
+        },
+        {
+          "id": "eps",
+          "x": 230,
+          "y": 200,
+          "w": 170,
+          "h": 52,
+          "label": "EndpointSlice",
+          "sub": "Pod の IP とポート",
+          "term": "endpointslice"
+        },
+        {
+          "id": "pa",
+          "x": 460,
+          "y": 16,
+          "w": 124,
+          "h": 52,
+          "label": "Pod",
+          "sub": "app=MyApp"
+        },
+        {
+          "id": "pb",
+          "x": 460,
+          "y": 100,
+          "w": 124,
+          "h": 52,
+          "label": "Pod",
+          "sub": "app=MyApp"
+        },
+        {
+          "id": "kp",
+          "x": 460,
+          "y": 200,
+          "w": 124,
+          "h": 52,
+          "label": "kube-proxy",
+          "sub": "転送の規則を作る",
+          "tone": "muted"
+        }
+      ],
+      "edges": [
+        {
+          "from": "client",
+          "to": "dns",
+          "label": "① 名前を引く"
+        },
+        {
+          "from": "client",
+          "to": "svc",
+          "label": "② 80 番へ"
+        },
+        {
+          "from": "svc",
+          "to": "pa"
+        },
+        {
+          "from": "svc",
+          "to": "pb"
+        },
+        {
+          "from": "svc",
+          "to": "eps",
+          "label": "自動で作る",
+          "dashed": true
+        },
+        {
+          "from": "eps",
+          "to": "kp",
+          "label": "もとにする",
+          "dashed": true
+        }
+      ]
+    }
+  },
+  {
+    "id": "service-types",
+    "terms": [
+      "clusterip",
+      "nodeport",
+      "loadbalancer"
+    ],
+    "spec": {
+      "caption": "LoadBalancer は外部のロードバランサーから各ノードの NodePort へ、NodePort は ClusterIP へとつなぎ、外に開く種類ほど内側の種類を含みます。ClusterIP だけなら、クラスタの中の Pod からしか届きません。",
+      "width": 620,
+      "height": 340,
+      "groups": [
+        {
+          "x": 16,
+          "y": 112,
+          "w": 588,
+          "h": 214,
+          "label": "クラスタ"
+        }
+      ],
+      "nodes": [
+        {
+          "id": "ext",
+          "x": 16,
+          "y": 24,
+          "w": 150,
+          "h": 52,
+          "label": "外のクライアント",
+          "tone": "muted"
+        },
+        {
+          "id": "lb",
+          "x": 250,
+          "y": 24,
+          "w": 200,
+          "h": 52,
+          "label": "LoadBalancer",
+          "sub": "外部のロードバランサー",
+          "term": "loadbalancer"
+        },
+        {
+          "id": "np",
+          "x": 40,
+          "y": 170,
+          "w": 180,
+          "h": 52,
+          "label": "NodePort",
+          "sub": "各ノードの 30000〜32767",
+          "term": "nodeport"
+        },
+        {
+          "id": "cip",
+          "x": 270,
+          "y": 170,
+          "w": 160,
+          "h": 52,
+          "label": "ClusterIP",
+          "sub": "中だけの仮想の IP",
+          "term": "clusterip"
+        },
+        {
+          "id": "pod",
+          "x": 470,
+          "y": 170,
+          "w": 120,
+          "h": 52,
+          "label": "Pod",
+          "sub": "後ろの Pod"
+        },
+        {
+          "id": "inner",
+          "x": 270,
+          "y": 264,
+          "w": 160,
+          "h": 52,
+          "label": "中の Pod",
+          "sub": "クラスタの中から",
+          "tone": "muted"
+        }
+      ],
+      "edges": [
+        {
+          "from": "ext",
+          "to": "lb",
+          "label": "外から"
+        },
+        {
+          "from": "lb",
+          "to": "np"
+        },
+        {
+          "from": "ext",
+          "to": "np",
+          "label": "直接も可",
+          "dashed": true
+        },
+        {
+          "from": "np",
+          "to": "cip"
+        },
+        {
+          "from": "cip",
+          "to": "pod"
+        },
+        {
+          "from": "inner",
+          "to": "cip"
+        }
+      ]
+    }
+  },
+  {
+    "id": "headless-service",
+    "terms": [
+      "headless-service"
+    ],
+    "spec": {
+      "caption": "ヘッドレス Service は仮想の IP を持たず、名前を引くとクラスタの DNS が、選ばれた Pod の IP をそのまま全部返します。呼ぶ側はその中から選んで、web-0 のような Pod に直接つなぎます。",
+      "width": 600,
+      "height": 250,
+      "nodes": [
+        {
+          "id": "client",
+          "x": 16,
+          "y": 30,
+          "w": 140,
+          "h": 52,
+          "label": "呼ぶ側の Pod",
+          "tone": "muted"
+        },
+        {
+          "id": "dns",
+          "x": 16,
+          "y": 180,
+          "w": 150,
+          "h": 52,
+          "label": "クラスタの DNS",
+          "sub": "Pod の IP を全部返す"
+        },
+        {
+          "id": "hl",
+          "x": 250,
+          "y": 180,
+          "w": 180,
+          "h": 52,
+          "label": "ヘッドレス Service",
+          "sub": "clusterIP: None",
+          "term": "headless-service"
+        },
+        {
+          "id": "w0",
+          "x": 460,
+          "y": 20,
+          "w": 124,
+          "h": 52,
+          "label": "web-0",
+          "sub": "Pod"
+        },
+        {
+          "id": "w1",
+          "x": 460,
+          "y": 100,
+          "w": 124,
+          "h": 52,
+          "label": "web-1",
+          "sub": "Pod"
+        }
+      ],
+      "edges": [
+        {
+          "from": "client",
+          "to": "dns",
+          "label": "① 名前を引く"
+        },
+        {
+          "from": "hl",
+          "to": "dns",
+          "label": "Pod の一覧"
+        },
+        {
+          "from": "client",
+          "to": "w0",
+          "label": "② 直接つなぐ"
+        },
+        {
+          "from": "hl",
+          "to": "w1",
+          "label": "selector",
+          "dashed": true
+        }
+      ]
+    }
+  },
+  {
+    "id": "ingress-gateway",
+    "terms": [
+      "ingress",
+      "gateway-api"
+    ],
+    "spec": {
+      "caption": "Ingress は 1 つのリソースにホスト名とパスのルールを書き、Ingress コントローラーがそれを読んで Service へ届けます。後継の Gateway API は、実装 (GatewayClass)・入口 (Gateway)・経路 (HTTPRoute) を別のリソースに分けます。",
+      "width": 620,
+      "height": 380,
+      "groups": [
+        {
+          "x": 16,
+          "y": 110,
+          "w": 286,
+          "h": 186,
+          "label": "Ingress"
+        },
+        {
+          "x": 324,
+          "y": 110,
+          "w": 280,
+          "h": 186,
+          "label": "Gateway API"
+        }
+      ],
+      "nodes": [
+        {
+          "id": "ext",
+          "x": 240,
+          "y": 16,
+          "w": 140,
+          "h": 52,
+          "label": "外のクライアント",
+          "sub": "HTTP・HTTPS",
+          "tone": "muted"
+        },
+        {
+          "id": "ctrl",
+          "x": 28,
+          "y": 150,
+          "w": 120,
+          "h": 52,
+          "label": "コントローラー",
+          "sub": "Traefik など",
+          "tone": "muted"
+        },
+        {
+          "id": "ing",
+          "x": 190,
+          "y": 150,
+          "w": 100,
+          "h": 52,
+          "label": "Ingress",
+          "sub": "host・path",
+          "term": "ingress"
+        },
+        {
+          "id": "gw",
+          "x": 340,
+          "y": 150,
+          "w": 120,
+          "h": 52,
+          "label": "Gateway",
+          "sub": "入口の実体",
+          "term": "gateway-api"
+        },
+        {
+          "id": "gwc",
+          "x": 474,
+          "y": 150,
+          "w": 120,
+          "h": 52,
+          "label": "GatewayClass",
+          "sub": "どの実装か",
+          "term": "gateway-api"
+        },
+        {
+          "id": "route",
+          "x": 340,
+          "y": 230,
+          "w": 120,
+          "h": 52,
+          "label": "HTTPRoute",
+          "sub": "経路のルール",
+          "term": "gateway-api"
+        },
+        {
+          "id": "svc",
+          "x": 240,
+          "y": 316,
+          "w": 140,
+          "h": 52,
+          "label": "Service",
+          "tone": "muted"
+        }
+      ],
+      "edges": [
+        {
+          "from": "ext",
+          "to": "ctrl"
+        },
+        {
+          "from": "ext",
+          "to": "gw"
+        },
+        {
+          "from": "ing",
+          "to": "ctrl",
+          "label": "読む",
+          "dashed": true
+        },
+        {
+          "from": "ctrl",
+          "to": "svc"
+        },
+        {
+          "from": "gwc",
+          "to": "gw",
+          "dashed": true
+        },
+        {
+          "from": "gw",
+          "to": "route"
+        },
+        {
+          "from": "route",
+          "to": "svc"
+        }
+      ]
+    }
+  },
+  {
+    "id": "cni-networkpolicy",
+    "terms": [
+      "cni",
+      "networkpolicy"
+    ],
+    "spec": {
+      "caption": "CNI プラグインが Pod に IP を振り、ノードをまたいだ Pod どうしを直接つなぎます。NetworkPolicy で絞ると、db の Pod へは frontend の Pod からの 6379 番だけが通ります。ポリシーを効かせるのも、対応したプラグインです。",
+      "width": 620,
+      "height": 310,
+      "groups": [
+        {
+          "x": 16,
+          "y": 16,
+          "w": 270,
+          "h": 196,
+          "label": "ノード A"
+        },
+        {
+          "x": 334,
+          "y": 16,
+          "w": 270,
+          "h": 196,
+          "label": "ノード B"
+        }
+      ],
+      "nodes": [
+        {
+          "id": "fe",
+          "x": 32,
+          "y": 56,
+          "w": 170,
+          "h": 52,
+          "label": "frontend の Pod",
+          "sub": "role=frontend"
+        },
+        {
+          "id": "other",
+          "x": 32,
+          "y": 140,
+          "w": 170,
+          "h": 52,
+          "label": "ほかの Pod",
+          "sub": "ほかのラベル",
+          "tone": "warn"
+        },
+        {
+          "id": "db",
+          "x": 400,
+          "y": 56,
+          "w": 190,
+          "h": 52,
+          "label": "db の Pod",
+          "sub": "role=db :6379"
+        },
+        {
+          "id": "np",
+          "x": 360,
+          "y": 140,
+          "w": 230,
+          "h": 52,
+          "label": "NetworkPolicy",
+          "sub": "db へは frontend だけ",
+          "term": "networkpolicy"
+        },
+        {
+          "id": "cni",
+          "x": 160,
+          "y": 246,
+          "w": 300,
+          "h": 52,
+          "label": "CNI プラグイン",
+          "sub": "Pod に IP・ノード間をつなぐ",
+          "term": "cni"
+        }
+      ],
+      "edges": [
+        {
+          "from": "fe",
+          "to": "db",
+          "label": "6379 番を許す"
+        },
+        {
+          "from": "other",
+          "to": "db",
+          "label": "拒否",
+          "dashed": true
+        },
+        {
+          "from": "np",
+          "to": "cni",
+          "label": "効かせる",
+          "dashed": true
+        }
+      ]
+    }
+  },
+  {
+    "id": "service-mesh",
+    "terms": [
+      "service-mesh"
+    ],
+    "spec": {
+      "caption": "サイドカー型のサービスメッシュでは、Pod ごとに付けたプロキシが通信を横取りし、アプリのコードを変えずに暗号化・負荷分散・計測を足します。プロキシは性能のデータも集めます。",
+      "width": 620,
+      "height": 250,
+      "groups": [
+        {
+          "x": 16,
+          "y": 120,
+          "w": 270,
+          "h": 110,
+          "label": "Pod A"
+        },
+        {
+          "x": 334,
+          "y": 120,
+          "w": 270,
+          "h": 110,
+          "label": "Pod B"
+        }
+      ],
+      "nodes": [
+        {
+          "id": "data",
+          "x": 220,
+          "y": 20,
+          "w": 180,
+          "h": 52,
+          "label": "計測のデータ",
+          "sub": "性能・メトリクス",
+          "tone": "muted"
+        },
+        {
+          "id": "a",
+          "x": 32,
+          "y": 160,
+          "w": 100,
+          "h": 52,
+          "label": "アプリ A"
+        },
+        {
+          "id": "pa",
+          "x": 150,
+          "y": 160,
+          "w": 100,
+          "h": 52,
+          "label": "プロキシ A",
+          "sub": "サイドカー",
+          "term": "service-mesh"
+        },
+        {
+          "id": "pb",
+          "x": 370,
+          "y": 160,
+          "w": 100,
+          "h": 52,
+          "label": "プロキシ B",
+          "sub": "サイドカー",
+          "term": "service-mesh"
+        },
+        {
+          "id": "b",
+          "x": 488,
+          "y": 160,
+          "w": 100,
+          "h": 52,
+          "label": "アプリ B"
+        }
+      ],
+      "edges": [
+        {
+          "from": "a",
+          "to": "pa"
+        },
+        {
+          "from": "pa",
+          "to": "pb",
+          "label": "暗号化して送る"
+        },
+        {
+          "from": "pb",
+          "to": "b"
+        },
+        {
+          "from": "pa",
+          "to": "data",
+          "dashed": true
+        },
+        {
+          "from": "pb",
+          "to": "data",
+          "dashed": true
+        }
+      ]
+    }
+  },
+  {
+    "id": "rbac-binding",
+    "terms": [
+      "role",
+      "clusterrole",
+      "rolebinding",
+      "serviceaccount"
+    ],
+    "spec": {
+      "caption": "Role (1 つの Namespace) と ClusterRole (クラスタ全体) は権限を並べるだけで、RoleBinding や ClusterRoleBinding が roleRef で指し、subjects の ServiceAccount やユーザーに与えます。RoleBinding で ClusterRole を指すと、その Namespace の中だけに効きます。",
+      "width": 620,
+      "height": 280,
+      "nodes": [
+        {
+          "id": "sa",
+          "x": 16,
+          "y": 40,
+          "w": 146,
+          "h": 52,
+          "label": "ServiceAccount",
+          "sub": "人でないものの名前",
+          "term": "serviceaccount"
+        },
+        {
+          "id": "user",
+          "x": 16,
+          "y": 200,
+          "w": 146,
+          "h": 52,
+          "label": "ユーザー・グループ",
+          "tone": "muted"
+        },
+        {
+          "id": "rb",
+          "x": 240,
+          "y": 40,
+          "w": 160,
+          "h": 52,
+          "label": "RoleBinding",
+          "sub": "その Namespace だけ",
+          "term": "rolebinding"
+        },
+        {
+          "id": "crb",
+          "x": 240,
+          "y": 200,
+          "w": 160,
+          "h": 52,
+          "label": "ClusterRoleBinding",
+          "sub": "クラスタ全体",
+          "tone": "muted"
+        },
+        {
+          "id": "role",
+          "x": 454,
+          "y": 40,
+          "w": 150,
+          "h": 52,
+          "label": "Role",
+          "sub": "pod-reader など",
+          "term": "role"
+        },
+        {
+          "id": "cr",
+          "x": 454,
+          "y": 200,
+          "w": 150,
+          "h": 52,
+          "label": "ClusterRole",
+          "sub": "view など",
+          "term": "clusterrole"
+        }
+      ],
+      "edges": [
+        {
+          "from": "rb",
+          "to": "sa",
+          "label": "subjects"
+        },
+        {
+          "from": "rb",
+          "to": "role",
+          "label": "roleRef"
+        },
+        {
+          "from": "rb",
+          "to": "cr",
+          "label": "roleRef も可",
+          "dashed": true
+        },
+        {
+          "from": "crb",
+          "to": "user",
+          "label": "subjects"
+        },
+        {
+          "from": "crb",
+          "to": "cr",
+          "label": "roleRef"
+        }
+      ]
+    }
+  },
+  {
+    "id": "pod-security-standards",
+    "terms": [
+      "pod-security-standards"
+    ],
+    "spec": {
+      "caption": "Pod Security Standards は、緩いほうから Privileged・Baseline・Restricted の 3 段階です。Namespace に pod-security.kubernetes.io/enforce: restricted のラベルを付けると、Pod Security Admission が違反する Pod を拒否します。",
+      "width": 620,
+      "height": 250,
+      "nodes": [
+        {
+          "id": "priv",
+          "x": 16,
+          "y": 30,
+          "w": 160,
+          "h": 52,
+          "label": "Privileged",
+          "sub": "制限なし",
+          "term": "pod-security-standards"
+        },
+        {
+          "id": "base",
+          "x": 230,
+          "y": 30,
+          "w": 160,
+          "h": 52,
+          "label": "Baseline",
+          "sub": "既知の昇格を防ぐ",
+          "term": "pod-security-standards"
+        },
+        {
+          "id": "res",
+          "x": 444,
+          "y": 30,
+          "w": 160,
+          "h": 52,
+          "label": "Restricted",
+          "sub": "root 以外で動かす等",
+          "term": "pod-security-standards"
+        },
+        {
+          "id": "pod",
+          "x": 16,
+          "y": 170,
+          "w": 130,
+          "h": 52,
+          "label": "新しい Pod",
+          "tone": "muted"
+        },
+        {
+          "id": "psa",
+          "x": 190,
+          "y": 170,
+          "w": 210,
+          "h": 52,
+          "label": "Pod Security Admission",
+          "sub": "Namespace のラベルで判定"
+        },
+        {
+          "id": "ng",
+          "x": 444,
+          "y": 170,
+          "w": 160,
+          "h": 52,
+          "label": "拒否",
+          "sub": "違反する Pod",
+          "tone": "warn"
+        }
+      ],
+      "edges": [
+        {
+          "from": "priv",
+          "to": "base",
+          "label": "厳しく"
+        },
+        {
+          "from": "base",
+          "to": "res",
+          "label": "厳しく"
+        },
+        {
+          "from": "res",
+          "to": "psa",
+          "label": "enforce に指定",
+          "dashed": true
+        },
+        {
+          "from": "pod",
+          "to": "psa"
+        },
+        {
+          "from": "psa",
+          "to": "ng",
+          "label": "違反"
+        }
+      ]
+    }
+  },
+  {
+    "id": "persistent-storage",
+    "terms": [
+      "pv",
+      "pvc",
+      "storageclass",
+      "csi"
+    ],
+    "spec": {
+      "caption": "Pod は PVC で大きさとアクセスモードを求め、合う PV と 1 対 1 で結び付きます。PVC が StorageClass を指すと、provisioner に書いた CSI ドライバーが外のストレージにボリュームを作り、ドライバーに添える external-provisioner がそれを表す PV を作ります。",
+      "width": 620,
+      "height": 340,
+      "nodes": [
+        {
+          "id": "pod",
+          "x": 16,
+          "y": 30,
+          "w": 130,
+          "h": 52,
+          "label": "Pod",
+          "sub": "claimName で指す",
+          "tone": "muted"
+        },
+        {
+          "id": "pvc",
+          "x": 196,
+          "y": 30,
+          "w": 170,
+          "h": 52,
+          "label": "PVC",
+          "sub": "1Gi・ReadWriteOnce",
+          "term": "pvc"
+        },
+        {
+          "id": "pv",
+          "x": 430,
+          "y": 30,
+          "w": 174,
+          "h": 52,
+          "label": "PV",
+          "sub": "ストレージの実物",
+          "term": "pv"
+        },
+        {
+          "id": "sc",
+          "x": 196,
+          "y": 160,
+          "w": 170,
+          "h": 52,
+          "label": "StorageClass",
+          "sub": "作り方を決める",
+          "term": "storageclass"
+        },
+        {
+          "id": "csi",
+          "x": 430,
+          "y": 160,
+          "w": 174,
+          "h": 52,
+          "label": "CSI ドライバー",
+          "sub": "provisioner が PV も作る",
+          "term": "csi"
+        },
+        {
+          "id": "disk",
+          "x": 430,
+          "y": 270,
+          "w": 174,
+          "h": 52,
+          "label": "外のストレージ",
+          "sub": "クラウドのディスク等",
+          "tone": "muted"
+        }
+      ],
+      "edges": [
+        {
+          "from": "pod",
+          "to": "pvc",
+          "label": "使う"
+        },
+        {
+          "from": "pvc",
+          "to": "pv",
+          "label": "Bound"
+        },
+        {
+          "from": "pvc",
+          "to": "sc",
+          "label": "storageClassName",
+          "dashed": true
+        },
+        {
+          "from": "sc",
+          "to": "csi",
+          "label": "作らせる"
+        },
+        {
+          "from": "csi",
+          "to": "pv",
+          "label": "PV を作る"
+        },
+        {
+          "from": "csi",
+          "to": "disk",
+          "label": "ボリューム"
+        }
+      ]
+    }
+  },
+  {
+    "id": "api-access",
+    "terms": [
+      "authn-authz",
+      "rbac"
+    ],
+    "spec": {
+      "caption": "API サーバーは、届いた要求をまず認証で「誰か」確かめ (だめなら 401)、次に認可で「何をしてよいか」を決め (だめなら 403)、アドミッション制御へ進めます。RBAC は認可の方法の 1 つです。",
+      "width": 620,
+      "height": 250,
+      "nodes": [
+        {
+          "id": "cl",
+          "x": 16,
+          "y": 30,
+          "w": 120,
+          "h": 52,
+          "label": "kubectl・Pod",
+          "sub": "TLS でつなぐ",
+          "tone": "muted"
+        },
+        {
+          "id": "authn",
+          "x": 172,
+          "y": 30,
+          "w": 120,
+          "h": 52,
+          "label": "認証",
+          "sub": "誰か",
+          "term": "authn-authz"
+        },
+        {
+          "id": "authz",
+          "x": 330,
+          "y": 30,
+          "w": 130,
+          "h": 52,
+          "label": "認可",
+          "sub": "何をしてよいか",
+          "term": "authn-authz"
+        },
+        {
+          "id": "adm",
+          "x": 490,
+          "y": 30,
+          "w": 120,
+          "h": 52,
+          "label": "アドミッション",
+          "tone": "muted"
+        },
+        {
+          "id": "e401",
+          "x": 172,
+          "y": 170,
+          "w": 120,
+          "h": 52,
+          "label": "401",
+          "sub": "確かめられない",
+          "tone": "warn"
+        },
+        {
+          "id": "e403",
+          "x": 330,
+          "y": 170,
+          "w": 130,
+          "h": 52,
+          "label": "403",
+          "sub": "どれも許さない",
+          "tone": "warn"
+        },
+        {
+          "id": "rbac",
+          "x": 490,
+          "y": 170,
+          "w": 120,
+          "h": 52,
+          "label": "RBAC",
+          "sub": "認可の方法",
+          "term": "rbac"
+        }
+      ],
+      "edges": [
+        {
+          "from": "cl",
+          "to": "authn"
+        },
+        {
+          "from": "authn",
+          "to": "authz"
+        },
+        {
+          "from": "authz",
+          "to": "adm"
+        },
+        {
+          "from": "authn",
+          "to": "e401",
+          "label": "失敗",
+          "dashed": true
+        },
+        {
+          "from": "authz",
+          "to": "e403",
+          "label": "拒否",
+          "dashed": true
+        },
+        {
+          "from": "rbac",
+          "to": "authz",
+          "label": "決まり",
+          "dashed": true
+        }
+      ]
+    }
+  },
+  {
+    "id": "tls-x509",
+    "terms": [
+      "tls",
+      "x509-certificate"
+    ],
+    "spec": {
+      "caption": "TLS の通り道を作るとき、サーバーは CA が署名した X.509 証明書を見せ、クライアントは信頼する CA でそれを確かめます。相互 TLS では、クライアントも自分の証明書を見せます。",
+      "width": 620,
+      "height": 290,
+      "nodes": [
+        {
+          "id": "ca",
+          "x": 196,
+          "y": 20,
+          "w": 200,
+          "h": 52,
+          "label": "CA (認証局)",
+          "sub": "署名で結び付きを示す"
+        },
+        {
+          "id": "cert",
+          "x": 436,
+          "y": 20,
+          "w": 168,
+          "h": 52,
+          "label": "X.509 証明書",
+          "sub": "公開鍵と持ち主",
+          "term": "x509-certificate"
+        },
+        {
+          "id": "cl",
+          "x": 16,
+          "y": 130,
+          "w": 160,
+          "h": 52,
+          "label": "クライアント",
+          "sub": "kubectl など"
+        },
+        {
+          "id": "tls",
+          "x": 196,
+          "y": 130,
+          "w": 200,
+          "h": 52,
+          "label": "TLS の通り道",
+          "sub": "確認・秘匿・完全性",
+          "term": "tls"
+        },
+        {
+          "id": "srv",
+          "x": 436,
+          "y": 130,
+          "w": 168,
+          "h": 52,
+          "label": "サーバー",
+          "sub": "API サーバー :6443"
+        },
+        {
+          "id": "cc",
+          "x": 16,
+          "y": 226,
+          "w": 160,
+          "h": 52,
+          "label": "クライアント証明書",
+          "sub": "相互 TLS のとき",
+          "tone": "muted"
+        }
+      ],
+      "edges": [
+        {
+          "from": "ca",
+          "to": "cert",
+          "label": "署名"
+        },
+        {
+          "from": "cert",
+          "to": "srv",
+          "label": "見せる"
+        },
+        {
+          "from": "cl",
+          "to": "ca",
+          "label": "手元の CA で確かめる",
+          "dashed": true
+        },
+        {
+          "from": "cl",
+          "to": "tls"
+        },
+        {
+          "from": "tls",
+          "to": "srv"
+        },
+        {
+          "from": "cc",
+          "to": "cl",
+          "label": "見せる",
+          "dashed": true
+        }
+      ]
+    }
+  },
+  {
+    "id": "oauth2-oidc",
+    "terms": [
+      "oauth2",
+      "oidc"
+    ],
+    "spec": {
+      "caption": "OAuth 2.0 では、資源の持ち主が認可サーバーで許可すると、クライアントはパスワードの代わりにアクセストークンを受け取り、資源のサーバーを呼びます。OpenID Connect は、ログインした人が誰かを ID トークン (JWT) で伝える層を足します。",
+      "width": 620,
+      "height": 260,
+      "nodes": [
+        {
+          "id": "owner",
+          "x": 16,
+          "y": 30,
+          "w": 150,
+          "h": 52,
+          "label": "資源の持ち主",
+          "sub": "resource owner",
+          "tone": "muted"
+        },
+        {
+          "id": "as",
+          "x": 220,
+          "y": 30,
+          "w": 160,
+          "h": 52,
+          "label": "認可サーバー",
+          "sub": "トークンを出す",
+          "term": "oauth2"
+        },
+        {
+          "id": "idt",
+          "x": 454,
+          "y": 30,
+          "w": 150,
+          "h": 52,
+          "label": "ID トークン",
+          "sub": "誰か (JWT)",
+          "term": "oidc"
+        },
+        {
+          "id": "cl",
+          "x": 16,
+          "y": 190,
+          "w": 150,
+          "h": 52,
+          "label": "クライアント",
+          "sub": "アプリ"
+        },
+        {
+          "id": "rs",
+          "x": 454,
+          "y": 190,
+          "w": 150,
+          "h": 52,
+          "label": "資源のサーバー",
+          "sub": "resource server",
+          "tone": "muted"
+        }
+      ],
+      "edges": [
+        {
+          "from": "owner",
+          "to": "as",
+          "label": "許可する"
+        },
+        {
+          "from": "as",
+          "to": "idt",
+          "label": "OIDC なら"
+        },
+        {
+          "from": "as",
+          "to": "cl",
+          "label": "アクセストークン"
+        },
+        {
+          "from": "idt",
+          "to": "cl",
+          "label": "誰かを伝える",
+          "dashed": true
+        },
+        {
+          "from": "cl",
+          "to": "rs",
+          "label": "トークンで呼ぶ"
+        }
+      ]
+    }
+  },
+  {
+    "id": "jwt",
+    "terms": [
+      "jwt"
+    ],
+    "spec": {
+      "caption": "JWT は、ヘッダー・クレームのペイロード・署名を base64url にしてピリオドでつないだ小さな証票です。受け手は署名で書き換えが無いかを、exp で期限を確かめます。OIDC の ID トークンも ServiceAccount のトークンもこの形です。中身は暗号化されず、誰でも読めます。",
+      "width": 620,
+      "height": 270,
+      "groups": [
+        {
+          "x": 16,
+          "y": 16,
+          "w": 588,
+          "h": 108,
+          "label": "JWT (base64url の部品を . でつなぐ)"
+        }
+      ],
+      "nodes": [
+        {
+          "id": "hd",
+          "x": 32,
+          "y": 56,
+          "w": 170,
+          "h": 52,
+          "label": "ヘッダー",
+          "sub": "署名の方式など",
+          "term": "jwt"
+        },
+        {
+          "id": "pl",
+          "x": 224,
+          "y": 56,
+          "w": 170,
+          "h": 52,
+          "label": "ペイロード",
+          "sub": "iss・sub・aud・exp",
+          "term": "jwt"
+        },
+        {
+          "id": "sg",
+          "x": 418,
+          "y": 56,
+          "w": 170,
+          "h": 52,
+          "label": "署名",
+          "sub": "ヘッダーと中身に署名",
+          "term": "jwt"
+        },
+        {
+          "id": "idt",
+          "x": 16,
+          "y": 200,
+          "w": 170,
+          "h": 52,
+          "label": "ID トークン",
+          "sub": "OpenID Connect",
+          "tone": "muted"
+        },
+        {
+          "id": "sat",
+          "x": 224,
+          "y": 200,
+          "w": 170,
+          "h": 52,
+          "label": "SA のトークン",
+          "sub": "ServiceAccount",
+          "tone": "muted"
+        },
+        {
+          "id": "rcv",
+          "x": 434,
+          "y": 200,
+          "w": 170,
+          "h": 52,
+          "label": "受け手",
+          "sub": "署名と exp を確かめる"
+        }
+      ],
+      "edges": [
+        {
+          "from": "idt",
+          "to": "pl",
+          "label": "この形",
+          "dashed": true
+        },
+        {
+          "from": "sat",
+          "to": "pl",
+          "label": "この形",
+          "dashed": true
+        },
+        {
+          "from": "sg",
+          "to": "rcv",
+          "label": "確かめる"
+        }
+      ]
+    }
+  },
+  {
+    "id": "serviceaccount-token",
+    "terms": [
+      "serviceaccount-token"
+    ],
+    "spec": {
+      "caption": "v1.22 以降、Pod の ServiceAccount のトークンは TokenRequest API で短い期限付きで発行され、projected volume で Pod にマウントされて自動で入れ替わります。API サーバーは届いたトークンの署名・期限・宛先を確かめます。Secret に入れる昔のトークンは期限が無く、今は勧められません。",
+      "width": 620,
+      "height": 320,
+      "nodes": [
+        {
+          "id": "sa",
+          "x": 16,
+          "y": 30,
+          "w": 140,
+          "h": 52,
+          "label": "ServiceAccount",
+          "sub": "Pod に割り当て",
+          "tone": "muted"
+        },
+        {
+          "id": "tr",
+          "x": 256,
+          "y": 30,
+          "w": 170,
+          "h": 52,
+          "label": "TokenRequest API",
+          "sub": "短い期限で出す"
+        },
+        {
+          "id": "tok",
+          "x": 256,
+          "y": 140,
+          "w": 170,
+          "h": 52,
+          "label": "SA のトークン",
+          "sub": "署名付きの JWT",
+          "term": "serviceaccount-token"
+        },
+        {
+          "id": "pod",
+          "x": 16,
+          "y": 140,
+          "w": 150,
+          "h": 52,
+          "label": "Pod",
+          "sub": "projected volume"
+        },
+        {
+          "id": "old",
+          "x": 444,
+          "y": 140,
+          "w": 160,
+          "h": 52,
+          "label": "Secret のトークン",
+          "sub": "期限なし・非推奨",
+          "tone": "warn"
+        },
+        {
+          "id": "api",
+          "x": 256,
+          "y": 250,
+          "w": 170,
+          "h": 52,
+          "label": "API サーバー",
+          "sub": "署名・期限・aud"
+        }
+      ],
+      "edges": [
+        {
+          "from": "sa",
+          "to": "tr",
+          "label": "kubelet が頼む"
+        },
+        {
+          "from": "tr",
+          "to": "tok",
+          "label": "発行"
+        },
+        {
+          "from": "tok",
+          "to": "pod",
+          "label": "マウント"
+        },
+        {
+          "from": "pod",
+          "to": "api",
+          "label": "トークンで名乗る"
+        }
+      ]
+    }
+  }
+]
