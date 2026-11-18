@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { onRouteChanged, startScrollMemory } from './scrollMemory';
 
 // GitHub Pages ではサーバーで経路を振り分けられないので、URL の # の後ろで画面を決める。
 export type Route = { name: 'home'; week: number } | { name: 'lesson'; lessonId: string } | { name: 'about' } | { name: 'settings' } | { name: 'review' } | { name: 'progress' } | { name: 'exam' } | { name: 'glossary' } | { name: 'guide' } | { name: 'handbook'; topicId?: string };
@@ -37,9 +38,10 @@ export const weekHref = (week: number) => `#/week/${week}`;
 export function useRoute(): Route {
   const [route, setRoute] = useState(() => parseRoute(window.location.hash));
   useEffect(() => {
+    startScrollMemory();
     const onChange = () => {
       setRoute(parseRoute(window.location.hash));
-      window.scrollTo(0, 0);
+      onRouteChanged();
     };
     window.addEventListener('hashchange', onChange);
     return () => window.removeEventListener('hashchange', onChange);

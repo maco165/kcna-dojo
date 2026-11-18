@@ -457,6 +457,26 @@ async function run(browser, name, width, height) {
   check(figureMissing.length === 0, `${tag} ハンドブックの 13 トピックすべてに図がある ${figureMissing.join(',')}`);
   check(allIds.length === 13 && widest.w <= width, `${tag} ハンドブックの 13 トピックが横にはみ出さない (いちばん広い ${widest.id} ${widest.w} <= ${width})`);
 
+  // 16. 戻る操作: 目次を下まで送ってトピックを開き、戻ると元の位置。新しく開いたページは先頭
+  {
+    const scrollTop = () => page.evaluate(() => (document.querySelector('.astryx-layout-content') ?? document.scrollingElement).scrollTop);
+    const scrollTo = (y) => page.evaluate((v) => ((document.querySelector('.astryx-layout-content') ?? document.scrollingElement).scrollTop = v), y);
+    await page.goto(`${BASE}#/handbook`);
+    await page.locator('.hb-topic').first().waitFor();
+    await scrollTo(900);
+    await page.waitForTimeout(300);
+    const before = await scrollTop();
+    await page.locator('.hb-topic').last().click();
+    await page.getByRole('heading', { name: '全体の流れ' }).waitFor();
+    await page.waitForTimeout(300);
+    check((await scrollTop()) < 5, `${tag} 新しく開いたトピックは先頭から (${await scrollTop()})`);
+    await page.goBack();
+    await page.locator('.hb-topic').first().waitFor();
+    await page.waitForTimeout(600);
+    const after = await scrollTop();
+    check(before > 100 && Math.abs(after - before) < 5, `${tag} 戻ると目次の元の位置 (${before} → ${after})`);
+  }
+
   check(errors.length === 0, `${tag} ページのエラーが無い ${errors.length ? errors.join(' / ') : ''}`);
   await context.close();
 }
