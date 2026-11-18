@@ -2418,6 +2418,29 @@ html[data-loading='true'] body::before {
   font-size: 13px;
 }
 
+/* 答えたあとの「読み直す」。ハンドブックと用語集への札を、ラベルと並べる */
+.read-more {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.read-more__title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.read-more__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+}
+
+.read-more__label {
+  /* ラベルは札の上に置く (札が折り返しても揃う) */
+  flex: 0 0 100%;
 .cmd-note__absent {
   padding: 0 6px;
   border-radius: 6px;

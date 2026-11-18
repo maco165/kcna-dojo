@@ -109,6 +109,7 @@ async function run(browser, name, width, height) {
     const wrong = q.choices.find((c) => c.id !== q.answer).id;
     const pick = i === 0 ? wrong : q.answer;
     await page.getByRole('radio', { name: choiceLabel(q, pick) }).check();
+    if (i === 0) check((await page.getByRole('navigation', { name: '読み直す' }).count()) === 0, `${tag} 答える前には読み直す先を出さない`);
     await page.getByRole('button', { name: '確かめる' }).click();
     if (i === 0) {
       check(await page.getByText('不正解 · 正しくは').isVisible(), `${tag} 不正解のとき知らせが出る`);
@@ -117,6 +118,12 @@ async function run(browser, name, width, height) {
       const answerLetter = answerLabel.trim().slice(0, 1);
       check(/^[A-D]$/.test(answerLetter) && (await page.getByText(`不正解 · 正しくは ${answerLetter}`).isVisible()), `${tag} 「正しくは ${answerLetter}」が画面の並びと合う`);
       check(await page.getByText(q.explanation).isVisible(), `${tag} 不正解のとき解説が出る`);
+      // 答えたあとに、読み直す先 (ハンドブック・用語集) が出る。答える前には出さない
+      const readMore = page.getByRole('navigation', { name: '読み直す' });
+      await readMore.waitFor({ timeout: 5000 }).catch(() => {});
+      const hbLinks = await readMore.locator('a[href*="/handbook/"]').count();
+      const glLinks = await readMore.locator('a[href*="/glossary/"]').count();
+      check(hbLinks + glLinks >= 1, `${tag} 答えたあとに読み直す先が出る (ハンドブック ${hbLinks}・用語集 ${glLinks})`);
       await noHorizontalOverflow(page, width, `${tag} 4 択の解説`);
     } else {
       check(await page.getByText('正解', { exact: true }).isVisible(), `${tag} ${q.id} 正解の知らせ`);
@@ -393,6 +400,10 @@ async function run(browser, name, width, height) {
   check(afterExam?.exams?.length === 1 && afterExam.exams[0].total === 60 && afterExam.exams[0].set === 1, `${tag} 模擬試験の結果が回の番号つきで記録に残る`);
   const answersAdded = Object.keys(afterExam?.answers ?? {}).length - answersBefore;
   check(answersAdded <= 1, `${tag} 答えなしの問題は記録しない (増えた記録 ${answersAdded})`);
+  // ほぼ答えずに採点したので、4 分野とも目安に届かず、分野ごとに読み直すトピックが出る
+  const weak = page.getByRole('navigation', { name: '弱い分野を読み直す' });
+  await weak.waitFor({ timeout: 5000 }).catch(() => {});
+  check((await weak.locator('a[href*="/handbook/"]').count()) >= 4, `${tag} 模擬試験の結果に、弱い分野の読み直すトピックが出る`);
   await noHorizontalOverflow(page, width, `${tag} 模擬試験の結果`);
   await page.getByRole('button', { name: '模擬試験の最初へ戻る' }).click();
   check(await page.getByText(/前回 \d+ \/ 60/).first().isVisible(), `${tag} 第 1 回の前回の結果が回の選択に出る`);
