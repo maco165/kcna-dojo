@@ -44,6 +44,9 @@ describe('validateGlossary', () => {
     expect(c([{ ...ok, lessons: [], topics: ['k3s-vs-kubernetes'] }])).toEqual([]);
     expect(c([{ ...ok, lessons: [], topics: ['no-such'] }]).join()).toMatch(/no-such というトピック/);
     expect(c([{ ...ok, lessons: [] }])[0]).toMatch(/topics を付ける/);
+    expect(c([{ ...ok, lessons: [], topics: [] }])[0]).toMatch(/topics を付ける/);
+    expect(c([{ ...ok, topics: ['k3s-vs-kubernetes', 'k3s-vs-kubernetes'] }])[0]).toMatch(/同じトピック/);
+    expect(c([{ ...ok, sources: [{ label: 'a', url: 'https://k/' }, { label: 'b', url: 'https://k/' }] }])[0]).toMatch(/同じ URL/);
   });
   it('AI に聞く文は、語と説明を入れ、初学者向けにやさしく聞く (サイトからは送らず、開いた先の入力欄に入る)', () => {
     const q = termQuestion({ term: 'Pod', description: 'コンテナの最小の単位' });

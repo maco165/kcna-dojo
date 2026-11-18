@@ -119,10 +119,12 @@ export function validateGlossary(data: unknown, knownLessonIds: Set<string>, kno
           }
           if (!ok) errors.push(`${where}: sources は label と https の url を持ちます`);
         }
+      if (Array.isArray(t.sources) && new Set((t.sources as { url?: unknown }[]).map((x) => x?.url)).size !== t.sources.length) errors.push(`${where}: sources に同じ URL が重なっています`);
     }
     const topics = Array.isArray(t?.topics) ? (t.topics as unknown[]) : [];
     if (t?.topics !== undefined && !Array.isArray(t.topics)) errors.push(`${where}: topics は配列にします`);
     for (const x of topics) if (!knownTopicIds.has(x as string)) errors.push(`${where}: topics の ${String(x)} というトピックはありません`);
+    if (new Set(topics).size !== topics.length) errors.push(`${where}: topics に同じトピックが重なっています`);
     // 試験の範囲の語はレッスンで、範囲の外の語はハンドブックのトピックで、どこで出てくるかを示す
     if (!Array.isArray(t?.lessons) || (t.lessons.length === 0 && topics.length === 0)) errors.push(`${where}: lessons が空です (範囲の外の語なら topics を付ける)`);
     else {

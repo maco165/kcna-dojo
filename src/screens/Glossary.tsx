@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { AppShell } from '@astryxdesign/core/AppShell';
 import { Link } from '@astryxdesign/core/Link';
 import { VStack } from '@astryxdesign/core/Stack';
@@ -14,11 +14,8 @@ import glossary from '../content/glossary.json';
 import type { Domain } from '../content/types';
 import { isFreshVisit } from '../lib/scrollMemory';
 import { searchTerms, sortTerms, termDomain, termQuestion, type GlossaryTerm } from '../lib/glossary';
-import { aiLinks } from '../lib/askAi';
+import { AskAiLinks } from '../components/AskAi';
 import { findTopic } from '../content/handbook';
-import { Button } from '@astryxdesign/core/Button';
-import { HStack } from '@astryxdesign/core/Stack';
-import { ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline';
 import { DOMAINS } from '../lib/lessonStatus';
 import type { Progress } from '../lib/progress';
 import { handbookHref, lessonHref } from '../lib/route';
@@ -46,19 +43,6 @@ function hostOf(url: string) {
   } catch {
     return url;
   }
-}
-
-/** 用語集でも分からないときに、語と説明を入れた Claude / ChatGPT を開く (サイトからは何も送らない) */
-function AskTerm({ t }: { t: Entry }) {
-  const links = aiLinks(termQuestion(t));
-  const icon = <ChatBubbleLeftRightIcon width={16} height={16} />;
-  return (
-    <HStack gap={2} wrap="wrap" vAlign="center">
-      <Text type="supporting">まだ分からなければ AI に聞く</Text>
-      <Button size="sm" variant="ghost" icon={icon} label="Claude" href={links.claude} target="_blank" rel="noopener noreferrer" />
-      <Button size="sm" variant="ghost" icon={icon} label="ChatGPT" href={links.chatgpt} target="_blank" rel="noopener noreferrer" />
-    </HStack>
-  );
 }
 
 /** 説明・詳しい説明・出てくるレッスンとハンドブック・出典・AI に聞く (開いた語の中身。スマホと PC で共通) */
@@ -103,15 +87,15 @@ function Detail({ t, large }: { t: Entry; large?: boolean }) {
       <Text type="supporting">
         出典:{' '}
         {sources.map((x, i) => (
-          <span key={x.url}>
+          <Fragment key={x.url}>
             {i > 0 && '・'}
             <Link href={x.url} isExternalLink newTabLabel="(新しいタブで開きます)">
               {x.label}
             </Link>
-          </span>
+          </Fragment>
         ))}
       </Text>
-      <AskTerm t={t} />
+      <AskAiLinks text={termQuestion(t)} lead="まだ分からなければ AI に聞く" />
     </div>
   );
 }
