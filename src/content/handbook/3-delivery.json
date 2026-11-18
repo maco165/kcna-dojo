@@ -420,7 +420,7 @@
               "text": "1 分ほど待って状態を見ると、RESTARTS が増え、STATUS が CrashLoopBackOff になります。",
               "code": {
                 "language": "bash",
-                "text": "kubectl get pod crash -n try-kcna"
+                "text": "sleep 60\nkubectl get pod crash -n try-kcna"
               },
               "output": "NAME    READY   STATUS             RESTARTS      AGE\ncrash   0/1     CrashLoopBackOff   3 (20s ago)   70s"
             },
