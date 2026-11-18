@@ -330,7 +330,7 @@ export const HANDBOOK_FIGURES: Record<string, DiagramSpec> = {
       { id: 'u-api', x: 32, y: 116, w: 140, h: 52, label: 'kube-apiserver', sub: 'static Pod', tone: 'accent' },
       { id: 'u-etcd', x: 190, y: 116, w: 140, h: 52, label: 'etcd', sub: 'static Pod' },
       { id: 'u-ctl', x: 32, y: 190, w: 298, h: 52, label: 'scheduler・controller-manager', sub: 'それぞれ別の static Pod' },
-      { id: 'u-node', x: 32, y: 264, w: 298, h: 52, label: 'kubelet・kube-proxy・ランタイム', sub: 'ノードごとに入れる' },
+      { id: 'u-node', x: 32, y: 264, w: 298, h: 52, label: 'kubelet・コンテナランタイム', sub: 'ノードごとに入れる (kube-proxy は DaemonSet)' },
       { id: 'u-cni', x: 32, y: 338, w: 298, h: 52, label: 'CNI のアドオン', sub: '自分で入れる (入れるまで CoreDNS は起きない)', tone: 'warn' },
       { id: 'k-server', x: 390, y: 116, w: 298, h: 52, label: 'k3s server', sub: 'コントロールプレーンを 1 つのプロセスに', tone: 'accent' },
       { id: 'k-db', x: 390, y: 190, w: 298, h: 52, label: 'データストア', sub: '既定は SQLite・HA は組み込みの etcd など' },

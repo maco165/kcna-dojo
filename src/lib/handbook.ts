@@ -8,7 +8,7 @@ const CODE_KEYS = new Set(['language', 'text']);
 const TRY_KEYS = new Set(['goal', 'steps']);
 const FILE_KEYS = new Set(['domain', 'topics']);
 /** 学習要領の外のトピックを置くファイルの domain (細目の原文とは照らさない) */
-export const APPENDIX_DOMAIN = '付録';
+export const APPENDIX_DOMAIN = '付録' as const;
 
 function unknownKeys(obj: Record<string, unknown>, allowed: Set<string>, where: string, errors: string[]) {
   for (const k of Object.keys(obj)) if (!allowed.has(k)) errors.push(`${where}: ${k} という欄は使いません`);

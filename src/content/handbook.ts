@@ -2,6 +2,7 @@
 // 正本は src/content/handbook/*.json (分野ごとに 1 ファイル)。形は lib/handbook.ts の validateHandbook が検査する
 import type { Domain } from './types';
 import { DOMAINS } from '../lib/lessonStatus';
+import { APPENDIX_DOMAIN } from '../lib/handbook';
 
 export type HandbookCode = { language: 'bash' | 'yaml'; text: string };
 /** 手順のあとクラスタの中で起きること (本文に書いてある結果を短く)。ok は思いどおり、warn は失敗・止まる */
@@ -19,7 +20,7 @@ export type HandbookTopic = {
   sources: { label: string; url: string }[];
 };
 /** 学習要領の外の話 (k3s と Kubernetes の違いなど)。配点は無く、目次の最後に並べる */
-export const APPENDIX = '付録';
+export const APPENDIX = APPENDIX_DOMAIN;
 export type HandbookSection = Domain | typeof APPENDIX;
 export type HandbookDomain = { domain: HandbookSection; topics: HandbookTopic[] };
 

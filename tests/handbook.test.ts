@@ -90,6 +90,10 @@ describe('validateHandbook', () => {
     bad.topics[0].competency = '';
     expect(validateHandbook([...others, bad], domains, lessonIds).join()).toMatch(/小見出し/);
     expect(validateHandbook([...others, { ...app, topics: [] }], domains, lessonIds).join()).toMatch(/1 つ以上/);
-    expect(validateHandbook([...others, app, app], domains, lessonIds).join()).toMatch(/2 つあります/);
+    expect(validateHandbook([...others, app, { ...app, topics: [] }], domains, lessonIds).join()).toMatch(/付録 のファイルが 2 つあります/);
+    const twin = structuredClone(app);
+    twin.topics.push({ ...structuredClone(app.topics[0]), id: 'twin-topic' });
+    expect(validateHandbook([...others, twin], domains, lessonIds).join()).toMatch(/competency .* のトピックが 2 つあります/);
+    expect(validateHandbook([{ domain: 'X', topics: [] }], domains, lessonIds).join()).toMatch(/4 分野のどれかか/);
   });
 });
