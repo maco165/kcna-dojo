@@ -90,6 +90,11 @@ export function useRoute(): Route {
       // ハンドブックのトピックと用語集の語だけは、題名に重いデータが要るので後から読む (読み終えたときに、まだ同じページにいるときだけ書く)
       const at = shown;
       if (needsHeavyTitle(next)) void import('./pageMeta').then((m) => shown === at && (document.title = m.fullTitle(next)));
+      // 比較表の表は、比較表のデータだけを読んで題名を決める (pageMeta はハンドブックのデータも読むので使わない)
+      else if (next.name === 'compare' && next.tableId) {
+        const id = next.tableId;
+        void import('../content/compare').then((m) => shown === at && (document.title = withSite(m.findTable(id)?.title ?? '似た語の比較表')));
+      }
       else document.title = withSite(lightTitle(next));
       onRouteChanged();
     };

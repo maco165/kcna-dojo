@@ -57,7 +57,7 @@
         ]
       },
       {
-        "label": "Pod の名前",
+        "label": "Pod の名前と残り方",
         "cells": [
           "ReplicaSet 名 + 乱数で、作り直すと変わります",
           "web-0, web-1 のような連番で固定です",
@@ -79,9 +79,9 @@
       {
         "label": "更新・失敗の扱い",
         "cells": [
-          "既定は RollingUpdate (25% ずつ入れ替え)",
+          "既定は RollingUpdate (止める数・増やす数とも最大 25%)",
           "大きい番号の Pod から 1 つずつ更新します",
-          "ノードを外すと Pod も片付けられます",
+          "既定は RollingUpdate (ノードごとに入れ替え)",
           "既定で 6 回失敗すると Job は失敗です",
           "既定は前の Job と同時に動かせます (Allow)"
         ]
@@ -121,6 +121,14 @@
       {
         "label": "CronJob",
         "url": "https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/"
+      },
+      {
+        "label": "Deployments",
+        "url": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"
+      },
+      {
+        "label": "Perform a Rolling Update on a DaemonSet",
+        "url": "https://kubernetes.io/docs/tasks/manage-daemon/update-daemon-set/"
       }
     ]
   },
@@ -522,7 +530,7 @@
           "名前空間の中のリソース",
           "nodes などクラスタ全体のリソースも",
           "同じ名前空間の Role か、ClusterRole",
-          "ClusterRole をクラスタ全体に結びます"
+          "ClusterRole だけを結べます (Role は結べません)"
         ]
       },
       {
@@ -560,6 +568,10 @@
       {
         "label": "Using RBAC Authorization",
         "url": "https://kubernetes.io/docs/reference/access-authn-authz/rbac/"
+      },
+      {
+        "label": "ClusterRoleBinding (API リファレンス)",
+        "url": "https://kubernetes.io/docs/reference/kubernetes-api/authorization-resources/cluster-role-binding-v1/"
       }
     ]
   },
@@ -646,7 +658,7 @@
       {
         "language": "yaml",
         "title": "VPA は CRD のリソースとして書く (Off は推奨値を出すだけ)",
-        "code": "apiVersion: autoscaling.k8s.io/v1\nkind: VerticalPodAutoscaler\nmetadata:\n  name: my-app-vpa\nspec:\n  targetRef:\n    apiVersion: \"apps/v1\"\n    kind: Deployment\n    name: my-app\n  updatePolicy:\n    updateMode: \"Off\"   # Off, Initial, Recreate, InPlaceOrRecreate, InPlace"
+        "code": "apiVersion: autoscaling.k8s.io/v1\nkind: VerticalPodAutoscaler\nmetadata:\n  name: my-app-vpa\nspec:\n  targetRef:\n    apiVersion: \"apps/v1\"\n    kind: Deployment\n    name: my-app\n  updatePolicy:\n    updateMode: \"Off\"   # Off, Initial, Recreate, InPlaceOrRecreate, InPlace (InPlace は VPA 1.7.0 でアルファ)"
       }
     ],
     "sources": [
@@ -708,7 +720,7 @@
         "cells": [
           "ノードと同じくクラスタのリソースです",
           "名前空間に属し、使う Pod と同じ名前空間",
-          "PVC が storageClassName で名前を指します"
+          "名前空間に属さない、クラスタのリソースです"
         ]
       },
       {
@@ -806,7 +818,7 @@
         "label": "書かないと",
         "cells": [
           "limits だけ書くと limits と同じ値になります",
-          "上限はノードの容量と同じになります",
+          "上限は無く、ノードの空きまで使えます (名前空間に既定があればそれ)",
           "どちらも書かないと BestEffort です"
         ]
       },
@@ -834,7 +846,7 @@
       {
         "language": "bash",
         "title": "付いた QoS クラスを確かめる",
-        "code": "kubectl get pod frontend -o jsonpath='{.status.qosClass}'\n# Burstable"
+        "code": "kubectl get pod frontend -o jsonpath='{.status.qosClass}{\"\\n\"}'\n# Burstable"
       }
     ],
     "sources": [
@@ -845,6 +857,14 @@
       {
         "label": "Pod Quality of Service Classes",
         "url": "https://kubernetes.io/docs/concepts/workloads/pods/pod-qos/"
+      },
+      {
+        "label": "Assign Memory Resources to Containers and Pods",
+        "url": "https://kubernetes.io/docs/tasks/configure-pod-container/assign-memory-resource/"
+      },
+      {
+        "label": "Configure Quality of Service for Pods",
+        "url": "https://kubernetes.io/docs/tasks/configure-pod-container/quality-service-pod/"
       }
     ]
   },
@@ -988,7 +1008,7 @@
         "cells": [
           "アプリと、動かすのに要るライブラリ",
           "コンテナ・共有のストレージとネットワーク",
-          "kubelet・コンテナランタイム・kube-proxy",
+          "kubelet・コンテナランタイム・kube-proxy (省ける)",
           "ノードと、API サーバーなどの control plane"
         ]
       },
@@ -1053,6 +1073,10 @@
       {
         "label": "Kubernetes Components",
         "url": "https://kubernetes.io/docs/concepts/overview/components/"
+      },
+      {
+        "label": "Service",
+        "url": "https://kubernetes.io/docs/concepts/services-networking/service/"
       }
     ]
   },
@@ -1095,7 +1119,7 @@
         "cells": [
           "各部品の /metrics (Prometheus 形式)",
           "コンテナの stdout と stderr",
-          "部品が OTLP で送り出します (ベータ)"
+          "kube-apiserver と kubelet が OTLP で送り出します (v1.34 から安定版)"
         ]
       },
       {
@@ -1143,6 +1167,10 @@
       {
         "label": "OpenTelemetry Signals",
         "url": "https://opentelemetry.io/docs/concepts/signals/"
+      },
+      {
+        "label": "Feature Gates",
+        "url": "https://kubernetes.io/docs/reference/command-line-tools-reference/feature-gates/"
       }
     ]
   },
@@ -1201,7 +1229,7 @@
           "扱いません",
           "配信の方式によります",
           "次に流すまで残ります",
-          "望む状態へ自動で戻します"
+          "自動で戻せます (Flux は既定で戻し、Argo CD は selfHeal を有効にしたとき)"
         ]
       },
       {
@@ -1223,7 +1251,7 @@
       {
         "language": "bash",
         "title": "push 型と pull 型で、人やパイプラインがすること",
-        "code": "# push 型: パイプラインがクラスタに書き込む (クラスタへの書き込みの権限が外にある)\nkubectl apply -f k8s/\n\n# pull 型 (GitOps): Git を変えるだけ。クラスタの中の Argo CD や Flux が取り込む\ngit commit -am \"replicas を 3 に\"\ngit push"
+        "code": "# push 型: パイプラインを流したときだけ、外からクラスタへ当てる\nkubectl apply -f k8s/\n\n# pull 型 (GitOps): Git を変えるだけ。クラスタの中の Argo CD や Flux が取り込む\ngit commit -am \"replicas を 3 に\"\ngit push"
       }
     ],
     "sources": [
@@ -1242,6 +1270,10 @@
       {
         "label": "Flux の Core Concepts",
         "url": "https://fluxcd.io/flux/concepts/"
+      },
+      {
+        "label": "Argo CD Automated Sync Policy",
+        "url": "https://argo-cd.readthedocs.io/en/stable/user-guide/auto_sync/"
       }
     ]
   },

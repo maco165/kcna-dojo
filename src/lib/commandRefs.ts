@@ -2,7 +2,8 @@
 // 答えたあとの解説の下に「出てきたコマンド」として出す
 import type { Question } from '../content/types';
 
-export type CommandFlag = { flags: string[]; text: string };
+/** absent: そのコマンドに無い指定 (誤りの選択肢に出てくるもの)。「無い指定」として別に出す */
+export type CommandFlag = { flags: string[]; text: string; absent?: boolean };
 export type CommandEntry = {
   id: string;
   /** 道具とサブコマンド (例: "kubectl rollout undo") */
@@ -17,6 +18,10 @@ export type CommandEntry = {
   flags?: CommandFlag[];
   /** 公式リファレンスのページ */
   source: string;
+  /** リファレンスに無いことを補う出典 (概念のページ・実装など) */
+  refs?: { label: string; url: string }[];
+  /** 無いコマンド (誤りの選択肢に出てくる kubectl helm など)。ページは作らず「無いコマンド」として出す */
+  absent?: boolean;
 };
 /** 道具ごとの、どのサブコマンドにも付けられるオプション (kubectl の -n など) */
 export type ToolEntry = { tool: string; globalFlags: CommandFlag[]; source: string };
@@ -30,7 +35,8 @@ export type CommandUse = { entry: CommandEntry; flags: CommandFlag[] };
 /** 説明のデータに無かったもの (検査で使う) */
 export type Unknown = { line: string; reason: 'command' | 'flag'; token: string };
 
-const TOOL_RE = new RegExp(`(?:^|[\\s\`$(「])(${TOOLS.join('|')})\\s+([^\\n\`」、。（）]*)`, 'g');
+// 前は空白・記号・日本語の句読点を許し (「…ので、kubectl logs」)、後ろはパイプと日本語の文の手前まで (同じ行の 2 つ目の道具も拾う)
+const TOOL_RE = new RegExp(`(?:^|[\\s\`$(「、。・])(${TOOLS.join('|')})\\s+([^\\n\`」、。（）|\u3041-\u3093\u30a1-\u30f6\u4e00-\u9fa0]*)`, 'g');
 /** コマンドの行の終わり (パイプ・つなぎ・日本語の文が始まるところ) */
 const LINE_END = /\s(?:\||&&|;)\s|[ぁ-んァ-ヶ一-龠]/;
 

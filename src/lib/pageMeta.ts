@@ -1,9 +1,8 @@
 // ページの題名 (ハンドブックのトピックと用語集の語まで)。書き出す HTML (scripts/prerender.mjs) と、
 // サイトの中でハンドブックのトピック・用語集の語へ移ったときの document.title が使う。データを持つので後から読む
-import compare from '../content/compare.json';
-import { findCommandPage } from '../content/commandPages';
 import glossary from '../content/glossary.json';
 import { findTopic } from '../content/handbook';
+import { findCommandPage } from '../content/commandPages';
 import type { GlossaryTerm } from './glossary';
 import { lightTitle, SITE_TITLE, withSite } from './pageTitle';
 import type { Route } from './route';
@@ -21,7 +20,6 @@ export function pageTitle(route: Route): string | undefined {
     const c = findCommandPage(route.commandId);
     return c ? `${c.command} の中身と使い方` : 'コマンド';
   }
-  if (route.name === 'compare' && route.tableId) return (compare as { id: string; title: string }[]).find((t) => t.id === route.tableId)?.title ?? '似た語の比較表';
   return lightTitle(route);
 }
 

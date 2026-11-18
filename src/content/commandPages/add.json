@@ -1,0 +1,132 @@
+[
+  {
+    "id": "k3s-ctr-images-import",
+    "inside": [
+      "k3s ctr は k3s のバイナリに入った containerd の ctr です。k3s は ctr の既定を書き換えていて、つなぐ先は k3s の containerd のソケット /run/k3s/containerd/containerd.sock、名前空間は k8s.io です。ソケットは root でないと開けないので sudo を付けます。Kubernetes の API サーバーは通しません。",
+      "引数が - なので、ファイルを開く代わりに標準入力を読みます。docker save hello:0.1 | の左側が書き出したイメージの tar が、そのまま流れ込みます。読める形は OCI v1 と Docker の v1.1・v1.2 です。",
+      "containerd v2 の ctr は、既定で containerd の転送 (transfer) の API に tar の流れを渡し、containerd の側で取り込みます (--local を付けると、v1.7 までの既定と同じく ctr の中で取り込みます)。tar の中の層と設定とマニフェストを containerd の中身の置き場 (content store) に書きます。",
+      "tar に付いていた名前は完全な形に直して、イメージの名前として登録します。hello:0.1 は docker.io/library/hello:0.1 になります。名前の無いイメージには import-<日付> の名前が付きます。",
+      "既定ではこのノードの CPU に合う版の層を、スナップショッター (k3s では既定で overlayfs) に展開 (unpack) して、すぐにコンテナを起こせるようにします。--no-unpack なら展開しません。",
+      "名前空間 k8s.io は kubelet が CRI で使う置き場なので、取り込んだイメージは sudo k3s crictl images にも出ます。Pod の imagePullPolicy を IfNotPresent か Never にすれば、レジストリから取らずにこのイメージで起動できます。取り込まれるのは打ったノードだけで、ほかのノードには入りません。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "docker のイメージをパイプで取り込む (問題の形。形の例)",
+        "code": "$ docker save hello:0.1 | sudo k3s ctr images import -",
+        "output": "unpacking docker.io/library/hello:0.1 (sha256:0f1e2d3c...)...done",
+        "note": "この 1 行の形は ctr が自分で取り込むとき (--local。containerd v1.7 までの既定) の文言で、実装の fmt.Printf から書いた形の例です。今の k3s に入っている containerd v2 の既定 (転送の API) では、代わりに進み具合の表が出ます。どちらも、名前が docker.io/library/hello:0.1 に直ります。"
+      },
+      {
+        "title": "取り込めたかを確かめる (K3s の文書の例)",
+        "code": "$ sudo k3s ctr images list",
+        "output": "(取り込んだイメージ docker.io/library/hello:0.1 が一覧に出ます)",
+        "note": "k3s の文書は、containerd のイメージの置き場を見るのにこのコマンドを使います。出力の表の例は文書に無いので、何が出るかだけを書いています。CRI から見るなら sudo k3s crictl images です。"
+      }
+    ],
+    "impl": {
+      "repo": "containerd/containerd",
+      "ref": "v2.3.7",
+      "path": "cmd/ctr/commands/images/import.go",
+      "lines": "L178-L195",
+      "excerpt": "\t\t\tvar r io.ReadCloser\n\t\t\tif in == \"-\" {\n\t\t\t\tr = os.Stdin\n\t\t\t} else {\n\t\t\t\tvar err error\n\t\t\t\tr, err = os.Open(in)\n\t\t\t\tif err != nil {\n\t\t\t\t\treturn err\n\t\t\t\t}\n\t\t\t}\n\t\t\tiis := tarchive.NewImageImportStream(r, \"\", iopts...)\n\n\t\t\tpf, done := ProgressHandler(ctx, os.Stdout)\n\t\t\tdefer done()\n\n\t\t\terr := client.Transfer(ctx, iis, is, transfer.WithProgress(pf))\n\t\t\tcloseErr := r.Close()\n\t\t\tif err != nil {",
+      "note": "引数が - なら os.Stdin を、そうでなければファイルを開いて読み、tar の流れを転送の API (client.Transfer) で containerd に渡しています。進み具合は ProgressHandler が標準出力に出します。",
+      "url": "https://github.com/containerd/containerd/blob/v2.3.7/cmd/ctr/commands/images/import.go#L178-L195"
+    },
+    "sources": [
+      {
+        "label": "K3s: CLI Tools (k3s ctr)",
+        "url": "https://docs.k3s.io/cli"
+      },
+      {
+        "label": "K3s: Import Images",
+        "url": "https://docs.k3s.io/add-ons/import-images"
+      },
+      {
+        "label": "K3s: Embedded Registry Mirror",
+        "url": "https://docs.k3s.io/installation/registry-mirror"
+      },
+      {
+        "label": "Kubernetes: Images (imagePullPolicy)",
+        "url": "https://kubernetes.io/docs/concepts/containers/images/#image-pull-policy"
+      },
+      {
+        "label": "containerd v2.3.7: cmd/ctr/commands/images/import.go",
+        "url": "https://github.com/containerd/containerd/blob/v2.3.7/cmd/ctr/commands/images/import.go"
+      },
+      {
+        "label": "containerd v2.3.7: core/images/archive/reference.go (名前を完全な形に直す)",
+        "url": "https://github.com/containerd/containerd/blob/v2.3.7/core/images/archive/reference.go"
+      },
+      {
+        "label": "k3s v1.36.6+k3s1: pkg/ctr/main.go",
+        "url": "https://github.com/k3s-io/k3s/blob/v1.36.6%2Bk3s1/pkg/ctr/main.go"
+      }
+    ]
+  },
+  {
+    "id": "k3s-agent",
+    "inside": [
+      "--server (K3S_URL) の server のノードを宛先に、手元に小さなロードバランサーを立てます (既定で 6444 番)。最初の宛先は --server の住所だけで、加わったあとは default の名前空間の kubernetes の Service の Endpoints から、ほかの server の住所も覚えて、1 台が落ちてもつながるようにします。",
+      "--token (K3S_TOKEN) を使って server を確かめます。K10 で始まる完全な形のトークンなら、まず server の /cacerts から CA を取り、その SHA256 がトークンの中のハッシュと合うかを照らしてから、資格情報を送ります。確かめられなければ 2 秒ごとにやり直します。",
+      "server から、このノードの設定と kubelet などの証明書を受け取ります。ノードのパスワードを作って /etc/rancher/node/password に置き、server の側は kube-system の Secret <ノード名>.node-password.k3s にそのハッシュを残します。同じノード名で入り直すときは同じパスワードが要ります。",
+      "containerd を起こし、server との間に websocket のトンネルを張ります。API サーバーから kubelet への通信 (logs や exec など) はこのトンネルを通るので、agent は kubelet のポートを外に開けなくて済みます。",
+      "kubelet と kube-proxy を動かします。kubelet が API サーバーに Node を登録し、API サーバーの準備ができたら Flannel (CNI) と kube-router のネットワークポリシーのコントローラーを動かします。API サーバー・スケジューラー・コントローラーマネージャー・データストアはこのノードでは動きません。",
+      "kubectl get nodes に、ROLES が <none> の行として現れ、Ready になればスケジューラーが Pod を割り当てるようになります。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "agent の使い方を見る (K3s の文書の例)",
+        "code": "$ k3s agent --help",
+        "output": "NAME:\n   k3s agent - Run node agent\n\nUSAGE:\n   k3s agent [OPTIONS]\n\nOPTIONS:\n   ...\n   --token value, -t value                    (cluster) Token to use for authentication [$K3S_TOKEN]\n   --token-file value                         (cluster) Token file to use for authentication [$K3S_TOKEN_FILE]\n   --server value, -s value                   (cluster) Server to connect to [$K3S_URL]\n   --data-dir value, -d value                 (agent/data) Folder to hold state (default: \"/var/lib/rancher/k3s\") [$K3S_DATA_DIR]\n   ...",
+        "note": "[$K3S_URL] のように角かっこに書かれた環境変数でも、同じオプションを渡せます。導入スクリプトに K3S_URL と K3S_TOKEN を渡すと agent として入るのはこのためです。"
+      },
+      {
+        "title": "agent が加わったクラスター (K3s の文書の例)",
+        "code": "$ k3s kubectl get nodes -A",
+        "output": "NAME       STATUS   ROLES                       AGE     VERSION\nagent-1    Ready    <none>                      32s     v1.27.3+k3s1\nagent-2    Ready    <none>                      20s     v1.27.3+k3s1\nagent-3    Ready    <none>                      9s      v1.27.3+k3s1\nserver-1   Ready    control-plane,etcd,master   4m22s   v1.27.3+k3s1\n...",
+        "note": "k3s agent で動くノードは ROLES が <none> で、control-plane や etcd が付きません。server のノードにも agent の部品が入っているので、server も Ready のノードとして並びます。"
+      }
+    ],
+    "impl": {
+      "repo": "k3s-io/k3s",
+      "ref": "v1.36.6+k3s1",
+      "path": "pkg/agent/run.go",
+      "lines": "L151-L166",
+      "excerpt": "\tgo func() {\n\t\tif err := startCRI(ctx, nodeConfig); err != nil {\n\t\t\tsignals.RequestShutdown(errors.WithMessage(err, \"failed to start container runtime\"))\n\t\t}\n\t}()\n\n\tif err := setupTunnelAndRunAgent(ctx, nodeConfig, cfg, proxy); err != nil {\n\t\treturn err\n\t}\n\n\tgo func() {\n\t\t<-executor.APIServerReadyChan()\n\t\tif err := startNetwork(ctx, &sync.WaitGroup{}, nodeConfig); err != nil {\n\t\t\tsignals.RequestShutdown(errors.WithMessage(err, \"failed to start networking\"))\n\t\t\treturn\n\t\t}",
+      "note": "コンテナランタイム (containerd) を起こし、トンネルを張って kubelet などの agent の部品を動かし (setupTunnelAndRunAgent)、API サーバーの準備ができてから CNI などのネットワークを起こしています。",
+      "url": "https://github.com/k3s-io/k3s/blob/v1.36.6%2Bk3s1/pkg/agent/run.go#L151-L166"
+    },
+    "sources": [
+      {
+        "label": "K3s: agent",
+        "url": "https://docs.k3s.io/cli/agent"
+      },
+      {
+        "label": "K3s: Architecture",
+        "url": "https://docs.k3s.io/architecture"
+      },
+      {
+        "label": "K3s: token",
+        "url": "https://docs.k3s.io/cli/token"
+      },
+      {
+        "label": "K3s: Basic Network Options (Control-Plane Egress Selector)",
+        "url": "https://docs.k3s.io/networking/basic-network-options"
+      },
+      {
+        "label": "K3s: Cluster Load Balancer",
+        "url": "https://docs.k3s.io/datastore/cluster-loadbalancer"
+      },
+      {
+        "label": "K3s: CLI Tools",
+        "url": "https://docs.k3s.io/cli"
+      },
+      {
+        "label": "k3s v1.36.6+k3s1: pkg/agent/run.go",
+        "url": "https://github.com/k3s-io/k3s/blob/v1.36.6%2Bk3s1/pkg/agent/run.go"
+      }
+    ]
+  }
+]
