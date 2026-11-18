@@ -1,0 +1,984 @@
+[
+  {
+    "id": "helm-install",
+    "inside": [
+      "helm は kubectl と同じく kubeconfig (KUBECONFIG か $HOME/.kube/config) を読んで、行き先の API サーバーと資格情報と名前空間を決めます。チャートはフォルダ・.tgz・URL・リポジトリ名から探して読み込みます。",
+      "API サーバーに GET /version などを送ってつながるかと版を確かめ、同じ名前のリリースの記録 (owner=helm・name=<リリース名> のラベルの付いた Secret) を一覧して、名前が使われていないかを見ます。",
+      "チャートの既定の値 (values.yaml) に -f や --set の値を重ね、Go のテンプレートでマニフェストを描きます。描いたものはフックとそれ以外に分け、Namespace・ServiceAccount・Deployment … のように入れる順に並べます。",
+      "まずリビジョン 1 の記録を、状態 pending-install のまま Secret sh.helm.release.v1.<リリース名>.v1 として作ります (POST)。中身はリリース全体 (チャート・値・マニフェスト) を gzip して base64 にしたものです。",
+      "次にマニフェストの各リソースを API サーバーへ送ります。v4.0.0 からは --server-side が既定で true で、リソースごとに Server-Side Apply の PATCH (fieldManager=helm) を送ります。API サーバーは認証・認可・アドミッションを通して etcd に書き、あとは Deployment のコントローラーや kubelet がふだんどおり Pod を起こします。",
+      "フック (pre-install・post-install) があればその前後で走らせ、--wait などで待つ指定があれば待ちます。最後に記録の Secret を状態 deployed に書き換え (PUT)、NAME・NAMESPACE・STATUS・REVISION とチャートの NOTES を出します。"
+    ],
+    "api": [
+      {
+        "method": "GET",
+        "path": "/version",
+        "note": "つながるかと Kubernetes の版を確かめる (発見の /api・/apis も読む)"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/namespaces/{namespace}/secrets?labelSelector=name%3D{release},owner%3Dhelm",
+        "note": "同じ名前のリリースの記録があるかを見る"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/namespaces/{namespace}/secrets",
+        "note": "リビジョン 1 の記録 sh.helm.release.v1.{release}.v1 を pending-install で作る"
+      },
+      {
+        "method": "PATCH",
+        "path": "/apis/apps/v1/namespaces/{namespace}/deployments/{name}?fieldManager=helm",
+        "note": "チャートの中のリソースごとに Server-Side Apply (Content-Type: application/apply-patch+yaml)。Deployment のときの例"
+      },
+      {
+        "method": "PUT",
+        "path": "/api/v1/namespaces/{namespace}/secrets/sh.helm.release.v1.{release}.v1",
+        "note": "記録を deployed に書き換える"
+      }
+    ],
+    "examples": [
+      {
+        "title": "手元のフォルダのチャートを入れる (Chart Template Guide の例)",
+        "code": "$ helm install full-coral ./mychart",
+        "output": "NAME: full-coral\nLAST DEPLOYED: Tue Nov  1 17:36:01 2016\nNAMESPACE: default\nSTATUS: DEPLOYED\nREVISION: 1\nTEST SUITE: None",
+        "note": "REVISION: 1 が、この install で履歴が 1 から始まったことを示します。出力は helm.sh の文書の例で、古い版のため STATUS が大文字です (今の版は deployed と小文字)。"
+      },
+      {
+        "title": "リポジトリのチャートを入れる (Using Helm の例)",
+        "code": "$ helm install happy-panda bitnami/wordpress",
+        "output": "NAME: happy-panda\nLAST DEPLOYED: Tue Jan 26 10:27:17 2021\nNAMESPACE: default\nSTATUS: deployed\nREVISION: 1\nNOTES:\n** Please be patient while the chart is being deployed **\n...",
+        "note": "NOTES: より下は、チャートの templates/NOTES.txt を描いたものです。Kubernetes から返ったものではありません。"
+      }
+    ],
+    "impl": {
+      "repo": "helm/helm",
+      "ref": "v4.3.2",
+      "path": "pkg/action/install.go",
+      "lines": "L386-L405",
+      "excerpt": "\trel := i.createRelease(chrt, vals, i.Labels)\n\n\tvar manifestDoc *bytes.Buffer\n\trel.Hooks, manifestDoc, rel.Info.Notes, err = i.cfg.renderResources(ctx, chrt, valuesToRender, i.ReleaseName, i.OutputDir, i.SubNotes, i.UseReleaseName, i.IncludeCRDs, i.PostRenderer, interactWithServer(i.DryRunStrategy), i.EnableDNS, i.HideSecret, i.PostRenderStrategy)\n\t// Even for errors, attach this if available\n\tif manifestDoc != nil {\n\t\trel.Manifest = manifestDoc.String()\n\t}\n\t// Check error from render\n\tif err != nil {\n\t\trel.SetStatus(rcommon.StatusFailed, \"failed to render resource: \"+err.Error())\n\t\t// Return a release with partial data so that the client can show debugging information.\n\t\treturn rel, err\n\t}\n\n\t// Mark this release as in-progress\n\trel.SetStatus(rcommon.StatusPendingInstall, \"Initial install underway\")\n\n\tvar toBeAdopted kube.ResourceList\n\tresources, err := i.cfg.KubeClient.Build(bytes.NewBufferString(rel.Manifest), !i.DisableOpenAPIValidation)",
+      "note": "リリースの記録を作り、renderResources でテンプレートを描いてマニフェストにし、状態を pending-install にしてから、マニフェストを Kubernetes のオブジェクトに組み立てています。この後で記録の Secret を作り (Releases.Create)、リソースを送ります。",
+      "url": "https://github.com/helm/helm/blob/v4.3.2/pkg/action/install.go#L386-L405"
+    },
+    "sources": [
+      {
+        "label": "Helm: helm install",
+        "url": "https://helm.sh/docs/helm/helm_install/"
+      },
+      {
+        "label": "Helm: Storage backends (リリースの記録は既定で Secret)",
+        "url": "https://helm.sh/docs/topics/advanced/#storage-backends"
+      },
+      {
+        "label": "Kubernetes: Server-Side Apply",
+        "url": "https://kubernetes.io/docs/reference/using-api/server-side-apply/"
+      },
+      {
+        "label": "Helm: Chart Template Guide (Getting Started)",
+        "url": "https://helm.sh/docs/chart_template_guide/getting_started/"
+      },
+      {
+        "label": "helm/helm v4.3.2: pkg/action/install.go",
+        "url": "https://github.com/helm/helm/blob/v4.3.2/pkg/action/install.go"
+      },
+      {
+        "label": "helm/helm v4.3.2: pkg/storage/driver/secrets.go",
+        "url": "https://github.com/helm/helm/blob/v4.3.2/pkg/storage/driver/secrets.go"
+      },
+      {
+        "label": "helm/helm v4.3.2: pkg/kube/client.go",
+        "url": "https://github.com/helm/helm/blob/v4.3.2/pkg/kube/client.go"
+      }
+    ]
+  },
+  {
+    "id": "helm-upgrade",
+    "inside": [
+      "kubeconfig で行き先を決め、リリースの記録 (owner=helm・name=<リリース名> の Secret) を一覧して、いちばん新しいリビジョンと、いま deployed のリビジョンを探します。記録が無ければ失敗します (-i を付けたときは install に切り替えます)。最新が pending の状態なら、別の操作の途中とみなして止まります。",
+      "新しいチャートの既定の値に -f や --set の値を重ねて描き直します (-f を複数渡すと右のファイルが優先)。値を 1 つも渡さないときは前回の値をそのまま使いますが、何か渡したときは、--reuse-values などを付けない限り前回の値は引き継がれません。",
+      "新しいリビジョン (最新の番号 + 1) の記録を pending-upgrade で作ります。作る前に、--history-max (既定 10) を超える古いリビジョンの記録を消します。",
+      "前のリビジョンのマニフェストと新しいマニフェストを比べ、増えたものは作り、変わったものは更新し、無くなったものは消すように API サーバーへ送ります。--server-side は既定で auto で、前のリリースが入れたときのやり方 (Server-Side Apply か、クライアント側の 3 方向マージ) を引き継ぎます。",
+      "Deployment の Pod テンプレートが変わっていれば、Deployment のコントローラーが新しい ReplicaSet を作ってローリング更新します。",
+      "成功すると、前のリビジョンの記録を superseded に、新しい記録を deployed にして、「Release \"<名前>\" has been upgraded. Happy Helming!」とリリースの状態を出します。"
+    ],
+    "api": [
+      {
+        "method": "GET",
+        "path": "/api/v1/namespaces/{namespace}/secrets?labelSelector=name%3D{release},owner%3Dhelm",
+        "note": "リリースの履歴を読み、最新と deployed のリビジョンを探す"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/namespaces/{namespace}/secrets",
+        "note": "新しいリビジョンの記録 sh.helm.release.v1.{release}.v{N} を pending-upgrade で作る"
+      },
+      {
+        "method": "PATCH",
+        "path": "/apis/apps/v1/namespaces/{namespace}/deployments/{name}",
+        "note": "変わったリソースを更新する (Deployment のときの例。Server-Side Apply なら apply-patch+yaml)"
+      },
+      {
+        "method": "PUT",
+        "path": "/api/v1/namespaces/{namespace}/secrets/sh.helm.release.v1.{release}.v{N-1}",
+        "note": "前のリビジョンの記録を superseded にする"
+      },
+      {
+        "method": "PUT",
+        "path": "/api/v1/namespaces/{namespace}/secrets/sh.helm.release.v1.{release}.v{N}",
+        "note": "新しいリビジョンの記録を deployed にする"
+      }
+    ],
+    "examples": [
+      {
+        "title": "値のファイルを替えて上げ、効いたかを見る (Using Helm の例)",
+        "code": "$ helm upgrade -f panda.yaml happy-panda bitnami/wordpress\n$ helm get values happy-panda",
+        "output": "mariadb:\n  auth:\n    username: user1",
+        "note": "panda.yaml に書いた mariadb.auth.username が、リリースに渡した値として記録されたことが分かります。出力は helm.sh の文書の例です。 今の版 (v4) の helm get values は、出力の先頭に USER-SUPPLIED VALUES: の行を出します。"
+      },
+      {
+        "title": "上げるたびにリビジョンが増える (helm history の文書の例)",
+        "code": "$ helm history angry-bird",
+        "output": "REVISION    UPDATED                     STATUS          CHART             APP VERSION     DESCRIPTION\n1           Mon Oct 3 10:15:13 2016     superseded      alpine-0.1.0      1.0             Initial install\n2           Mon Oct 3 10:15:13 2016     superseded      alpine-0.1.0      1.0             Upgraded successfully\n...\n4           Mon Oct 3 10:15:13 2016     deployed        alpine-0.1.0      1.0             Upgraded successfully",
+        "note": "deployed は最新の 1 つだけで、上げる前のものは superseded になります。今の版の実装では、上げたときの DESCRIPTION は「Upgrade complete」です。"
+      }
+    ],
+    "impl": {
+      "repo": "helm/helm",
+      "ref": "v4.3.2",
+      "path": "pkg/action/upgrade.go",
+      "lines": "L505-L523",
+      "excerpt": "\n\t// post-upgrade hooks\n\tif !u.DisableHooks {\n\t\tif err := u.cfg.execHook(upgradedRelease, release.HookPostUpgrade, u.WaitStrategy, u.WaitOptions, u.Timeout, serverSideApply); err != nil {\n\t\t\tu.reportToPerformUpgrade(c, upgradedRelease, results.Created, fmt.Errorf(\"post-upgrade hooks failed: %w\", err))\n\t\t\treturn\n\t\t}\n\t}\n\n\toriginalRelease.Info.Status = rcommon.StatusSuperseded\n\tu.cfg.recordRelease(originalRelease)\n\n\tupgradedRelease.Info.Status = rcommon.StatusDeployed\n\tif u.Description != \"\" {\n\t\tupgradedRelease.Info.Description = u.Description\n\t} else {\n\t\tupgradedRelease.Info.Description = \"Upgrade complete\"\n\t}\n\tu.reportToPerformUpgrade(c, upgradedRelease, nil, nil)",
+      "note": "リソースを更新して待ち終えたあと、post-upgrade のフックを走らせ、前のリリースを superseded、新しいリリースを deployed にしています。",
+      "url": "https://github.com/helm/helm/blob/v4.3.2/pkg/action/upgrade.go#L505-L523"
+    },
+    "sources": [
+      {
+        "label": "Helm: helm upgrade",
+        "url": "https://helm.sh/docs/helm/helm_upgrade/"
+      },
+      {
+        "label": "Helm: Using Helm",
+        "url": "https://helm.sh/docs/intro/using_helm/"
+      },
+      {
+        "label": "Helm: Storage backends (リリースの記録は既定で Secret)",
+        "url": "https://helm.sh/docs/topics/advanced/#storage-backends"
+      },
+      {
+        "label": "helm/helm v4.3.2: pkg/action/upgrade.go",
+        "url": "https://github.com/helm/helm/blob/v4.3.2/pkg/action/upgrade.go"
+      },
+      {
+        "label": "helm/helm v4.3.2: pkg/cmd/upgrade.go",
+        "url": "https://github.com/helm/helm/blob/v4.3.2/pkg/cmd/upgrade.go"
+      },
+      {
+        "label": "helm/helm v4.3.2: pkg/cli/environment.go",
+        "url": "https://github.com/helm/helm/blob/v4.3.2/pkg/cli/environment.go"
+      }
+    ]
+  },
+  {
+    "id": "helm-rollback",
+    "inside": [
+      "kubeconfig で行き先を決め、リリースの記録 (owner=helm・name=<リリース名> の Secret) を一覧して、いちばん新しいリビジョンを探します。リビジョンを省くか 0 にすると、戻す先は「最新の番号 - 1」です。戻す先のリビジョンが履歴に無ければ失敗します。",
+      "戻す先のリビジョンの記録 (sh.helm.release.v1.<名前>.v<番号>) を読み、そのときのチャート・値・描いたマニフェストを取り出します。テンプレートは描き直しません。",
+      "戻すことも 1 つの新しいリビジョンです。番号は「最新 + 1」で、中身は戻す先のマニフェストをそのまま写した記録を pending-rollback で作ります。履歴は消えず、番号は戻りません。",
+      "今のリビジョンのマニフェストと戻す先のマニフェストを比べ、違うところを API サーバーへ送ってリソースを書き戻します。Deployment の Pod テンプレートが変われば、コントローラーがローリング更新します。",
+      "成功すると、前の記録を superseded、新しい記録を deployed にし、DESCRIPTION に「Rollback to <番号>」を残して、「Rollback was a success! Happy Helming!」を出します。"
+    ],
+    "api": [
+      {
+        "method": "GET",
+        "path": "/api/v1/namespaces/{namespace}/secrets?labelSelector=name%3D{release},owner%3Dhelm",
+        "note": "履歴を読み、最新と戻す先のリビジョンを探す"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/namespaces/{namespace}/secrets/sh.helm.release.v1.{release}.v{revision}",
+        "note": "戻す先のリビジョンの記録を読む"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/namespaces/{namespace}/secrets",
+        "note": "新しいリビジョン (最新 + 1) の記録を pending-rollback で作る"
+      },
+      {
+        "method": "PATCH",
+        "path": "/apis/apps/v1/namespaces/{namespace}/deployments/{name}",
+        "note": "違うリソースを書き戻す (Deployment のときの例)"
+      },
+      {
+        "method": "PUT",
+        "path": "/api/v1/namespaces/{namespace}/secrets/sh.helm.release.v1.{release}.v{N}",
+        "note": "記録を deployed に書き換える"
+      }
+    ],
+    "examples": [
+      {
+        "title": "リビジョン 1 に戻す (Using Helm の例)",
+        "code": "$ helm rollback happy-panda 1",
+        "output": "Rollback was a success! Happy Helming!",
+        "note": "コマンドは helm.sh の文書の例です。出力の文言は文書に載っていないので、実装 (pkg/cmd/rollback.go) の文字列から書いた形の例です。"
+      },
+      {
+        "title": "戻したあとの履歴 (helm history の文書の例)",
+        "code": "$ helm history angry-bird --show-rollback-revision",
+        "output": "REVISION    UPDATED                     STATUS          CHART             APP VERSION     ROLLBACK     DESCRIPTION\n1           Mon Oct 3 10:15:13 2016     superseded      alpine-0.1.0      1.0                          Initial install\n2           Mon Oct 3 10:15:13 2016     superseded      alpine-0.1.0      1.0                          Upgraded successfully\n3           Mon Oct 3 10:15:13 2016     superseded      alpine-0.1.0      1.0             2            Rolled back to 2\n4           Mon Oct 3 10:15:13 2016     deployed        alpine-0.1.0      1.0                          Upgraded successfully",
+        "note": "リビジョン 2 に戻した操作が、新しいリビジョン 3 として残っています。ROLLBACK の列が戻した先の番号です。今の版の実装では DESCRIPTION は「Rollback to 2」の形になります。"
+      }
+    ],
+    "impl": {
+      "repo": "helm/helm",
+      "ref": "v4.3.2",
+      "path": "pkg/action/rollback.go",
+      "lines": "L189-L207",
+      "excerpt": "\t// Store a new release object with previous release's configuration\n\ttargetRelease := &release.Release{\n\t\tName:      name,\n\t\tNamespace: currentRelease.Namespace,\n\t\tChart:     previousRelease.Chart,\n\t\tConfig:    previousRelease.Config,\n\t\tInfo: &release.Info{\n\t\t\tFirstDeployed:    currentRelease.Info.FirstDeployed,\n\t\t\tLastDeployed:     time.Now(),\n\t\t\tStatus:           common.StatusPendingRollback,\n\t\t\tNotes:            previousRelease.Info.Notes,\n\t\t\tRollbackRevision: previousVersion,\n\t\t\t// Because we lose the reference to previous version elsewhere, we set the\n\t\t\t// message here, and only override it later if we experience failure.\n\t\t\tDescription: description,\n\t\t},\n\t\tVersion:     currentRelease.Version + 1,\n\t\tLabels:      previousRelease.Labels,\n\t\tManifest:    previousRelease.Manifest,\n// ...",
+      "note": "戻す先 (previousRelease) のチャート・値・マニフェスト・フックを写し、番号を「今の最新 + 1」にした新しいリリースを pending-rollback で組み立てています。戻すことが新しいリビジョンになる理由がここにあります。",
+      "url": "https://github.com/helm/helm/blob/v4.3.2/pkg/action/rollback.go#L189-L207"
+    },
+    "sources": [
+      {
+        "label": "Helm: helm rollback",
+        "url": "https://helm.sh/docs/helm/helm_rollback/"
+      },
+      {
+        "label": "Helm: Using Helm",
+        "url": "https://helm.sh/docs/intro/using_helm/"
+      },
+      {
+        "label": "Helm: helm history",
+        "url": "https://helm.sh/docs/helm/helm_history/"
+      },
+      {
+        "label": "helm/helm v4.3.2: pkg/action/rollback.go",
+        "url": "https://github.com/helm/helm/blob/v4.3.2/pkg/action/rollback.go"
+      },
+      {
+        "label": "helm/helm v4.3.2: pkg/cmd/rollback.go",
+        "url": "https://github.com/helm/helm/blob/v4.3.2/pkg/cmd/rollback.go"
+      }
+    ]
+  },
+  {
+    "id": "helm-history",
+    "inside": [
+      "kubeconfig で行き先と名前空間を決め、GET /version で API サーバーにつながるかを確かめます。",
+      "リリースの記録は既定でリリースの名前空間の Secret にあるので、owner=helm と name=<リリース名> のラベルで Secret を一覧します (GET)。1 つの Secret が 1 つのリビジョンで、名前は sh.helm.release.v1.<名前>.v<番号> です。",
+      "Secret の release のデータ (base64 で gzip したリリース) をほどき、リビジョンの番号・更新日時・状態・チャート・アプリの版・説明を取り出します。クラスターの Deployment などは読みません。",
+      "リビジョンの番号の順に並べ、最大 256 件 (--max) までを表にして出します。"
+    ],
+    "api": [
+      {
+        "method": "GET",
+        "path": "/version",
+        "note": "つながるかを確かめる"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/namespaces/{namespace}/secrets?labelSelector=name%3D{release},owner%3Dhelm",
+        "note": "そのリリースのすべてのリビジョンの記録を一覧する"
+      }
+    ],
+    "examples": [
+      {
+        "title": "履歴を見る (helm history の文書の例)",
+        "code": "$ helm history angry-bird",
+        "output": "REVISION    UPDATED                     STATUS          CHART             APP VERSION     DESCRIPTION\n1           Mon Oct 3 10:15:13 2016     superseded      alpine-0.1.0      1.0             Initial install\n2           Mon Oct 3 10:15:13 2016     superseded      alpine-0.1.0      1.0             Upgraded successfully\n3           Mon Oct 3 10:15:13 2016     superseded      alpine-0.1.0      1.0             Rolled back to 2\n4           Mon Oct 3 10:15:13 2016     deployed        alpine-0.1.0      1.0             Upgraded successfully",
+        "note": "STATUS が deployed の行が今のリリースです。rollback で戻す先の番号はこの REVISION の列から選びます。 出力は helm.sh の文書の例です。今の版 (v4) の実装では DESCRIPTION は Install complete・Upgrade complete・Rollback to 2 の形になります。"
+      }
+    ],
+    "impl": {
+      "repo": "helm/helm",
+      "ref": "v4.3.2",
+      "path": "pkg/storage/driver/secrets.go",
+      "lines": "L122-L141",
+      "excerpt": "// Query fetches all releases that match the provided map of labels.\n// An error is returned if the secret fails to retrieve the releases.\nfunc (secrets *Secrets) Query(labels map[string]string) ([]release.Releaser, error) {\n\tls := kblabels.Set{}\n\tfor k, v := range labels {\n\t\tif errs := validation.IsValidLabelValue(v); len(errs) != 0 {\n\t\t\treturn nil, fmt.Errorf(\"invalid label value: %q: %s\", v, strings.Join(errs, \"; \"))\n\t\t}\n\t\tls[k] = v\n\t}\n\n\topts := metav1.ListOptions{LabelSelector: ls.AsSelector().String()}\n\n\tlist, err := secrets.impl.List(context.Background(), opts)\n\tif err != nil {\n\t\treturn nil, fmt.Errorf(\"query: failed to query with labels: %w\", err)\n\t}\n\n\tif len(list.Items) == 0 {\n\t\treturn nil, ErrReleaseNotFound",
+      "note": "渡されたラベル (name と owner) からラベルセレクターを作り、Secret を一覧しています。続きで各 Secret の release のデータをほどいてリリースに戻します。helm history は Storage.History からこれを呼びます。",
+      "url": "https://github.com/helm/helm/blob/v4.3.2/pkg/storage/driver/secrets.go#L122-L141"
+    },
+    "sources": [
+      {
+        "label": "Helm: helm history",
+        "url": "https://helm.sh/docs/helm/helm_history/"
+      },
+      {
+        "label": "Helm: Storage backends (リリースの記録は既定で Secret)",
+        "url": "https://helm.sh/docs/topics/advanced/#storage-backends"
+      },
+      {
+        "label": "Kubernetes API リファレンス: Secret",
+        "url": "https://kubernetes.io/docs/reference/kubernetes-api/config-and-storage-resources/secret-v1/"
+      },
+      {
+        "label": "helm/helm v4.3.2: pkg/action/history.go",
+        "url": "https://github.com/helm/helm/blob/v4.3.2/pkg/action/history.go"
+      },
+      {
+        "label": "helm/helm v4.3.2: pkg/storage/storage.go",
+        "url": "https://github.com/helm/helm/blob/v4.3.2/pkg/storage/storage.go"
+      },
+      {
+        "label": "helm/helm v4.3.2: pkg/storage/driver/secrets.go",
+        "url": "https://github.com/helm/helm/blob/v4.3.2/pkg/storage/driver/secrets.go"
+      }
+    ]
+  },
+  {
+    "id": "helm-template",
+    "inside": [
+      "チャート (フォルダ・.tgz・URL・リポジトリ名) を手元に読み込みます。リポジトリ名で指したときは、そのチャートの取得のためにリポジトリへの通信はあります。",
+      "values.yaml に -f や --set の値を重ね、Go のテンプレートでマニフェストを描きます。リリース名を省くと release-name になります。",
+      "既定 (--dry-run を付けない) では Kubernetes の API サーバーに一切つなぎません。Capabilities.KubeVersion や API の一覧は手元の既定の値で、テンプレートの lookup 関数は空の結果を返します。--api-versions や --kube-version で仮の値を変えられます。",
+      "描いたものはクラスターに送らず、記録の Secret も作りません。各ファイルを「# Source: <チャート>/templates/<ファイル>」の見出し付きで標準出力に出します (フックも出ます)。--dry-run=server を付けたときだけ API サーバーに問い合わせます。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "手元で描いて中身を確かめる (形の例)",
+        "code": "$ helm template web ./mychart",
+        "output": "---\n# Source: mychart/templates/configmap.yaml\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: web-configmap\ndata:\n  myvalue: \"Hello World\"",
+        "note": "Chart Template Guide の見本のチャート (名前が {{ .Release.Name }}-configmap の ConfigMap) を、リリース名 web で描いたときの形です。文書の例は helm get manifest の出力で、見出しと中身の形は同じです。"
+      }
+    ],
+    "impl": {
+      "repo": "helm/helm",
+      "ref": "v4.3.2",
+      "path": "pkg/cmd/template.go",
+      "lines": "L95-L108",
+      "excerpt": "\t\t\tdryRunStrategy, err := cmdGetDryRunFlagStrategy(cmd, true)\n\t\t\tif err != nil {\n\t\t\t\treturn err\n\t\t\t}\n\t\t\tif validate {\n\t\t\t\t// Mimic deprecated --validate flag behavior by enabling server dry run\n\t\t\t\tdryRunStrategy = action.DryRunServer\n\t\t\t}\n\t\t\tclient.DryRunStrategy = dryRunStrategy\n\t\t\tclient.ReleaseName = \"release-name\"\n\t\t\tclient.Replace = true // Skip the name check\n\t\t\tclient.APIVersions = common.VersionSet(extraAPIs)\n\t\t\tclient.IncludeCRDs = includeCrds\n\t\t\trel, err := runInstall(args, client, valueOpts, out)",
+      "note": "dry-run の既定を template 用に決め (クライアント側だけ)、リリース名を release-name、名前の重なりの確かめを省く設定 (Replace) にして、install と同じ runInstall を呼んでいます。helm template は「クラスターに送らない install」です。",
+      "url": "https://github.com/helm/helm/blob/v4.3.2/pkg/cmd/template.go#L95-L108"
+    },
+    "sources": [
+      {
+        "label": "Helm: helm template",
+        "url": "https://helm.sh/docs/helm/helm_template/"
+      },
+      {
+        "label": "Helm: Chart Template Guide (Getting Started)",
+        "url": "https://helm.sh/docs/chart_template_guide/getting_started/"
+      },
+      {
+        "label": "helm/helm v4.3.2: pkg/cmd/template.go",
+        "url": "https://github.com/helm/helm/blob/v4.3.2/pkg/cmd/template.go"
+      },
+      {
+        "label": "helm/helm v4.3.2: pkg/action/action.go",
+        "url": "https://github.com/helm/helm/blob/v4.3.2/pkg/action/action.go"
+      }
+    ]
+  },
+  {
+    "id": "helm-show-values",
+    "inside": [
+      "チャート (フォルダ・.tgz・URL・リポジトリ名) を探して手元に読み込みます。リポジトリ名で指したときは、リポジトリからチャートの .tgz を取ってきます。",
+      "読み込んだチャートの中から values.yaml のファイルを探し、書かれたままの文字列 (コメントも含む) を出します。--jsonpath を付けたときは、値を読み込んだうえでその部分だけを出します。",
+      "Kubernetes の API サーバーには一切つなぎません。入れたあとのリリースに渡した値は、クラスターの記録にあるので helm get values で見ます。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "入れる前に変えられる値を調べる (Using Helm の例)",
+        "code": "$ helm show values bitnami/wordpress",
+        "output": "## Global Docker image parameters\n## Please, note that this will override the image parameters, including dependencies, configured to use the global value\n...\nimage:\n  registry: docker.io\n  repository: bitnami/wordpress\n  tag: 5.6.0-debian-10-r35\n  [..]",
+        "note": "コメントの行まで出るのは、values.yaml のファイルをそのまま出しているからです。出力は helm.sh の文書の例です。"
+      }
+    ],
+    "impl": {
+      "repo": "helm/helm",
+      "ref": "v4.3.2",
+      "path": "pkg/action/show.go",
+      "lines": "L101-L117",
+      "excerpt": "\tif (s.OutputFormat == ShowValues || s.OutputFormat == ShowAll) && s.chart.Values != nil {\n\t\tif s.OutputFormat == ShowAll {\n\t\t\tfmt.Fprintln(&out, \"---\")\n\t\t}\n\t\tif s.JSONPathTemplate != \"\" {\n\t\t\tprinter, err := printers.NewJSONPathPrinter(s.JSONPathTemplate)\n\t\t\tif err != nil {\n\t\t\t\treturn \"\", fmt.Errorf(\"error parsing jsonpath %s: %w\", s.JSONPathTemplate, err)\n\t\t\t}\n\t\t\tprinter.Execute(&out, s.chart.Values)\n\t\t} else {\n\t\t\tfor _, f := range s.chart.Raw {\n\t\t\t\tif f.Name == chartutil.ValuesfileName {\n\t\t\t\t\tfmt.Fprintln(&out, string(f.Data))\n\t\t\t\t}\n\t\t\t}\n\t\t}",
+      "note": "values を出すときは、--jsonpath が無ければチャートの生のファイル (chart.Raw) から values.yaml を探して、そのまま書き出しています。",
+      "url": "https://github.com/helm/helm/blob/v4.3.2/pkg/action/show.go#L101-L117"
+    },
+    "sources": [
+      {
+        "label": "Helm: helm show values",
+        "url": "https://helm.sh/docs/helm/helm_show_values/"
+      },
+      {
+        "label": "Helm: Using Helm",
+        "url": "https://helm.sh/docs/intro/using_helm/"
+      },
+      {
+        "label": "helm/helm v4.3.2: pkg/action/show.go",
+        "url": "https://github.com/helm/helm/blob/v4.3.2/pkg/action/show.go"
+      }
+    ]
+  },
+  {
+    "id": "helm-get-values",
+    "inside": [
+      "kubeconfig で行き先と名前空間を決め、GET /version で API サーバーにつながるかを確かめます。",
+      "--revision を付けなければ、owner=helm と name=<リリース名> のラベルで記録の Secret を一覧して最新のリビジョンを選びます。付けたときは sh.helm.release.v1.<名前>.v<番号> の Secret を 1 つ読みます (GET)。",
+      "Secret の release のデータをほどいてリリースに戻し、install や upgrade のときに -f や --set で渡した値 (Config) だけを取り出します。",
+      "-a (--all) を付けると、チャートの既定の値と渡した値を重ねて計算した全部の値を出します。出力は「USER-SUPPLIED VALUES:」(-a のときは「COMPUTED VALUES:」) の見出しのあとに YAML で出ます。"
+    ],
+    "api": [
+      {
+        "method": "GET",
+        "path": "/api/v1/namespaces/{namespace}/secrets?labelSelector=name%3D{release},owner%3Dhelm",
+        "note": "--revision を付けないとき。最新のリビジョンを探す"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/namespaces/{namespace}/secrets/sh.helm.release.v1.{release}.v{revision}",
+        "note": "--revision を付けたとき"
+      }
+    ],
+    "examples": [
+      {
+        "title": "upgrade で渡した値を確かめる (Using Helm の例)",
+        "code": "$ helm get values happy-panda",
+        "output": "mariadb:\n  auth:\n    username: user1",
+        "note": "渡した値だけが出て、チャートの既定の値は出ません。出力は helm.sh の文書の例で、今の版では先頭に「USER-SUPPLIED VALUES:」の行も出ます (実装の pkg/cmd/get_values.go)。"
+      }
+    ],
+    "impl": {
+      "repo": "helm/helm",
+      "ref": "v4.3.2",
+      "path": "pkg/action/get_values.go",
+      "lines": "L53-L71",
+      "excerpt": "\t}\n\n\trel, err := releaserToV1Release(reli)\n\tif err != nil {\n\t\treturn nil, err\n\t}\n\n\t// If the user wants all values, compute the values and return.\n\tif g.AllValues {\n\t\tcfg, err := util.CoalesceValues(rel.Chart, rel.Config)\n\t\tif err != nil {\n\t\t\treturn nil, err\n\t\t}\n\t\treturn cfg, nil\n\t}\n\treturn rel.Config, nil\n}\n\n// releaserToV1Release is a helper function to convert a v1 release passed by interface",
+      "note": "記録から読んだリリースを型に戻し、-a のときはチャートの既定 (rel.Chart) と渡した値 (rel.Config) を CoalesceValues で重ね、そうでなければ渡した値だけを返しています。",
+      "url": "https://github.com/helm/helm/blob/v4.3.2/pkg/action/get_values.go#L53-L71"
+    },
+    "sources": [
+      {
+        "label": "Helm: helm get values",
+        "url": "https://helm.sh/docs/helm/helm_get_values/"
+      },
+      {
+        "label": "Helm: Using Helm",
+        "url": "https://helm.sh/docs/intro/using_helm/"
+      },
+      {
+        "label": "Helm: Storage backends (リリースの記録は既定で Secret)",
+        "url": "https://helm.sh/docs/topics/advanced/#storage-backends"
+      },
+      {
+        "label": "helm/helm v4.3.2: pkg/action/get_values.go",
+        "url": "https://github.com/helm/helm/blob/v4.3.2/pkg/action/get_values.go"
+      },
+      {
+        "label": "helm/helm v4.3.2: pkg/cmd/get_values.go",
+        "url": "https://github.com/helm/helm/blob/v4.3.2/pkg/cmd/get_values.go"
+      }
+    ]
+  },
+  {
+    "id": "helm-list",
+    "inside": [
+      "kubeconfig で行き先と名前空間を決め、GET /version で API サーバーにつながるかを確かめます。",
+      "owner=helm のラベルで、今の名前空間の Secret を一覧します。-A を付けると、名前空間をまたいで /api/v1/secrets を一覧します。記録が Secret にあるので、Secret を list できない権限 (たとえば既定の view のロール) では helm list は失敗します。",
+      "各 Secret をほどいてリリースに戻し、同じ名前のリリースはいちばん新しいリビジョンだけを残します。--deployed や --failed などで状態を絞り、名前の順 (-d なら日時の順) に並べて、最大 256 件までにします。",
+      "NAME・NAMESPACE・REVISION・UPDATED・STATUS・CHART・APP VERSION の表を出します。クラスターの Pod などの状態は読みません。"
+    ],
+    "api": [
+      {
+        "method": "GET",
+        "path": "/version",
+        "note": "つながるかを確かめる"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/namespaces/{namespace}/secrets?labelSelector=owner%3Dhelm",
+        "note": "今の名前空間のリリースの記録を一覧する"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/secrets?labelSelector=owner%3Dhelm",
+        "note": "-A (--all-namespaces) のとき"
+      }
+    ],
+    "examples": [
+      {
+        "title": "入れたリリースの一覧 (Quickstart の例)",
+        "code": "$ helm list",
+        "output": "NAME       \tNAMESPACE\tREVISION\tUPDATED                             \tSTATUS  \tCHART         \tAPP VERSION\nmy-podinfo \tdefault  \t1       \t2026-05-03 12:05:00.000000 +0000 UTC\tdeployed\tpodinfo-6.11.2\t6.7.1",
+        "note": "REVISION は最新のリビジョンの番号です。リリースごとに 1 行で、過去のリビジョンは helm history で見ます。出力は helm.sh の文書の例です。"
+      },
+      {
+        "title": "名前で絞る (helm list の文書の例)",
+        "code": "$ helm list --filter 'ara[a-z]+'",
+        "output": "NAME                UPDATED                                  CHART\nmaudlin-arachnid    2020-06-18 14:17:46.125134977 +0000 UTC  alpine-0.1.0",
+        "note": "--filter は正規表現で、リリースの名前に当てます。Secret を読んだあとに helm の中で絞るので、API への要求は変わりません。"
+      }
+    ],
+    "impl": {
+      "repo": "helm/helm",
+      "ref": "v4.3.2",
+      "path": "pkg/storage/driver/secrets.go",
+      "lines": "L88-L107",
+      "excerpt": "// that filter(release) == true. An error is returned if the\n// secret fails to retrieve the releases.\nfunc (secrets *Secrets) List(filter func(release.Releaser) bool) ([]release.Releaser, error) {\n\tlsel := kblabels.Set{\"owner\": \"helm\"}.AsSelector()\n\topts := metav1.ListOptions{LabelSelector: lsel.String()}\n\n\tlist, err := secrets.impl.List(context.Background(), opts)\n\tif err != nil {\n\t\treturn nil, fmt.Errorf(\"list: failed to list: %w\", err)\n\t}\n\n\tvar results []release.Releaser\n\n\t// iterate over the secrets object list\n\t// and decode each release\n\tfor _, item := range list.Items {\n\t\trls, err := decodeRelease(string(item.Data[\"release\"]))\n\t\tif err != nil {\n\t\t\tsecrets.Logger().Debug(\n\t\t\t\t\"list failed to decode release\", slog.String(\"key\", item.Name),",
+      "note": "ラベル owner=helm のセレクターで Secret を一覧し、各 Secret の release のデータをほどいています。helm list は、この結果から同じ名前の最新のリビジョンだけを残して表にします。",
+      "url": "https://github.com/helm/helm/blob/v4.3.2/pkg/storage/driver/secrets.go#L88-L107"
+    },
+    "sources": [
+      {
+        "label": "Helm: helm list",
+        "url": "https://helm.sh/docs/helm/helm_list/"
+      },
+      {
+        "label": "Helm: Quickstart Guide",
+        "url": "https://helm.sh/docs/intro/quickstart/"
+      },
+      {
+        "label": "Helm: Storage backends (リリースの記録は既定で Secret)",
+        "url": "https://helm.sh/docs/topics/advanced/#storage-backends"
+      },
+      {
+        "label": "Kubernetes API リファレンス: Secret",
+        "url": "https://kubernetes.io/docs/reference/kubernetes-api/config-and-storage-resources/secret-v1/"
+      },
+      {
+        "label": "helm/helm v4.3.2: pkg/action/list.go",
+        "url": "https://github.com/helm/helm/blob/v4.3.2/pkg/action/list.go"
+      },
+      {
+        "label": "helm/helm v4.3.2: pkg/storage/driver/secrets.go",
+        "url": "https://github.com/helm/helm/blob/v4.3.2/pkg/storage/driver/secrets.go"
+      }
+    ]
+  },
+  {
+    "id": "helm-repo-add",
+    "inside": [
+      "Kubernetes の API サーバーには一切つなぎません。手元の設定のファイル repositories.yaml (Linux の既定は $HOME/.config/helm/repositories.yaml) を、同時に書かれないようにロックしてから読みます。",
+      "同じ名前がすでにあり、URL などの設定も同じなら何もせず終わります。設定が違えば、--force-update を付けない限り失敗します。",
+      "渡した URL の index.yaml (そのリポジトリにあるチャートと版の一覧) を HTTP(S) で取ってきて、チャートのリポジトリとして読めるかを確かめます。取れなければ「not a valid chart repository or cannot be reached」で止まります。",
+      "取った index を手元のキャッシュ ($HOME/.cache/helm/repository/<名前>-index.yaml と <名前>-charts.txt) に書き、repositories.yaml に名前と URL を足して書き戻し、「\"<名前>\" has been added to your repositories」を出します。以後は <名前>/<チャート> で指せます。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "リポジトリを足して、中を探す (Using Helm の例)",
+        "code": "$ helm repo add brigade https://brigadecore.github.io/charts\n$ helm search repo brigade",
+        "output": "\"brigade\" has been added to your repositories\nNAME                          CHART VERSION APP VERSION DESCRIPTION\nbrigade/brigade               1.3.2         v1.2.1      Brigade provides event-driven scripting of Kube...\n...",
+        "note": "helm search repo は、repo add で手元に取った index を探すので、探すときにはネットにつなぎません。出力は helm.sh の文書の例です。"
+      }
+    ],
+    "impl": {
+      "repo": "helm/helm",
+      "ref": "v4.3.2",
+      "path": "pkg/cmd/repo_add.go",
+      "lines": "L204-L222",
+      "excerpt": "\tr, err := repo.NewChartRepository(&c, getter.All(settings, getter.WithTimeout(o.timeout)))\n\tif err != nil {\n\t\treturn err\n\t}\n\n\tif o.repoCache != \"\" {\n\t\tr.CachePath = o.repoCache\n\t}\n\tif _, err := r.DownloadIndexFile(); err != nil {\n\t\treturn fmt.Errorf(\"looks like %q is not a valid chart repository or cannot be reached: %w\", o.url, err)\n\t}\n\n\tf.Update(&c)\n\n\tif err := f.WriteFile(o.repoFile, 0o600); err != nil {\n\t\treturn err\n\t}\n\tfmt.Fprintf(out, \"%q has been added to your repositories\\n\", o.name)\n\treturn nil",
+      "note": "リポジトリを表すものを作って index.yaml を取り (DownloadIndexFile)、取れたら設定に足して repositories.yaml を 0600 で書き戻しています。",
+      "url": "https://github.com/helm/helm/blob/v4.3.2/pkg/cmd/repo_add.go#L204-L222"
+    },
+    "sources": [
+      {
+        "label": "Helm: helm repo add",
+        "url": "https://helm.sh/docs/helm/helm_repo_add/"
+      },
+      {
+        "label": "Helm: Using Helm",
+        "url": "https://helm.sh/docs/intro/using_helm/"
+      },
+      {
+        "label": "Helm: helm (共通のオプションと置き場所)",
+        "url": "https://helm.sh/docs/helm/helm/"
+      },
+      {
+        "label": "helm/helm v4.3.2: pkg/cmd/repo_add.go",
+        "url": "https://github.com/helm/helm/blob/v4.3.2/pkg/cmd/repo_add.go"
+      },
+      {
+        "label": "helm/helm v4.3.2: pkg/repo/v1/chartrepo.go",
+        "url": "https://github.com/helm/helm/blob/v4.3.2/pkg/repo/v1/chartrepo.go"
+      }
+    ]
+  },
+  {
+    "id": "docker-build",
+    "inside": [
+      "既定のビルダーは Docker のドライバーで、Docker Engine に組み込まれた BuildKit を使います。DOCKER_BUILDKIT=0 のときと、Buildx のプラグインが無いときは古いビルダーに戻り、非推奨の警告が出ます (Windows のデーモンでは古いビルダーが既定です)。",
+      "Buildx は、Dockerfile・ビルドの引数・出力の指定 (-t の名前など)・キャッシュの指定を、ビルドの要求として BuildKit に送ります。",
+      "BuildKit の Dockerfile のフロントエンドが Dockerfile を読み、LLB という中間の形の依存のグラフに変えます。使われない段は飛ばし、依存の無い段は並べて実行できます。",
+      "コンテキスト (最後に渡す . などのフォルダ) は丸ごと送られるのではなく、BuildKit が COPY や ADD に要るファイルだけを Buildx に求めます。.dockerignore に書いたものは送られません。出力の「load build context」「transferring context」がこの受け渡しです。",
+      "FROM のベースイメージを取り、RUN・COPY などの命令を 1 つずつ実行して層 (レイヤー) を重ねます。命令と入力のファイルのチェックサムが前回と同じならキャッシュを使い (CACHED)、1 つの層が変わるとその後ろの層は作り直します。",
+      "最後に「exporting to image」で層とイメージの設定を書き、Docker のドライバーではイメージが Engine の手元のイメージの置き場に入ります。-t を付けていれば、その名前とタグが付きます。Kubernetes の API には何も送りません。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "今のフォルダをコンテキストにして作る (Docker の文書の例)",
+        "code": "$ docker build .",
+        "output": "[+] Building 3.5s (11/11) FINISHED                                              docker:desktop-linux\n => [internal] load build definition from Dockerfile                                            0.0s\n => => transferring dockerfile: 308B                                                            0.0s\n => [internal] load metadata for docker.io/library/python:3.12                                  0.0s\n => [internal] load .dockerignore                                                               0.0s\n => [1/6] FROM docker.io/library/python:3.12                                                    0.0s\n => [internal] load build context                                                               0.0s\n => => transferring context: 123B                                                               0.0s\n ...\n => [6/6] COPY ./app ./app                                                                      0.0s\n => exporting to image                                                                          0.1s\n => => exporting layers                                                                         0.1s\n => => writing image sha256:9924dfd9350407b3df01d1a0e1033b1e543523ce7d5d5e2c83a724480ebe8f00    0.0s",
+        "note": "[1/6] などが Dockerfile の命令で、それぞれが層になります。-t hello:0.1 を付けると、最後に名前を付ける行も出ます。出力は docs.docker.com の例です。"
+      },
+      {
+        "title": "コンテキストに無いファイルは COPY できない (Docker の文書の例)",
+        "code": "$ docker build -<<< $'FROM scratch\\nCOPY main.c .'",
+        "output": "[+] Building 0.0s (4/4) FINISHED\n ...\n => ERROR [1/1] COPY main.c .                              0.0s\n...\nERROR: failed to solve: failed to compute cache key: failed to calculate checksum of ref 7ab2bb61-0c28-432e-abf5-a4c3440bc6b6::4lgfpdf54n5uqxnv9v6ymg7ih: \"/main.c\": not found",
+        "note": "Dockerfile を標準入力から渡すとコンテキストが空になり、手元に main.c があっても BuildKit からは見えません。COPY が読めるのはコンテキストの中だけです。"
+      }
+    ],
+    "impl": {
+      "repo": "docker/cli",
+      "ref": "v29.10.0",
+      "path": "cmd/docker/builder.go",
+      "lines": "L82-L98",
+      "excerpt": "\t// is this a build that should be forwarded to the builder?\n\tfwargs, fwosargs, fwcmdpath, forwarded := forwardBuilder(builderAlias, args, osargs)\n\tif !forwarded {\n\t\treturn args, osargs, nil, nil\n\t}\n\n\tif !useBuilder {\n\t\t// Builder is not explicitly configured as an alias for buildx.\n\t\t// Detect whether we should use BuildKit, or fallback to the\n\t\t// legacy builder.\n\t\tif si := dockerCli.ServerInfo(); si.BuildkitVersion != build.BuilderBuildKit && si.OSType == \"windows\" {\n\t\t\t// The daemon didn't advertise BuildKit as the preferred builder,\n\t\t\t// so use the legacy builder, which is still the default for\n\t\t\t// Windows / WCOW.\n\t\t\treturn args, osargs, nil, nil\n\t\t}\n\t}",
+      "note": "build を Buildx に回す (forward) かを決めています。Windows のデーモンが BuildKit を勧めないときだけ古いビルダーに残り、それ以外は Buildx の BuildKit で作ります。",
+      "url": "https://github.com/docker/cli/blob/v29.10.0/cmd/docker/builder.go#L82-L98"
+    },
+    "sources": [
+      {
+        "label": "Docker: docker buildx build",
+        "url": "https://docs.docker.com/reference/cli/docker/buildx/build/"
+      },
+      {
+        "label": "Docker: Docker Build Overview",
+        "url": "https://docs.docker.com/build/concepts/overview/"
+      },
+      {
+        "label": "Docker: BuildKit",
+        "url": "https://docs.docker.com/build/buildkit/"
+      },
+      {
+        "label": "Docker: Build context",
+        "url": "https://docs.docker.com/build/concepts/context/"
+      },
+      {
+        "label": "Docker: Docker driver",
+        "url": "https://docs.docker.com/build/builders/drivers/docker/"
+      },
+      {
+        "label": "Docker: Docker build cache",
+        "url": "https://docs.docker.com/build/cache/"
+      },
+      {
+        "label": "docker/cli v29.10.0: cmd/docker/builder.go",
+        "url": "https://github.com/docker/cli/blob/v29.10.0/cmd/docker/builder.go"
+      }
+    ]
+  },
+  {
+    "id": "docker-save",
+    "inside": [
+      "docker の CLI は、-o が無く標準出力が端末のままなら、バイナリを画面に流さないよう「cowardly refusing to save to a terminal」で止めます。-o を付けたときは、書き終えてから置き換える形でファイルを 0600 で開きます。",
+      "Docker Engine の API に GET /images/get?names=<イメージ> を送ります (Kubernetes の API ではありません)。--platform を付けたときは platform の問い合わせも足します。",
+      "Docker Engine は、指したイメージの層・設定・マニフェストを 1 つの tar にまとめて流し返します。tar は OCI のイメージのレイアウトの中身に、昔の docker save と互換の manifest.json を足した形です。",
+      "CLI は返ってきた流れをそのまま標準出力か -o のファイルに写します。できた tar は docker load や、containerd の側の取り込み (k3s ではノードの /var/lib/rancher/k3s/agent/images/ に置くなど) に使えます。"
+    ],
+    "api": [
+      {
+        "method": "GET",
+        "path": "/images/get?names={image}",
+        "note": "Docker Engine API (ImageGetAll)。Kubernetes の API ではない"
+      }
+    ],
+    "examples": [
+      {
+        "title": "tar に書き出して大きさを見る (Docker の文書の例)",
+        "code": "$ docker save busybox > busybox.tar\n$ ls -sh busybox.tar",
+        "output": "2.7M busybox.tar",
+        "note": "標準出力をリダイレクトしてファイルにしています。-o busybox.tar でも同じです。出力は docs.docker.com の例です。"
+      },
+      {
+        "title": "gzip で縮める (Docker の文書の例)",
+        "code": "$ docker save myimage:latest | gzip > myimage_latest.tar.gz",
+        "output": "(何も出ません。myimage_latest.tar.gz ができます)",
+        "note": "docker save は標準出力に流すので、パイプで別の道具に渡せます。"
+      }
+    ],
+    "impl": {
+      "repo": "docker/cli",
+      "ref": "v29.10.0",
+      "path": "cli/command/image/save.go",
+      "lines": "L71-L90",
+      "excerpt": "\tif opts.output == \"\" {\n\t\tif dockerCLI.Out().IsTerminal() {\n\t\t\treturn errors.New(\"cowardly refusing to save to a terminal. Use the -o flag or redirect\")\n\t\t}\n\t\toutput = dockerCLI.Out()\n\t} else {\n\t\twriter, err := atomicwriter.New(opts.output, 0o600)\n\t\tif err != nil {\n\t\t\treturn fmt.Errorf(\"failed to save image: %w\", err)\n\t\t}\n\t\tdefer writer.Close()\n\t\toutput = writer\n\t}\n\n\tresponseBody, err := dockerCLI.Client().ImageSave(ctx, opts.images, options...)\n\tif err != nil {\n\t\treturn err\n\t}\n\tdefer responseBody.Close()\n",
+      "note": "-o が無く出力が端末なら止め、-o があればファイルを開き、Engine の API (ImageSave) から返った流れを io.Copy で書き写しています。",
+      "url": "https://github.com/docker/cli/blob/v29.10.0/cli/command/image/save.go#L71-L90"
+    },
+    "sources": [
+      {
+        "label": "Docker: docker image save",
+        "url": "https://docs.docker.com/reference/cli/docker/image/save/"
+      },
+      {
+        "label": "Docker Engine API (Export several images)",
+        "url": "https://docs.docker.com/reference/api/engine/version/v1.52/#tag/Image/operation/ImageGetAll"
+      },
+      {
+        "label": "K3s: Air-Gap Install (イメージの tar を置く場所)",
+        "url": "https://docs.k3s.io/installation/airgap"
+      },
+      {
+        "label": "docker/cli v29.10.0: cli/command/image/save.go",
+        "url": "https://github.com/docker/cli/blob/v29.10.0/cli/command/image/save.go"
+      },
+      {
+        "label": "docker/cli v29.10.0: vendor/github.com/moby/moby/client/image_save.go",
+        "url": "https://github.com/docker/cli/blob/v29.10.0/vendor/github.com/moby/moby/client/image_save.go"
+      }
+    ]
+  },
+  {
+    "id": "k3s-crictl-ps",
+    "inside": [
+      "k3s crictl は k3s のバイナリに入った crictl で、設定のファイル /var/lib/rancher/k3s/agent/etc/crictl.yaml を CRI_CONFIG_FILE で指してから動きます。そこに k3s の containerd の口 unix:///run/k3s/containerd/containerd.sock が書いてあります。このファイルとソケットは root でないと読めないので、ノードの上で sudo を付けて打ちます。",
+      "crictl は API サーバーも kubelet も通さず、CRI (コンテナランタイムのインターフェース) の gRPC で containerd に直接問い合わせます。呼ぶのは runtime.v1.RuntimeService の ListContainers です。",
+      "-a も --state も付けないときは、状態 CONTAINER_RUNNING の絞り込みを付けて頼みます。-a なら絞り込みを外し、止まった (Exited) コンテナも返ります。",
+      "containerd は、kubelet が CRI で作った Pod のコンテナを返します。CRI を通さずに作ったもの (docker run のコンテナなど) は出ません。",
+      "crictl が CONTAINER・IMAGE・CREATED・STATE・NAME・ATTEMPT・POD ID・POD・NAMESPACE の表に整えて出します。ATTEMPT は同じコンテナの再起動の回数です。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "動いているコンテナ (kubernetes.io の crictl の文書の例)",
+        "code": "$ sudo k3s crictl ps",
+        "output": "CONTAINER ID        IMAGE                                                                                                             CREATED             STATE               NAME                       ATTEMPT\n1f73f2d81bf98       busybox@sha256:141c253bc4c3fd0a201d32dc1f493bcf3fff003b6df416dea4f41046e0f37d47                                   6 minutes ago       Running             sh                         1\n87d3992f84f74       nginx@sha256:d0a8828cccb73397acb0073bf34f4d7d8aa315263f1e7806bf8c55d8ac139d5f                                     7 minutes ago       Running             nginx                      0\n1941fb4da154f       k8s-gcrio.azureedge.net/hyperkube-amd64@sha256:00d814b1f7763f4ab5be80c58e98140dfc69df107f253d7fdd714b30a714260a   17 hours ago        Running             kube-proxy                 0",
+        "note": "文書の例は古い版の crictl ps の出力です。今の版 (v1.36) では、先頭の列名が CONTAINER になり、IMAGE の列はイメージの ID の頭 13 字になり、右に POD ID・POD・NAMESPACE の列も出ます。k3s crictl でも同じ形です。"
+      },
+      {
+        "title": "止まったものも含める (kubernetes.io の crictl の文書の例)",
+        "code": "$ sudo k3s crictl ps -a",
+        "output": "CONTAINER ID        IMAGE                                                                                                             CREATED             STATE               NAME                       ATTEMPT\n1f73f2d81bf98       busybox@sha256:141c253bc4c3fd0a201d32dc1f493bcf3fff003b6df416dea4f41046e0f37d47                                   7 minutes ago       Running             sh                         1\n9c5951df22c78       busybox@sha256:141c253bc4c3fd0a201d32dc1f493bcf3fff003b6df416dea4f41046e0f37d47                                   8 minutes ago       Exited              sh                         0\n...",
+        "note": "STATE が Exited の行は、再起動で置き換わる前の sh のコンテナ (ATTEMPT 0) です。-a を付けないと出ません。"
+      }
+    ],
+    "impl": {
+      "repo": "kubernetes-sigs/cri-tools",
+      "ref": "v1.36.0",
+      "path": "cmd/crictl/container.go",
+      "lines": "L1276-L1290",
+      "excerpt": "func ListContainers(ctx context.Context, runtimeClient internalapi.RuntimeService, imageClient internalapi.ImageManagerService, opts *listOptions) ([]*pb.Container, error) {\n\tfilter := &pb.ContainerFilter{}\n\tif opts.id != \"\" {\n\t\tfilter.Id = opts.id\n\t}\n\n\tif opts.podID != \"\" {\n\t\tfilter.PodSandboxId = opts.podID\n\t}\n\n\tst := &pb.ContainerStateValue{}\n\tif !opts.all && opts.state == \"\" {\n\t\tst.State = pb.ContainerState_CONTAINER_RUNNING\n\t\tfilter.State = st\n\t}",
+      "note": "ListContainers の要求の絞り込みを組み立てています。-a も --state も無ければ CONTAINER_RUNNING で絞るので、既定では動いているものだけが出ます。",
+      "url": "https://github.com/kubernetes-sigs/cri-tools/blob/v1.36.0/cmd/crictl/container.go#L1276-L1290"
+    },
+    "sources": [
+      {
+        "label": "Kubernetes: Debugging Kubernetes nodes with crictl",
+        "url": "https://kubernetes.io/docs/tasks/debug/debug-cluster/crictl/"
+      },
+      {
+        "label": "Kubernetes: Container Runtime Interface (CRI)",
+        "url": "https://kubernetes.io/docs/concepts/containers/cri/"
+      },
+      {
+        "label": "cri-api: api.proto (RuntimeService・ImageService)",
+        "url": "https://github.com/kubernetes/cri-api/blob/master/pkg/apis/runtime/v1/api.proto"
+      },
+      {
+        "label": "k3s v1.36.6+k3s1: pkg/agent/run_linux.go (crictl.yaml を書く)",
+        "url": "https://github.com/k3s-io/k3s/blob/v1.36.6%2Bk3s1/pkg/agent/run_linux.go"
+      },
+      {
+        "label": "cri-tools v1.36.0: cmd/crictl/container.go",
+        "url": "https://github.com/kubernetes-sigs/cri-tools/blob/v1.36.0/cmd/crictl/container.go"
+      }
+    ]
+  },
+  {
+    "id": "k3s-crictl-images",
+    "inside": [
+      "k3s crictl は k3s のバイナリに入った crictl で、設定のファイル /var/lib/rancher/k3s/agent/etc/crictl.yaml を CRI_CONFIG_FILE で指してから動きます。そこに k3s の containerd の口 unix:///run/k3s/containerd/containerd.sock が書いてあります。このファイルとソケットは root でないと読めないので、ノードの上で sudo を付けて打ちます。",
+      "crictl は CRI の gRPC で、containerd の runtime.v1.ImageService の ListImages を呼びます。リポジトリ名 (例: nginx) を渡すと、その名前の絞り込みを付けて頼みます。",
+      "containerd は、CRI から見えるイメージを返します。kubelet が Pod のために取ったイメージや、k3s が取り込んだイメージがここにあります。docker build で作って Docker Engine にあるイメージは別の置き場なので出ません。",
+      "crictl が名前の順に並べ、IMAGE・TAG・IMAGE ID・SIZE の表に整えて出します。そのイメージでコンテナが動いているかは分かりません (それは crictl ps)。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "ノードにあるイメージ (kubernetes.io の crictl の文書の例)",
+        "code": "$ sudo k3s crictl images",
+        "output": "IMAGE                                     TAG                 IMAGE ID            SIZE\nbusybox                                   latest              8c811b4aec35f       1.15MB\nk8s-gcrio.azureedge.net/hyperkube-amd64   v1.10.3             e179bbfe5d238       665MB\nk8s-gcrio.azureedge.net/pause-amd64       3.1                 da86e6ba6ca19       742kB\nnginx                                     latest              cd5239a0906a6       109MB",
+        "note": "pause はどの Pod にも入る土台のコンテナのイメージです。文書の例は crictl images の出力で、k3s crictl でも同じ形です。"
+      },
+      {
+        "title": "リポジトリで絞る (kubernetes.io の crictl の文書の例)",
+        "code": "$ sudo k3s crictl images nginx",
+        "output": "IMAGE               TAG                 IMAGE ID            SIZE\nnginx               latest              cd5239a0906a6       109MB",
+        "note": "渡した名前は ListImages の要求の絞り込み (ImageFilter) に入ります。"
+      }
+    ],
+    "impl": {
+      "repo": "kubernetes-sigs/cri-tools",
+      "ref": "v1.36.0",
+      "path": "cmd/crictl/image.go",
+      "lines": "L798-L811",
+      "excerpt": "// ListImages sends a ListImagesRequest to the server, and parses\n// the returned ListImagesResponse.\nfunc ListImages(ctx context.Context, client internalapi.ImageManagerService, nameFilter string, conditionFilters []string) (*pb.ListImagesResponse, error) {\n\trequest := &pb.ListImagesRequest{Filter: &pb.ImageFilter{Image: &pb.ImageSpec{Image: nameFilter}}}\n\tlogrus.Debugf(\"ListImagesRequest: %v\", request)\n\n\tres, err := InterruptableRPC(ctx, func(ctx context.Context) ([]*pb.Image, error) {\n\t\treturn client.ListImages(ctx, request.GetFilter())\n\t})\n\tif err != nil {\n\t\treturn nil, err\n\t}\n\n\tresp := &pb.ListImagesResponse{Images: res}",
+      "note": "名前の絞り込みを入れた ListImagesRequest を作り、CRI の ImageService の ListImages を呼んで、返ったイメージを並べ替えています。",
+      "url": "https://github.com/kubernetes-sigs/cri-tools/blob/v1.36.0/cmd/crictl/image.go#L798-L811"
+    },
+    "sources": [
+      {
+        "label": "Kubernetes: Debugging Kubernetes nodes with crictl",
+        "url": "https://kubernetes.io/docs/tasks/debug/debug-cluster/crictl/"
+      },
+      {
+        "label": "cri-api: api.proto (RuntimeService・ImageService)",
+        "url": "https://github.com/kubernetes/cri-api/blob/master/pkg/apis/runtime/v1/api.proto"
+      },
+      {
+        "label": "k3s v1.36.6+k3s1: pkg/agent/run_linux.go (crictl.yaml を書く)",
+        "url": "https://github.com/k3s-io/k3s/blob/v1.36.6%2Bk3s1/pkg/agent/run_linux.go"
+      },
+      {
+        "label": "cri-tools v1.36.0: cmd/crictl/image.go",
+        "url": "https://github.com/kubernetes-sigs/cri-tools/blob/v1.36.0/cmd/crictl/image.go"
+      }
+    ]
+  },
+  {
+    "id": "etcdctl",
+    "inside": [
+      "etcdctl は --endpoints (や ETCDCTL_ENDPOINTS) で etcd のメンバーの住所を、--cacert・--cert・--key で TLS の証明書を受け取り、etcd の v3 の API (gRPC) につなぎます。v3.4 からは v3 の API が既定なので、ETCDCTL_API=3 は要りません。Kubernetes の API サーバーは通しません。",
+      "snapshot save は、エンドポイントがちょうど 1 つでないと「snapshot must be requested to one selected node」で止まります。スナップショットはメンバー 1 つから取るものだからです。",
+      "まず <ファイル>.part という作業用のファイルを作り、gRPC の Maintenance.Snapshot を呼びます。メンバーは自分のバックエンドのデータベース (bbolt) の全体を、ストリームで少しずつ送り返します。",
+      "受け取ったデータを .part に書き、末尾に sha256 のチェックサムが付いた大きさかを確かめ、ディスクに書き切ってから (fsync) 本来のファイル名に変えます。最後に「Snapshot saved at <ファイル>」とサーバーの版を出します。",
+      "戻すのは etcdctl ではありません。v3.6 では etcdutl snapshot restore が新しいデータのディレクトリを作り、新しいクラスタとして起こします。k3s の組み込みの etcd では、etcdctl の代わりに k3s etcd-snapshot save を使います。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "動いているメンバーからスナップショットを取る (etcd の文書の例)",
+        "code": "$ ETCDCTL_API=3 etcdctl --endpoints $ENDPOINT snapshot save snapshot.db",
+        "output": "Snapshot saved at snapshot.db",
+        "note": "コマンドは etcd.io の Disaster recovery の例です。出力は、実装 (etcdctl/ctlv3/command/snapshot_command.go) の文字列から書いた形の例です。実際には、その前に進み具合のログ (created temporary db file など) が、後に Server version の行が出ます。"
+      },
+      {
+        "title": "スナップショットの中身を確かめる (etcd の文書の例)",
+        "code": "$ etcdutl snapshot status snapshot.db -w table",
+        "output": "+---------+----------+------------+------------+\n|  HASH   | REVISION | TOTAL KEYS | TOTAL SIZE |\n+---------+----------+------------+------------+\n| 7ef846e |   485261 |      11642 |      94 MB |\n+---------+----------+------------+------------+",
+        "note": "REVISION は、取った時点の etcd のリビジョン (書くたびに 1 つ増える番号) です。etcdutl はファイルだけを見る道具で、etcd にはつなぎません。"
+      }
+    ],
+    "impl": {
+      "repo": "etcd-io/etcd",
+      "ref": "v3.6.16",
+      "path": "client/v3/snapshot/v3_snapshot.go",
+      "lines": "L85-L104",
+      "excerpt": "\tstart := time.Now()\n\tresp, err := cli.SnapshotWithVersion(ctx)\n\tif err != nil {\n\t\treturn \"\", err\n\t}\n\tdefer func() {\n\t\terr = resp.Snapshot.Close()\n\t\tif err != nil {\n\t\t\tlg.Error(\"Could not close snapshot stream\", zap.Error(err))\n\t\t}\n\t}()\n\tlg.Info(\"fetching snapshot\", zap.String(\"endpoint\", cfg.Endpoints[0]))\n\tvar size int64\n\tsize, err = io.Copy(f, resp.Snapshot)\n\tif err != nil {\n\t\treturn resp.Version, fmt.Errorf(\"could not write snapshot: %w\", err)\n\t}\n\tif !hasChecksum(size) {\n\t\treturn resp.Version, fmt.Errorf(\"sha256 checksum not found [bytes: %d]\", size)\n\t}",
+      "note": "Maintenance.Snapshot のストリームを開き、io.Copy で .part のファイルに書き、末尾に sha256 のチェックサムが付いた大きさかを確かめてから fsync しています。この後で .part を本来の名前に変えます。",
+      "url": "https://github.com/etcd-io/etcd/blob/v3.6.16/client/v3/snapshot/v3_snapshot.go#L85-L104"
+    },
+    "sources": [
+      {
+        "label": "etcd v3.6: Disaster recovery",
+        "url": "https://etcd.io/docs/v3.6/op-guide/recovery/"
+      },
+      {
+        "label": "Kubernetes: Operating etcd clusters for Kubernetes",
+        "url": "https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/"
+      },
+      {
+        "label": "K3s: etcd-snapshot",
+        "url": "https://docs.k3s.io/cli/etcd-snapshot"
+      },
+      {
+        "label": "etcd-io/etcd v3.6.16: client/v3/snapshot/v3_snapshot.go",
+        "url": "https://github.com/etcd-io/etcd/blob/v3.6.16/client/v3/snapshot/v3_snapshot.go"
+      },
+      {
+        "label": "etcd-io/etcd v3.6.16: etcdctl/ctlv3/command/snapshot_command.go",
+        "url": "https://github.com/etcd-io/etcd/blob/v3.6.16/etcdctl/ctlv3/command/snapshot_command.go"
+      },
+      {
+        "label": "etcd-io/etcd v3.6.16: api/etcdserverpb/rpc.proto",
+        "url": "https://github.com/etcd-io/etcd/blob/v3.6.16/api/etcdserverpb/rpc.proto"
+      }
+    ]
+  },
+  {
+    "id": "curl",
+    "inside": [
+      "curl は URL の名前 (get.k3s.io) を DNS で IP に引き、https なら 443 番に TCP でつないで TLS の握手をし、サーバーの証明書を確かめます。",
+      "HTTP の GET を送ります。-L を付けると、301 や 302 などの移転先 (Location) をたどって送り直します。-f を付けると、400 以上の答えのときは中身を出さず、終了コード 22 で失敗します。-s は進み具合と、エラーの表示を消します。",
+      "受け取った中身 (k3s の導入スクリプト install.sh) を標準出力に出します。| sh - で、それをそのままシェルに読ませて実行します。-f があるので、取れなかったときに失敗のページを sh が実行することはありません。",
+      "スクリプトは、CPU の種類を調べ、k3s のバイナリとその sha256 のハッシュを取ってきて照らし合わせ、ふつうは /usr/local/bin/k3s に置きます。kubectl・crictl・ctr を k3s へのリンクとして作り、k3s-killall.sh・k3s-uninstall.sh を置きます。",
+      "最後に systemd (か openrc) のサービスを作って有効にし、k3s を起こします。K3S_URL を付けたときはエージェントとして、付けないときはサーバーとして起き、kubeconfig を /etc/rancher/k3s/k3s.yaml に書きます。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "-L が移転先をたどる (このページのために打った例)",
+        "code": "$ curl -sL -o /dev/null -w '%{http_code} redirects=%{num_redirects} %{url_effective}\\n' http://get.k3s.io",
+        "output": "200 redirects=1 https://get.k3s.io/",
+        "note": "http で頼むと 301 で https に移され、-L がそれを 1 回たどって 200 を受け取ったことが分かります。k3s は入れず、中身は /dev/null に捨てています。"
+      },
+      {
+        "title": "-f が 400 以上で失敗にする (このページのために打った例)",
+        "code": "$ curl -sfL https://kubernetes.io/no-such-page-xyz/ > /dev/null; echo \"exit=$?\"",
+        "output": "exit=22",
+        "note": "404 が返ったので、-f により中身を出さずに終了コード 22 で終わりました。-f が無いと、404 のページの中身がそのまま出力されます。"
+      },
+      {
+        "title": "取れるのはシェルのスクリプト (このページのために打った例)",
+        "code": "$ curl -sfL https://get.k3s.io | head -8",
+        "output": "#!/bin/sh\nset -e\nset -o noglob\n\n# Usage:\n#   curl ... | ENV_VAR=... sh -\n#       or\n#   ENV_VAR=... ./install.sh",
+        "note": "sh に渡す代わりに head で先頭だけを見ています。導入の本番 (curl -sfL https://get.k3s.io | sh -) はこの中身をシェルで実行します。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "curl man page",
+        "url": "https://curl.se/docs/manpage.html"
+      },
+      {
+        "label": "K3s: Quick-Start Guide",
+        "url": "https://docs.k3s.io/quick-start"
+      },
+      {
+        "label": "K3s: Configuration Options (導入スクリプトの環境変数)",
+        "url": "https://docs.k3s.io/installation/configuration"
+      },
+      {
+        "label": "k3s v1.36.6+k3s1: install.sh",
+        "url": "https://github.com/k3s-io/k3s/blob/v1.36.6%2Bk3s1/install.sh"
+      }
+    ]
+  },
+  {
+    "id": "nslookup",
+    "inside": [
+      "nslookup は Pod の /etc/resolv.conf を読み、問い合わせ先の DNS サーバー (nameserver) を決めます。このファイルは kubelet が Pod ごとに書き、nameserver はクラスターの DNS の Service (kube-dns) の ClusterIP です。k3s の既定は 10.43.0.10 です。",
+      "resolv.conf の options ndots:5 により、名前の点が 5 つより少ないときは、search の <名前空間>.svc.cluster.local・svc.cluster.local・cluster.local を順に後ろに付けた名前を先に試し、引けなければそのままの名前を引きます。web.shop.svc.cluster.local も点は 4 つなので、search を付けた名前を先に試します。",
+      "UDP の 53 番で A (と AAAA) の問い合わせを送ります。宛先は Service の ClusterIP なので、ノードの kube-proxy の規則で CoreDNS の Pod のどれかに届きます。",
+      "CoreDNS の kubernetes プラグインは、API サーバーを watch して Service と EndpointSlice を覚えていて、その記憶から答えます。ふつうの Service なら ClusterIP を 1 つ、ヘッドレスの Service なら Pod の IP を並べて返します。クラスターの外の名前は forward で上流の DNS に回します。",
+      "nslookup は、答えた DNS サーバー (Server・Address) と、引いた名前と IP (Name・Address) を出します。引けなければ can't resolve などのエラーを出します。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "Pod の中から Service の名前を引く (kubernetes.io の DNS の調べ方の例)",
+        "code": "$ kubectl exec -i -t dnsutils -- nslookup kubernetes.default",
+        "output": "Server:    10.0.0.10\nAddress 1: 10.0.0.10\n\nName:      kubernetes.default\nAddress 1: 10.0.0.1",
+        "note": "Server が答えた DNS (kube-dns の Service の ClusterIP)、下の Address が default の名前空間の kubernetes の Service の ClusterIP です。kubernetes.default は search の svc.cluster.local を付けて引かれています。"
+      },
+      {
+        "title": "引けないとき (kubernetes.io の DNS の調べ方の例)",
+        "code": "$ kubectl exec -i -t dnsutils -- nslookup kubernetes.default",
+        "output": "Server:    10.0.0.10\nAddress 1: 10.0.0.10 kube-dns.kube-system.svc.cluster.local\n\nnslookup: can't resolve 'kubernetes.default'",
+        "note": "DNS サーバーには届いたが名前が引けなかった形です。次は /etc/resolv.conf の search と nameserver、CoreDNS の Pod が動いているかを確かめます。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "Kubernetes: Debugging DNS Resolution",
+        "url": "https://kubernetes.io/docs/tasks/administer-cluster/dns-debugging-resolution/"
+      },
+      {
+        "label": "Kubernetes: DNS for Services and Pods",
+        "url": "https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/"
+      },
+      {
+        "label": "CoreDNS: kubernetes plugin",
+        "url": "https://coredns.io/plugins/kubernetes/"
+      },
+      {
+        "label": "K3s: Server CLI (--cluster-dns の既定)",
+        "url": "https://docs.k3s.io/cli/server"
+      },
+      {
+        "label": "BIND 9: nslookup",
+        "url": "https://github.com/isc-projects/bind9/blob/main/bin/dig/nslookup.rst"
+      }
+    ]
+  }
+]

@@ -132,6 +132,43 @@ export async function buildPages(load) {
     pages.push({ path: `glossary/${t.id}/`, canonical: 'glossary/', inSitemap: false, title: `${t.term} (用語集)`, description: clip(t.description), body: `<h1>${esc(t.term)}</h1>\n<p>${esc(t.description)}</p>\n<p>${link('glossary/', '用語集の一覧')}</p>` });
   }
 
+  // コマンド: 一覧と、コマンドごとのページ (中で何が起きるか・API の要求・実行の例・実装の抜粋まで、画面と同じ中身)
+  const { COMMAND_PAGES, implUrl, commandPageTitle } = await load('/src/content/commandPages.ts');
+  pages.push({
+    path: 'commands/',
+    title: 'コマンド',
+    description: `kubectl・helm など、KCNA の問題に出てくる ${COMMAND_PAGES.length} のコマンドが中で何をしているか (API の要求・動く部品) を、実行の例と実装のソースと一緒に、公式リファレンスに沿って説明する。`,
+    body: ['<h1>コマンド</h1>', `<ul>${COMMAND_PAGES.map((c) => `<li>${link(`commands/${c.id}/`, c.command)}: ${esc(c.summary)}</li>`).join('')}</ul>`].join('\n'),
+  });
+  for (const c of COMMAND_PAGES) {
+    const flags = [...(c.flags ?? []), ...c.globalFlags];
+    pages.push({
+      path: `commands/${c.id}/`,
+      title: commandPageTitle(c.id),
+      description: clip(`${c.summary} ${c.detail ?? ''}`),
+      body: [
+        `<p>${link('commands/', 'コマンド')}</p>`,
+        `<h1>${esc(c.command)}</h1>`,
+        `<p>${esc(c.summary)}</p>`,
+        c.detail ? `<p>${esc(c.detail)}</p>` : '',
+        '<h2>書き方</h2>',
+        `<pre><code>${esc(c.usage)}</code></pre>`,
+        flags.length ? `<dl>${flags.map((f) => `<dt>${esc(f.flags.join(', '))}</dt><dd>${esc(f.text)}</dd>`).join('')}</dl>` : '',
+        '<h2>中で何が起きるか</h2>',
+        `<ol>${c.inside.map((x) => `<li>${esc(x)}</li>`).join('')}</ol>`,
+        c.api.length ? `<table><thead><tr><th>メソッド</th><th>パス</th><th>いつ</th></tr></thead><tbody>${c.api.map((a) => `<tr><td>${esc(a.method)}</td><td>${esc(a.path)}</td><td>${esc(a.note ?? '')}</td></tr>`).join('')}</tbody></table>` : '',
+        '<h2>実行の例</h2>',
+        ...c.examples.map((e) => `<h3>${esc(e.title)}</h3><pre><code>${esc(e.output ? `${e.code}\n${e.output}` : e.code)}</code></pre>${e.note ? `<p>${esc(e.note)}</p>` : ''}`),
+        c.verbose ? `<h3>-v で見える要求</h3><pre><code>${esc(`${c.verbose.code}\n${c.verbose.output}`)}</code></pre>` : '',
+        c.impl ? `<h2>実装を読む</h2><p><a href="${esc(implUrl(c.impl))}">${esc(`${c.impl.repo} ${c.impl.ref} の ${c.impl.path}`)}</a></p><pre><code>${esc(c.impl.excerpt)}</code></pre>` : '',
+        '<h2>出典</h2>',
+        `<ul>${[{ label: `${c.command} の公式リファレンス`, url: c.source }, ...c.sources.filter((x) => x.url !== c.source)].map((x) => `<li><a href="${esc(x.url)}">${esc(x.label)}</a></li>`).join('')}</ul>`,
+      ]
+        .filter(Boolean)
+        .join('\n'),
+    });
+  }
+
   // 似た語の比較表: 一覧と、表ごとのページ (表・取り違えやすい点・コード・出典まで、画面と同じ中身)
   const tables = (await load('/src/content/compare.json')).default;
   pages.push({

@@ -2593,3 +2593,74 @@ html[data-loading='true'] body::before {
   gap: 6px;
   min-width: 0;
 }
+
+/* コマンドのページ (/commands/)。一覧は 1 行ずつ、ページは比較表と同じ節の組み */
+.desk > .cmdp {
+  padding: var(--spacing-8);
+}
+
+.cmdp-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-container);
+  background: var(--color-background-card);
+}
+
+.cmdp-list li + li {
+  border-top: 1px solid var(--color-border);
+}
+
+.hb .cmdp-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  padding: 12px 16px;
+  color: var(--color-text-primary);
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.hb .cmdp-row:hover {
+  background: var(--color-background-muted);
+}
+
+.hb .cmdp-title {
+  font-family: var(--font-family-code, 'SF Mono', Monaco, Consolas, monospace);
+  /* 見出しのコマンド名は見出しと同じ大きさ (code の小さい字にしない) */
+  font-size: 1em;
+}
+
+.cmdp-flags {
+  max-width: 48em;
+  font-size: 14px;
+}
+
+.cmdp-inside {
+  margin: 0;
+  /* 空白の無い API のパスでも、スマホの幅で折り返す */
+  overflow-wrap: anywhere;
+  padding-left: 1.6em;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 40em;
+  line-height: 1.8;
+}
+
+.cmdp-api code {
+  font-family: var(--font-family-code, 'SF Mono', Monaco, Consolas, monospace);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.cmdp-note {
+  margin: 0;
+  overflow-wrap: anywhere;
+  max-width: 40em;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--color-text-secondary);
+}

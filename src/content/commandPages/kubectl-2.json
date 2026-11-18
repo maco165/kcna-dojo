@@ -1,0 +1,1127 @@
+[
+  {
+    "id": "kubectl-explain",
+    "inside": [
+      "kubeconfig を読んで行き先の API サーバーと資格情報を決めます。手元の資料は使わず、説明はすべてクラスタから取ります。",
+      "まず /api と /apis を読み (discovery)、pods や deploy のような名前を、API のグループ・版・種類 (例: core の v1 の pods) に直します。",
+      "次に GET /openapi/v3 で、グループと版ごとの OpenAPI v3 の文書の置き場の一覧を受け取ります。OpenAPI v3 の配信は v1.27 から stable です。",
+      "core の v1 なら /openapi/v3/api/v1 のように、該当するグループと版の文書を 1 本だけ GET します。hash の付いた URL は中身が変わらない文書を指し、API サーバーはキャッシュしてよいことを示すヘッダー (Cache-Control: immutable) を付けて返します。",
+      "読むだけの要求なので、API サーバーでは認証と認可だけが行われ、アドミッションも etcd への書き込みもありません。文書はサーバーが持っている型の定義から作られます。",
+      "kubectl は受け取った文書の中で、pods.spec.containers.resources のような . の道をたどり、その項目の型 (<ResourceRequirements> など)・説明・下の項目を、文字のひな形 (plaintext) で整えて出します。CRD で足した種類も、サーバーが文書を配っていれば同じように引けます。"
+    ],
+    "api": [
+      {
+        "method": "GET",
+        "path": "/openapi/v3",
+        "note": "グループと版ごとの OpenAPI v3 の文書の一覧 (API リファレンスではなく The Kubernetes API の OpenAPI V3 の節に載っている)"
+      },
+      {
+        "method": "GET",
+        "path": "/openapi/v3/api/v1",
+        "note": "core の v1 (Pod・Service など) の文書。apps の種類なら /openapi/v3/apis/apps/v1"
+      }
+    ],
+    "examples": [
+      {
+        "title": "Pod の resources の項目を引く",
+        "code": "$ kubectl explain pods.spec.containers.resources",
+        "output": "KIND:       Pod\nVERSION:    v1\n\nFIELD: resources <ResourceRequirements>\n\n\nDESCRIPTION:\n    Compute Resources required by this container. Cannot be updated. More info:\n    https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/\n    ResourceRequirements describes the compute resource requirements.\n    \nFIELDS:\n  claims\t<[]ResourceClaim>\n  ...\n  limits\t<map[string]Quantity>\n    Limits describes the maximum amount of compute resources allowed. More info:\n    https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/\n\n  requests\t<map[string]Quantity>\n    Requests describes the minimum amount of compute resources required. If\n    Requests is omitted for a container, it defaults to Limits if that is\n    explicitly specified, otherwise to an implementation-defined value. Requests\n    cannot exceed Limits. More info:\n  ...",
+        "note": "家のクラスタ (v1.36) で打った出力です。FIELD の <> の中が型で、FIELDS に下の項目が並びます。requests を省くと limits が使われることが説明に書かれています。"
+      },
+      {
+        "title": "apps グループの種類を引く",
+        "code": "$ kubectl explain deployment.spec.replicas",
+        "output": "GROUP:      apps\nKIND:       Deployment\nVERSION:    v1\n\nFIELD: replicas <integer>\n\n\nDESCRIPTION:\n    Number of desired pods. This is a pointer to distinguish between explicit\n    zero and not specified. Defaults to 1.",
+        "note": "家のクラスタで打った出力です。core 以外の種類では GROUP の行が出ます。replicas を書かなければ 1 になることが分かります。"
+      }
+    ],
+    "verbose": {
+      "code": "$ kubectl explain pods.spec.containers.resources -v=6",
+      "output": "I1118 18:08:20.600254 2065200 loader.go:408] Config loaded from file:  /home/user/.kube/config\nI1118 18:08:20.629046 2065200 round_trippers.go:632] \"Response\" verb=\"GET\" url=\"https://<API サーバー>/api?timeout=32s\" status=\"200 OK\" milliseconds=26\nI1118 18:08:20.643303 2065200 round_trippers.go:632] \"Response\" verb=\"GET\" url=\"https://<API サーバー>/apis?timeout=32s\" status=\"200 OK\" milliseconds=6\nI1118 18:08:20.696228 2065200 round_trippers.go:632] \"Response\" verb=\"GET\" url=\"https://<API サーバー>/openapi/v3?timeout=32s\" status=\"200 OK\" milliseconds=4\nI1118 18:08:20.717683 2065200 round_trippers.go:632] \"Response\" verb=\"GET\" url=\"https://<API サーバー>/openapi/v3/api/v1?hash=B6B6A956...B73B054&timeout=32s\" status=\"200 OK\" milliseconds=5",
+      "note": "家のクラスタで、手元のキャッシュを空にして打ちました (hash は途中を省いています)。名前を直すための /api と /apis、文書の一覧の /openapi/v3、Pod の文書の /openapi/v3/api/v1 の 4 本だけで、Pod そのものは 1 つも読んでいません。"
+    },
+    "impl": {
+      "repo": "kubernetes/kubectl",
+      "ref": "v0.37.2",
+      "path": "pkg/explain/v2/explain.go",
+      "lines": "L62-L81",
+      "excerpt": "\tpaths, err := client.Paths()\n\n\tif err != nil {\n\t\treturn fmt.Errorf(\"failed to fetch list of groupVersions: %w\", err)\n\t}\n\n\tvar resourcePath string\n\tif len(gvr.Group) == 0 {\n\t\tresourcePath = fmt.Sprintf(\"api/%s\", gvr.Version)\n\t} else {\n\t\tresourcePath = fmt.Sprintf(\"apis/%s/%s\", gvr.Group, gvr.Version)\n\t}\n\n\tgv, exists := paths[resourcePath]\n\n\tif !exists {\n\t\treturn fmt.Errorf(\"couldn't find resource for \\\"%v\\\"\", gvr)\n\t}\n\n\topenAPISchemaBytes, err := gv.Schema(runtime.ContentTypeJSON)",
+      "note": "GET /openapi/v3 で一覧 (paths) を取り、グループが空 (core) なら api/<版>、そうでなければ apis/<グループ>/<版> の文書を選んで、その JSON を取ります。この後、ひな形で項目の説明を組み立てます。"
+    },
+    "sources": [
+      {
+        "label": "kubectl explain",
+        "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_explain/"
+      },
+      {
+        "label": "The Kubernetes API: OpenAPI V3",
+        "url": "https://kubernetes.io/docs/concepts/overview/kubernetes-api/#openapi-v3"
+      },
+      {
+        "label": "kubectl の実装 (pkg/explain/v2/explain.go)",
+        "url": "https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/explain/v2/explain.go#L62-L81"
+      },
+      {
+        "label": "kubectl の実装 (pkg/cmd/explain/explain.go)",
+        "url": "https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/cmd/explain/explain.go#L193-L244"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-cluster-info",
+    "inside": [
+      "kubeconfig を読んで、今のコンテキストのクラスタの API サーバーの URL と資格情報を決めます。1 行目の「Kubernetes control plane is running at」の住所は、この kubeconfig に書かれた URL そのままです。",
+      "-n を付けなければ kube-system の名前空間を対象にし、ラベル kubernetes.io/cluster-service=true が付いた Service の一覧を、GET の 1 本で API サーバーに頼みます。",
+      "読むだけの要求なので、API サーバーでは認証と認可だけを通り、etcd に保存されている Service を返します。",
+      "kubectl は返ってきた Service ごとに住所を作ります。LoadBalancer の外向きの IP があれば http://IP:ポート、無ければ API サーバーを経由する /api/v1/namespaces/<名前空間>/services/<名前>/proxy の URL です。",
+      "名前はラベル kubernetes.io/name の値 (CoreDNS など) を使い、最後に、詳しく調べるには kubectl cluster-info dump を使うよう添えて終わります。"
+    ],
+    "api": [
+      {
+        "method": "GET",
+        "path": "/api/v1/namespaces/{namespace}/services",
+        "note": "既定は kube-system。labelSelector=kubernetes.io/cluster-service=true を付ける"
+      }
+    ],
+    "examples": [
+      {
+        "title": "つながっているクラスタを確かめる",
+        "code": "$ kubectl cluster-info",
+        "output": "Kubernetes control plane is running at https://<API サーバー>\nCoreDNS is running at https://<API サーバー>/api/v1/namespaces/kube-system/services/kube-dns:dns/proxy\nMetrics-server is running at https://<API サーバー>/api/v1/namespaces/kube-system/services/https:metrics-server:https/proxy\n\nTo further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.",
+        "note": "家のクラスタ (k3s) で打った出力です。kube-dns:dns は「Service 名:ポート名」、https:metrics-server:https は「スキーム:Service 名:ポート名」の形で、API サーバーの proxy を通る住所です。"
+      }
+    ],
+    "verbose": {
+      "code": "$ kubectl cluster-info -v=6",
+      "output": "I1118 18:08:27.571201 2065522 round_trippers.go:632] \"Response\" verb=\"GET\" url=\"https://<API サーバー>/api/v1/namespaces/kube-system/services?labelSelector=kubernetes.io%2Fcluster-service%3Dtrue\" status=\"200 OK\" milliseconds=41",
+      "note": "家のクラスタで打ちました。本体の要求は、ラベルで絞った Service の一覧の GET の 1 本だけです (%2F は /、%3D は =)。"
+    },
+    "impl": {
+      "repo": "kubernetes/kubectl",
+      "ref": "v0.37.2",
+      "path": "pkg/cmd/clusterinfo/clusterinfo.go",
+      "lines": "L96-L115",
+      "excerpt": "\tb := o.Builder.\n\t\tWithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).\n\t\tNamespaceParam(o.Namespace).DefaultNamespace().\n\t\tLabelSelectorParam(\"kubernetes.io/cluster-service=true\").\n\t\tResourceTypeOrNameArgs(false, []string{\"services\"}...).\n\t\tLatest()\n\terr := b.Do().Visit(func(r *resource.Info, err error) error {\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}\n\t\tprintService(o.Out, \"Kubernetes control plane\", o.Client.Host)\n\n\t\tservices := r.Object.(*corev1.ServiceList).Items\n\t\tfor _, service := range services {\n\t\t\tvar link string\n\t\t\tif len(service.Status.LoadBalancer.Ingress) > 0 {\n\t\t\t\tingress := service.Status.LoadBalancer.Ingress[0]\n\t\t\t\tip := ingress.IP\n\t\t\t\tif ip == \"\" {\n\t\t\t\t\tip = ingress.Hostname",
+      "note": "ラベル kubernetes.io/cluster-service=true で Service を選び、最初に kubeconfig の住所 (o.Client.Host) を control plane として出します。Service に LoadBalancer の IP があればその http の住所を作ります。"
+    },
+    "sources": [
+      {
+        "label": "kubectl cluster-info",
+        "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_cluster-info/"
+      },
+      {
+        "label": "Service (API リファレンス)",
+        "url": "https://kubernetes.io/docs/reference/kubernetes-api/service-resources/service-v1/"
+      },
+      {
+        "label": "kubectl の実装 (pkg/cmd/clusterinfo/clusterinfo.go)",
+        "url": "https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/cmd/clusterinfo/clusterinfo.go#L77-L155"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-cluster-info-dump",
+    "inside": [
+      "kubeconfig を読んで行き先と資格情報を決め、kubeconfig の今の名前空間を調べます。対象は --namespaces で選べ、省くと kube-system と今の名前空間、-A ならすべての名前空間です。",
+      "最初に Node の一覧を GET します。Node には IP・OS・kubelet の版などが入るので、出力は人に渡す前に中身を確かめる必要があります。",
+      "名前空間ごとに Event・ReplicationController・Service・DaemonSet・Deployment・ReplicaSet・Pod の一覧を、順に 1 本ずつ GET します。どれも読むだけの要求なので、API サーバーでは認証と認可だけを通ります。",
+      "次に、各 Pod の init コンテナとコンテナごとに、ログの GET (pods/<名前>/log) を送ります。API サーバーはこの要求を、Pod が動く Node の kubelet に問い合わせ、kubelet がコンテナのログを返します。",
+      "既定は JSON (-o で yaml も選べる) で全部を画面に出します。--output-directory を付けると、nodes.json、<名前空間>/pods.json、<名前空間>/<Pod 名>/logs.txt のようにファイルに分けて書き、最後に Cluster info dumped to <フォルダ> と出します。"
+    ],
+    "api": [
+      {
+        "method": "GET",
+        "path": "/api/v1/nodes",
+        "note": "最初の 1 本。Node の一覧"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/namespaces/{namespace}/events",
+        "note": "名前空間ごと。replicationcontrollers・services・pods も同じ形"
+      },
+      {
+        "method": "GET",
+        "path": "/apis/apps/v1/namespaces/{namespace}/deployments",
+        "note": "名前空間ごと。daemonsets・replicasets も同じ形"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/namespaces/{namespace}/pods/{name}/log",
+        "note": "Pod のコンテナごと (?container=<名前>)。API サーバーが kubelet に問い合わせる"
+      }
+    ],
+    "examples": [
+      {
+        "title": "状態をフォルダに書き出す (公式の例)",
+        "code": "$ kubectl cluster-info dump --output-directory=/path/to/cluster-state",
+        "output": "Cluster info dumped to /path/to/cluster-state",
+        "note": "出力の行は実装 (clusterinfo_dump.go の最後) の文言です。フォルダの中は nodes.json と、名前空間ごとの events.json・services.json・pods.json などと、Pod ごとの logs.txt に分かれます。家のクラスタでは、秘密やノードの情報が多く出るので打っていません。"
+      },
+      {
+        "title": "名前空間を選んで書き出す (公式の例)",
+        "code": "$ kubectl cluster-info dump --namespaces default,kube-system --output-directory=/path/to/cluster-state",
+        "output": "Cluster info dumped to /path/to/cluster-state",
+        "note": "--namespaces を付けると、既定の 2 つ (kube-system と今の名前空間) の代わりに、指定した名前空間だけを書き出します。"
+      }
+    ],
+    "verbose": {
+      "code": "$ kubectl cluster-info dump --output-directory=out -v=6",
+      "output": "... \"Response\" verb=\"GET\" url=\"https://<API サーバー>/api/v1/nodes\" status=\"200 OK\"\n... \"Response\" verb=\"GET\" url=\"https://<API サーバー>/api/v1/namespaces/kube-system/events\" status=\"200 OK\"\n... \"Response\" verb=\"GET\" url=\"https://<API サーバー>/api/v1/namespaces/kube-system/replicationcontrollers\" status=\"200 OK\"\n... \"Response\" verb=\"GET\" url=\"https://<API サーバー>/api/v1/namespaces/kube-system/services\" status=\"200 OK\"\n... \"Response\" verb=\"GET\" url=\"https://<API サーバー>/apis/apps/v1/namespaces/kube-system/daemonsets\" status=\"200 OK\"\n... \"Response\" verb=\"GET\" url=\"https://<API サーバー>/apis/apps/v1/namespaces/kube-system/deployments\" status=\"200 OK\"\n... \"Response\" verb=\"GET\" url=\"https://<API サーバー>/apis/apps/v1/namespaces/kube-system/replicasets\" status=\"200 OK\"\n... \"Response\" verb=\"GET\" url=\"https://<API サーバー>/api/v1/namespaces/kube-system/pods\" status=\"200 OK\"\n... \"Response\" verb=\"GET\" url=\"https://<API サーバー>/api/v1/namespaces/kube-system/pods/coredns-xxxxx/log?container=coredns\" status=\"200 OK\"\n...\nCluster info dumped to out",
+      "note": "形の例です。家のクラスタでは打たず、実装 (Run の中の一覧の順番) から、要求の並びを書きました。名前空間の数だけ 7 本の一覧と、コンテナの数だけログの要求が続きます。"
+    },
+    "impl": {
+      "repo": "kubernetes/kubectl",
+      "ref": "v0.37.2",
+      "path": "pkg/cmd/clusterinfo/clusterinfo_dump.go",
+      "lines": "L193-L211",
+      "excerpt": "\tvar namespaces []string\n\tif o.AllNamespaces {\n\t\tnamespaceList, err := o.CoreClient.Namespaces().List(context.TODO(), metav1.ListOptions{})\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}\n\t\tfor ix := range namespaceList.Items {\n\t\t\tnamespaces = append(namespaces, namespaceList.Items[ix].Name)\n\t\t}\n\t} else {\n\t\tif len(o.Namespaces) == 0 {\n\t\t\tnamespaces = []string{\n\t\t\t\tmetav1.NamespaceSystem,\n\t\t\t\to.Namespace,\n\t\t\t}\n\t\t} else {\n\t\t\tnamespaces = o.Namespaces\n\t\t}\n\t}",
+      "note": "書き出す名前空間を決める部分です。-A ならまず名前空間の一覧を GET し、--namespaces が無ければ kube-system と kubeconfig の今の名前空間の 2 つにします。"
+    },
+    "sources": [
+      {
+        "label": "kubectl cluster-info dump",
+        "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_cluster-info/kubectl_cluster-info_dump/"
+      },
+      {
+        "label": "Pod の log (API リファレンス)",
+        "url": "https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#get-read-log-of-the-specified-pod"
+      },
+      {
+        "label": "kubectl の実装 (pkg/cmd/clusterinfo/clusterinfo_dump.go)",
+        "url": "https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/cmd/clusterinfo/clusterinfo_dump.go#L173-L314"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-autoscale",
+    "inside": [
+      "kubeconfig を読んで行き先と資格情報を決め、対象の Deployment などを GET します。scale のサブリソースを持つ種類 (Deployment・ReplicaSet・StatefulSet・ReplicationController) でなければ、ここで止まります。",
+      "kubectl は手元で HorizontalPodAutoscaler (HPA) を組み立てます。scaleTargetRef に対象を、minReplicas と maxReplicas に --min と --max を、--cpu=50% なら CPU の使用率 50% (type: Utilization) を目標として書きます。",
+      "まず autoscaling/v2 の HPA を POST で作ります。v2 で断られたときは、設定が v1 で表せる場合に限って autoscaling/v1 で作り直します。",
+      "API サーバーでは認証・認可・アドミッションを通り、HPA が etcd に保存されます。この時点では Pod の数は変わりません。",
+      "kube-controller-manager の中の HPA のコントローラーが、既定で 15 秒ごとに、metrics.k8s.io (多くは Metrics Server) から Pod の使用量を読みます。使用率は Pod の requests に対する割合なので、requests が無いと計算できません。",
+      "必要な数は ceil(今の数 × 今の値 ÷ 目標の値) で決まり、コントローラーは対象の scale のサブリソースの replicas を書き換えます。kubectl は作った HPA の名前と autoscaled を出して終わります。"
+    ],
+    "api": [
+      {
+        "method": "GET",
+        "path": "/apis/apps/v1/namespaces/{namespace}/deployments/{name}",
+        "note": "対象を名前で指定したとき"
+      },
+      {
+        "method": "POST",
+        "path": "/apis/autoscaling/v2/namespaces/{namespace}/horizontalpodautoscalers",
+        "note": "HPA を作る。断られたときだけ /apis/autoscaling/v1/... に作り直す"
+      }
+    ],
+    "examples": [
+      {
+        "title": "CPU の使用率 50% を目標にする (サーバーで検査だけ)",
+        "code": "$ kubectl autoscale -f web-deploy.yaml --min=1 --max=5 --cpu=50% --dry-run=server -o yaml",
+        "output": "apiVersion: autoscaling/v2\nkind: HorizontalPodAutoscaler\nmetadata:\n  name: web\n  namespace: default\nspec:\n  maxReplicas: 5\n  metrics:\n  - resource:\n      name: cpu\n      target:\n        averageUtilization: 50\n        type: Utilization\n    type: Resource\n  minReplicas: 1\n  scaleTargetRef:\n    apiVersion: apps/v1\n    kind: Deployment\n    name: web\n...",
+        "note": "家のクラスタで、web の Deployment のマニフェスト web-deploy.yaml を -f で渡し、--dry-run=server を付けて打ち、保存はしていません (uid などの行は省いています)。--cpu=50% が averageUtilization: 50 の目標になっています。"
+      },
+      {
+        "title": "公式の例",
+        "code": "$ kubectl autoscale deployment bar --min=3 --max=6 --cpu=500m --memory=200Mi",
+        "output": "horizontalpodautoscaler.autoscaling/bar autoscaled",
+        "note": "500m のように量で書くと、割合ではなく Pod あたりの平均の使用量 (AverageValue) が目標になります。出力の文言は、家のクラスタの検査 (server dry run) と同じ形です。"
+      }
+    ],
+    "verbose": {
+      "code": "$ kubectl autoscale -f web-deploy.yaml --min=2 --max=5 --cpu=50% --dry-run=server -v=6",
+      "output": "I1118 18:09:51.389787 2069321 round_trippers.go:632] \"Response\" verb=\"POST\" url=\"https://<API サーバー>/apis/autoscaling/v2/namespaces/default/horizontalpodautoscalers?dryRun=All&fieldManager=kubectl-autoscale\" status=\"201 Created\" milliseconds=44\nhorizontalpodautoscaler.autoscaling/web autoscaled (server dry run)",
+      "note": "家のクラスタで打ちました。-f で渡したので対象の GET は無く、autoscaling/v2 への POST の 1 本です。dryRun=All なので API サーバーは検査だけして保存しません。名前で指定すると、前に対象の Deployment の GET が 1 本付きます。"
+    },
+    "impl": {
+      "repo": "kubernetes/kubectl",
+      "ref": "v0.37.2",
+      "path": "pkg/cmd/autoscale/autoscale.go",
+      "lines": "L251-L270",
+      "excerpt": "\t\t// handles the creation of HorizontalPodAutoscaler objects for both autoscaling/v2 and autoscaling/v1 APIs.\n\t\t// If autoscaling/v2 API fails, try to create and handle HorizontalPodAutoscaler using autoscaling/v1 API\n\t\tvar hpaV2 runtime.Object\n\t\thpaV2, err = o.createHorizontalPodAutoscalerV2(info.Name, mapping)\n\t\tif err != nil {\n\t\t\treturn fmt.Errorf(\"failed to create HorizontalPodAutoscaler using autoscaling/v2 API: %w\", err)\n\t\t}\n\t\tif err = o.handleHPA(hpaV2); err != nil {\n\t\t\tklog.V(1).Infof(\"Encountered an error with the autoscaling/v2 HorizontalPodAutoscaler: %v. \"+\n\t\t\t\t\"Falling back to try the autoscaling/v1 HorizontalPodAutoscaler\", err)\n\t\t\t// check if the HPA can be created using v1 API.\n\t\t\tif ok, err := o.canCreateHPAV1(); !ok {\n\t\t\t\treturn fmt.Errorf(\"failed to create autoscaling/v2 HPA and the configuration is incompatible with autoscaling/v1: %w\", err)\n\t\t\t}\n\t\t\thpaV1 := o.createHorizontalPodAutoscalerV1(info.Name, mapping)\n\t\t\tif err := o.handleHPA(hpaV1); err != nil {\n\t\t\t\treturn err\n\t\t\t}\n\t\t}\n\t\tcount++",
+      "note": "まず autoscaling/v2 の HPA を作って送り、失敗したら、v1 で表せる設定 (CPU の使用率だけ) のときに限り autoscaling/v1 の HPA を作って送り直します。"
+    },
+    "sources": [
+      {
+        "label": "kubectl autoscale",
+        "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_autoscale/"
+      },
+      {
+        "label": "Horizontal Pod Autoscaling",
+        "url": "https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/"
+      },
+      {
+        "label": "HorizontalPodAutoscaler v2 (API リファレンス)",
+        "url": "https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/horizontal-pod-autoscaler-v2/"
+      },
+      {
+        "label": "kubectl の実装 (pkg/cmd/autoscale/autoscale.go)",
+        "url": "https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/cmd/autoscale/autoscale.go#L224-L330"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-scale",
+    "inside": [
+      "kubeconfig を読んで行き先と資格情報を決め、対象の Deployment などを GET して、種類と名前を確かめます。",
+      "--current-replicas や --resource-version を付けていなければ、kubectl は spec.replicas だけを書いた小さなパッチ {\"spec\":{\"replicas\":3}} を作り、Deployment 本体ではなく scale のサブリソースに PATCH で送ります。付けているときは、先に scale を GET して条件を確かめてから PUT で送ります。",
+      "API サーバーでは認証・認可・アドミッションを通ります。認可は deployments/scale というサブリソースに対して行われ、通れば Deployment の spec.replicas が etcd に保存されます。",
+      "Deployment のコントローラーが変化を見て、今の ReplicaSet の replicas を同じ数に合わせます。ReplicaSet のコントローラーが Pod を足すか消し、足した Pod はスケジューラーが Node に割り当て、kubelet が起動します。",
+      "Pod テンプレートは変わらないので、新しいリビジョンは作られず、ロールアウトの履歴にも残りません。kubectl は deployment.apps/<名前> scaled と出して終わり、--timeout を付けたときだけ数がそろうまで待ちます。"
+    ],
+    "api": [
+      {
+        "method": "GET",
+        "path": "/apis/apps/v1/namespaces/{namespace}/deployments/{name}",
+        "note": "対象を確かめる"
+      },
+      {
+        "method": "PATCH",
+        "path": "/apis/apps/v1/namespaces/{namespace}/deployments/{name}/scale",
+        "note": "spec.replicas だけのマージパッチ。条件を付けたときは GET と PUT"
+      }
+    ],
+    "examples": [
+      {
+        "title": "数を変える (公式の例)",
+        "code": "$ kubectl scale deployment/nginx-deployment --replicas=10",
+        "output": "deployment.apps/nginx-deployment scaled",
+        "note": "公式の Deployment の文書の例です。数を変えてもリビジョンは増えないので、rollout undo で数を戻すことはできません。"
+      },
+      {
+        "title": "今の数が 2 のときだけ 3 にする (公式の例)",
+        "code": "$ kubectl scale --current-replicas=2 --replicas=3 deployment/mysql",
+        "output": "deployment.apps/mysql scaled",
+        "note": "条件を付けると、kubectl は scale を読んで今の数を確かめてから書きます。今の数が違えば書かずに止まります。出力の文言は実装の printer (scaled) によります。"
+      }
+    ],
+    "verbose": {
+      "code": "$ kubectl scale deploy coredns -n kube-system --replicas=3 --dry-run=server -v=6",
+      "output": "I1118 18:09:21.376592 2068205 round_trippers.go:632] \"Response\" verb=\"GET\" url=\"https://<API サーバー>/apis/apps/v1/namespaces/kube-system/deployments/coredns\" status=\"200 OK\" milliseconds=20\nI1118 18:09:21.382651 2068205 round_trippers.go:632] \"Response\" verb=\"PATCH\" url=\"https://<API サーバー>/apis/apps/v1/namespaces/kube-system/deployments/coredns/scale?dryRun=All\" status=\"403 Forbidden\" milliseconds=5",
+      "note": "家のクラスタで --dry-run=server を付けて打ち、変更はしていません。PATCH が Deployment 本体ではなく /scale に飛んでいるのが分かります。家の利用者は kube-system に書く権限が無いので 403 で断られました。dryRun でも認可は普段どおり行われます。"
+    },
+    "impl": {
+      "repo": "kubernetes/kubectl",
+      "ref": "v0.37.2",
+      "path": "pkg/scale/scale.go",
+      "lines": "L145-L164",
+      "excerpt": "\ttype objectForReplicas struct {\n\t\tReplicas uint `json:\"replicas\"`\n\t}\n\t// objectForSpec is used for encoding scale patch\n\ttype objectForSpec struct {\n\t\tSpec objectForReplicas `json:\"spec\"`\n\t}\n\tspec := objectForSpec{\n\t\tSpec: objectForReplicas{Replicas: newSize},\n\t}\n\tpatch, err := json.Marshal(&spec)\n\tif err != nil {\n\t\treturn \"\", 0, err\n\t}\n\tpatchOptions := metav1.PatchOptions{}\n\tif dryRun {\n\t\tpatchOptions.DryRun = []string{metav1.DryRunAll}\n\t}\n\tupdatedScale, err := s.scaleNamespacer.Scales(namespace).Patch(context.TODO(), gvr, name, types.MergePatchType, patch, patchOptions)\n\tif err != nil {",
+      "note": "条件が無いときの道です。{\"spec\":{\"replicas\":N}} の JSON を作り、マージパッチとして scale のサブリソースに送ります。--dry-run=server なら DryRun: All を付けます。"
+    },
+    "sources": [
+      {
+        "label": "kubectl scale",
+        "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_scale/"
+      },
+      {
+        "label": "Deployments",
+        "url": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"
+      },
+      {
+        "label": "Deployment の scale (API リファレンス)",
+        "url": "https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/deployment-v1/"
+      },
+      {
+        "label": "kubectl の実装 (pkg/scale/scale.go)",
+        "url": "https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/scale/scale.go#L123-L170"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-run",
+    "inside": [
+      "kubeconfig を読んで行き先と資格情報を決めます。kubectl は手元で Pod を 1 つ組み立て、名前と同じ値のラベル run=<名前> を付けます。-i なら stdin: true、-t なら tty: true をコンテナに書きます。",
+      "Pod を POST で API サーバーに送ります。Deployment は作らないので、Pod が消えても作り直されません。",
+      "API サーバーでは認証・認可・アドミッションを通ります。アドミッションで、ServiceAccount のトークンを読むボリュームや、Node の不調のときに 300 秒で退く tolerations などが足され、etcd に保存されます。",
+      "スケジューラーが Pod を Node に割り当て、その Node の kubelet がイメージを取ってコンテナを起動します。-it を付けないときは、kubectl は pod/<名前> created と出してすぐ終わります。",
+      "-it を付けたときは、Pod が動き出すまで待ち、それまでに出たログを先に見せてから、attach で入出力をつなぎます (WebSocket。v1.30 からの既定)。",
+      "--rm も付けていれば、つないだ処理が終わった後に Pod を DELETE します。--restart=Never なら、コンテナの終了コードが kubectl の終了コードになります。"
+    ],
+    "api": [
+      {
+        "method": "POST",
+        "path": "/api/v1/namespaces/{namespace}/pods",
+        "note": "Pod を作る"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/namespaces/{namespace}/pods/{name}/attach",
+        "note": "-it のときだけ。WebSocket で API サーバーにつなぐ"
+      },
+      {
+        "method": "DELETE",
+        "path": "/api/v1/namespaces/{namespace}/pods/{name}",
+        "note": "--rm のときだけ。終わった後に消す"
+      }
+    ],
+    "examples": [
+      {
+        "title": "Pod を 1 つ作る (サーバーで検査だけ)",
+        "code": "$ kubectl run web --image=nginx:1.27 --dry-run=server -o yaml",
+        "output": "apiVersion: v1\nkind: Pod\nmetadata:\n  labels:\n    run: web\n  name: web\n  namespace: default\n  ...\nspec:\n  containers:\n  - image: nginx:1.27\n    imagePullPolicy: IfNotPresent\n    name: web\n    ...\n    volumeMounts:\n    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount\n      name: kube-api-access-xxxxx\n      readOnly: true\n  ...\n  restartPolicy: Always\n  serviceAccountName: default\n  tolerations:\n  - effect: NoExecute\n    key: node.kubernetes.io/not-ready\n    operator: Exists\n    tolerationSeconds: 300\n  ...",
+        "note": "家のクラスタで --dry-run=server を付けて打ち、保存はしていません。ラベル run: web は kubectl が付け、ServiceAccount のボリュームと tolerations はアドミッションが足したものです。nodeName が無いのは、検査だけでスケジューラーが動いていないからです。"
+      },
+      {
+        "title": "使い捨ての Pod で 1 回だけ動かす (公式の例)",
+        "code": "$ kubectl run -i -t busybox --image=busybox --restart=Never",
+        "output": "If you don't see a command prompt, try pressing enter.\n/ #",
+        "note": "公式の例のコマンドです。出力の 1 行目は attach の実装が出す案内の文言で、今の版ではその前に、入力した内容もコンテナのログに残るという注意の行も出ます。--rm を足すと、抜けた後に Pod が消えます。"
+      }
+    ],
+    "verbose": {
+      "code": "$ kubectl run web --image=nginx:1.27 --dry-run=server -v=6",
+      "output": "I1118 18:09:21.527176 2068216 round_trippers.go:632] \"Response\" verb=\"POST\" url=\"https://<API サーバー>/api/v1/namespaces/default/pods?dryRun=All&fieldManager=kubectl-run\" status=\"201 Created\" milliseconds=29\npod/web created (server dry run)",
+      "note": "家のクラスタで打ちました。要求は Pod の POST の 1 本だけで、fieldManager は kubectl-run です。dryRun=All なので 201 が返っても保存はされません。"
+    },
+    "impl": {
+      "repo": "kubernetes/kubectl",
+      "ref": "v0.37.2",
+      "path": "pkg/cmd/run/run.go",
+      "lines": "L706-L722",
+      "excerpt": "\tif o.DryRunStrategy != cmdutil.DryRunClient {\n\t\tif err := util.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), obj, scheme.DefaultJSONEncoder()); err != nil {\n\t\t\treturn nil, err\n\t\t}\n\t\tclient, err := f.ClientForMapping(mapping)\n\t\tif err != nil {\n\t\t\treturn nil, err\n\t\t}\n\t\tactualObj, err = resource.\n\t\t\tNewHelper(client, mapping).\n\t\t\tDryRun(o.DryRunStrategy == cmdutil.DryRunServer).\n\t\t\tWithFieldManager(o.fieldManager).\n\t\t\tCreate(o.Namespace, false, obj)\n\t\tif err != nil {\n\t\t\treturn nil, err\n\t\t}\n\t} else {",
+      "note": "組み立てた Pod を、resource.Helper の Create で送るところです。--dry-run=client ならここを通らず手元で出すだけ、server なら DryRun を付けて送ります。"
+    },
+    "sources": [
+      {
+        "label": "kubectl run",
+        "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_run/"
+      },
+      {
+        "label": "Pod (API リファレンス)",
+        "url": "https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/"
+      },
+      {
+        "label": "kubectl の実装 (pkg/cmd/run/run.go)",
+        "url": "https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/cmd/run/run.go#L340-L420"
+      },
+      {
+        "label": "kubectl の実装 (pkg/cmd/run/run.go)",
+        "url": "https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/cmd/run/run.go#L504-L545"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-kustomize",
+    "inside": [
+      "kubectl kustomize は、kubectl に組み込まれた kustomize (kustomize build と同じもの) を呼ぶだけです。クラスタには 1 本も要求を送らないので、kubeconfig も使いません。",
+      "指定したフォルダの kustomization.yaml を読み、resources に書かれたファイルや、別のフォルダ (base) をたどって、元のマニフェストを集めます。",
+      "overlay に書いた変更を順に当てます。namePrefix で名前に接頭辞を付け、labels でラベルを足し、images でイメージのタグを、replicas で数を書き換えます。元のファイルは変わりません。",
+      "組み立てた結果を YAML として画面に出して終わります。反映はしないので、クラスタに送るときは kubectl apply -k <フォルダ> を使います。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "overlay を組み立てる",
+        "code": "$ cat overlays/prod/kustomization.yaml\nresources:\n- ../../base\nnamePrefix: prod-\nlabels:\n- pairs:\n    env: prod\n  includeSelectors: true\nimages:\n- name: nginx\n  newTag: \"1.28\"\nreplicas:\n- name: web\n  count: 3\n$ kubectl kustomize overlays/prod",
+        "output": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  labels:\n    env: prod\n  name: prod-web\n  namespace: default\nspec:\n  replicas: 3\n  selector:\n    matchLabels:\n      app: web\n      env: prod\n  template:\n    metadata:\n      labels:\n        app: web\n        env: prod\n    spec:\n      containers:\n      - image: nginx:1.28\n        name: web\n  ...",
+        "note": "手元で打った出力です (kubectl v1.37.2、組み込みの kustomize v5.8.1)。base の web が prod-web になり、ラベル env: prod がセレクタにも足され、イメージのタグと数が変わっています。"
+      }
+    ],
+    "verbose": {
+      "code": "$ kubectl kustomize overlays/prod -v=6",
+      "output": "apiVersion: apps/v1\nkind: Deployment\n...",
+      "note": "手元で打ちました。-v=6 を付けても round_trippers の行は 1 つも出ず、組み立てた YAML だけが出ます。API サーバーには何も送っていないことが分かります。"
+    },
+    "impl": {
+      "repo": "kubernetes/kubectl",
+      "ref": "v0.37.2",
+      "path": "pkg/cmd/kustomize/kustomize.go",
+      "lines": "L29-L41",
+      "excerpt": "// NewCmdKustomize returns an adapted kustomize build command.\nfunc NewCmdKustomize(streams genericiooptions.IOStreams) *cobra.Command {\n\th := build.MakeHelp(\"kubectl\", \"kustomize\")\n\treturn build.NewCmdBuild(\n\t\tfilesys.MakeFsOnDisk(),\n\t\t&build.Help{\n\t\t\tUse:     h.Use,\n\t\t\tShort:   i18n.T(h.Short),\n\t\t\tLong:    templates.LongDesc(i18n.T(h.Long)),\n\t\t\tExample: templates.Examples(i18n.T(h.Example)),\n\t\t},\n\t\tstreams.Out)\n}",
+      "note": "kubectl kustomize の実装はこれで全部です。kustomize の build コマンド (sigs.k8s.io/kustomize) を、手元のファイルを読む filesys.MakeFsOnDisk() で作って返しています。"
+    },
+    "sources": [
+      {
+        "label": "kubectl kustomize",
+        "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_kustomize/"
+      },
+      {
+        "label": "Declarative Management of Kubernetes Objects Using Kustomize",
+        "url": "https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/"
+      },
+      {
+        "label": "kubectl の実装 (pkg/cmd/kustomize/kustomize.go)",
+        "url": "https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/cmd/kustomize/kustomize.go#L29-L41"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-expose",
+    "inside": [
+      "kubeconfig を読んで行き先と資格情報を決め、公開する Deployment などを GET します (-f でファイルを渡したときは、ファイルの中身をそのまま使います)。",
+      "kubectl は元のリソースからセレクタを取り出します。Deployment なら spec.selector.matchLabels で、matchExpressions を使っているものは Service のセレクタに直せないので公開できません。",
+      "--port を省くと元のコンテナのポートを使います。--target-port を省くと、Service の決まりで targetPort は port と同じ値になります。名前は --name を省くと元のリソースと同じ名前です。",
+      "組み立てた Service を POST で送ります。API サーバーでは認証・認可・アドミッションを通り、ClusterIP が割り当てられて etcd に保存されます。",
+      "EndpointSlice のコントローラーが、セレクタに合う Pod の IP を EndpointSlice に書き、各 Node の kube-proxy がそれを読んで、ClusterIP への通信を Pod へ振り分ける設定を入れます。",
+      "kubectl は service/<名前> exposed と出して終わります。"
+    ],
+    "api": [
+      {
+        "method": "GET",
+        "path": "/apis/apps/v1/namespaces/{namespace}/deployments/{name}",
+        "note": "名前で指定したとき。元のセレクタとポートを読む"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/namespaces/{namespace}/services",
+        "note": "Service を作る"
+      }
+    ],
+    "examples": [
+      {
+        "title": "Deployment を Service で公開する (サーバーで検査だけ)",
+        "code": "$ kubectl expose -f web-deploy.yaml --port=80 --target-port=80 --dry-run=server -o yaml",
+        "output": "apiVersion: v1\nkind: Service\nmetadata:\n  name: web\n  namespace: default\n  ...\nspec:\n  clusterIP: 10.0.0.x\n  ...\n  ports:\n  - port: 80\n    protocol: TCP\n    targetPort: 80\n  selector:\n    app: web\n  sessionAffinity: None\n  type: ClusterIP\n...",
+        "note": "家のクラスタで web の Deployment のマニフェストを渡して打ち、保存はしていません (IP は伏せています)。selector: app: web は、Deployment の matchLabels をそのまま写したものです。"
+      },
+      {
+        "title": "公式の例",
+        "code": "$ kubectl expose rc nginx --port=80 --target-port=8000",
+        "output": "service/nginx exposed",
+        "note": "Service は 80 番で受け、コンテナの 8000 番に渡します。出力の文言は実装の printer (exposed) によります。"
+      }
+    ],
+    "verbose": {
+      "code": "$ kubectl expose -f web-deploy.yaml --port=80 --target-port=80 --dry-run=server -v=6",
+      "output": "I1118 18:09:50.634330 2069292 round_trippers.go:632] \"Response\" verb=\"POST\" url=\"https://<API サーバー>/api/v1/namespaces/default/services?dryRun=All&fieldManager=kubectl-expose\" status=\"201 Created\" milliseconds=20\nservice/web exposed (server dry run)",
+      "note": "家のクラスタで打ちました。-f で渡したので Deployment の GET は無く、Service の POST の 1 本です。kubectl expose deployment web と名前で指定すると、その前に Deployment の GET が付きます。"
+    },
+    "impl": {
+      "repo": "kubernetes/kubectl",
+      "ref": "v0.37.2",
+      "path": "pkg/cmd/expose/expose.go",
+      "lines": "L326-L345",
+      "excerpt": "\t\t// For objects that need a pod selector, derive it from the exposed object in case a user\n\t\t// didn't explicitly specify one via --selector\n\t\tif len(o.Selector) == 0 {\n\t\t\ts, err := o.MapBasedSelectorForObject(info.Object)\n\t\t\tif err != nil {\n\t\t\t\treturn fmt.Errorf(\"couldn't retrieve selectors via --selector flag or introspection: %v\", err)\n\t\t\t}\n\t\t\to.Selector = s\n\t\t}\n\n\t\tisHeadlessService := o.ClusterIP == \"None\"\n\n\t\t// For objects that need a port, derive it from the exposed object in case a user\n\t\t// didn't explicitly specify one via --port\n\t\tif len(o.Port) == 0 {\n\t\t\tports, err := o.PortsForObject(info.Object)\n\t\t\tif err != nil {\n\t\t\t\treturn fmt.Errorf(\"couldn't find port via --port flag or introspection: %v\", err)\n\t\t\t}\n\t\t\tswitch len(ports) {",
+      "note": "--selector が無ければ元のリソースから matchLabels を取り出し (MapBasedSelectorForObject)、--port が無ければ元のコンテナのポートを使います。ポートが複数あればすべてを Service に写します。"
+    },
+    "sources": [
+      {
+        "label": "kubectl expose",
+        "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_expose/"
+      },
+      {
+        "label": "Service",
+        "url": "https://kubernetes.io/docs/concepts/services-networking/service/"
+      },
+      {
+        "label": "Service (API リファレンス)",
+        "url": "https://kubernetes.io/docs/reference/kubernetes-api/service-resources/service-v1/"
+      },
+      {
+        "label": "kubectl の実装 (pkg/cmd/expose/expose.go)",
+        "url": "https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/cmd/expose/expose.go#L296-L430"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-edit",
+    "inside": [
+      "kubeconfig を読んで行き先と資格情報を決め、対象を GET して今の状態を取ります。",
+      "取った中身を YAML (-o json なら JSON) にして一時ファイルに書き、KUBE_EDITOR か EDITOR の環境変数のエディタ (無ければ Linux では vi) で開きます。先頭に、# の行は無視され、空にすると取りやめになるという案内が付きます。",
+      "エディタを閉じると、kubectl は元と編集後を比べます。何も変わっていなければ Edit cancelled, no changes made. と出して終わります。apiVersion・kind・name を変えるとエラーです。",
+      "差がある部分だけのパッチを手元で作ります。組み込みの種類は strategic merge patch、kubectl が型を知らない CRD などは JSON merge patch です。それを PATCH で送ります。",
+      "API サーバーでは認証・認可・アドミッションを通って etcd に保存され、すぐに反映されます。Deployment の Pod テンプレートを変えたなら、Deployment のコントローラーがロールアウトを始めます。",
+      "保存が断られたときは、kubectl はエラーをファイルの先頭に書いて、もう一度エディタを開きます。手元のマニフェストのファイルは変わらないので、ファイルと実物がずれます。"
+    ],
+    "api": [
+      {
+        "method": "GET",
+        "path": "/apis/apps/v1/namespaces/{namespace}/deployments/{name}",
+        "note": "Deployment を編集するとき。種類に合わせたパス"
+      },
+      {
+        "method": "PATCH",
+        "path": "/apis/apps/v1/namespaces/{namespace}/deployments/{name}",
+        "note": "差の部分だけのパッチ (Content-Type: application/strategic-merge-patch+json)"
+      }
+    ],
+    "examples": [
+      {
+        "title": "Service を編集する (公式の例)",
+        "code": "$ kubectl edit svc/registry",
+        "output": "# Please edit the object below. Lines beginning with a '#' will be ignored,\n# and an empty file will abort the edit. If an error occurs while saving this file will be\n# reopened with the relevant failures.\n#\napiVersion: v1\nkind: Service\nmetadata:\n  name: registry\n...",
+        "note": "エディタに開かれる一時ファイルの先頭です。案内の文言は実装 (editoptions.go の editHeader) のものです。家のクラスタでは、実際に変えてしまうので打っていません。"
+      },
+      {
+        "title": "エディタを変える (公式の例)",
+        "code": "$ KUBE_EDITOR=\"nano\" kubectl edit svc/registry",
+        "output": "service/registry edited",
+        "note": "保存して閉じたときの出力です (文言は実装の printer の edited)。何も変えずに閉じると Edit cancelled, no changes made. と出ます。"
+      }
+    ],
+    "verbose": {
+      "code": "$ kubectl edit deployment/web -v=6",
+      "output": "... \"Response\" verb=\"GET\" url=\"https://<API サーバー>/apis/apps/v1/namespaces/default/deployments/web\" status=\"200 OK\"\n(エディタが開き、保存して閉じる)\n... \"Response\" verb=\"PATCH\" url=\"https://<API サーバー>/apis/apps/v1/namespaces/default/deployments/web?fieldManager=kubectl-edit\" status=\"200 OK\"\ndeployment.apps/web edited",
+      "note": "形の例です。edit には --dry-run が無く、打つとクラスタが変わるので、家のクラスタでは打っていません。実装から、GET 1 本と、閉じた後の PATCH 1 本 (fieldManager の既定は kubectl-edit) になります。"
+    },
+    "impl": {
+      "repo": "kubernetes/kubectl",
+      "ref": "v0.37.2",
+      "path": "pkg/cmd/util/editor/editoptions.go",
+      "lines": "L697-L716",
+      "excerpt": "\t\t\tpatchType = types.StrategicMergePatchType\n\t\t\tpatch, err = strategicpatch.CreateTwoWayMergePatch(originalJS, editedJS, versionedObject, preconditions...)\n\t\t\tif err != nil {\n\t\t\t\tklog.V(4).Infof(\"Unable to calculate diff, no merge is possible: %v\", err)\n\t\t\t\tif mergepatch.IsPreconditionFailed(err) {\n\t\t\t\t\treturn fmt.Errorf(\"%s\", \"At least one of apiVersion, kind and name was changed\")\n\t\t\t\t}\n\t\t\t\treturn err\n\t\t\t}\n\t\t}\n\n\t\tif o.OutputPatch {\n\t\t\tfmt.Fprintf(o.Out, \"Patch: %s\\n\", string(patch))\n\t\t}\n\n\t\tpatched, err := resource.NewHelper(info.Client, info.Mapping).\n\t\t\tWithFieldManager(o.FieldManager).\n\t\t\tWithFieldValidation(o.ValidationDirective).\n\t\t\tWithSubresource(o.Subresource).\n\t\t\tPatch(info.Namespace, info.Name, patchType, patch, nil)",
+      "note": "元 (originalJS) と編集後 (editedJS) から、差だけの strategic merge patch を作ります。apiVersion・kind・name が変わっていると止め、--output-patch ならパッチを画面に出してから送ります。"
+    },
+    "sources": [
+      {
+        "label": "kubectl edit",
+        "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_edit/"
+      },
+      {
+        "label": "Update API Objects in Place Using kubectl patch",
+        "url": "https://kubernetes.io/docs/tasks/manage-kubernetes-objects/update-api-object-kubectl-patch/"
+      },
+      {
+        "label": "kubectl の実装 (pkg/cmd/util/editor/editoptions.go)",
+        "url": "https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/cmd/util/editor/editoptions.go#L620-L730"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-drain",
+    "inside": [
+      "kubeconfig を読んで行き先と資格情報を決め、対象の Node を GET します。",
+      "まず cordon します。Node の spec.unschedulable を true にするパッチを PATCH で送り、スケジューラーが新しい Pod をこの Node に置かないようにします。",
+      "次に、spec.nodeName がこの Node の Pod の一覧を GET し、退かせる Pod を選びます。DaemonSet の Pod は退かせても DaemonSet がすぐ戻すので、--ignore-daemonsets が無ければ止まり、付けても消しません。emptyDir を使う Pod は --delete-emptydir-data、どのコントローラーにも属さない Pod は --force が無ければ止まります。",
+      "選んだ Pod ごとに、Eviction (退去) を POST します。API サーバーはアドミッションを通したあと、eviction の処理の中で PodDisruptionBudget を確かめ、許せば Pod を消し (200)、許さなければ 429 を返します (1 つの Pod に PDB が複数あれば 500)。kubectl は 429 なら 5 秒待って送り直します。",
+      "消された Pod は、kubelet が猶予の時間の中で止めます。Deployment などの Pod なら、コントローラーが代わりを作り、スケジューラーが別の Node に置きます。",
+      "kubectl は Pod が消えるまで待ち、node/<名前> drained と出して終わります。保守が終わったら kubectl uncordon で spec.unschedulable を戻します。"
+    ],
+    "api": [
+      {
+        "method": "GET",
+        "path": "/api/v1/nodes/{name}",
+        "note": "対象の Node"
+      },
+      {
+        "method": "PATCH",
+        "path": "/api/v1/nodes/{name}",
+        "note": "cordon。spec.unschedulable を true に"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/pods",
+        "note": "fieldSelector=spec.nodeName=<Node 名> で、その Node の Pod を全名前空間から"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/namespaces/{namespace}/pods/{name}/eviction",
+        "note": "Pod ごとの退去。--disable-eviction なら代わりに DELETE"
+      }
+    ],
+    "examples": [
+      {
+        "title": "公式の手順",
+        "code": "$ kubectl drain --ignore-daemonsets <node name>",
+        "output": "node/node1 cordoned\nevicting pod default/web-5d7b9c8f6d-abcde\n...\npod/web-5d7b9c8f6d-abcde evicted\nnode/node1 drained",
+        "note": "公式の Safely Drain a Node の手順のコマンドです。出力の行の形 (cordoned・evicting pod・evicted・drained) は実装の文言で、名前は例です。家のクラスタでは実際には打っていません。"
+      },
+      {
+        "title": "emptyDir を使う Pod があって止まる (サーバーで検査だけ)",
+        "code": "$ kubectl drain node1 --ignore-daemonsets --dry-run=server",
+        "output": "error: unable to drain node \"node1\" due to error: cannot delete Pods with local storage (use --delete-emptydir-data to override): default/db-xxxxx, default/web-xxxxx, continuing command...",
+        "note": "家のクラスタで --dry-run=server を付けて打った出力です (Node と Pod の名前は伏せています)。emptyDir の中身は Pod と一緒に消えるので、drain は既定では止まります。"
+      }
+    ],
+    "verbose": {
+      "code": "$ kubectl drain node1 --ignore-daemonsets --dry-run=server -v=6",
+      "output": "I1118 18:10:02.675956 2069930 round_trippers.go:632] \"Response\" verb=\"GET\" url=\"https://<API サーバー>/api/v1/nodes/node1\" status=\"200 OK\" milliseconds=20\nI1118 18:10:02.689173 2069930 round_trippers.go:632] \"Response\" verb=\"PATCH\" url=\"https://<API サーバー>/api/v1/nodes/node1?dryRun=All\" status=\"403 Forbidden\" milliseconds=5\nerror: unable to cordon node \"node1\": nodes \"node1\" is forbidden: User \"kcna-user\" cannot patch resource \"nodes\" in API group \"\" at the cluster scope\nI1118 18:10:02.704395 2069930 round_trippers.go:632] \"Response\" verb=\"GET\" url=\"https://<API サーバー>/api/v1/pods?fieldSelector=spec.nodeName%3Dnode1&limit=500\" status=\"200 OK\" milliseconds=12\nI1118 18:10:02.724044 2069930 round_trippers.go:632] \"Response\" verb=\"GET\" url=\"https://<API サーバー>/apis/apps/v1/namespaces/kube-system/daemonsets/svclb-web-xxxxx\" status=\"200 OK\" milliseconds=7\n...",
+      "note": "家のクラスタで --dry-run=server を付けて打ち、Node も Pod も変わっていないことを確かめました (名前は伏せています)。cordon の PATCH は Node を書く権限が無く 403 になりました。続けて Node の Pod の一覧と、Pod の持ち主の DaemonSet を GET して、退かせてよいかを調べています。"
+    },
+    "impl": {
+      "repo": "kubernetes/kubectl",
+      "ref": "v0.37.2",
+      "path": "pkg/drain/drain.go",
+      "lines": "L248-L267",
+      "excerpt": "func (d *Helper) DeleteOrEvictPods(pods []corev1.Pod) error {\n\tif len(pods) == 0 {\n\t\treturn nil\n\t}\n\n\t// TODO(justinsb): unnecessary?\n\tgetPodFn := func(namespace, name string) (*corev1.Pod, error) {\n\t\treturn d.Client.CoreV1().Pods(namespace).Get(d.getContext(), name, metav1.GetOptions{})\n\t}\n\n\tif !d.DisableEviction {\n\t\tevictionGroupVersion, err := CheckEvictionSupport(d.Client)\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}\n\n\t\tif !evictionGroupVersion.Empty() {\n\t\t\treturn d.evictPods(pods, evictionGroupVersion, getPodFn)\n\t\t}\n\t}",
+      "note": "Pod を退かせる本体です。--disable-eviction でなければ、サーバーが Eviction の API に対応しているか確かめて evictPods で退去を頼み、対応していなければ deletePods で普通の DELETE を送ります。"
+    },
+    "sources": [
+      {
+        "label": "kubectl drain",
+        "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_drain/"
+      },
+      {
+        "label": "Safely Drain a Node",
+        "url": "https://kubernetes.io/docs/tasks/administer-cluster/safely-drain-node/"
+      },
+      {
+        "label": "API-initiated Eviction",
+        "url": "https://kubernetes.io/docs/concepts/scheduling-eviction/api-eviction/"
+      },
+      {
+        "label": "kubectl の実装 (pkg/drain/drain.go)",
+        "url": "https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/drain/drain.go#L248-L420"
+      },
+      {
+        "label": "kubectl の実装 (pkg/cmd/drain/drain.go)",
+        "url": "https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/cmd/drain/drain.go#L325-L364"
+      },
+      {
+        "label": "kube-apiserver の実装 (pkg/registry/core/pod/storage/eviction.go)",
+        "url": "https://github.com/kubernetes/kubernetes/blob/v1.37.2/pkg/registry/core/pod/storage/eviction.go#L150-L275"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-diff",
+    "inside": [
+      "kubeconfig を読んで行き先と資格情報を決め、-f のファイルを読んで、中のオブジェクトごとに今の実物を GET します。",
+      "反映したらどうなるかを、API サーバーに作らせます。実物があれば、kubectl apply と同じやり方で作ったパッチを PATCH で、無ければ POST で、どちらも dryRun=All を付けて送ります (--server-side なら server-side apply の PATCH)。",
+      "API サーバーは認証・認可・アドミッション (既定値の補完や mutating webhook も含む) と検証まで本当に通し、etcd には書かずに、保存したらこうなるという結果だけを返します。",
+      "kubectl は、今の実物を LIVE-、反映後の結果を MERGED- の名前の一時フォルダに YAML で書きます。managedFields は省き、Secret の値は伏せます。",
+      "diff -u -N (KUBECTL_EXTERNAL_DIFF で別のコマンドにも変えられる) で 2 つのフォルダを比べ、差を出します。終了コードは差が無ければ 0、差があれば 1、kubectl か diff の失敗なら 1 より大きい値です。"
+    ],
+    "api": [
+      {
+        "method": "GET",
+        "path": "/api/v1/namespaces/{namespace}/serviceaccounts/{name}",
+        "note": "ServiceAccount のとき。種類に合わせたパスで今の実物を読む"
+      },
+      {
+        "method": "PATCH",
+        "path": "/api/v1/namespaces/{namespace}/serviceaccounts/{name}",
+        "note": "dryRun=All で反映後の形を作らせる。実物が無ければ POST /api/v1/namespaces/{namespace}/serviceaccounts"
+      }
+    ],
+    "examples": [
+      {
+        "title": "ラベルを足したら何が変わるか",
+        "code": "$ kubectl diff -f sa.yaml",
+        "output": "diff -u -N /tmp/LIVE-584389952/v1.ServiceAccount.default.default /tmp/MERGED-330115294/v1.ServiceAccount.default.default\n--- /tmp/LIVE-584389952/v1.ServiceAccount.default.default\t2026-11-18 18:12:33.628954058 +0900\n+++ /tmp/MERGED-330115294/v1.ServiceAccount.default.default\t2026-11-18 18:12:33.628954058 +0900\n@@ -2,6 +2,8 @@\n kind: ServiceAccount\n metadata:\n   creationTimestamp: \"2025-12-19T19:08:41Z\"\n+  labels:\n+    team: web\n   name: default\n   namespace: default\n   resourceVersion: \"415\"\n$ echo $?\n1",
+        "note": "家のクラスタで、default の ServiceAccount にラベル team: web を足したファイルを渡して打ちました。+ の行が反映すると増える部分です。差があったので終了コードは 1 で、実物のラベルは変わっていません。"
+      },
+      {
+        "title": "まだ無いものを比べる",
+        "code": "$ kubectl diff -f web-deploy.yaml",
+        "output": "diff -u -N /tmp/LIVE-3613817035/apps.v1.Deployment.default.web /tmp/MERGED-3230969216/apps.v1.Deployment.default.web\n...\n@@ -0,0 +1,43 @@\n+apiVersion: apps/v1\n+kind: Deployment\n+metadata:\n...\n+spec:\n+  progressDeadlineSeconds: 600\n+  replicas: 2\n+  revisionHistoryLimit: 10\n...",
+        "note": "家のクラスタで、まだ無い Deployment のファイルを渡して打ちました。LIVE が空なので全部が + になります。progressDeadlineSeconds: 600 のように、ファイルに書いていない既定値まで出るのは、API サーバーが作った結果を見ているからです。"
+      }
+    ],
+    "verbose": {
+      "code": "$ kubectl diff -f sa.yaml -v=6",
+      "output": "I1118 18:12:33.750896 2074305 round_trippers.go:632] \"Response\" verb=\"GET\" url=\"https://<API サーバー>/api/v1/namespaces/default/serviceaccounts/default\" status=\"200 OK\" milliseconds=21\nI1118 18:12:33.756192 2074305 round_trippers.go:632] \"Response\" verb=\"GET\" url=\"https://<API サーバー>/openapi/v3?timeout=32s\" status=\"200 OK\" milliseconds=4\nI1118 18:12:33.795853 2074305 round_trippers.go:632] \"Response\" verb=\"GET\" url=\"https://<API サーバー>/openapi/v3/api/v1?hash=B6B6A956...B73B054&timeout=32s\" status=\"200 OK\" milliseconds=38\nI1118 18:12:33.978577 2074305 round_trippers.go:632] \"Response\" verb=\"PATCH\" url=\"https://<API サーバー>/api/v1/namespaces/default/serviceaccounts/default?dryRun=All&fieldManager=kubectl-client-side-apply\" status=\"200 OK\" milliseconds=11",
+      "note": "家のクラスタで打ちました。実物の GET、パッチを作るための型の文書 (OpenAPI v3) の GET、dryRun=All の PATCH の順です。fieldManager が kubectl-client-side-apply なのは、apply と同じパッチの作り方をしているからです。"
+    },
+    "impl": {
+      "repo": "kubernetes/kubectl",
+      "ref": "v0.37.2",
+      "path": "pkg/cmd/diff/diff.go",
+      "lines": "L348-L377",
+      "excerpt": "func (obj InfoObject) Merged() (runtime.Object, error) {\n\thelper := resource.NewHelper(obj.Info.Client, obj.Info.Mapping).\n\t\tDryRun(true).\n\t\tWithFieldManager(obj.FieldManager)\n\t// ...\n\t// Build the patcher, and then apply the patch with dry-run, unless the object doesn't exist, in which case we need to create it.\n\tif obj.Live() == nil {\n\t\t// Dry-run create if the object doesn't exist.\n\t\treturn helper.CreateWithOptions(\n\t\t\tobj.Info.Namespace,\n\t\t\ttrue,\n\t\t\tobj.LocalObj,\n\t\t\t&metav1.CreateOptions{},",
+      "note": "反映後の形 (MERGED) を作る関数です。helper に DryRun(true) を付け、--server-side なら apply のパッチを、実物が無ければ dry-run の作成を送ります。どちらでもなければ、この後 apply と同じ Patcher で dry-run の PATCH を送ります。"
+    },
+    "sources": [
+      {
+        "label": "kubectl diff",
+        "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_diff/"
+      },
+      {
+        "label": "Kubernetes API Concepts: Dry-run",
+        "url": "https://kubernetes.io/docs/reference/using-api/api-concepts/#dry-run"
+      },
+      {
+        "label": "kubectl の実装 (pkg/cmd/diff/diff.go)",
+        "url": "https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/cmd/diff/diff.go#L342-L411"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-config-use-context",
+    "inside": [
+      "kubectl は kubeconfig のファイル (既定は $HOME/.kube/config。KUBECONFIG で複数をつなげることもできる) を読みます。API サーバーには 1 本も要求を送りません。",
+      "指定した名前のコンテキストが contexts の中にあるかを確かめます。無ければ no context exists with the name と出して止まり、ファイルは変えません。",
+      "あれば current-context の値をその名前に書き換え、ファイルに書き戻します。クラスタ・ユーザー・証明書などほかの中身は変えません。",
+      "Switched to context \"<名前>\". と出して終わります。この後の kubectl は、そのコンテキストの組 (クラスタの URL・資格情報・名前空間) で API サーバーにつなぎます。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "接続先を切り替える",
+        "code": "$ kubectl config get-contexts\nCURRENT   NAME   CLUSTER   AUTHINFO    NAMESPACE\n*         dev    dev       dev-user    web\n          prod   prod      prod-user   \n$ kubectl config use-context prod\n$ kubectl config get-contexts",
+        "output": "Switched to context \"prod\".\nCURRENT   NAME   CLUSTER   AUTHINFO    NAMESPACE\n          dev    dev       dev-user    web\n*         prod   prod      prod-user   ",
+        "note": "例のための kubeconfig (dev と prod の 2 つのコンテキスト) で手元で打った出力です。* が今のコンテキストで、use-context の後は prod に移っています。"
+      },
+      {
+        "title": "無い名前を指定する",
+        "code": "$ kubectl config use-context nope",
+        "output": "error: no context exists with the name: \"nope\"",
+        "note": "同じ kubeconfig で打った出力です。名前が無いときはファイルを書き換えずに止まります。"
+      }
+    ],
+    "verbose": {
+      "code": "$ kubectl config use-context prod -v=6",
+      "output": "I1118 18:10:14.500670 2070573 loader.go:408] Config loaded from file:  /home/user/.kube/config\n...\nSwitched to context \"prod\".",
+      "note": "例のための kubeconfig で手元で打ちました。kubeconfig を読んだ行 (loader.go) だけで、round_trippers の行 (API サーバーへの要求) は出ません。"
+    },
+    "impl": {
+      "repo": "kubernetes/kubectl",
+      "ref": "v0.37.2",
+      "path": "pkg/cmd/config/use_context.go",
+      "lines": "L67-L81",
+      "excerpt": "func (o useContextOptions) run() error {\n\tconfig, err := o.configAccess.GetStartingConfig()\n\tif err != nil {\n\t\treturn err\n\t}\n\n\terr = o.validate(config)\n\tif err != nil {\n\t\treturn err\n\t}\n\n\tconfig.CurrentContext = o.contextName\n\n\treturn clientcmd.ModifyConfig(o.configAccess, *config, true)\n}",
+      "note": "kubeconfig を読み、名前を確かめてから、CurrentContext を書き換えて ModifyConfig でファイルに書き戻します。中身はこれだけです。"
+    },
+    "sources": [
+      {
+        "label": "kubectl config use-context",
+        "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_config/kubectl_config_use-context/"
+      },
+      {
+        "label": "Organizing Cluster Access Using kubeconfig Files",
+        "url": "https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/"
+      },
+      {
+        "label": "kubectl の実装 (pkg/cmd/config/use_context.go)",
+        "url": "https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/cmd/config/use_context.go#L67-L105"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-attach",
+    "inside": [
+      "kubeconfig を読んで行き先と資格情報を決め、Pod を GET します。rs/nginx のように Pod 以外を指定すると、その持ち物の Pod を 1 つ選びます。終わった Pod (Succeeded・Failed) にはつなげません。",
+      "つなぐコンテナを決めます。-c が無ければ注釈 kubectl.kubernetes.io/default-container のコンテナ、それも無ければ最初のコンテナです。コンテナが tty: true で起動していなければ、-t は使えず外されます。",
+      "API サーバーの pods/<名前>/attach に、どの入出力をつなぐか (container・stdin・stdout・tty) を付けて要求します。kubectl v1.30 からは WebSocket が既定で、つなげないときだけ SPDY に戻ります (KUBECTL_REMOTE_COMMAND_WEBSOCKETS=false で WebSocket を切れる)。",
+      "API サーバーは認証・認可・アドミッションを通します。認可では pods/attach の create が要ります (WebSocket の GET は get として認可され、v1.35 からは create も確かめられます)。通れば 101 Switching Protocols で WebSocket に切り替えます。",
+      "Node が WebSocket に対応していると申告していれば (ExtendWebSocketsToKubelet、v1.36 から既定)、API サーバーは WebSocket のまま kubelet へ渡し、申告が無ければ SPDY に訳して kubelet へつなぎます。kubelet はコンテナランタイムに頼み、今動いているメインのプロセスの入出力をつなぎます。exec と違って新しいプロセスは動かしません。",
+      "-i で送った入力は、そのプロセスの stdin に届きます (コンテナの stdin: true が要る)。打った内容はコンテナのログにも残ります。",
+      "-i -t でつないだときは、ctrl-p, ctrl-q (v1.36 で足された --detach-keys の既定) で、プロセスを止めずに切り離せます。抜けた後に、もう一度つなぐためのコマンドが表示されます。"
+    ],
+    "api": [
+      {
+        "method": "GET",
+        "path": "/api/v1/namespaces/{namespace}/pods/{name}",
+        "note": "Pod とコンテナを確かめる"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/namespaces/{namespace}/pods/{name}/attach",
+        "note": "WebSocket に切り替える要求 (connect)。SPDY に戻るときは POST"
+      }
+    ],
+    "examples": [
+      {
+        "title": "Pod の出力を見る (公式の例)",
+        "code": "$ kubectl attach mypod",
+        "output": "All commands and output from this session will be recorded in container logs, including credentials and sensitive information passed through the command prompt.\nIf you don't see a command prompt, try pressing enter.\n...",
+        "note": "最初の 2 行は実装 (attach.go の Run) が出す文言です。この後に、メインのプロセスがこの先に出す出力が流れます。家のクラスタでは打っていません。"
+      },
+      {
+        "title": "入力も渡して端末としてつなぐ (公式の例)",
+        "code": "$ kubectl attach mypod -c ruby-container -i -t",
+        "output": "All commands and output from this session will be recorded in container logs, including credentials and sensitive information passed through the command prompt.\nIf you don't see a command prompt, try pressing enter.\n...\nSession ended, resume using 'kubectl attach mypod -c ruby-container -n default -i -t' command",
+        "note": "最後の行は、-i -t で抜けたときに実装が出す文言で、同じプロセスにつなぎ直すコマンドを教えてくれます (名前空間は例)。"
+      }
+    ],
+    "verbose": {
+      "code": "$ kubectl attach web -it -v=6",
+      "output": "... \"Response\" verb=\"GET\" url=\"https://<API サーバー>/api/v1/namespaces/default/pods/web\" status=\"200 OK\"\n... \"Response\" verb=\"GET\" url=\"https://<API サーバー>/api/v1/namespaces/default/pods/web/attach?container=web&stdin=true&stdout=true&tty=true\" status=\"101 Switching Protocols\"",
+      "note": "形の例です。attach はコンテナに入力を渡せるので、家のクラスタでは打っていません。実装から、Pod の GET と、WebSocket に切り替える attach の GET (101 Switching Protocols) になります。-t のときは実装が stderr を別に頼まない (DisableStderr) ので、stderr=true は付きません。"
+    },
+    "impl": {
+      "repo": "kubernetes/kubectl",
+      "ref": "v0.37.2",
+      "path": "pkg/cmd/attach/attach.go",
+      "lines": "L190-L209",
+      "excerpt": "func createExecutor(url *url.URL, config *restclient.Config) (remotecommand.Executor, error) {\n\texec, err := remotecommand.NewSPDYExecutor(config, \"POST\", url)\n\tif err != nil {\n\t\treturn nil, err\n\t}\n\t// Fallback executor is default, unless feature flag is explicitly disabled.\n\tif !cmdutil.RemoteCommandWebsockets.IsDisabled() {\n\t\t// WebSocketExecutor must be \"GET\" method as described in RFC 6455 Sec. 4.1 (page 17).\n\t\twebsocketExec, err := remotecommand.NewWebSocketExecutor(config, \"GET\", url.String())\n\t\tif err != nil {\n\t\t\treturn nil, err\n\t\t}\n\t\texec, err = remotecommand.NewFallbackExecutor(websocketExec, exec, func(err error) bool {\n\t\t\treturn httpstream.IsUpgradeFailure(err) || httpstream.IsHTTPSProxyError(err)\n\t\t})\n\t\tif err != nil {\n\t\t\treturn nil, err\n\t\t}\n\t}\n\treturn exec, nil",
+      "note": "つなぐ道具を作るところです。SPDY の executor を作り、WebSocket を切っていなければ、WebSocket (GET) を先に試し、切り替えに失敗したときだけ SPDY (POST) に戻る FallbackExecutor にします。"
+    },
+    "sources": [
+      {
+        "label": "kubectl attach",
+        "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_attach/"
+      },
+      {
+        "label": "Pod の attach (API リファレンス)",
+        "url": "https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/"
+      },
+      {
+        "label": "kubectl の実装 (pkg/cmd/attach/attach.go)",
+        "url": "https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/cmd/attach/attach.go#L139-L211"
+      },
+      {
+        "label": "kubectl の実装 (pkg/cmd/attach/attach.go)",
+        "url": "https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/cmd/attach/attach.go#L260-L337"
+      },
+      {
+        "label": "Feature Gates (ExtendWebSocketsToKubelet・AuthorizePodWebsocketUpgradeCreatePermission)",
+        "url": "https://kubernetes.io/docs/reference/command-line-tools-reference/feature-gates/"
+      },
+      {
+        "label": "kube-apiserver の実装 (pkg/registry/core/pod/rest/subresources.go)",
+        "url": "https://github.com/kubernetes/kubernetes/blob/v1.37.2/pkg/registry/core/pod/rest/subresources.go#L115-L157"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-api-resources",
+    "inside": [
+      "kubeconfig を読んで行き先と資格情報を決めます。--cached を付けなければ、手元の discovery のキャッシュ (~/.kube/cache) を捨てて、必ずサーバーから読み直します。",
+      "GET /api と GET /apis の 2 本を送ります。Accept のヘッダーで APIGroupDiscoveryList の形を頼むと、すべてのグループ・版・種類がこの 2 本にまとめて返ります (aggregated discovery。v1.30 から stable)。",
+      "読むだけの要求なので、API サーバーでは認証と認可だけを通ります。返す中身は、組み込みの種類に加えて、CRD や aggregated API (metrics.k8s.io など) で足された種類も含みます。",
+      "kubectl はグループごとに優先する版 (preferred version) の種類だけを残し、--namespaced・--api-group・--verbs などで絞ります。",
+      "NAME・SHORTNAMES・APIVERSION・NAMESPACED・KIND の表にして出します。-o wide なら、使える動詞 (VERBS) とカテゴリ (all など) も出ます。"
+    ],
+    "api": [
+      {
+        "method": "GET",
+        "path": "/api",
+        "note": "core (v1) の種類。Accept: application/json;g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList"
+      },
+      {
+        "method": "GET",
+        "path": "/apis",
+        "note": "core 以外のすべてのグループの種類"
+      }
+    ],
+    "examples": [
+      {
+        "title": "使える種類の一覧",
+        "code": "$ kubectl api-resources",
+        "output": "NAME                                SHORTNAMES   APIVERSION                        NAMESPACED   KIND\nbindings                                         v1                                true         Binding\ncomponentstatuses                   cs           v1                                false        ComponentStatus\nconfigmaps                          cm           v1                                true         ConfigMap\n...\npods                                po           v1                                true         Pod\n...\ndeployments                         deploy       apps/v1                           true         Deployment\n...\nhorizontalpodautoscalers            hpa          autoscaling/v2                    true         HorizontalPodAutoscaler\n...\npods                                             metrics.k8s.io/v1beta1            true         PodMetrics\n...",
+        "note": "家のクラスタで打った出力です。pods が 2 行あるのは、core の Pod と、Metrics Server が足した metrics.k8s.io の PodMetrics が同じ名前だからです。"
+      },
+      {
+        "title": "グループで絞る・動詞も見る",
+        "code": "$ kubectl api-resources --api-group=apps\n$ kubectl api-resources -o wide | grep -E '^(NAME|deployments)'",
+        "output": "NAME                  SHORTNAMES   APIVERSION   NAMESPACED   KIND\ncontrollerrevisions                apps/v1      true         ControllerRevision\ndaemonsets            ds           apps/v1      true         DaemonSet\ndeployments           deploy       apps/v1      true         Deployment\nreplicasets           rs           apps/v1      true         ReplicaSet\nstatefulsets          sts          apps/v1      true         StatefulSet\nNAME          SHORTNAMES   APIVERSION   NAMESPACED   KIND         VERBS                                                        CATEGORIES\ndeployments   deploy       apps/v1      true         Deployment   create,delete,deletecollection,get,list,patch,update,watch   all",
+        "note": "家のクラスタで打った出力です (-o wide の列の空白は詰めています)。CATEGORIES の all は、kubectl get all に含まれる種類という印です。"
+      }
+    ],
+    "verbose": {
+      "code": "$ kubectl api-resources -v=6",
+      "output": "I1118 18:08:29.082228 2065628 round_trippers.go:632] \"Response\" verb=\"GET\" url=\"https://<API サーバー>/api?timeout=32s\" status=\"200 OK\" milliseconds=25\nI1118 18:08:29.095513 2065628 round_trippers.go:632] \"Response\" verb=\"GET\" url=\"https://<API サーバー>/apis?timeout=32s\" status=\"200 OK\" milliseconds=6",
+      "note": "家のクラスタで打ちました。要求は 2 本だけです。-v=8 で見ると、Accept と Content-Type が application/json;g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList で、まとめた形で返っていることが分かります。"
+    },
+    "impl": {
+      "repo": "kubernetes/kubectl",
+      "ref": "v0.37.2",
+      "path": "pkg/cmd/apiresources/apiresources.go",
+      "lines": "L170-L189",
+      "excerpt": "func (o *APIResourceOptions) RunAPIResources() error {\n\tw := printers.GetNewTabWriter(o.Out)\n\tdefer w.Flush()\n\n\tif !o.Cached {\n\t\t// Always request fresh data from the server\n\t\to.discoveryClient.Invalidate()\n\t}\n\n\terrs := []error{}\n\tlists, err := o.discoveryClient.ServerPreferredResources()\n\tif err != nil {\n\t\terrs = append(errs, err)\n\t}\n\n\tvar allResources []*metav1.APIResourceList\n\n\tfor _, list := range lists {\n\t\tif len(list.APIResources) == 0 {\n\t\t\tcontinue",
+      "note": "--cached でなければキャッシュを捨て (Invalidate)、ServerPreferredResources で各グループの優先する版の種類を取ります。この後、--api-group や --namespaced で絞ります。"
+    },
+    "sources": [
+      {
+        "label": "kubectl api-resources",
+        "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_api-resources/"
+      },
+      {
+        "label": "The Kubernetes API: Aggregated discovery",
+        "url": "https://kubernetes.io/docs/concepts/overview/kubernetes-api/#aggregated-discovery"
+      },
+      {
+        "label": "kubectl の実装 (pkg/cmd/apiresources/apiresources.go)",
+        "url": "https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/cmd/apiresources/apiresources.go#L170-L260"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-rollout-status",
+    "inside": [
+      "kubeconfig を読んで行き先と資格情報を決め、対象の Deployment などを GET します。",
+      "名前で絞った (fieldSelector=metadata.name=<名前>) 一覧と watch の要求を送り、Deployment が変わるたびに API サーバーから知らせを受け取ります。今の版では、一覧の代わりに sendInitialEvents=true の watch 1 本で、今の状態と変化をまとめて受け取ります。",
+      "読むだけの要求なので、API サーバーでは認証と認可だけを通ります。Pod の入れ替えそのものは、Deployment のコントローラーが新しい ReplicaSet を増やし古い方を減らして進め、その進み具合を Deployment の status に書いています。",
+      "kubectl は知らせごとに status を見ます。コントローラーがまだ最新の spec を見ていなければ (observedGeneration が generation より小さい) 待ち、新しい Pod の数・残っている古い Pod の数・使える Pod の数がそろうまで Waiting for deployment ... の行を出します。",
+      "全部そろうと successfully rolled out と出して終了コード 0 で終わります。progressDeadlineSeconds (既定 600 秒) を過ぎて進まなければ exceeded its progress deadline のエラーで終わります。--watch=false なら 1 回見ただけで終わります。"
+    ],
+    "api": [
+      {
+        "method": "GET",
+        "path": "/apis/apps/v1/namespaces/{namespace}/deployments/{name}",
+        "note": "対象を確かめる"
+      },
+      {
+        "method": "GET",
+        "path": "/apis/apps/v1/namespaces/{namespace}/deployments",
+        "note": "watch=true&fieldSelector=metadata.name=<名前> で変化を受け取る"
+      }
+    ],
+    "examples": [
+      {
+        "title": "入れ替えが終わるまで見る (公式の例)",
+        "code": "$ kubectl rollout status deployment/nginx-deployment",
+        "output": "Waiting for rollout to finish: 2 out of 3 new replicas have been updated...\ndeployment \"nginx-deployment\" successfully rolled out",
+        "note": "公式の Deployment の文書の出力の例です。今の版の実装では、1 行目は Waiting for deployment \"nginx-deployment\" rollout to finish: 2 out of 3 new replicas have been updated... の形です。"
+      },
+      {
+        "title": "終わっているものを見る",
+        "code": "$ kubectl rollout status deployment/web",
+        "output": "deployment \"web\" successfully rolled out",
+        "note": "家のクラスタで打った出力です (名前は伏せています)。もう入れ替えが終わっているので、すぐにこの 1 行で終わります。"
+      }
+    ],
+    "verbose": {
+      "code": "$ kubectl rollout status deployment/coredns -n kube-system -v=6",
+      "output": "I1118 18:08:36.141020 2065942 round_trippers.go:632] \"Response\" verb=\"GET\" url=\"https://<API サーバー>/apis/apps/v1/namespaces/kube-system/deployments/coredns\" status=\"200 OK\" milliseconds=26\nI1118 18:08:36.155130 2065942 round_trippers.go:632] \"Response\" verb=\"GET\" url=\"https://<API サーバー>/apis/apps/v1/namespaces/kube-system/deployments?allowWatchBookmarks=true&fieldSelector=metadata.name%3Dcoredns&resourceVersionMatch=NotOlderThan&sendInitialEvents=true&timeoutSeconds=322&watch=true\" status=\"200 OK\" milliseconds=6\ndeployment \"coredns\" successfully rolled out",
+      "note": "家のクラスタ (k3s 標準の coredns) で打ちました。2 本目が watch=true の要求で、sendInitialEvents=true なので、今の状態も watch の最初の知らせとして届きます。"
+    },
+    "impl": {
+      "repo": "kubernetes/kubectl",
+      "ref": "v0.37.2",
+      "path": "pkg/polymorphichelpers/rollout_status.go",
+      "lines": "L75-L91",
+      "excerpt": "\tif deployment.Generation <= deployment.Status.ObservedGeneration {\n\t\tcond := deploymentutil.GetDeploymentCondition(deployment.Status, appsv1.DeploymentProgressing)\n\t\tif cond != nil && cond.Reason == deploymentutil.TimedOutReason {\n\t\t\treturn \"\", false, fmt.Errorf(\"deployment %q exceeded its progress deadline\", deployment.Name)\n\t\t}\n\t\tif deployment.Spec.Replicas != nil && deployment.Status.UpdatedReplicas < *deployment.Spec.Replicas {\n\t\t\treturn fmt.Sprintf(\"Waiting for deployment %q rollout to finish: %d out of %d new replicas have been updated...\\n\", deployment.Name, deployment.Status.UpdatedReplicas, *deployment.Spec.Replicas), false, nil\n\t\t}\n\t\tif deployment.Status.Replicas > deployment.Status.UpdatedReplicas {\n\t\t\treturn fmt.Sprintf(\"Waiting for deployment %q rollout to finish: %d old replicas are pending termination...\\n\", deployment.Name, deployment.Status.Replicas-deployment.Status.UpdatedReplicas), false, nil\n\t\t}\n\t\tif deployment.Status.AvailableReplicas < deployment.Status.UpdatedReplicas {\n\t\t\treturn fmt.Sprintf(\"Waiting for deployment %q rollout to finish: %d of %d updated replicas are available...\\n\", deployment.Name, deployment.Status.AvailableReplicas, deployment.Status.UpdatedReplicas), false, nil\n\t\t}\n\t\treturn fmt.Sprintf(\"deployment %q successfully rolled out\\n\", deployment.Name), true, nil\n\t}\n\treturn fmt.Sprintf(\"Waiting for deployment spec update to be observed...\\n\"), false, nil",
+      "note": "Deployment の status から、終わったかを決める部分です。期限切れならエラー、新しい Pod が足りない・古い Pod が残る・使える Pod が足りないの順に確かめ、全部そろえば successfully rolled out です。"
+    },
+    "sources": [
+      {
+        "label": "kubectl rollout status",
+        "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_rollout/kubectl_rollout_status/"
+      },
+      {
+        "label": "Deployments",
+        "url": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"
+      },
+      {
+        "label": "Kubernetes API Concepts: Streaming lists",
+        "url": "https://kubernetes.io/docs/reference/using-api/api-concepts/#streaming-lists"
+      },
+      {
+        "label": "kubectl の実装 (pkg/polymorphichelpers/rollout_status.go)",
+        "url": "https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/polymorphichelpers/rollout_status.go#L58-L92"
+      },
+      {
+        "label": "kubectl の実装 (pkg/cmd/rollout/rollout_status.go)",
+        "url": "https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/cmd/rollout/rollout_status.go#L185-L232"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-rollout-undo",
+    "inside": [
+      "kubeconfig を読んで行き先と資格情報を決め、対象の Deployment を GET します。",
+      "Deployment のセレクタで ReplicaSet の一覧を GET し、注釈 deployment.kubernetes.io/revision の番号を見ます。--to-revision が無ければ 2 番目に新しい ReplicaSet (一つ前の版) を、あればその番号の ReplicaSet を選びます。",
+      "選んだ ReplicaSet の Pod テンプレートが今と同じなら、skipped rollback と出して何もしません。Deployment が一時停止 (paused) 中なら止まります。",
+      "違えば、その ReplicaSet の Pod テンプレートを Deployment の spec.template に書き戻す JSON パッチ (op: replace) を作り、PATCH で送ります。API サーバーで認証・認可・アドミッションを通り、etcd に保存されます。",
+      "Deployment のコントローラーは、テンプレートが前の ReplicaSet と同じになったのを見て、その ReplicaSet を増やし今の ReplicaSet を減らす、普段のロールアウトとして入れ替えます。戻した ReplicaSet には、新しいリビジョンの番号が付きます。",
+      "kubectl は deployment.apps/<名前> rolled back と出して終わります。入れ替えの進み具合は rollout status で見ます。"
+    ],
+    "api": [
+      {
+        "method": "GET",
+        "path": "/apis/apps/v1/namespaces/{namespace}/deployments/{name}",
+        "note": "対象の Deployment"
+      },
+      {
+        "method": "GET",
+        "path": "/apis/apps/v1/namespaces/{namespace}/replicasets",
+        "note": "labelSelector に Deployment のセレクタを付けて、履歴の ReplicaSet を読む"
+      },
+      {
+        "method": "PATCH",
+        "path": "/apis/apps/v1/namespaces/{namespace}/deployments/{name}",
+        "note": "spec.template と注釈を書き戻す JSON パッチ (application/json-patch+json)"
+      }
+    ],
+    "examples": [
+      {
+        "title": "一つ前の版に戻す (公式の例)",
+        "code": "$ kubectl rollout undo deployment/nginx-deployment",
+        "output": "deployment.apps/nginx-deployment rolled back",
+        "note": "公式の Deployment の文書の例です。戻すのは Pod テンプレートだけで、replicas などの数は戻りません。"
+      },
+      {
+        "title": "番号を選んで戻す (公式の例)",
+        "code": "$ kubectl rollout undo deployment/nginx-deployment --to-revision=2",
+        "output": "deployment.apps/nginx-deployment rolled back",
+        "note": "番号は kubectl rollout history で調べます。残る履歴の数は revisionHistoryLimit (既定 10) までです。"
+      }
+    ],
+    "verbose": {
+      "code": "$ kubectl rollout undo deployment/traefik -n kube-system --dry-run=server -v=6",
+      "output": "I1118 18:09:21.919475 2068242 round_trippers.go:632] \"Response\" verb=\"GET\" url=\"https://<API サーバー>/apis/apps/v1/namespaces/kube-system/deployments/traefik\" status=\"200 OK\" milliseconds=20\nI1118 18:09:21.935735 2068242 round_trippers.go:632] \"Response\" verb=\"GET\" url=\"https://<API サーバー>/apis/apps/v1/namespaces/kube-system/deployments/traefik\" status=\"200 OK\" milliseconds=8\nI1118 18:09:21.944860 2068242 round_trippers.go:632] \"Response\" verb=\"GET\" url=\"https://<API サーバー>/apis/apps/v1/namespaces/kube-system/replicasets?labelSelector=app.kubernetes.io%2Finstance%3Dtraefik-kube-system%2Capp.kubernetes.io%2Fname%3Dtraefik\" status=\"200 OK\" milliseconds=8\nI1118 18:09:21.957070 2068242 round_trippers.go:632] \"Response\" verb=\"PATCH\" url=\"https://<API サーバー>/apis/apps/v1/namespaces/kube-system/deployments/traefik?dryRun=All\" status=\"403 Forbidden\" milliseconds=5",
+      "note": "家のクラスタ (k3s 標準の traefik) で --dry-run=server を付けて打ち、変更はしていません。Deployment の GET が 2 本 (コマンドの読み込みと戻す処理の中) あり、セレクタで ReplicaSet を読み、PATCH を送っています。家の利用者は kube-system に書く権限が無いので 403 で断られました。"
+    },
+    "impl": {
+      "repo": "kubernetes/kubectl",
+      "ref": "v0.37.2",
+      "path": "pkg/polymorphichelpers/rollback.go",
+      "lines": "L195-L210",
+      "excerpt": "func getDeploymentPatch(podTemplate *corev1.PodTemplateSpec, annotations map[string]string) (types.PatchType, []byte, error) {\n\t// Create a patch of the Deployment that replaces spec.template\n\tpatch, err := json.Marshal([]interface{}{\n\t\tmap[string]interface{}{\n\t\t\t\"op\":    \"replace\",\n\t\t\t\"path\":  \"/spec/template\",\n\t\t\t\"value\": podTemplate,\n\t\t},\n\t\tmap[string]interface{}{\n\t\t\t\"op\":    \"replace\",\n\t\t\t\"path\":  \"/metadata/annotations\",\n\t\t\t\"value\": annotations,\n\t\t},\n\t})\n\treturn types.JSONPatchType, patch, err\n}",
+      "note": "戻すためのパッチを作る関数です。選んだ ReplicaSet の Pod テンプレートで /spec/template を、注釈で /metadata/annotations を置き換える JSON パッチ (op: replace) にします。"
+    },
+    "sources": [
+      {
+        "label": "kubectl rollout undo",
+        "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_rollout/kubectl_rollout_undo/"
+      },
+      {
+        "label": "Deployments",
+        "url": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"
+      },
+      {
+        "label": "kubectl の実装 (pkg/polymorphichelpers/rollback.go)",
+        "url": "https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/polymorphichelpers/rollback.go#L99-L260"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-rollout-restart",
+    "inside": [
+      "kubeconfig を読んで行き先と資格情報を決め、対象の Deployment などを GET します (-n の名前空間の deployment をまとめて、や --selector でも選べる)。",
+      "kubectl は Pod テンプレートの注釈 kubectl.kubernetes.io/restartedAt に今の時刻を書き込み、元との差だけの strategic merge patch を作ります。一時停止 (paused) 中の Deployment は止まります。1 秒以内に 2 回打つと時刻が同じで差ができず、エラーになります。",
+      "パッチを PATCH で送ります。API サーバーで認証・認可・アドミッションを通り、Deployment の spec.template が変わって etcd に保存されます。",
+      "Pod テンプレートが変わったので、Deployment のコントローラーは新しい ReplicaSet を作り、strategy (既定は RollingUpdate の maxSurge 25%・maxUnavailable 25%) に沿って古い Pod を順に新しい Pod に入れ替えます。設定は変わらず、注釈の値だけが違う Pod になります。",
+      "入れ替えは新しいリビジョンとして記録されます。kubectl は deployment.apps/<名前> restarted と出してすぐ終わるので、進み具合は rollout status で見ます。"
+    ],
+    "api": [
+      {
+        "method": "GET",
+        "path": "/apis/apps/v1/namespaces/{namespace}/deployments/{name}",
+        "note": "対象の Deployment"
+      },
+      {
+        "method": "PATCH",
+        "path": "/apis/apps/v1/namespaces/{namespace}/deployments/{name}",
+        "note": "spec.template.metadata.annotations に restartedAt を足す strategic merge patch"
+      }
+    ],
+    "examples": [
+      {
+        "title": "Deployment の Pod を作り直す (公式の例)",
+        "code": "$ kubectl rollout restart deployment/nginx",
+        "output": "deployment.apps/nginx restarted",
+        "note": "公式の例のコマンドです。出力の文言は実装の printer (restarted) によります。家のクラスタでは、実際に Pod が入れ替わるので打っていません。"
+      },
+      {
+        "title": "名前空間の Deployment をまとめて (公式の例)",
+        "code": "$ kubectl rollout restart deployment -n test-namespace",
+        "output": "deployment.apps/web restarted\ndeployment.apps/api restarted",
+        "note": "名前を省くと、その名前空間のすべての Deployment が対象です (出力の名前は例)。"
+      }
+    ],
+    "verbose": {
+      "code": "$ kubectl rollout restart deployment/web -v=8",
+      "output": "... \"Request\" verb=\"GET\" url=\"https://<API サーバー>/apis/apps/v1/namespaces/default/deployments/web\"\n...\n... \"Request\" verb=\"PATCH\" url=\"https://<API サーバー>/apis/apps/v1/namespaces/default/deployments/web?fieldManager=kubectl-rollout\" headers=<\n\tContent-Type: application/strategic-merge-patch+json\n >\n... \"Request Body\" body=\"{\\\"spec\\\":{\\\"template\\\":{\\\"metadata\\\":{\\\"annotations\\\":{\\\"kubectl.kubernetes.io/restartedAt\\\":\\\"2026-11-18T18:00:00+09:00\\\"}}}}}\"\n...\ndeployment.apps/web restarted",
+      "note": "形の例です。v1.37 の rollout restart には --dry-run が無く、打つと Pod が入れ替わるので、家のクラスタでは打っていません。実装から、GET と、restartedAt の注釈だけを足す PATCH (fieldManager の既定は kubectl-rollout) になります。"
+    },
+    "impl": {
+      "repo": "kubernetes/kubectl",
+      "ref": "v0.37.2",
+      "path": "pkg/polymorphichelpers/objectrestarter.go",
+      "lines": "L44-L52",
+      "excerpt": "\tcase *appsv1.Deployment:\n\t\tif obj.Spec.Paused {\n\t\t\treturn nil, errors.New(\"can't restart paused deployment (run rollout resume first)\")\n\t\t}\n\t\tif obj.Spec.Template.ObjectMeta.Annotations == nil {\n\t\t\tobj.Spec.Template.ObjectMeta.Annotations = make(map[string]string)\n\t\t}\n\t\tobj.Spec.Template.ObjectMeta.Annotations[\"kubectl.kubernetes.io/restartedAt\"] = time.Now().Format(time.RFC3339)\n\t\treturn runtime.Encode(scheme.Codecs.LegacyCodec(appsv1.SchemeGroupVersion), obj)",
+      "note": "apps/v1 の Deployment のときの処理です。一時停止中なら断り、Pod テンプレートの注釈 kubectl.kubernetes.io/restartedAt に今の時刻 (RFC3339) を書きます。この変更との差がパッチになります。"
+    },
+    "sources": [
+      {
+        "label": "kubectl rollout restart",
+        "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_rollout/kubectl_rollout_restart/"
+      },
+      {
+        "label": "Deployments",
+        "url": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"
+      },
+      {
+        "label": "kubectl の実装 (pkg/polymorphichelpers/objectrestarter.go)",
+        "url": "https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/polymorphichelpers/objectrestarter.go#L32-L119"
+      },
+      {
+        "label": "kubectl の実装 (pkg/cmd/rollout/rollout_restart.go)",
+        "url": "https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/cmd/rollout/rollout_restart.go#L145-L215"
+      }
+    ]
+  }
+]

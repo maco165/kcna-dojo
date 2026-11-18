@@ -1,0 +1,1349 @@
+[
+  {
+    "id": "kubectl-get",
+    "inside": [
+      "kubeconfig を読み、current-context のクラスタ (API サーバーの URL と CA)・ユーザーの資格情報・既定の名前空間を決めます。-n を付けるとその名前空間に、-A を付けるとすべての名前空間になります。",
+      "pods・po・deploy のような種類の名前を、API のグループ・版・資源に引き当てます。この対応表は API サーバーの /api と /apis から読んだ一覧 (discovery) で、手元の ~/.kube/cache に貯めて使い回します。",
+      "一覧なら GET /api/v1/namespaces/{namespace}/pods?limit=500 を送ります (-A なら /api/v1/pods)。500 件ずつ区切って読み、続きがあれば次を読みます。名前を付けると GET .../pods/{name} の 1 件読みになります。-l は labelSelector、--field-selector は fieldSelector の引数になり、絞り込みは API サーバーの側で行われます。",
+      "表で出すとき (-o 無しか wide) は、Accept ヘッダーで Table の形を頼みます。どの列を出すかは API サーバーが決めて返し、kubectl は受けた表を整えて出すだけです。-o yaml・json のときは Table を頼まず、オブジェクトそのものを受け取ります。",
+      "API サーバーは認証と認可 (RBAC で list や get が許されているか) を通します。読むだけの要求なのでアドミッションは通らず、保存してある状態を読んで返します。",
+      "-w (--watch) を付けると、一覧を出したあとに watch の GET を開いたままにし、変わるたびに行を足して出し続けます。"
+    ],
+    "api": [
+      {
+        "method": "GET",
+        "path": "/api/v1/namespaces/{namespace}/pods",
+        "note": "kubectl get pods (一覧)"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/namespaces/{namespace}/pods/{name}",
+        "note": "kubectl get pod <名前>"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/pods",
+        "note": "kubectl get pods -A"
+      },
+      {
+        "method": "GET",
+        "path": "/apis/apps/v1/namespaces/{namespace}/deployments",
+        "note": "kubectl get deployments"
+      }
+    ],
+    "examples": [
+      {
+        "title": "kube-system の Pod を、IP と Node の列を足して出す",
+        "code": "$ kubectl get pods -n kube-system -o wide",
+        "output": "NAME                                      READY   STATUS      RESTARTS      AGE   IP          NODE    NOMINATED NODE   READINESS GATES\ncoredns-5688c889c9-fxn66                  1/1     Running     1 (21d ago)   23d   10.0.0.11   node3   <none>           <none>\nhelm-install-traefik-q9z6w                0/1     Completed   0             10d   10.0.0.12   node1   <none>           <none>\nlocal-path-provisioner-67d6887d65-554hw   1/1     Running     1 (21d ago)   23d   10.0.0.13   node3   <none>           <none>\nmetrics-server-74c8c4d68b-wl2pz           1/1     Running     1 (21d ago)   23d   10.0.0.14   node3   <none>           <none>\n...\ntraefik-7489bb4c44-l6dvf                  1/1     Running     0             10d   10.0.0.15   node1   <none>           <none>",
+        "note": "READY は「準備のできたコンテナの数/コンテナの数」、RESTARTS は再起動の回数と最後の再起動からの時間です。wide で IP (Pod の IP) と NODE (置かれた Node) の列が増えます。"
+      },
+      {
+        "title": "ラベルで絞り、付いているラベルも出す",
+        "code": "$ kubectl get pods -n kube-system -l k8s-app=kube-dns --show-labels",
+        "output": "NAME                       READY   STATUS    RESTARTS      AGE   LABELS\ncoredns-5688c889c9-fxn66   1/1     Running   1 (21d ago)   23d   k8s-app=kube-dns,pod-template-hash=5688c889c9",
+        "note": "-l の条件は labelSelector として API サーバーに送られ、合う Pod だけが返ります。pod-template-hash は Deployment が ReplicaSet ごとに付けるラベルです。"
+      }
+    ],
+    "verbose": {
+      "code": "$ kubectl get pods -n kube-system -v=6",
+      "output": "I1118 18:08:19.714290 2065158 loader.go:408] Config loaded from file:  /home/user/.kube/config\nI1118 18:08:19.768410 2065158 round_trippers.go:632] \"Response\" verb=\"GET\" url=\"https://<API サーバー>/api/v1/namespaces/kube-system/pods?limit=500\" status=\"200 OK\" milliseconds=23\nNAME                                      READY   STATUS      RESTARTS      AGE\ncoredns-5688c889c9-fxn66                  1/1     Running     1 (21d ago)   23d\n...",
+      "note": "本体の要求は GET の 1 本です。limit=500 は 500 件ずつ区切って読むしるしです。手元のキャッシュが新しければ、/api・/apis への GET は出ません。"
+    },
+    "impl": {
+      "repo": "kubernetes/kubectl",
+      "ref": "v0.37.2",
+      "path": "pkg/cmd/get/get.go",
+      "lines": "L430-L445",
+      "excerpt": "func (o *GetOptions) transformRequests(req *rest.Request) {\n\tif !o.ServerPrint || !o.IsHumanReadablePrinter {\n\t\treturn\n\t}\n\n\treq.SetHeader(\"Accept\", strings.Join([]string{\n\t\tfmt.Sprintf(\"application/json;as=Table;v=%s;g=%s\", metav1.SchemeGroupVersion.Version, metav1.GroupName),\n\t\tfmt.Sprintf(\"application/json;as=Table;v=%s;g=%s\", metav1beta1.SchemeGroupVersion.Version, metav1beta1.GroupName),\n\t\t\"application/json\",\n\t}, \",\"))\n\n\t// if sorting, ensure we receive the full object in order to introspect its fields via jsonpath\n\tif len(o.SortBy) > 0 {\n\t\treq.Param(\"includeObject\", \"Object\")\n\t}\n}",
+      "note": "表の形で出すとき (-o 無しか wide) にだけ、Accept ヘッダーで Table の形を頼んでいます。--sort-by のときは並べ替えに元のオブジェクトも要るので、includeObject=Object を足しています。"
+    },
+    "sources": [
+      {
+        "label": "Kubernetes: kubectl get",
+        "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_get/"
+      },
+      {
+        "label": "Kubernetes: Kubernetes API Concepts",
+        "url": "https://kubernetes.io/docs/reference/using-api/api-concepts/"
+      },
+      {
+        "label": "Kubernetes API: Pod",
+        "url": "https://kubernetes.io/docs/reference/kubernetes-api/core/pod-v1/"
+      },
+      {
+        "label": "Kubernetes: kubectl Quick Reference",
+        "url": "https://kubernetes.io/docs/reference/kubectl/quick-reference/"
+      },
+      {
+        "label": "kubernetes/kubectl v0.37.2: pkg/cmd/get/get.go",
+        "url": "https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/cmd/get/get.go#L430-L445"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-describe",
+    "inside": [
+      "kubeconfig を読んで行き先と資格情報を決め、種類と名前から対象を GET で読みます。",
+      "種類ごとに kubectl の中に書かれた表示の処理 (describer。Pod 用・Deployment 用など) を選びます。describer は対象をもう一度自分で GET で読むので、-v=6 では同じ GET が 2 回出ます。",
+      "表示に要る関係するものを、別の要求で読みます。Deployment なら、セレクターに合う ReplicaSet の一覧を labelSelector 付きで読み、OldReplicaSets と NewReplicaSet の行を作ります。",
+      "イベントを GET /api/v1/namespaces/{namespace}/events に fieldSelector (involvedObject.name・namespace・kind・uid) を付けて読みます。イベントは本体とは別の資源として保存されているので、本体の中にはありません。",
+      "どれも読むだけの要求なので、API サーバーでは認証と認可だけを通り、アドミッションは通りません。",
+      "読んだものを kubectl が手元で、人が読む文章の形に組み立てて出します。get と違い、サーバーが作る表 (Table) は使いません。"
+    ],
+    "api": [
+      {
+        "method": "GET",
+        "path": "/apis/apps/v1/namespaces/{namespace}/deployments/{name}",
+        "note": "kubectl describe deployment <名前> の本体"
+      },
+      {
+        "method": "GET",
+        "path": "/apis/apps/v1/namespaces/{namespace}/replicasets",
+        "note": "Deployment のときに、持っている ReplicaSet を labelSelector で読む"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/namespaces/{namespace}/events",
+        "note": "関係するイベントを fieldSelector で読む"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/namespaces/{namespace}/pods/{name}",
+        "note": "kubectl describe pod <名前> の本体"
+      }
+    ],
+    "examples": [
+      {
+        "title": "Deployment の設定と状態を読む",
+        "code": "$ kubectl describe deployment coredns -n kube-system",
+        "output": "Name:                   coredns\nNamespace:              kube-system\nLabels:                 k8s-app=kube-dns\n...\nSelector:               k8s-app=kube-dns\nReplicas:               1 desired | 1 updated | 1 total | 1 available | 0 unavailable\nStrategyType:           RollingUpdate\nRollingUpdateStrategy:  1 max unavailable, 25% max surge\nPod Template:\n  Labels:           k8s-app=kube-dns\n  Service Account:  coredns\n  Containers:\n   coredns:\n    Image:       rancher/mirrored-coredns-coredns:1.14.7\n    Ports:       53/UDP (dns), 53/TCP (dns-tcp), 9153/TCP (metrics)\n    ...\n    Liveness:     http-get http://:8080/health delay=60s timeout=1s period=10s successThreshold=1 failureThreshold=3\n    Readiness:    http-get http://:8181/ready delay=0s timeout=1s period=2s successThreshold=1 failureThreshold=3\n...\nConditions:\n  Type           Status  Reason\n  ----           ------  ------\n  Available      True    MinimumReplicasAvailable\n  Progressing    True    NewReplicaSetAvailable\nOldReplicaSets:  <none>\nNewReplicaSet:   coredns-5688c889c9 (1/1 replicas created)\nEvents:          <none>",
+        "note": "Replicas の行は望む数・更新済み・全部・使える・使えない Pod の数です。最後の Events に、この Deployment に関するイベントが出ます (ここでは古いものが消えていて <none>)。"
+      }
+    ],
+    "verbose": {
+      "code": "$ kubectl describe deployment coredns -n kube-system -v=6",
+      "output": "I1118 18:08:20.348954 2065184 round_trippers.go:632] \"Response\" verb=\"GET\" url=\"https://<API サーバー>/apis/apps/v1/namespaces/kube-system/deployments/coredns\" status=\"200 OK\" milliseconds=35\nI1118 18:08:20.358090 2065184 round_trippers.go:632] \"Response\" verb=\"GET\" url=\"https://<API サーバー>/apis/apps/v1/namespaces/kube-system/deployments/coredns\" status=\"200 OK\" milliseconds=7\nI1118 18:08:20.371442 2065184 round_trippers.go:632] \"Response\" verb=\"GET\" url=\"https://<API サーバー>/api/v1/namespaces/kube-system/events?fieldSelector=involvedObject.name%3Dcoredns%2CinvolvedObject.namespace%3Dkube-system%2CinvolvedObject.kind%3DDeployment%2C...\" status=\"200 OK\" ...\nI1118 18:08:20.378353 2065184 round_trippers.go:632] \"Response\" verb=\"GET\" url=\"https://<API サーバー>/apis/apps/v1/namespaces/kube-system/replicasets?labelSelector=k8s-app%3Dkube-dns&limit=500\" status=\"200 OK\" milliseconds=6",
+      "note": "本体の GET が 2 回 (探す段と describer の段)、イベントの GET、ReplicaSet の GET の 4 本です。どれも GET で、何も書きません。"
+    },
+    "impl": {
+      "repo": "kubernetes/kubectl",
+      "ref": "v0.37.2",
+      "path": "pkg/describe/describe.go",
+      "lines": "L5408-L5438",
+      "excerpt": "func searchEvents(client corev1client.EventsGetter, objOrRef runtime.Object, limit int64) (*corev1.EventList, error) {\n\t// ...\n\te := client.Events(ref.Namespace)\n\tfieldSelector := e.GetFieldSelector(&ref.Name, &ref.Namespace, refKind, refUID)\n\tinitialOpts := metav1.ListOptions{FieldSelector: fieldSelector.String(), Limit: limit}\n\teventList := &corev1.EventList{}\n\terr = runtimeresource.FollowContinue(&initialOpts,\n\t\tfunc(options metav1.ListOptions) (runtime.Object, error) {\n\t\t\tnewEvents, err := e.List(context.TODO(), options)\n\t\t\tif err != nil {\n\t\t\t\treturn nil, runtimeresource.EnhanceListError(err, options, \"events\")\n\t\t\t}\n\t\t\teventList.Items = append(eventList.Items, newEvents.Items...)\n\t\t\treturn newEvents, nil\n\t\t})\n\treturn eventList, err\n}",
+      "note": "describe がイベントを探す処理です。対象の名前・名前空間・種類・UID から fieldSelector を作り、Event の一覧を区切りながら (FollowContinue) 全部読みます。"
+    },
+    "sources": [
+      {
+        "label": "Kubernetes: kubectl describe",
+        "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_describe/"
+      },
+      {
+        "label": "Kubernetes API: Deployment",
+        "url": "https://kubernetes.io/docs/reference/kubernetes-api/apps/deployment-v1/"
+      },
+      {
+        "label": "Kubernetes API: Event",
+        "url": "https://kubernetes.io/docs/reference/kubernetes-api/core/event-v1/"
+      },
+      {
+        "label": "Kubernetes: Kubernetes API Concepts",
+        "url": "https://kubernetes.io/docs/reference/using-api/api-concepts/"
+      },
+      {
+        "label": "kubernetes/kubectl v0.37.2: pkg/describe/describe.go",
+        "url": "https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/describe/describe.go#L5408-L5438"
+      },
+      {
+        "label": "kubernetes/kubectl v0.37.2: pkg/cmd/describe/describe.go",
+        "url": "https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/cmd/describe/describe.go#L179-L230"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-apply",
+    "inside": [
+      "-f のファイル・フォルダ・URL (-k なら Kustomize で組み立てた結果) を読み、YAML を 1 つずつのオブジェクトに分けます。kubeconfig から行き先と資格情報を決め、API サーバーの OpenAPI (/openapi/v3) から資源の型の情報を読みます。",
+      "既定 (client-side apply) では、まず GET で今のオブジェクトを読みます。無ければ (404)、当てた形を注釈 kubectl.kubernetes.io/last-applied-configuration に入れて POST で作ります。",
+      "あれば、前に当てた形 (注釈)・今の形・ファイルの形の 3 つを比べ (3-way merge)、差だけを PATCH で送ります。ファイルから消した欄も、前に当てた形にあれば消す差になります。",
+      "--server-side のときは GET をせず、ファイルの形を丸ごと PATCH (Content-Type: application/apply-patch+yaml) の 1 本で送ります。差の計算と、欄ごとの持ち主 (managedFields) の記録は API サーバーが行い、別の持ち主の欄を変えると conflict になります。",
+      "API サーバーは認証・認可 (create や patch が許されているか) のあと、書く要求なのでアドミッション (mutating のあとに validating) を通し、型どおりかを検証して etcd に書きます。--dry-run=server なら URL に dryRun=All が付き、検査だけをして保存しません。",
+      "保存されると、その種類を見張るコントローラー (Deployment なら Deployment コントローラー) が、書かれた望みの状態に合わせて ReplicaSet や Pod を作り・直します。kubectl は created・configured・unchanged などを出して戻り、Pod ができるのは待ちません。"
+    ],
+    "api": [
+      {
+        "method": "GET",
+        "path": "/api/v1/namespaces/{namespace}/configmaps/{name}",
+        "note": "client-side apply で今の形を読む (ConfigMap の例)"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/namespaces/{namespace}/configmaps",
+        "note": "無かったときに作る"
+      },
+      {
+        "method": "PATCH",
+        "path": "/api/v1/namespaces/{namespace}/configmaps/{name}",
+        "note": "あったときの差分、または --server-side の本体"
+      }
+    ],
+    "examples": [
+      {
+        "title": "まだ無い ConfigMap を当てる (保存しない検査だけ)",
+        "code": "$ kubectl apply -f cm.yaml --dry-run=server",
+        "output": "configmap/demo created (server dry run)",
+        "note": "API サーバーが検査まで通した結果です。(server dry run) が付いているときは保存されていません。"
+      },
+      {
+        "title": "server-side apply で当てる (保存しない検査だけ)",
+        "code": "$ kubectl apply --server-side -f cm.yaml --dry-run=server",
+        "output": "configmap/demo serverside-applied (server dry run)",
+        "note": "server-side apply では、作ったか変えたかに関係なく serverside-applied と出ます。"
+      }
+    ],
+    "verbose": {
+      "code": "$ kubectl apply -f cm.yaml --dry-run=server -v=6",
+      "output": "I1118 18:08:24.947516 2065305 round_trippers.go:632] \"Response\" verb=\"GET\" url=\"https://<API サーバー>/openapi/v3?timeout=32s\" status=\"200 OK\" milliseconds=23\n...\nI1118 18:08:25.208116 2065305 round_trippers.go:632] \"Response\" verb=\"GET\" url=\"https://<API サーバー>/api/v1/namespaces/default/configmaps/demo\" status=\"404 Not Found\" milliseconds=8\nI1118 18:08:25.217763 2065305 round_trippers.go:632] \"Response\" verb=\"POST\" url=\"https://<API サーバー>/api/v1/namespaces/default/configmaps?dryRun=All&fieldManager=kubectl-client-side-apply&fieldValidation=Strict\" status=\"201 Created\" milliseconds=8\nconfigmap/demo created (server dry run)",
+      "note": "OpenAPI を読み、GET で探して 404、POST で作る (dryRun=All なので保存はされない) の順です。fieldValidation=Strict は、知らない欄があれば断るように頼むしるしです。"
+    },
+    "impl": {
+      "repo": "kubernetes/kubectl",
+      "ref": "v0.37.2",
+      "path": "pkg/cmd/apply/apply.go",
+      "lines": "L680-L703",
+      "excerpt": "\tif err := info.Get(); err != nil {\n\t\tif !errors.IsNotFound(err) {\n\t\t\treturn cmdutil.AddSourceToErr(fmt.Sprintf(\"retrieving current configuration of:\\n%s\\nfrom server for:\", info.String()), info.Source, err)\n\t\t}\n\n\t\t// Create the resource if it doesn't exist\n\t\t// ...\n\t\tif o.DryRunStrategy != cmdutil.DryRunClient {\n\t\t\t// Then create the resource and skip the three-way merge\n\t\t\tobj, err := helper.Create(info.Namespace, true, info.Object)\n\t\t\tif err != nil {\n\t\t\t\treturn cmdutil.AddSourceToErr(\"creating\", info.Source, err)\n\t\t\t}\n\t\t\tinfo.Refresh(obj, true)",
+      "note": "client-side apply で、今のオブジェクトを読んで無かった (NotFound) ときの処理です。前に当てた形を注釈に入れてから、差分の計算をせずに Create (POST) で作ります。"
+    },
+    "sources": [
+      {
+        "label": "Kubernetes: kubectl apply",
+        "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_apply/"
+      },
+      {
+        "label": "Kubernetes: Declarative Management of Kubernetes Objects Using Configuration Files",
+        "url": "https://kubernetes.io/docs/tasks/manage-kubernetes-objects/declarative-config/"
+      },
+      {
+        "label": "Kubernetes: Server-Side Apply",
+        "url": "https://kubernetes.io/docs/reference/using-api/server-side-apply/"
+      },
+      {
+        "label": "Kubernetes API: ConfigMap",
+        "url": "https://kubernetes.io/docs/reference/kubernetes-api/core/config-map-v1/"
+      },
+      {
+        "label": "Kubernetes: Admission Control in Kubernetes",
+        "url": "https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/"
+      },
+      {
+        "label": "kubernetes/kubectl v0.37.2: pkg/cmd/apply/apply.go",
+        "url": "https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/cmd/apply/apply.go#L680-L703"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-logs",
+    "inside": [
+      "kubeconfig を読んで行き先を決めます。Pod の名前でなく deployment/coredns のように書くと、まずその Deployment を GET で読み、セレクターに合う Pod を一覧で読んで 1 つを選びます。",
+      "どのコンテナのログかを決めます。-c が無ければ、注釈 kubectl.kubernetes.io/default-container があればそのコンテナ、無ければ 1 つ目のコンテナを使います。",
+      "GET /api/v1/namespaces/{namespace}/pods/{name}/log を送ります。-c は container、--previous は previous=true、--tail は tailLines、-f は follow=true、--timestamps は timestamps=true という引数になります。",
+      "API サーバーは認証と認可 (pods/log を読んでよいか) を通したあと、etcd ではなく、その Pod が動く Node の kubelet に HTTPS でつないで、ログを問い合わせます。",
+      "kubelet は、コンテナランタイムが Node の /var/log/pods の下に書いたログのファイルを読んで返します。返るのは今のログのファイルの中身だけで、ローテーションで外れた古いファイルの分は返りません。",
+      "返ってきた文字をそのまま画面に出します。-f のときは接続を開いたままにし、新しい行が届くたびに出し続けます。"
+    ],
+    "api": [
+      {
+        "method": "GET",
+        "path": "/api/v1/namespaces/{namespace}/pods/{name}/log",
+        "note": "ログの本体。API サーバーが kubelet に取り次ぐ"
+      },
+      {
+        "method": "GET",
+        "path": "/apis/apps/v1/namespaces/{namespace}/deployments/{name}",
+        "note": "deployment/<名前> と書いたときに、Pod を選ぶために読む"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/namespaces/{namespace}/pods",
+        "note": "セレクターに合う Pod を探す"
+      }
+    ],
+    "examples": [
+      {
+        "title": "Deployment の Pod のログの最後の 5 行を読む",
+        "code": "$ kubectl logs -n kube-system deployment/coredns --tail=5",
+        "output": "[WARNING] No files matching import glob pattern: /etc/coredns/custom/*.server\n[WARNING] No files matching import glob pattern: /etc/coredns/custom/*.override\n[WARNING] No files matching import glob pattern: /etc/coredns/custom/*.server\n[WARNING] No files matching import glob pattern: /etc/coredns/custom/*.override\n[WARNING] No files matching import glob pattern: /etc/coredns/custom/*.server",
+        "note": "コンテナが標準出力・標準エラーに書いたものが、そのまま出ます。Pod が複数あっても、選ばれた 1 つの Pod の分だけです。"
+      },
+      {
+        "title": "行の頭に時刻を付ける",
+        "code": "$ kubectl logs -n kube-system deployment/coredns --tail=2 --timestamps",
+        "output": "2026-11-18T18:16:49.490723146+09:00 [WARNING] No files matching import glob pattern: /etc/coredns/custom/*.override\n2026-11-18T18:16:49.494101848+09:00 [WARNING] No files matching import glob pattern: /etc/coredns/custom/*.server",
+        "note": "時刻はコンテナランタイムがログを書いたときに付けたものです。アプリが自分で時刻を出さなくても、いつの行かが分かります。"
+      }
+    ],
+    "verbose": {
+      "code": "$ kubectl logs -n kube-system deployment/coredns --tail=3 -v=6",
+      "output": "I1118 18:08:21.173395 2065221 round_trippers.go:632] \"Response\" verb=\"GET\" url=\"https://<API サーバー>/apis/apps/v1/namespaces/kube-system/deployments/coredns\" status=\"200 OK\" milliseconds=25\nI1118 18:08:21.205551 2065221 round_trippers.go:632] \"Response\" verb=\"GET\" url=\"https://<API サーバー>/api/v1/namespaces/kube-system/pods?labelSelector=k8s-app%3Dkube-dns\" status=\"200 OK\" milliseconds=11\nI1118 18:08:21.218407 2065221 round_trippers.go:632] \"Response\" verb=\"GET\" url=\"https://<API サーバー>/api/v1/namespaces/kube-system/pods/coredns-5688c889c9-fxn66/log?container=coredns&tailLines=3\" status=\"200 OK\" milliseconds=11\n[WARNING] No files matching import glob pattern: /etc/coredns/custom/*.server\n...",
+      "note": "Deployment を読む、Pod を選ぶ、pods/{name}/log を読む、の 3 本です。--tail=3 が tailLines=3 に、選んだコンテナが container=coredns になっています。"
+    },
+    "impl": {
+      "repo": "kubernetes/kubectl",
+      "ref": "v0.37.2",
+      "path": "pkg/polymorphichelpers/logsforobject.go",
+      "lines": "L107-L128",
+      "excerpt": "\t\t\tif currOpts.Container == \"\" {\n\t\t\t\t// Default to the first container name(aligning behavior with `kubectl exec').\n\t\t\t\tcurrOpts.Container = t.Spec.Containers[0].Name\n\t\t\t\tif len(t.Spec.Containers) > 1 || len(t.Spec.InitContainers) > 0 || len(t.Spec.EphemeralContainers) > 0 {\n\t\t\t\t\tif !allPods {\n\t\t\t\t\t\tfmt.Fprintf(os.Stderr, \"Defaulted container %q out of: %s\\n\", currOpts.Container, podcmd.AllContainerNames(t))\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t}\n\t\t\t// ...\n\t\t\tret := make(map[corev1.ObjectReference]rest.ResponseWrapper, 1)\n\t\t\tret[*ref] = clientset.Pods(t.Namespace).GetLogs(t.Name, currOpts)\n\t\t\treturn ret, nil",
+      "note": "コンテナの名前が決まっていないときは 1 つ目のコンテナを使い、複数あれば Defaulted container と知らせます。最後に Pods(...).GetLogs で pods/{name}/log への要求を作ります。"
+    },
+    "sources": [
+      {
+        "label": "Kubernetes: kubectl logs",
+        "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_logs/"
+      },
+      {
+        "label": "Kubernetes: Logging Architecture",
+        "url": "https://kubernetes.io/docs/concepts/cluster-administration/logging/"
+      },
+      {
+        "label": "Kubernetes: Communication between Nodes and the Control Plane",
+        "url": "https://kubernetes.io/docs/concepts/architecture/control-plane-node-communication/"
+      },
+      {
+        "label": "Kubernetes API: Pod",
+        "url": "https://kubernetes.io/docs/reference/kubernetes-api/core/pod-v1/"
+      },
+      {
+        "label": "kubernetes/kubectl v0.37.2: pkg/polymorphichelpers/logsforobject.go",
+        "url": "https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/polymorphichelpers/logsforobject.go#L107-L128"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-delete",
+    "inside": [
+      "kubeconfig を読んで行き先を決め、種類と名前 (または -f のファイル、-l のラベル) から消すものを決めます。-l のときは、先に一覧を GET して当てはまるものを集めます。",
+      "1 つずつ DELETE を送ります (例: DELETE /api/v1/namespaces/{namespace}/configmaps/{name})。要求の中身 (DeleteOptions) に、--cascade の値を propagationPolicy (既定は Background) として、--grace-period があれば gracePeriodSeconds として入れます。--dry-run=server なら dryRun: [\"All\"] も入ります。",
+      "API サーバーは認証・認可 (delete が許されているか) とアドミッションを通します。Background (既定) なら本体はすぐ消え、子はあとでガベージコレクターが消します。Foreground なら API サーバーが deletionTimestamp と foregroundDeletion のファイナライザーを付け、子が消えてから本体を消します。ほかのファイナライザーが付いているものと、猶予の時間つきで消える Pod は、deletionTimestamp だけが付いた状態で残り、片付けが済んでから消えます。",
+      "持ち主が消えた子 (Deployment を消したときの ReplicaSet と Pod) は、Background なら kube-controller-manager のガベージコレクターが後から消します。Foreground なら子が先に消えてから本体が消え、orphan なら子は残ります。",
+      "Pod は猶予の時間 (既定 30 秒) の付いた削除になります。kubelet がコンテナに止まるよう知らせ (TERM のシグナル)、止まってから Pod が消えます。Deployment などが管理している Pod なら、コントローラーが足りない分の新しい Pod を作ります。",
+      "kubectl は既定 (--wait=true) で、消え終わるのを待ってから、deleted と出して戻ります。"
+    ],
+    "api": [
+      {
+        "method": "DELETE",
+        "path": "/api/v1/namespaces/{namespace}/configmaps/{name}",
+        "note": "kubectl delete configmap <名前>"
+      },
+      {
+        "method": "DELETE",
+        "path": "/apis/apps/v1/namespaces/{namespace}/deployments/{name}",
+        "note": "kubectl delete deployment <名前>"
+      },
+      {
+        "method": "DELETE",
+        "path": "/api/v1/namespaces/{namespace}/pods/{name}",
+        "note": "kubectl delete pod <名前>"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/namespaces/{namespace}/pods",
+        "note": "-l で消すものを集めるとき"
+      }
+    ],
+    "examples": [
+      {
+        "title": "ConfigMap を消したらどうなるかを、保存せずに確かめる",
+        "code": "$ kubectl delete configmap kube-root-ca.crt -n default --dry-run=server",
+        "output": "configmap \"kube-root-ca.crt\" deleted from default namespace (server dry run)",
+        "note": "API サーバーが認可とアドミッションまで通したうえで、消さずに結果だけを返しています。--dry-run=server を外すと本当に消えます。"
+      }
+    ],
+    "verbose": {
+      "code": "$ kubectl delete configmap kube-root-ca.crt -n default --dry-run=server -v=8",
+      "output": "I1118 18:09:06.806755 2067510 helper.go:202] \"Request Body\" body=<\n\t{\"propagationPolicy\":\"Background\",\"dryRun\":[\"All\"]}\n >\nI1118 18:09:06.806872 2067510 round_trippers.go:527] \"Request\" verb=\"DELETE\" url=\"https://<API サーバー>/api/v1/namespaces/default/configmaps/kube-root-ca.crt\" headers=<\n\tAccept: application/json\n\tContent-Type: application/json\n\tUser-Agent: kubectl/v1.37.2 (linux/amd64) kubernetes/c50e539\n >\nI1118 18:09:06.829417 2067510 round_trippers.go:632] \"Response\" status=\"200 OK\" ...\nconfigmap \"kube-root-ca.crt\" deleted from default namespace (server dry run)",
+      "note": "DELETE では、dryRun と propagationPolicy は URL ではなく要求の中身 (DeleteOptions) に入ります。"
+    },
+    "impl": {
+      "repo": "kubernetes/kubectl",
+      "ref": "v0.37.2",
+      "path": "pkg/cmd/delete/delete.go",
+      "lines": "L394-L484",
+      "excerpt": "\t\toptions := &metav1.DeleteOptions{}\n\t\tif o.GracePeriod >= 0 {\n\t\t\toptions = metav1.NewDeleteOptions(int64(o.GracePeriod))\n\t\t}\n\t\toptions.PropagationPolicy = &o.CascadingStrategy\n// ...\nfunc (o *DeleteOptions) deleteResource(info *resource.Info, deleteOptions *metav1.DeleteOptions) (runtime.Object, error) {\n\tdeleteResponse, err := resource.\n\t\tNewHelper(info.Client, info.Mapping).\n\t\tDryRun(o.DryRunStrategy == cmdutil.DryRunServer).\n\t\tDeleteWithOptions(info.Namespace, info.Name, deleteOptions)",
+      "note": "DeleteOptions を作り、--cascade の値を propagationPolicy に入れます。--dry-run=server のときは DryRun(true) を付けて DELETE を送ります。"
+    },
+    "sources": [
+      {
+        "label": "Kubernetes: kubectl delete",
+        "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_delete/"
+      },
+      {
+        "label": "Kubernetes: Garbage Collection",
+        "url": "https://kubernetes.io/docs/concepts/architecture/garbage-collection/"
+      },
+      {
+        "label": "Kubernetes: Pod Lifecycle (Termination of Pods)",
+        "url": "https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-termination"
+      },
+      {
+        "label": "Kubernetes API: ConfigMap",
+        "url": "https://kubernetes.io/docs/reference/kubernetes-api/core/config-map-v1/"
+      },
+      {
+        "label": "Kubernetes: Admission Control in Kubernetes",
+        "url": "https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/"
+      },
+      {
+        "label": "kubernetes/kubectl v0.37.2: pkg/cmd/delete/delete.go",
+        "url": "https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/cmd/delete/delete.go#L394-L484"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-exec",
+    "inside": [
+      "kubeconfig を読んで行き先を決め、対象の Pod を GET で読みます (deployment/web のように書くと Pod を 1 つ選びます)。Pod が終わっている (Succeeded か Failed) と断り、-c が無ければ既定のコンテナを選びます。",
+      "-- の後ろのコマンドを command=... の引数にした、/api/v1/namespaces/{namespace}/pods/{name}/exec への要求を作ります。-i は stdin=true、-t は tty=true になります。",
+      "kubectl v1.30 からは、まず WebSocket (GET と Upgrade: websocket、サブプロトコル v5.channel.k8s.io) でつなぎ、アップグレードに失敗したときだけ前からの SPDY/3.1 (POST) に戻します。この動きは環境変数 KUBECTL_REMOTE_COMMAND_WEBSOCKETS で切り替えます。",
+      "API サーバーは認証・認可・アドミッションを通したあと、101 Switching Protocols で切り替えます。認可では pods/exec の create が要ります (WebSocket の GET は get として認可され、v1.35 からは create も確かめられます)。Node が WebSocket に対応していると申告していれば (ExtendWebSocketsToKubelet、v1.36 から既定)、WebSocket のまま kubelet へ渡します。申告が無ければ、API サーバーが SPDY に訳して kubelet へつなぎます。",
+      "kubelet はコンテナランタイムに、そのコンテナの中でコマンドを動かすよう頼みます。標準入力・標準出力・標準エラー (と端末の大きさ) は、それぞれ別の流れとして、kubelet と API サーバーを通って kubectl までつながります。",
+      "kubectl は手元の端末とその流れをつなぎ、コマンドが終わると戻ります。新しいコンテナも Pod も作られず、etcd には何も書かれません。中で変えたファイルは、コンテナが作り直されると消えます。"
+    ],
+    "api": [
+      {
+        "method": "GET",
+        "path": "/api/v1/namespaces/{namespace}/pods/{name}",
+        "note": "Pod の状態とコンテナを確かめる"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/namespaces/{namespace}/pods/{name}/exec",
+        "note": "WebSocket でつなぐとき (kubectl v1.30 からの既定)"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/namespaces/{namespace}/pods/{name}/exec",
+        "note": "SPDY に戻ったとき"
+      }
+    ],
+    "examples": [
+      {
+        "title": "コンテナの中で 1 つのコマンドを動かす (公式の文書の例)",
+        "code": "$ kubectl exec -i -t dnsutils -- nslookup kubernetes.default",
+        "output": "Server:    10.0.0.10\nAddress 1: 10.0.0.10\n\nName:      kubernetes.default\nAddress 1: 10.0.0.1",
+        "note": "nslookup はコンテナの中で動いているので、Pod から見た DNS (クラスタの DNS の Service の IP) で名前を引いた結果が出ます。"
+      },
+      {
+        "title": "コンテナの中のファイルを読む (公式の文書の例)",
+        "code": "$ kubectl exec -ti dnsutils -- cat /etc/resolv.conf",
+        "output": "search default.svc.cluster.local svc.cluster.local cluster.local google.internal c.gce_project_id.internal\nnameserver 10.0.0.10\noptions ndots:5",
+        "note": "kubelet が Pod のために書いた DNS の設定です。手元のファイルではなく、コンテナの中のファイルが出ます。"
+      }
+    ],
+    "verbose": {
+      "code": "$ kubectl exec -v=8 nginx -- date",
+      "output": "GET https://127.0.0.1:43251/api/v1/namespaces/default/pods/nginx/exec?command=date…\nRequest Headers:\n    Connection: Upgrade\n    Upgrade: websocket\n    Sec-Websocket-Protocol: v5.channel.k8s.io\n    User-Agent: kubectl/v1.31.0 (linux/amd64) kubernetes/6911225\n...\nResponse Status: 101 Switching Protocols in 3 milliseconds\nResponse Headers:\n    Upgrade: websocket\n    Connection: Upgrade\n    Sec-Websocket-Accept: j0/jHW9RpaUoGsUAv97EcKw8jFM=\n    Sec-Websocket-Protocol: v5.channel.k8s.io",
+      "note": "公式ブログ (Kubernetes 1.31 の WebSocket への切り替え) に載っている -v=8 の例です (exec はコンテナの中でコマンドを動かすので、ここでは打っていません)。GET に Upgrade: websocket が付き、101 で切り替わるのが分かります。"
+    },
+    "impl": {
+      "repo": "kubernetes/kubectl",
+      "ref": "v0.37.2",
+      "path": "pkg/cmd/exec/exec.go",
+      "lines": "L146-L165",
+      "excerpt": "func createExecutor(url *url.URL, config *restclient.Config) (remotecommand.Executor, error) {\n\texec, err := remotecommand.NewSPDYExecutor(config, \"POST\", url)\n\tif err != nil {\n\t\treturn nil, err\n\t}\n\t// Fallback executor is default, unless feature flag is explicitly disabled.\n\tif !cmdutil.RemoteCommandWebsockets.IsDisabled() {\n\t\t// WebSocketExecutor must be \"GET\" method as described in RFC 6455 Sec. 4.1 (page 17).\n\t\twebsocketExec, err := remotecommand.NewWebSocketExecutor(config, \"GET\", url.String())\n\t\tif err != nil {\n\t\t\treturn nil, err\n\t\t}\n\t\texec, err = remotecommand.NewFallbackExecutor(websocketExec, exec, func(err error) bool {\n\t\t\treturn httpstream.IsUpgradeFailure(err) || httpstream.IsHTTPSProxyError(err)\n\t\t})\n\t\tif err != nil {\n\t\t\treturn nil, err\n\t\t}\n\t}\n\treturn exec, nil",
+      "note": "まず SPDY の executor を作り、機能が切られていなければ WebSocket の executor を前に置いた fallback にします。WebSocket へのアップグレードに失敗したとき (古いサーバーや途中のプロキシ) だけ SPDY に戻ります。"
+    },
+    "sources": [
+      {
+        "label": "Kubernetes: kubectl exec",
+        "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_exec/"
+      },
+      {
+        "label": "Kubernetes Blog: Kubernetes 1.31: Streaming Transitions from SPDY to WebSockets",
+        "url": "https://kubernetes.io/blog/2024/08/20/websockets-transition/"
+      },
+      {
+        "label": "Kubernetes: Get a Shell to a Running Container",
+        "url": "https://kubernetes.io/docs/tasks/debug/debug-application/get-shell-running-container/"
+      },
+      {
+        "label": "Kubernetes: Debugging DNS Resolution",
+        "url": "https://kubernetes.io/docs/tasks/administer-cluster/dns-debugging-resolution/"
+      },
+      {
+        "label": "Kubernetes: Communication between Nodes and the Control Plane",
+        "url": "https://kubernetes.io/docs/concepts/architecture/control-plane-node-communication/"
+      },
+      {
+        "label": "Kubernetes API: Pod",
+        "url": "https://kubernetes.io/docs/reference/kubernetes-api/core/pod-v1/"
+      },
+      {
+        "label": "kubernetes/kubectl v0.37.2: pkg/cmd/exec/exec.go",
+        "url": "https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/cmd/exec/exec.go#L146-L165"
+      },
+      {
+        "label": "kubernetes/kubectl v0.37.2: pkg/cmd/exec/exec.go (exec の要求を作る所)",
+        "url": "https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/cmd/exec/exec.go#L392-L400"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-auth-can-i",
+    "inside": [
+      "kubeconfig を読んで行き先と資格情報を決め、list pods の pods のような種類を、API のグループと資源の名前に引き当てます (そのために /api/v1 などの一覧を読みます)。",
+      "問いを SelfSubjectAccessReview というオブジェクトの spec.resourceAttributes (namespace・verb・group・resource・name) に入れ、POST /apis/authorization.k8s.io/v1/selfsubjectaccessreviews で送ります。中身は protobuf の形で送られます。",
+      "--as を付けると Impersonate-User のヘッダーを付けて送り、API サーバーはその利用者になりきって判断します。なりきるには、自分に impersonate の権限が要ります。",
+      "API サーバーは、ふつうの要求と同じ認可の仕組み (RBAC・Node など、設定した順) で「この人がこの操作をしてよいか」を評価し、結果を status.allowed に入れて返します。この問い合わせは etcd に何も保存しません。",
+      "kubectl は allowed が true なら yes、false なら no を出し、no のときは終了コード 1 で終わります。--list は別の SelfSubjectRulesReview で、その名前空間で許された操作の一覧を聞きます。"
+    ],
+    "api": [
+      {
+        "method": "POST",
+        "path": "/apis/authorization.k8s.io/v1/selfsubjectaccessreviews",
+        "note": "kubectl auth can-i <動詞> <種類>"
+      },
+      {
+        "method": "POST",
+        "path": "/apis/authorization.k8s.io/v1/selfsubjectrulesreviews",
+        "note": "kubectl auth can-i --list"
+      }
+    ],
+    "examples": [
+      {
+        "title": "自分が default の Pod を一覧できるか",
+        "code": "$ kubectl auth can-i list pods -n default",
+        "output": "yes",
+        "note": "認可の仕組みが許すと答えたので yes です。"
+      },
+      {
+        "title": "サービスアカウントになりきって聞く",
+        "code": "$ kubectl auth can-i create deployments -n kube-system --as=system:serviceaccount:default:default",
+        "output": "no",
+        "note": "サービスアカウントは system:serviceaccount:<名前空間>:<名前> という利用者名で表されます。default のサービスアカウントには既定では (API の発見の役割を除き) 権限が付いていないので no です。"
+      }
+    ],
+    "verbose": {
+      "code": "$ kubectl auth can-i list pods -n default -v=8",
+      "output": "I1118 18:08:23.809462 2065273 round_trippers.go:527] \"Request\" verb=\"GET\" url=\"https://<API サーバー>/api/v1\" headers=<\n...\nI1118 18:08:23.848434 2065273 type.go:213] \"Request Body\" body=<\n\t00000000  6b 38 73 00 0a 32 0a 17  61 75 74 68 6f 72 69 7a  |k8s..2..authoriz|\n\t00000010  61 74 69 6f 6e 2e 6b 38  73 2e 69 6f 2f 76 31 12  |ation.k8s.io/v1.|\n\t00000020  17 53 65 6c 66 53 75 62  6a 65 63 74 41 63 63 65  |.SelfSubjectAcce|\n\t00000030  73 73 52 65 76 69 65 77  12 3d 0a 10 0a 00 12 00  |ssReview.=......|\n\t...\n\t00000050  0a 07 64 65 66 61 75 6c  74 12 04 6c 69 73 74 1a  |..default..list.|\n\t00000060  00 22 00 2a 04 70 6f 64  73 32 00 3a 00 1a 08 08  |.\".*.pods2.:....|\n\t...\n >\nI1118 18:08:23.848641 2065273 round_trippers.go:527] \"Request\" verb=\"POST\" url=\"https://<API サーバー>/apis/authorization.k8s.io/v1/selfsubjectaccessreviews\" headers=<\n\tAccept: application/vnd.kubernetes.protobuf,application/json\n\tContent-Type: application/vnd.kubernetes.protobuf\n\t...\n >\nI1118 18:08:23.854960 2065273 round_trippers.go:632] \"Response\" status=\"201 Created\" ...\nyes",
+      "note": "中身は protobuf なので 16 進で出ますが、右の欄に SelfSubjectAccessReview・default・list・pods の文字が見えます。201 Created でも、何かが保存されたわけではありません。"
+    },
+    "impl": {
+      "repo": "kubernetes/kubectl",
+      "ref": "v0.37.2",
+      "path": "pkg/cmd/auth/cani.go",
+      "lines": "L270-L298",
+      "excerpt": "\t\tsar = &authorizationv1.SelfSubjectAccessReview{\n\t\t\tSpec: authorizationv1.SelfSubjectAccessReviewSpec{\n\t\t\t\tResourceAttributes: &authorizationv1.ResourceAttributes{\n\t\t\t\t\tNamespace:   o.Namespace,\n\t\t\t\t\tVerb:        o.Verb,\n\t\t\t\t\tGroup:       o.Resource.Group,\n\t\t\t\t\tResource:    o.Resource.Resource,\n\t\t\t\t\tSubresource: o.Subresource,\n\t\t\t\t\tName:        o.ResourceName,\n\t\t\t\t},\n\t\t\t},\n\t\t}\n\t// ...\n\tresponse, err := o.AuthClient.SelfSubjectAccessReviews().Create(context.TODO(), sar, metav1.CreateOptions{})\n\tif err != nil {\n\t\treturn false, err\n\t}\n\tif response.Status.Allowed {\n\t\tfmt.Fprintln(o.Out, \"yes\")",
+      "note": "問いを SelfSubjectAccessReview の spec.resourceAttributes (名前空間・動詞・グループ・資源・名前) に入れて Create (POST) し、返ってきた status.allowed で yes か no を出します。"
+    },
+    "sources": [
+      {
+        "label": "Kubernetes: kubectl auth can-i",
+        "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_auth/kubectl_auth_can-i/"
+      },
+      {
+        "label": "Kubernetes: Authorization (Checking API access)",
+        "url": "https://kubernetes.io/docs/reference/access-authn-authz/authorization/"
+      },
+      {
+        "label": "Kubernetes API: SelfSubjectAccessReview",
+        "url": "https://kubernetes.io/docs/reference/kubernetes-api/definitions/self-subject-access-review-v1-authorization/"
+      },
+      {
+        "label": "Kubernetes: User Impersonation",
+        "url": "https://kubernetes.io/docs/reference/access-authn-authz/user-impersonation/"
+      },
+      {
+        "label": "Kubernetes: Using RBAC Authorization",
+        "url": "https://kubernetes.io/docs/reference/access-authn-authz/rbac/"
+      },
+      {
+        "label": "kubernetes/kubectl v0.37.2: pkg/cmd/auth/cani.go",
+        "url": "https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/cmd/auth/cani.go#L270-L298"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-top",
+    "inside": [
+      "kubeconfig を読んで行き先を決め、/api と /apis の一覧を読んで、metrics.k8s.io の API があるか、どの版か (v1 があれば v1、無ければ v1beta1) を確かめます。無ければ Metrics API not available で止まります。",
+      "top pod なら GET /apis/metrics.k8s.io/<版>/namespaces/{namespace}/pods (v1.37 からの v1 があれば v1、無ければ v1beta1) を、top node なら .../nodes を送ります。top node は割合 (%) を出すために、Node の一覧 (/api/v1/nodes) も読んで、使える量と比べます。",
+      "metrics.k8s.io は API サーバーの中にある API ではなく、Metrics Server が API の集約 (aggregation layer) で足したものです。API サーバーは認証と認可のあと、要求を Metrics Server へ取り次ぎます。",
+      "Metrics Server は、各 Node の kubelet (/metrics/resource) から集めた CPU とメモリの値を返します。値は etcd に保存されたものではなく、直近の値です。",
+      "kubectl は、CPU をミリコア (m)、メモリを Mi にして表にします。--sort-by (cpu か memory) の並べ替えと --sum の合計は、受け取ったあとに手元で計算します。"
+    ],
+    "api": [
+      {
+        "method": "GET",
+        "path": "/apis/metrics.k8s.io/v1/namespaces/{namespace}/pods",
+        "note": "kubectl top pod (v1.37 からの v1。Metrics Server が返す)"
+      },
+      {
+        "method": "GET",
+        "path": "/apis/metrics.k8s.io/v1/nodes",
+        "note": "kubectl top node (v1.37 からの v1)"
+      },
+      {
+        "method": "GET",
+        "path": "/apis/metrics.k8s.io/v1beta1/namespaces/{namespace}/pods",
+        "note": "kubectl top pod。v1 を出していないクラスタ (この例の v1.36 など)"
+      },
+      {
+        "method": "GET",
+        "path": "/apis/metrics.k8s.io/v1beta1/nodes",
+        "note": "kubectl top node。v1 を出していないクラスタ (この例の v1.36 など)"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/nodes",
+        "note": "top node で割合を出すために読む"
+      }
+    ],
+    "examples": [
+      {
+        "title": "Node ごとの使用量",
+        "code": "$ kubectl top nodes",
+        "output": "NAME    CPU(cores)   CPU(%)      MEMORY(bytes)   MEMORY(%)\nnode1   359m         8%          3039Mi          38%\nnode3   1829m        45%         1957Mi          25%\nnode4   583m         14%         2517Mi          32%\nnode2   <unknown>    <unknown>   <unknown>       <unknown>",
+        "note": "359m は 0.359 コアです。% は Node の割り当てられる量に対する割合です。node2 は止まっていて (NotReady) 値を集められないので <unknown> です。"
+      },
+      {
+        "title": "Pod をメモリの多い順に並べる",
+        "code": "$ kubectl top pods -n kube-system --sort-by=memory",
+        "output": "NAME                                      CPU(cores)   MEMORY(bytes)\nmetrics-server-74c8c4d68b-wl2pz           16m          81Mi\ncoredns-5688c889c9-fxn66                  10m          78Mi\nlocal-path-provisioner-67d6887d65-554hw   1m           51Mi\ntraefik-7489bb4c44-l6dvf                  4m           24Mi\n...",
+        "note": "並べ替えは kubectl が手元で行います。終わった Pod (Completed) は値が無いので出ません。"
+      }
+    ],
+    "verbose": {
+      "code": "$ kubectl top pods -n kube-system -v=6",
+      "output": "I1118 18:08:22.288999 2065252 round_trippers.go:632] \"Response\" verb=\"GET\" url=\"https://<API サーバー>/api\" status=\"200 OK\" milliseconds=21\nI1118 18:08:22.297268 2065252 round_trippers.go:632] \"Response\" verb=\"GET\" url=\"https://<API サーバー>/apis\" status=\"200 OK\" milliseconds=6\nI1118 18:08:22.313634 2065252 round_trippers.go:632] \"Response\" verb=\"GET\" url=\"https://<API サーバー>/apis/metrics.k8s.io/v1beta1/namespaces/kube-system/pods\" status=\"200 OK\" milliseconds=11\nNAME                                      CPU(cores)   MEMORY(bytes)\n...",
+      "note": "/api と /apis で Metrics API を探し、v1beta1 の PodMetrics を読んでいます。この例のクラスタの Metrics Server は v1beta1 だけを出しています。"
+    },
+    "impl": {
+      "repo": "kubernetes/kubectl",
+      "ref": "v0.37.2",
+      "path": "pkg/cmd/top/top_pod.go",
+      "lines": "L191-L263",
+      "excerpt": "\tapiGroups, err := o.DiscoveryClient.ServerGroups()\n\tif err != nil {\n\t\treturn err\n\t}\n\n\tmetricsAPIAvailable := SupportedMetricsAPIVersionAvailable(apiGroups)\n\n\tif metricsAPIAvailable == \"\" {\n\t\treturn errors.New(\"Metrics API not available\")\n\t// ...\n\tif metricsAPIAvailable == \"v1\" {\n\t\tversionedMetrics := &metricsv1api.PodMetricsList{}\n\t\tif resourceName != \"\" {\n\t\t\tm, err := metricsClient.MetricsV1().PodMetricses(ns).Get(context.TODO(), resourceName, metav1.GetOptions{})\n\t// ...\n\t// fallback to metric v1beta1\n\tversionedMetrics := &metricsv1beta1api.PodMetricsList{}\n\tif resourceName != \"\" {\n\t\tm, err := metricsClient.MetricsV1beta1().PodMetricses(ns).Get(context.TODO(), resourceName, metav1.GetOptions{})",
+      "note": "API のグループの一覧から Metrics API があるかと版を調べ、無ければ Metrics API not available で止まります。v1 があれば v1、無ければ v1beta1 の PodMetrics を読みます。"
+    },
+    "sources": [
+      {
+        "label": "Kubernetes: kubectl top",
+        "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_top/"
+      },
+      {
+        "label": "Kubernetes: Resource metrics pipeline",
+        "url": "https://kubernetes.io/docs/tasks/debug/debug-cluster/resource-metrics-pipeline/"
+      },
+      {
+        "label": "kubernetes-sigs/metrics-server",
+        "url": "https://github.com/kubernetes-sigs/metrics-server"
+      },
+      {
+        "label": "kubernetes/kubectl v0.37.2: pkg/cmd/top/top_pod.go",
+        "url": "https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/cmd/top/top_pod.go#L191-L263"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-create-job",
+    "inside": [
+      "kubeconfig を読んで行き先を決め、引数から Job のオブジェクトを手元で組み立てます。--image なら、Job と同じ名前のコンテナ 1 つと restartPolicy: Never の Pod テンプレートを作り、-- の後ろをコマンドにします。",
+      "--from=cronjob/<名前> なら、先に GET でその CronJob を読み、spec.jobTemplate を写します。注釈 cronjob.kubernetes.io/instantiate: manual と、持ち主 (ownerReferences) としてその CronJob を付けます。",
+      "POST /apis/batch/v1/namespaces/{namespace}/jobs を送ります。",
+      "API サーバーは認証・認可・アドミッションを通して etcd に保存します。Pod Security Admission は、名前空間の基準に合わない Pod テンプレートに、warn のモードなら would violate PodSecurity の警告を返します。backoffLimit (既定 6) などの決まっていない欄は、既定の値で埋まります。",
+      "保存されると、kube-controller-manager の Job コントローラーが、選ぶためのラベル (batch.kubernetes.io/controller-uid など) を付けた Pod を作ります。スケジューラーが Node を選び、kubelet がコンテナを動かします。",
+      "Job コントローラーは成功で終わった Pod を数え、completions (既定 1) に届くと Job を完了にします。失敗すれば backoffLimit まで作り直します。kubectl は作った直後に戻り、終わるのは待ちません。"
+    ],
+    "api": [
+      {
+        "method": "POST",
+        "path": "/apis/batch/v1/namespaces/{namespace}/jobs",
+        "note": "Job を作る"
+      },
+      {
+        "method": "GET",
+        "path": "/apis/batch/v1/namespaces/{namespace}/cronjobs/{name}",
+        "note": "--from=cronjob/<名前> のとき"
+      }
+    ],
+    "examples": [
+      {
+        "title": "イメージを指定して Job を作る (保存しない検査だけ)",
+        "code": "$ kubectl create job hello --image=busybox:1.36 -n default --dry-run=server -- echo hello",
+        "output": "Warning: would violate PodSecurity \"restricted:latest\": allowPrivilegeEscalation != false (container \"hello\" must set securityContext.allowPrivilegeEscalation=false), unrestricted capabilities (container \"hello\" must set securityContext.capabilities.drop=[\"ALL\"]), ...\njob.batch/hello created (server dry run)",
+        "note": "この例の名前空間には Pod Security の restricted の警告 (warn) が付いているので、作れはするものの警告が出ています。"
+      },
+      {
+        "title": "API サーバーが埋めた既定の値を見る",
+        "code": "$ kubectl create job hello --image=busybox:1.36 -n default --dry-run=server -o yaml -- echo hello",
+        "output": "apiVersion: batch/v1\nkind: Job\nmetadata:\n  labels:\n    batch.kubernetes.io/controller-uid: <UID>\n    batch.kubernetes.io/job-name: hello\n    ...\n  name: hello\n  namespace: default\nspec:\n  backoffLimit: 6\n  completionMode: NonIndexed\n  completions: 1\n  ...\n  parallelism: 1\n  ...\n  template:\n    ...\n    spec:\n      containers:\n      - command:\n        - echo\n        - hello\n        image: busybox:1.36\n        imagePullPolicy: IfNotPresent\n        ...",
+        "note": "--dry-run=server と -o yaml を合わせると、保存されるはずの形が返ります。kubectl が送っていない backoffLimit: 6 や completions: 1、選ぶためのラベルは API サーバーが足したものです。"
+      }
+    ],
+    "verbose": {
+      "code": "$ kubectl create job hello --image=busybox:1.36 -n default --dry-run=server -v=6 -- echo hello",
+      "output": "I1118 18:08:26.052957 2065339 round_trippers.go:632] \"Response\" verb=\"POST\" url=\"https://<API サーバー>/apis/batch/v1/namespaces/default/jobs?dryRun=All&fieldManager=kubectl-create&fieldValidation=Strict\" status=\"201 Created\" milliseconds=26\nWarning: would violate PodSecurity \"restricted:latest\": ...\njob.batch/hello created (server dry run)",
+      "note": "本体は POST の 1 本です。警告は応答のヘッダー (Warning) で返り、kubectl がそれを出しています。"
+    },
+    "impl": {
+      "repo": "kubernetes/kubectl",
+      "ref": "v0.37.2",
+      "path": "pkg/cmd/create/create_job.go",
+      "lines": "L254-L277",
+      "excerpt": "func (o *CreateJobOptions) createJobFromCronJob(cronJob *batchv1.CronJob) *batchv1.Job {\n\tannotations := make(map[string]string)\n\tannotations[\"cronjob.kubernetes.io/instantiate\"] = \"manual\"\n\tfor k, v := range cronJob.Spec.JobTemplate.Annotations {\n\t\tannotations[k] = v\n\t}\n\n\tjob := &batchv1.Job{\n\t\t// this is ok because we know exactly how we want to be serialized\n\t\tTypeMeta: metav1.TypeMeta{APIVersion: batchv1.SchemeGroupVersion.String(), Kind: \"Job\"},\n\t\tObjectMeta: metav1.ObjectMeta{\n\t\t\tName:        o.Name,\n\t\t\tAnnotations: annotations,\n\t\t\tLabels:      cronJob.Spec.JobTemplate.Labels,\n\t\t\t\t\t// ...\n\t\t\t\t\tAPIVersion: batchv1.SchemeGroupVersion.String(),\n\t\t\t\t\tKind:       \"CronJob\",\n\t\t\t\t\tName:       cronJob.GetName(),\n\t\t\t\t\tUID:        cronJob.GetUID(),\n\t\t\t\t\tController: ptr.To(true),",
+      "note": "--from=cronjob/<名前> のとき、CronJob の jobTemplate を写して Job を作ります。注釈 cronjob.kubernetes.io/instantiate: manual と、持ち主としてその CronJob を付けます。"
+    },
+    "sources": [
+      {
+        "label": "Kubernetes: kubectl create job",
+        "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_create/kubectl_create_job/"
+      },
+      {
+        "label": "Kubernetes: Jobs",
+        "url": "https://kubernetes.io/docs/concepts/workloads/controllers/job/"
+      },
+      {
+        "label": "Kubernetes API: Job",
+        "url": "https://kubernetes.io/docs/reference/kubernetes-api/batch/job-v1/"
+      },
+      {
+        "label": "Kubernetes: Pod Security Admission",
+        "url": "https://kubernetes.io/docs/concepts/security/pod-security-admission/"
+      },
+      {
+        "label": "kubernetes/kubectl v0.37.2: pkg/cmd/create/create_job.go",
+        "url": "https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/cmd/create/create_job.go#L254-L277"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-create-secret-generic",
+    "inside": [
+      "kubeconfig を読んで行き先を決めます。--from-literal は キー=値 を、--from-file はファイルの中身 (キーは既定でファイル名) を読み、手元で Secret のオブジェクトを組み立てます。",
+      "値は data の欄にバイト列として入り、JSON にするときに Base64 で書かれます。Base64 は書き方を変えただけで、暗号化ではありません。--type が無ければ type は空のまま送られ、API サーバーが既定の Opaque にします。",
+      "POST /api/v1/namespaces/{namespace}/secrets を送ります。",
+      "API サーバーは認証・認可・アドミッションを通して etcd に保存します。既定では etcd の中でも暗号化されず、保存時の暗号化 (encryption at rest) を設定したときだけ暗号化されます。",
+      "Pod が env (secretKeyRef) や volume でこの Secret を参照すると、kubelet が API サーバーから読み、コンテナに環境変数やファイルとして渡します。その名前空間で Pod を作れる人は、Pod を通してその Secret を読めることになります。"
+    ],
+    "api": [
+      {
+        "method": "POST",
+        "path": "/api/v1/namespaces/{namespace}/secrets",
+        "note": "Secret を作る"
+      }
+    ],
+    "examples": [
+      {
+        "title": "キーと値を直接書いて作る (保存しない検査だけ)",
+        "code": "$ kubectl create secret generic demo-secret --from-literal=user=example -n default --dry-run=server",
+        "output": "secret/demo-secret created (server dry run)",
+        "note": "値は打ったコマンドの履歴にも残るので、本物の値は --from-file で渡すほうが安全です。"
+      },
+      {
+        "title": "type が何になったかだけを見る",
+        "code": "$ kubectl create secret generic demo-secret --from-literal=user=example -n default --dry-run=server -o jsonpath='{.type}'",
+        "output": "Opaque",
+        "note": "中身を出さずに type だけを取り出しています。kubectl は type を送っていないので、Opaque は API サーバーが埋めた既定の値です。"
+      }
+    ],
+    "verbose": {
+      "code": "$ kubectl create secret generic demo-secret --from-literal=user=example -n default --dry-run=server -v=6",
+      "output": "I1118 18:08:26.523480 2065410 round_trippers.go:632] \"Response\" verb=\"POST\" url=\"https://<API サーバー>/api/v1/namespaces/default/secrets?dryRun=All&fieldManager=kubectl-create&fieldValidation=Strict\" status=\"201 Created\" milliseconds=23\nsecret/demo-secret created (server dry run)",
+      "note": "POST の 1 本です。-v=8 にすると要求の中身 (Base64 にした値) まで出るので、本物の値で -v=8 を使うときは出力の扱いに気を付けます。"
+    },
+    "impl": {
+      "repo": "kubernetes/kubectl",
+      "ref": "v0.37.2",
+      "path": "pkg/cmd/create/create_secret.go",
+      "lines": "L312-L324",
+      "excerpt": "func handleSecretFromLiteralSources(secret *corev1.Secret, literalSources []string) error {\n\tfor _, literalSource := range literalSources {\n\t\tkeyName, value, err := util.ParseLiteralSource(literalSource)\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}\n\t\tif err = addKeyFromLiteralToSecret(secret, keyName, []byte(value)); err != nil {\n\t\t\treturn err\n\t\t}\n\t}\n\n\treturn nil\n}",
+      "note": "--from-literal の キー=値 を 1 つずつ分け、値をバイト列として Secret の data に入れます。暗号化はここでも送るときにもしません。"
+    },
+    "sources": [
+      {
+        "label": "Kubernetes: kubectl create secret generic",
+        "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_create/kubectl_create_secret_generic/"
+      },
+      {
+        "label": "Kubernetes: Secrets",
+        "url": "https://kubernetes.io/docs/concepts/configuration/secret/"
+      },
+      {
+        "label": "Kubernetes API: Secret",
+        "url": "https://kubernetes.io/docs/reference/kubernetes-api/core/secret-v1/"
+      },
+      {
+        "label": "kubernetes/kubectl v0.37.2: pkg/cmd/create/create_secret.go",
+        "url": "https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/cmd/create/create_secret.go#L312-L324"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-create-secret-docker-registry",
+    "inside": [
+      "kubeconfig を読んで行き先を決めます。--docker-server・--docker-username・--docker-password (と --docker-email) から、~/.docker/config.json と同じ形の JSON ({\"auths\":{\"<サーバー>\":{\"username\":...,\"password\":...,\"auth\":...}}}) を手元で作ります。auth は「ユーザー名:パスワード」を Base64 にしたものです。",
+      "その JSON を .dockerconfigjson のキーに入れ、type: kubernetes.io/dockerconfigjson の Secret を組み立てます。--from-file で、すでにある config.json をそのまま入れることもできます。",
+      "POST /api/v1/namespaces/{namespace}/secrets を送ります。",
+      "API サーバーは認証・認可・アドミッションに加え、この type の決まりとして、data に .dockerconfigjson のキーがあり、値が JSON として読めるかを確かめてから etcd に保存します (中身が本当に Docker の設定かまでは確かめません)。",
+      "Pod の spec.imagePullSecrets (またはサービスアカウントの imagePullSecrets) にこの Secret の名前を書くと、kubelet がイメージを取るときに、この資格情報を使ってレジストリにログインします。Secret は同じ名前空間の Pod からしか使えません。"
+    ],
+    "api": [
+      {
+        "method": "POST",
+        "path": "/api/v1/namespaces/{namespace}/secrets",
+        "note": "type: kubernetes.io/dockerconfigjson の Secret を作る"
+      }
+    ],
+    "examples": [
+      {
+        "title": "レジストリの資格情報の Secret を作る (保存しない検査だけ)",
+        "code": "$ kubectl create secret docker-registry regcred --docker-server=registry.example.com --docker-username=example --docker-password=example -n default --dry-run=server",
+        "output": "secret/regcred created (server dry run)",
+        "note": "作った regcred を Pod の imagePullSecrets に書くと、registry.example.com からイメージを取るときに使われます。"
+      }
+    ],
+    "verbose": {
+      "code": "$ kubectl create secret docker-registry regcred --docker-server=registry.example.com --docker-username=example --docker-password=example -n default --dry-run=server -v=6",
+      "output": "I1118 18:08:26.721430 2065452 round_trippers.go:632] \"Response\" verb=\"POST\" url=\"https://<API サーバー>/api/v1/namespaces/default/secrets?dryRun=All&fieldManager=kubectl-create&fieldValidation=Strict\" status=\"201 Created\" milliseconds=17\nsecret/regcred created (server dry run)",
+      "note": "generic と同じ secrets への POST です。違うのは中身の type と、.dockerconfigjson のキーだけです。"
+    },
+    "impl": {
+      "repo": "kubernetes/kubectl",
+      "ref": "v0.37.2",
+      "path": "pkg/cmd/create/create_secret_docker.go",
+      "lines": "L290-L308",
+      "excerpt": "func handleDockerCfgJSONContent(username, password, email, server string) ([]byte, error) {\n\tdockerConfigAuth := DockerConfigEntry{\n\t\tUsername: username,\n\t\tPassword: password,\n\t\tEmail:    email,\n\t\tAuth:     encodeDockerConfigFieldAuth(username, password),\n\t}\n\tdockerConfigJSON := DockerConfigJSON{\n\t\tAuths: map[string]DockerConfigEntry{server: dockerConfigAuth},\n\t}\n\n\treturn json.Marshal(dockerConfigJSON)\n}\n\n// encodeDockerConfigFieldAuth returns base64 encoding of the username and password string\nfunc encodeDockerConfigFieldAuth(username, password string) string {\n\tfieldValue := username + \":\" + password\n\treturn base64.StdEncoding.EncodeToString([]byte(fieldValue))\n}",
+      "note": "~/.docker/config.json と同じ形の JSON を作ります。auths の下にサーバーごとの項目を置き、auth には「ユーザー名:パスワード」を Base64 にしたものを入れます。"
+    },
+    "sources": [
+      {
+        "label": "Kubernetes: kubectl create secret docker-registry",
+        "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_create/kubectl_create_secret_docker-registry/"
+      },
+      {
+        "label": "Kubernetes: Secrets",
+        "url": "https://kubernetes.io/docs/concepts/configuration/secret/"
+      },
+      {
+        "label": "Kubernetes: Pull an Image from a Private Registry",
+        "url": "https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/"
+      },
+      {
+        "label": "Kubernetes API: Secret",
+        "url": "https://kubernetes.io/docs/reference/kubernetes-api/core/secret-v1/"
+      },
+      {
+        "label": "kubernetes/kubectl v0.37.2: pkg/cmd/create/create_secret_docker.go",
+        "url": "https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/cmd/create/create_secret_docker.go#L290-L308"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-create-rolebinding",
+    "inside": [
+      "kubeconfig を読んで行き先を決めます。--role か --clusterrole から roleRef (apiGroup: rbac.authorization.k8s.io・kind・name) を、--user・--group・--serviceaccount から subjects を、手元で組み立てます。--serviceaccount は <名前空間>:<名前> の形でないと断られます。",
+      "POST /apis/rbac.authorization.k8s.io/v1/namespaces/{namespace}/rolebindings を送ります。",
+      "API サーバーは認証・認可のあと、権限が広がらないかを確かめます。結び付ける Role の権限を、自分がその名前空間ですべて持っているか、その Role に対する bind の権限があるときだけ作れます。",
+      "検証を通ると etcd に保存されます。動かすコントローラーは無く、次の要求から、API サーバーの RBAC の認可がこの結び付けを使って許すかどうかを決めます。",
+      "roleRef は作ったあとに変えられません。結び付ける Role を変えたいときは、消して作り直します。"
+    ],
+    "api": [
+      {
+        "method": "POST",
+        "path": "/apis/rbac.authorization.k8s.io/v1/namespaces/{namespace}/rolebindings",
+        "note": "RoleBinding を作る"
+      }
+    ],
+    "examples": [
+      {
+        "title": "ClusterRole の view を、サービスアカウントに default の中だけで結び付ける (保存しない検査だけ)",
+        "code": "$ kubectl create rolebinding view-binding --clusterrole=view --serviceaccount=default:default -n default --dry-run=server -o yaml",
+        "output": "apiVersion: rbac.authorization.k8s.io/v1\nkind: RoleBinding\nmetadata:\n  ...\n  name: view-binding\n  namespace: default\nroleRef:\n  apiGroup: rbac.authorization.k8s.io\n  kind: ClusterRole\n  name: view\nsubjects:\n- kind: ServiceAccount\n  name: default\n  namespace: default",
+        "note": "roleRef が ClusterRole でも、RoleBinding なので権限が及ぶのは namespace: default の中だけです。サービスアカウントの subjects には namespace が入ります。"
+      }
+    ],
+    "verbose": {
+      "code": "$ kubectl create rolebinding view-binding --clusterrole=view --serviceaccount=default:default -n default --dry-run=server -v=6",
+      "output": "I1118 18:08:26.922458 2065486 round_trippers.go:632] \"Response\" verb=\"POST\" url=\"https://<API サーバー>/apis/rbac.authorization.k8s.io/v1/namespaces/default/rolebindings?dryRun=All&fieldManager=kubectl-create&fieldValidation=Strict\" status=\"201 Created\" ...\nrolebinding.rbac.authorization.k8s.io/view-binding created (server dry run)",
+      "note": "rbac.authorization.k8s.io のグループの API への POST の 1 本です。"
+    },
+    "impl": {
+      "repo": "kubernetes/kubectl",
+      "ref": "v0.37.2",
+      "path": "pkg/cmd/create/create_rolebinding.go",
+      "lines": "L214-L248",
+      "excerpt": "\tcase len(o.ClusterRole) > 0:\n\t\troleBinding.RoleRef = rbacv1.RoleRef{\n\t\t\tAPIGroup: rbacv1.GroupName,\n\t\t\tKind:     \"ClusterRole\",\n\t\t\tName:     o.ClusterRole,\n\t\t}\n\t}\n\t// ...\n\tfor _, sa := range o.ServiceAccounts {\n\t\ttokens := strings.Split(sa, \":\")\n\t\tif len(tokens) != 2 || tokens[0] == \"\" || tokens[1] == \"\" {\n\t\t\treturn nil, fmt.Errorf(\"serviceaccount must be <namespace>:<name>\")\n\t\t}\n\t\troleBinding.Subjects = append(roleBinding.Subjects, rbacv1.Subject{\n\t\t\tKind:      rbacv1.ServiceAccountKind,\n\t\t\tAPIGroup:  \"\",\n\t\t\tNamespace: tokens[0],\n\t\t\tName:      tokens[1],\n\t\t})",
+      "note": "--clusterrole から roleRef を、--serviceaccount から subjects を組み立てます。サービスアカウントは <名前空間>:<名前> の形でないと断ります。"
+    },
+    "sources": [
+      {
+        "label": "Kubernetes: kubectl create rolebinding",
+        "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_create/kubectl_create_rolebinding/"
+      },
+      {
+        "label": "Kubernetes: Using RBAC Authorization",
+        "url": "https://kubernetes.io/docs/reference/access-authn-authz/rbac/"
+      },
+      {
+        "label": "Kubernetes API: RoleBinding",
+        "url": "https://kubernetes.io/docs/reference/kubernetes-api/rbac/role-binding-v1/"
+      },
+      {
+        "label": "kubernetes/kubectl v0.37.2: pkg/cmd/create/create_rolebinding.go",
+        "url": "https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/cmd/create/create_rolebinding.go#L214-L248"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-events",
+    "inside": [
+      "kubeconfig を読んで行き先を決め、GET /api/v1/namespaces/{namespace}/events を送ります (-A なら /api/v1/events)。--for pod/web なら、involvedObject.kind・involvedObject.apiVersion・involvedObject.name の 3 つの fieldSelector を付け、API サーバーの側で絞ります。読むのは core の v1 の Event (/api/v1) です。events.k8s.io/v1 の Event は同じイベントを新しい形で見せる API ですが、kubectl events は使いません。",
+      "API サーバーは認証と認可 (events の list) を通し、保存されているイベントを返します。イベントは、kubelet・スケジューラー・コントローラーが何かをしたときに書く Event のオブジェクトで、kube-apiserver の --event-ttl (既定 1 時間) が過ぎると消えます。",
+      "--types=Warning のような種類の絞り込みは、受け取ったあとに kubectl が手元で行います。",
+      "kubectl は時刻の順に並べ替え、LAST SEEN・TYPE・REASON・OBJECT・MESSAGE の表にします。同じことが繰り返されたものは 1 つにまとめられ、(x23695 over 20d) のように回数と期間が付きます。",
+      "-w を付けると、一覧の代わりに watch の GET を 1 本開きます。今あるイベントも最初に ADDED として届き (並べ替えはしません)、そのあとも新しいイベントが届くたびに行を足します。"
+    ],
+    "api": [
+      {
+        "method": "GET",
+        "path": "/api/v1/namespaces/{namespace}/events",
+        "note": "kubectl events (--for のときは fieldSelector 付き)"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/events",
+        "note": "kubectl events -A"
+      }
+    ],
+    "examples": [
+      {
+        "title": "Warning のイベントだけを出す",
+        "code": "$ kubectl events -n kube-system --types=Warning",
+        "output": "LAST SEEN                 TYPE      REASON             OBJECT                         MESSAGE\n2m18s (x23695 over 20d)   Warning   DNSConfigForming   Pod/coredns-5688c889c9-fxn66   Nameserver limits were exceeded, some nameservers have been omitted, the applied nameserver line is: 192.0.2.1 192.0.2.2 2001:db8::3",
+        "note": "kubelet が、Node の DNS の設定の名前サーバーが多すぎて一部を外したと、20 日のあいだ繰り返し知らせています。同じイベントは回数だけが増えるので、ttl を過ぎても消えずに残っています。"
+      },
+      {
+        "title": "1 つのリソースに関するイベントに絞る",
+        "code": "$ kubectl events -n kube-system --for deployment/coredns",
+        "output": "No events found in kube-system namespace.",
+        "note": "条件に合うイベントが無いときの出力です。古いイベントは ttl で消えるので、何日も前のことは残っていません。"
+      }
+    ],
+    "verbose": {
+      "code": "$ kubectl events -n kube-system --for deployment/coredns -v=6",
+      "output": "I1118 18:08:24.724647 2065296 round_trippers.go:632] \"Response\" verb=\"GET\" url=\"https://<API サーバー>/api/v1/namespaces/kube-system/events?fieldSelector=involvedObject.kind%3DDeployment%2CinvolvedObject.apiVersion%3Dapps%2Fv1%2CinvolvedObject.name%3Dcoredns&limit=500\" status=\"200 OK\" ...\nNo events found in kube-system namespace.",
+      "note": "--for deployment/coredns が、kind=Deployment・apiVersion=apps/v1・name=coredns の 3 つの fieldSelector になっています。"
+    },
+    "impl": {
+      "repo": "kubernetes/kubectl",
+      "ref": "v0.37.2",
+      "path": "pkg/cmd/events/events.go",
+      "lines": "L222-L249",
+      "excerpt": "func (o *EventsOptions) Run() error {\n\tctx := context.TODO()\n\tnamespace := o.Namespace\n\tif o.AllNamespaces {\n\t\tnamespace = \"\"\n\t}\n\tlistOptions := metav1.ListOptions{Limit: cmdutil.DefaultChunkSize}\n\tif o.forName != \"\" {\n\t\tlistOptions.FieldSelector = fields.AndSelectors(\n\t\t\tfields.OneTermEqualSelector(\"involvedObject.kind\", o.forGVK.Kind),\n\t\t\tfields.OneTermEqualSelector(\"involvedObject.apiVersion\", o.forGVK.GroupVersion().String()),\n\t\t\tfields.OneTermEqualSelector(\"involvedObject.name\", o.forName)).String()\n\t}\n\tif o.Watch {\n\t\treturn o.runWatch(ctx, namespace, listOptions)\n\t// ...\n\terr := runtimeresource.FollowContinue(&listOptions,\n\t\tfunc(options metav1.ListOptions) (runtime.Object, error) {\n\t\t\tnewEvents, err := e.List(ctx, options)\n\t\t\tif err != nil {",
+      "note": "--for があると、involvedObject の kind・apiVersion・name の 3 つの条件を fieldSelector にして、Event の一覧を区切りながら読みます。--types の絞り込みはここには入らず、受け取ったあとに手元で行います。"
+    },
+    "sources": [
+      {
+        "label": "Kubernetes: kubectl events",
+        "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_events/"
+      },
+      {
+        "label": "Kubernetes API: Event",
+        "url": "https://kubernetes.io/docs/reference/kubernetes-api/core/event-v1/"
+      },
+      {
+        "label": "Kubernetes: kube-apiserver (--event-ttl)",
+        "url": "https://kubernetes.io/docs/reference/command-line-tools-reference/kube-apiserver/"
+      },
+      {
+        "label": "kubernetes/kubectl v0.37.2: pkg/cmd/events/events.go",
+        "url": "https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/cmd/events/events.go#L222-L249"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-debug",
+    "inside": [
+      "kubeconfig を読んで行き先を決め、対象によって 3 つの道に分かれます。Pod で --copy-to が無ければエフェメラルコンテナを足し、--copy-to があれば Pod の写しを作り、node/<名前> なら Node を調べる Pod を作ります。",
+      "エフェメラルコンテナのときは、Pod を GET で読み、新しいコンテナ (--image のイメージ、名前は debugger-xxxxx) を足した形との差を作って、PATCH /api/v1/namespaces/{namespace}/pods/{name}/ephemeralcontainers で送ります。この専用の口を通すので、kubectl edit で pod.spec に書き足すことはできません。",
+      "API サーバーは認証・認可 (pods/ephemeralcontainers の patch) とアドミッションを通して保存し、その Node の kubelet が、動いている Pod の中に新しいコンテナを起動します。--target を付けると、そのコンテナとプロセスの名前空間を共有します (ランタイムが対応していれば)。",
+      "-it のときは、Pod を watch してコンテナが動き出すのを待ち、kubectl attach と同じしくみ (pods/{name}/attach) でそのコンテナの端末につなぎます。エフェメラルコンテナは一度足すと、変えることも外すこともできません。",
+      "--copy-to のときは、元の Pod の写し (イメージやコマンドを変えたもの) を新しい Pod として POST で作ります。node/<名前> のときは、その Node に固定し、ホストの PID・ネットワーク・IPC の名前空間を使い、Node のファイルを /host に載せた Pod (node-debugger-<Node 名>-xxxxx) を作ります。作った Pod は自分で消します。",
+      "--profile で、足すコンテナの権限の型を選びます。既定は general で、sysadmin は特権のコンテナになります。"
+    ],
+    "api": [
+      {
+        "method": "GET",
+        "path": "/api/v1/namespaces/{namespace}/pods/{name}",
+        "note": "対象の Pod を読む"
+      },
+      {
+        "method": "PATCH",
+        "path": "/api/v1/namespaces/{namespace}/pods/{name}/ephemeralcontainers",
+        "note": "エフェメラルコンテナを足す"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/namespaces/{namespace}/pods/{name}/attach",
+        "note": "-it でつなぐ (WebSocket。戻ると POST の SPDY)"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/namespaces/{namespace}/pods",
+        "note": "--copy-to の写しと node/<名前> の Pod を作る"
+      }
+    ],
+    "examples": [
+      {
+        "title": "シェルの無いコンテナに、調べるためのコンテナを足す (公式の文書の例)",
+        "code": "$ kubectl debug -it ephemeral-demo --image=busybox:1.28 --target=ephemeral-demo",
+        "output": "Defaulting debug container name to debugger-8xzrl.\nIf you don't see a command prompt, try pressing enter.\n/ #",
+        "note": "名前を付けなかったので debugger-8xzrl という名前が付いています。プロンプトは足した busybox のコンテナの中のシェルです。"
+      },
+      {
+        "title": "Node を調べる Pod を作る (公式の文書の例)",
+        "code": "$ kubectl debug node/mynode -it --image=ubuntu",
+        "output": "Creating debugging pod node-debugger-mynode-pdx84 with container debugger on node mynode.\nIf you don't see a command prompt, try pressing enter.\nroot@mynode:/#",
+        "note": "ホストのネットワークの名前空間を使うので、プロンプトのホスト名が Node の名前です。Node のファイルは /host の下に見えます。終わったら kubectl delete pod node-debugger-mynode-pdx84 で消します。"
+      }
+    ],
+    "verbose": {
+      "code": "$ kubectl debug -it ephemeral-demo --image=busybox:1.28 --target=ephemeral-demo -v=6",
+      "output": "GET   https://<API サーバー>/api/v1/namespaces/default/pods/ephemeral-demo\nPATCH https://<API サーバー>/api/v1/namespaces/default/pods/ephemeral-demo/ephemeralcontainers\nGET   https://<API サーバー>/api/v1/namespaces/default/pods?fieldSelector=metadata.name%3Dephemeral-demo...\nGET   https://<API サーバー>/api/v1/namespaces/default/pods?fieldSelector=metadata.name%3Dephemeral-demo&watch=true...\nGET   https://<API サーバー>/api/v1/namespaces/default/pods/ephemeral-demo/attach?container=debugger-8xzrl&stdin=true&stdout=true&tty=true  (Upgrade: websocket)",
+      "note": "形の例です。debug はクラスタを変えるので実際には打たず、実装 (debugByEphemeralContainer・waitForContainer・attach) から要求の並びを書きました。実際の -v=6 は 1 行ずつ \"Response\" verb=... url=... の形で出ます。"
+    },
+    "impl": {
+      "repo": "kubernetes/kubectl",
+      "ref": "v0.37.2",
+      "path": "pkg/cmd/debug/debug.go",
+      "lines": "L487-L514",
+      "excerpt": "func (o *DebugOptions) debugByEphemeralContainer(ctx context.Context, pod *corev1.Pod) (*corev1.Pod, string, error) {\n\tklog.V(2).Infof(\"existing ephemeral containers: %v\", pod.Spec.EphemeralContainers)\n\tpodJS, err := json.Marshal(pod)\n\t// ...\n\tpatch, err := strategicpatch.CreateTwoWayMergePatch(podJS, debugJS, pod)\n\tif err != nil {\n\t\treturn nil, \"\", fmt.Errorf(\"error creating patch to add debug container: %v\", err)\n\t}\n\tklog.V(2).Infof(\"generated strategic merge patch for debug container: %s\", patch)\n\n\tpods := o.podClient.Pods(pod.Namespace)\n\tresult, err := pods.Patch(ctx, pod.Name, types.StrategicMergePatchType, patch, metav1.PatchOptions{}, \"ephemeralcontainers\")",
+      "note": "今の Pod と、エフェメラルコンテナを足した Pod の差を strategic merge patch にし、Pod の ephemeralcontainers のサブリソースに PATCH します。pod.spec を直に書き換えるのではありません。"
+    },
+    "sources": [
+      {
+        "label": "Kubernetes: kubectl debug",
+        "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_debug/"
+      },
+      {
+        "label": "Kubernetes: Debug Running Pods",
+        "url": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-running-pod/"
+      },
+      {
+        "label": "Kubernetes: Debugging Kubernetes Nodes With Kubectl",
+        "url": "https://kubernetes.io/docs/tasks/debug/debug-cluster/kubectl-node-debug/"
+      },
+      {
+        "label": "Kubernetes: Ephemeral Containers",
+        "url": "https://kubernetes.io/docs/concepts/workloads/pods/ephemeral-containers/"
+      },
+      {
+        "label": "Kubernetes API: Pod",
+        "url": "https://kubernetes.io/docs/reference/kubernetes-api/core/pod-v1/"
+      },
+      {
+        "label": "kubernetes/kubectl v0.37.2: pkg/cmd/debug/debug.go",
+        "url": "https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/cmd/debug/debug.go#L487-L514"
+      },
+      {
+        "label": "kubernetes/kubectl v0.37.2: pkg/cmd/debug/debug.go (waitForContainer)",
+        "url": "https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/cmd/debug/debug.go#L898-L913"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-taint",
+    "inside": [
+      "kubeconfig を読んで行き先を決め、引数の キー=値:効果 (後ろに - を付けると外す) を読み取ります。",
+      "対象の Node を GET /api/v1/nodes/{name} で読み、spec.taints の並びを手元で直します。同じキーと効果のテイントがすでにあると、--overwrite が無ければ断ります。",
+      "前と後の差を strategic merge patch にし、PATCH /api/v1/nodes/{name} (Content-Type: application/strategic-merge-patch+json) で送ります。Node はどの名前空間にも属さないので、URL に namespaces/ が入りません。",
+      "API サーバーは認証・認可 (nodes の patch) とアドミッションを通して etcd に書きます。Node を書き換える権限の無い利用者は、ここで 403 で断られます。",
+      "スケジューラーは、それ以降に Pod の置き先を選ぶときにテイントを見て、それを容認 (toleration) しない Pod をその Node に置きません。NoExecute のときは、kube-controller-manager の taint-eviction-controller (v1.29 で node controller から分かれたもの) が、容認しない動いている Pod を追い出します。",
+      "kubectl は node/<名前> tainted (外したときは untainted) と出して戻ります。"
+    ],
+    "api": [
+      {
+        "method": "GET",
+        "path": "/api/v1/nodes/{name}",
+        "note": "今のテイントを読む"
+      },
+      {
+        "method": "PATCH",
+        "path": "/api/v1/nodes/{name}",
+        "note": "spec.taints を書き換える"
+      }
+    ],
+    "examples": [
+      {
+        "title": "Node に付いているテイントを見る",
+        "code": "$ kubectl get nodes -o custom-columns=NAME:.metadata.name,TAINTS:.spec.taints",
+        "output": "NAME    TAINTS\nnode1   <none>\nnode2   [map[effect:NoSchedule key:node.kubernetes.io/unreachable timeAdded:2026-08-01T15:09:01Z] map[effect:NoExecute key:node.kubernetes.io/unreachable timeAdded:2026-10-28T16:17:13Z]]\nnode3   <none>\nnode4   <none>",
+        "note": "止まって届かなくなった node2 には、node controller が node.kubernetes.io/unreachable のテイントを NoSchedule と NoExecute の両方で付けています。kubectl taint で付けるテイントも、同じ spec.taints に入ります。"
+      },
+      {
+        "title": "権限の無い利用者が付けようとしたとき (保存しない検査)",
+        "code": "$ kubectl taint nodes node3 dedicated=gpu:NoSchedule --dry-run=server",
+        "output": "Error from server (Forbidden): nodes \"node3\" is forbidden: User \"kcna-user\" cannot patch resource \"nodes\" in API group \"\" at the cluster scope",
+        "note": "認可 (RBAC) で断られた 403 です。at the cluster scope は、Node が名前空間に属さない資源だからです。"
+      }
+    ],
+    "verbose": {
+      "code": "$ kubectl taint nodes node3 dedicated=gpu:NoSchedule --dry-run=server -v=8",
+      "output": "I1118 18:08:27.538798 2065517 round_trippers.go:527] \"Request\" verb=\"GET\" url=\"https://<API サーバー>/api/v1/nodes/node3\" headers=<\n...\nI1118 18:08:27.567870 2065517 helper.go:269] \"Request Body\" body=\"{\\\"spec\\\":{\\\"taints\\\":[{\\\"effect\\\":\\\"NoSchedule\\\",\\\"key\\\":\\\"dedicated\\\",\\\"value\\\":\\\"gpu\\\"}]}}\"\nI1118 18:08:27.567984 2065517 round_trippers.go:527] \"Request\" verb=\"PATCH\" url=\"https://<API サーバー>/api/v1/nodes/node3?dryRun=All&fieldManager=kubectl-taint&fieldValidation=Strict\" headers=<\n\tContent-Type: application/strategic-merge-patch+json\n\t...\n >\nI1118 18:08:27.572861 2065517 round_trippers.go:632] \"Response\" status=\"403 Forbidden\" ...\nError from server (Forbidden): nodes \"node3\" is forbidden: User \"kcna-user\" cannot patch resource \"nodes\" in API group \"\" at the cluster scope",
+      "note": "GET で読み、spec.taints だけの差を PATCH で送っています。この利用者には Node を書き換える権限が無いので、認可で 403 になりました (dryRun=All なので、許されても保存はされません)。"
+    },
+    "impl": {
+      "repo": "kubernetes/kubectl",
+      "ref": "v0.37.2",
+      "path": "pkg/cmd/taint/taint.go",
+      "lines": "L276-L342",
+      "excerpt": "\t\toldData, err := json.Marshal(obj)\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}\n\t\toperation, err := o.updateTaints(obj)\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}\n\t\tnewData, err := json.Marshal(obj)\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}\n\t\tpatchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, obj)\n\t\t\t// ...\n\t\t\toutputObj, err = helper.Patch(namespace, name, types.StrategicMergePatchType, patchBytes, nil)",
+      "note": "Node を JSON にした前の形と、テイントを直した後の形の差を strategic merge patch にして、Node に PATCH します。"
+    },
+    "sources": [
+      {
+        "label": "Kubernetes: kubectl taint",
+        "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_taint/"
+      },
+      {
+        "label": "Kubernetes: Taints and Tolerations",
+        "url": "https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/"
+      },
+      {
+        "label": "Kubernetes API: Node",
+        "url": "https://kubernetes.io/docs/reference/kubernetes-api/core/node-v1/"
+      },
+      {
+        "label": "kubernetes/kubectl v0.37.2: pkg/cmd/taint/taint.go",
+        "url": "https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/cmd/taint/taint.go#L276-L342"
+      },
+      {
+        "label": "kubernetes/kubectl v0.37.2: pkg/cmd/taint/utils.go",
+        "url": "https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/cmd/taint/utils.go#L32-L34"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-set-image",
+    "inside": [
+      "kubeconfig を読んで行き先を決め、対象 (deployment/web など) を GET で読みます。",
+      "Pod テンプレート (spec.template.spec) の中で、名前の合うコンテナと init コンテナの image を手元で書き換えます。名前に * を書くとすべてのコンテナです。合う名前が無ければ断ります。",
+      "前との差を strategic merge patch にし、PATCH /apis/apps/v1/namespaces/{namespace}/deployments/{name} (fieldManager=kubectl-set) で送ります。差が無いとき (今と同じイメージのとき) は PATCH を送りません。",
+      "API サーバーは認証・認可・アドミッションを通して etcd に書きます。Pod テンプレートが変わったので、metadata.generation が 1 つ増えます。",
+      "Deployment コントローラーはテンプレートが変わったのを見て、新しい pod-template-hash の ReplicaSet を作り、maxSurge・maxUnavailable の範囲で、新しい ReplicaSet を増やしながら古いものを減らします (ロールアウト)。進み具合は kubectl rollout status で見られ、kubectl rollout undo で前のテンプレートに戻せます。",
+      "kubectl は image updated と出してすぐ戻り、ロールアウトが終わるのは待ちません。"
+    ],
+    "api": [
+      {
+        "method": "GET",
+        "path": "/apis/apps/v1/namespaces/{namespace}/deployments/{name}",
+        "note": "今の形を読む"
+      },
+      {
+        "method": "PATCH",
+        "path": "/apis/apps/v1/namespaces/{namespace}/deployments/{name}",
+        "note": "Pod テンプレートのイメージを書き換える"
+      }
+    ],
+    "examples": [
+      {
+        "title": "Deployment のイメージを変える (公式の文書の例)",
+        "code": "$ kubectl set image deployment.v1.apps/nginx-deployment nginx=nginx:1.16.1",
+        "output": "deployment.apps/nginx-deployment image updated",
+        "note": "nginx はコンテナの名前、nginx:1.16.1 は新しいイメージです。このあと Deployment コントローラーがロールアウトを始めます。"
+      }
+    ],
+    "verbose": {
+      "code": "$ kubectl set image deployment/web -n default web=nginx:1.27-alpine --dry-run=server -v=8",
+      "output": "I1118 18:09:13.749295 2067843 round_trippers.go:527] \"Request\" verb=\"GET\" url=\"https://<API サーバー>/apis/apps/v1/namespaces/default/deployments/web\" headers=<\n...\nI1118 18:09:13.773945 2067843 helper.go:105] \"Response Body\" body=\"{\\\"kind\\\":\\\"Deployment\\\",\\\"apiVersion\\\":\\\"apps/v1\\\",\\\"metadata\\\":{\\\"name\\\":\\\"web\\\",\\\"namespace\\\":\\\"default\\\",...,\\\"generation\\\":1,...\"\nI1118 18:09:13.786958 2067843 helper.go:269] \"Request Body\" body=\"{\\\"spec\\\":{\\\"template\\\":{\\\"spec\\\":{\\\"$setElementOrder/containers\\\":[{\\\"name\\\":\\\"web\\\"}],\\\"containers\\\":[{\\\"image\\\":\\\"nginx:1.27-alpine\\\",\\\"name\\\":\\\"web\\\"}]}}}}\"\nI1118 18:09:13.787116 2067843 round_trippers.go:527] \"Request\" verb=\"PATCH\" url=\"https://<API サーバー>/apis/apps/v1/namespaces/default/deployments/web?dryRun=All&fieldManager=kubectl-set\" headers=<\n\tContent-Type: application/strategic-merge-patch+json\n\t...\n >\nI1118 18:09:13.810358 2067843 round_trippers.go:632] \"Response\" status=\"200 OK\" ...\nI1118 18:09:13.810650 2067843 helper.go:269] \"Response Body\" body=\"{...\\\"generation\\\":2,...\"\ndeployment.apps/web image updated (server dry run)",
+      "note": "PATCH の中身は、コンテナの名前で合わせて image だけを変える strategic merge patch です ($setElementOrder は並びを保つしるし)。応答では generation が 1 から 2 に増えています (dryRun なので保存はされません)。"
+    },
+    "impl": {
+      "repo": "kubernetes/kubectl",
+      "ref": "v0.37.2",
+      "path": "pkg/cmd/set/set_image.go",
+      "lines": "L236-L292",
+      "excerpt": "\tpatches := CalculatePatches(o.Infos, scheme.DefaultJSONEncoder(), func(obj runtime.Object) ([]byte, error) {\n\t\t_, err := o.UpdatePodSpecForObject(obj, func(spec *v1.PodSpec) error {\n\t\t\tfor name, image := range o.ContainerImages {\n\t\t\t\t// ...\n\t\t\t\tinitContainerFound := setImage(spec.InitContainers, name, resolvedImageName)\n\t\t\t\tcontainerFound := setImage(spec.Containers, name, resolvedImageName)\n\t\t// ...\n\t\t// patch the change\n\t\tactual, err := resource.\n\t\t\tNewHelper(info.Client, info.Mapping).\n\t\t\tDryRun(o.DryRunStrategy == cmdutil.DryRunServer).\n\t\t\tWithFieldManager(o.fieldManager).\n\t\t\tPatch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch, nil)",
+      "note": "Pod テンプレートの中の、名前の合う init コンテナとコンテナの image を書き換え、前との差を strategic merge patch にして PATCH します。"
+    },
+    "sources": [
+      {
+        "label": "Kubernetes: kubectl set image",
+        "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_set/kubectl_set_image/"
+      },
+      {
+        "label": "Kubernetes: Deployments",
+        "url": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"
+      },
+      {
+        "label": "Kubernetes API: Deployment",
+        "url": "https://kubernetes.io/docs/reference/kubernetes-api/apps/deployment-v1/"
+      },
+      {
+        "label": "kubernetes/kubectl v0.37.2: pkg/cmd/set/set_image.go",
+        "url": "https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/cmd/set/set_image.go#L236-L292"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-port-forward",
+    "inside": [
+      "kubeconfig を読んで行き先を決めます。deployment/mongo や service/mongo のように書くと、それに合う Pod を 1 つ選びます。Service のときは、Service のポートを選んだ Pod のポート (targetPort) に読み替えます。Service を通るのではなく、選んだ 1 つの Pod に直につながります。",
+      "Pod を GET で読み、Running でなければ断ります。",
+      "/api/v1/namespaces/{namespace}/pods/{name}/portforward への接続を開きます。v1.31 からは、まず WebSocket の上に SPDY を通す形でつなぎ、アップグレードに失敗したときだけ SPDY に戻します。この動きは環境変数 KUBECTL_PORT_FORWARD_WEBSOCKETS で切り替えます。",
+      "API サーバーは認証・認可 (pods の get と pods/portforward の create)・アドミッションを通します。Node が WebSocket に対応していると申告していれば (ExtendWebSocketsToKubelet、v1.36 から既定)、WebSocket のまま kubelet へ渡します。申告が無ければ、WebSocket の中の SPDY を API サーバーで取り出して kubelet へつなぎます。kubelet が、Pod のネットワークの中のそのポートにつなぎます。",
+      "kubectl は手元のポート (既定では localhost。--address で変えられる) で待ち受け、来た TCP の接続を、1 本の接続の中の別々の流れとして Pod へ送ります。UDP は扱えません。",
+      "Ctrl+C で止めるか、選んだ Pod が止まると終わります。Pod が作り直されても、新しい Pod には自動ではつながらないので、打ち直します。"
+    ],
+    "api": [
+      {
+        "method": "GET",
+        "path": "/api/v1/namespaces/{namespace}/pods/{name}",
+        "note": "Pod が Running かを確かめる"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/namespaces/{namespace}/pods/{name}/portforward",
+        "note": "WebSocket でつなぐとき (v1.31 からの既定)"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/namespaces/{namespace}/pods/{name}/portforward",
+        "note": "SPDY に戻ったとき"
+      }
+    ],
+    "examples": [
+      {
+        "title": "手元の 28015 番を Pod の 27017 番につなぐ (公式の文書の例)",
+        "code": "$ kubectl port-forward service/mongo 28015:27017",
+        "output": "Forwarding from 127.0.0.1:28015 -> 27017\nForwarding from [::1]:28015 -> 27017",
+        "note": "手元の IPv4 と IPv6 の localhost の両方で待ち受けています。Service を書いても、つながるのは選ばれた 1 つの Pod です。"
+      },
+      {
+        "title": "手元のポートを選ばせる (公式の文書の例)",
+        "code": "$ kubectl port-forward deployment/mongo :27017",
+        "output": "Forwarding from 127.0.0.1:63753 -> 27017\nForwarding from [::1]:63753 -> 27017",
+        "note": "手元のポートを書かないと、空いているポートを kubectl が選んで出します。"
+      }
+    ],
+    "verbose": {
+      "code": "$ kubectl port-forward pod/mongo-75f59d57f4-4nd6q 28015:27017 -v=6",
+      "output": "GET   https://<API サーバー>/api/v1/namespaces/default/pods/mongo-75f59d57f4-4nd6q   200 OK\n...   https://<API サーバー>/api/v1/namespaces/default/pods/mongo-75f59d57f4-4nd6q/portforward   (Upgrade: websocket。だめなら SPDY/3.1 で POST)\nForwarding from 127.0.0.1:28015 -> 27017\nForwarding from [::1]:28015 -> 27017",
+      "note": "形の例です。port-forward は実際には打たず、実装 (RunPortForwardContext と createDialer) から要求の並びを書きました。実際の -v=6 は 1 行ずつ \"Response\" verb=... url=... の形で出ます。"
+    },
+    "impl": {
+      "repo": "kubernetes/kubectl",
+      "ref": "v0.37.2",
+      "path": "pkg/cmd/portforward/portforward.go",
+      "lines": "L144-L454",
+      "excerpt": "\tdialer := spdy.NewDialerForStreaming(upgrader, &http.Client{Transport: transport}, method, url)\n\tif !cmdutil.PortForwardWebsockets.IsDisabled() {\n\t\ttunnelingDialer, err := portforward.NewSPDYOverWebsocketDialerForStreaming(url, opts.Config)\n\t\tif err != nil {\n\t\t\treturn nil, err\n\t\t}\n\t\t// First attempt tunneling (websocket) dialer, then fallback to spdy dialer.\n\t\tdialer = portforward.NewFallbackDialerForStreaming(tunnelingDialer, dialer, func(err error) bool {\n\t\t\treturn streamhttp.IsUpgradeFailure(err) || streamhttp.IsHTTPSProxyError(err)\n\t\t})\n\t}\n\t// ...\n\treq := o.RESTClient.Post().\n\t\tResource(\"pods\").\n\t\tNamespace(o.Namespace).\n\t\tName(pod.Name).\n\t\tSubResource(\"portforward\")\n\n\treturn o.PortForwarder.ForwardPorts(\"POST\", req.URL(), o)",
+      "note": "SPDY の dialer を作り、機能が切られていなければ WebSocket の上に SPDY を通す dialer を前に置いた fallback にします。つなぐ先は Pod の portforward のサブリソースです。\"POST\" は SPDY に戻ったときだけ使われ、WebSocket の dialer は RFC 6455 のとおり GET を送ります。"
+    },
+    "sources": [
+      {
+        "label": "Kubernetes: kubectl port-forward",
+        "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_port-forward/"
+      },
+      {
+        "label": "Kubernetes: Use Port Forwarding to Access Applications in a Cluster",
+        "url": "https://kubernetes.io/docs/tasks/access-application-cluster/port-forward-access-application-cluster/"
+      },
+      {
+        "label": "Kubernetes Blog: Kubernetes 1.31: Streaming Transitions from SPDY to WebSockets",
+        "url": "https://kubernetes.io/blog/2024/08/20/websockets-transition/"
+      },
+      {
+        "label": "Kubernetes: Communication between Nodes and the Control Plane",
+        "url": "https://kubernetes.io/docs/concepts/architecture/control-plane-node-communication/"
+      },
+      {
+        "label": "Kubernetes API: Pod",
+        "url": "https://kubernetes.io/docs/reference/kubernetes-api/core/pod-v1/"
+      },
+      {
+        "label": "kubernetes/kubectl v0.37.2: pkg/cmd/portforward/portforward.go",
+        "url": "https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/cmd/portforward/portforward.go#L144-L454"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-label",
+    "inside": [
+      "kubeconfig を読んで行き先を決め、引数の キー=値 (付ける) と キー- (外す) を読み取ります。",
+      "対象を GET で読み、metadata.labels を手元で書き換えます。すでにあるキーの値を変えるのに --overwrite が無ければ、ここで断ります。何も変わらなければ PATCH は送らず、not labeled と出します。",
+      "前と後の差を JSON merge patch ({\"metadata\":{\"labels\":{\"disktype\":\"ssd\"}}} の形) にし、PATCH (Content-Type: application/merge-patch+json、fieldManager=kubectl-label) で送ります。",
+      "API サーバーは認証・認可・アドミッションを通し、キーと値がラベルの形の決まりに合うかを検証して etcd に書きます。",
+      "ラベルは選ぶための印なので、書き換えると、それを使う仕組みの結果が変わります。Service や ReplicaSet のセレクター、Pod の nodeSelector に合うかどうかが変わり、たとえば ReplicaSet の Pod からラベルを外すと、その Pod は数から外れ、ReplicaSet が代わりの Pod を作ります。",
+      "kubectl は <種類>/<名前> labeled (外したときは unlabeled) と出して戻ります。"
+    ],
+    "api": [
+      {
+        "method": "GET",
+        "path": "/api/v1/nodes/{name}",
+        "note": "kubectl label nodes <名前> ... で今のラベルを読む"
+      },
+      {
+        "method": "PATCH",
+        "path": "/api/v1/nodes/{name}",
+        "note": "Node のラベルを書き換える"
+      },
+      {
+        "method": "PATCH",
+        "path": "/api/v1/namespaces/{namespace}/configmaps/{name}",
+        "note": "名前空間に属すものなら URL に namespaces/ が入る (ConfigMap の例)"
+      }
+    ],
+    "examples": [
+      {
+        "title": "ConfigMap にラベルを付ける (保存しない検査だけ)",
+        "code": "$ kubectl label configmap kube-root-ca.crt -n default env=demo --dry-run=server",
+        "output": "configmap/kube-root-ca.crt labeled (server dry run)",
+        "note": "API サーバーが検証まで通した結果です。--dry-run=server を外すと本当に付きます。"
+      }
+    ],
+    "verbose": {
+      "code": "$ kubectl label configmap kube-root-ca.crt -n default env=demo --dry-run=server -v=8",
+      "output": "I1118 18:09:26.574885 2068393 round_trippers.go:527] \"Request\" verb=\"GET\" url=\"https://<API サーバー>/api/v1/namespaces/default/configmaps/kube-root-ca.crt\" headers=<\n...\nI1118 18:09:26.598224 2068393 helper.go:269] \"Request Body\" body=\"{\\\"metadata\\\":{\\\"labels\\\":{\\\"env\\\":\\\"demo\\\"}}}\"\nI1118 18:09:26.598331 2068393 round_trippers.go:527] \"Request\" verb=\"PATCH\" url=\"https://<API サーバー>/api/v1/namespaces/default/configmaps/kube-root-ca.crt?dryRun=All&fieldManager=kubectl-label\" headers=<\n\tContent-Type: application/merge-patch+json\n\t...\n >\nI1118 18:09:26.609383 2068393 round_trippers.go:632] \"Response\" status=\"200 OK\" ...\nconfigmap/kube-root-ca.crt labeled (server dry run)",
+      "note": "GET で読み、labels だけの差を merge patch で送っています。taint や set image の strategic merge patch と違い、label は JSON merge patch です。"
+    },
+    "impl": {
+      "repo": "kubernetes/kubectl",
+      "ref": "v0.37.2",
+      "path": "pkg/cmd/label/label.go",
+      "lines": "L332-L353",
+      "excerpt": "\t\t\tif added.Len() > 0 || removed.Len() > 0 {\n\t\t\t\tnewObj, err := json.Marshal(obj)\n\t\t\t\tif err != nil {\n\t\t\t\t\treturn err\n\t\t\t\t}\n\t\t\t\tpatchBytes, err := jsonpatch.CreateMergePatch(oldData, newObj)\n\t\t\t\t// ...\n\t\t\t\thelper := resource.NewHelper(client, mapping).\n\t\t\t\t\tDryRun(o.dryRunStrategy == cmdutil.DryRunServer).\n\t\t\t\t\tWithFieldManager(o.fieldManager)\n\n\t\t\t\tif createdPatch {\n\t\t\t\t\toutputObj, err = helper.Patch(namespace, name, types.MergePatchType, patchBytes, nil)",
+      "note": "ラベルが増えたか減ったときだけ、前と後の差を JSON merge patch にし、MergePatchType で PATCH します。--dry-run=server なら DryRun(true) が付きます。"
+    },
+    "sources": [
+      {
+        "label": "Kubernetes: kubectl label",
+        "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_label/"
+      },
+      {
+        "label": "Kubernetes: Labels and Selectors",
+        "url": "https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/"
+      },
+      {
+        "label": "Kubernetes: ReplicaSet",
+        "url": "https://kubernetes.io/docs/concepts/workloads/controllers/replicaset/"
+      },
+      {
+        "label": "Kubernetes: Assign Pods to Nodes",
+        "url": "https://kubernetes.io/docs/tasks/configure-pod-container/assign-pods-nodes/"
+      },
+      {
+        "label": "Kubernetes API: Node",
+        "url": "https://kubernetes.io/docs/reference/kubernetes-api/core/node-v1/"
+      },
+      {
+        "label": "kubernetes/kubectl v0.37.2: pkg/cmd/label/label.go",
+        "url": "https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/cmd/label/label.go#L332-L353"
+      },
+      {
+        "label": "kubernetes/kubectl v0.37.2: pkg/cmd/label/label.go (出力の言葉)",
+        "url": "https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/cmd/label/label.go#L50-L52"
+      }
+    ]
+  }
+]

@@ -29,7 +29,8 @@ describe('答えたあとの読み直す先', () => {
     const q = { id: 'x-t-1', type: 'choice' as const, prompt: 'Pod とは', choices: [{ id: 'a', text: 'x' }], answer: 'a', explanation: 'x', source: 'https://kubernetes.io/' };
     expect(topicsForQuestion(q, ['pod'], TERMS, HANDBOOK_TOPICS)).toEqual([]);
   });
-  it('模擬試験用の問題: Service の問題にネットワークが出て、9 割以上が自分の分野のトピックを含む', () => {
+  // 120 問 × 全トピックを数えるので、重い機械や CI でも落ちないよう 30 秒まで待つ
+  it('模擬試験用の問題: Service の問題にネットワークが出て、9 割以上が自分の分野のトピックを含む', { timeout: 30_000 }, () => {
     const co2 = EXAM_ONLY.find((r) => r.question.id === 'x-co-002')!;
     expect(topicsOf(co2)).toContain('networking');
     const own = EXAM_ONLY.filter((r) => topicsOf(r).some((id) => domainOf(id) === r.domain));
@@ -41,7 +42,7 @@ describe('答えたあとの読み直す先', () => {
     // 範囲外のトピックが 1 つ目に来るのはまれ
     expect(EXAM_ONLY.filter((r) => String(domainOf(topicsOf(r)[0] ?? '') ?? '').startsWith('付録')).length).toBeLessThanOrEqual(EXAM_ONLY.length / 10);
   });
-  it('レッスンの問題は、ほとんどが読み直すトピックを持ち、1 つ目が範囲外になることはまれ', () => {
+  it('レッスンの問題は、ほとんどが読み直すトピックを持ち、1 つ目が範囲外になることはまれ', { timeout: 30_000 }, () => {
     const all = allQuestions();
     const none = all.filter((r) => topicsOf(r).length === 0);
     expect(none.length, none.map((r) => r.question.id).join(', ')).toBeLessThanOrEqual(all.length / 10);

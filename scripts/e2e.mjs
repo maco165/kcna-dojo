@@ -11,7 +11,7 @@
 //   8. どの画面も横にはみ出さない
 //   9. リポジトリへのリンク、このサイトについての画面、サイト名の横の印
 import { spawn } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { gzipSync } from 'node:zlib';
 
@@ -73,10 +73,10 @@ function checkFirstLoad() {
   const kb = Math.round(gz / 1024);
   check(kb <= 380, `最初に読む JS は gzip で 380KB まで (${kb}KB、${files.length} ファイル)`);
   // 名前だけでなく中身でも見る (静的に取り込まれて本体に混ざっても気づけるように)。それぞれのデータにしか無い文字で調べる
-  const marks = { ハンドブックのデータ: 'k3s-vs-kubernetes', 用語集のデータ: 'container-image', 説明のページ: '2026-03-22 の版', 模擬試験用の問題: 'のイメージを更新した直後に', 比較表のデータ: 'volumeClaimTemplates:  # Pod ごとに', コマンドの説明: 'リソースの一覧や状態を表で表示します' };
+  const marks = { ハンドブックのデータ: 'k3s-vs-kubernetes', 用語集のデータ: 'container-image', 説明のページ: '2026-03-22 の版', 模擬試験用の問題: 'のイメージを更新した直後に', 比較表のデータ: 'volumeClaimTemplates:  # Pod ごとに', コマンドの説明: 'リソースの一覧や状態を表で表示します', コマンドのページのデータ: 'Initial install underway', コマンドのページの中身: 'のような種類の名前を、API のグループ・版・資源に引き当てます' };
   const text = files.map((f) => readFileSync(new URL(`../dist/assets/${f}`, import.meta.url), 'utf8')).join('\n');
   const found = Object.entries(marks).filter(([, m]) => text.includes(m)).map(([k]) => k);
-  check(found.length === 0, `ハンドブック・用語集・説明のページ・模擬試験用の問題・コマンドの説明・比較表は最初に読まない ${found.join(',')}`);
+  check(found.length === 0, `ハンドブック・用語集・説明のページ・模擬試験用の問題・コマンドの説明・比較表・コマンドのページは最初に読まない ${found.join(',')}`);
   // 書き出したハンドブックの目次も、画面と同じ 2 部 (h2) と段 (h3) の組みにする
   const hbHtml = readFileSync(new URL('../dist/handbook/index.html', import.meta.url), 'utf8');
   const hbHeads = [...hbHtml.matchAll(/<h([23])>([^<]*)<\/h\1>/g)].map((m) => `${m[1]}:${m[2]}`);
@@ -736,6 +736,38 @@ async function run(browser, name, width, height) {
     check((await page.locator('a.gloss-chip[href*="/compare/"]').count()) >= 1, `${tag} 用語集の語から、その語の比較表へ飛べる`);
   }
 
+  // 15d. コマンドのページ: 一覧から開き、中で何が起きるか・API の要求・実行の例・実装を読むが出る。答えたあとの説明から飛べる
+  {
+    await page.goto(`${BASE}commands/`);
+    await page.locator('.cmdp-row').first().waitFor();
+    check((await page.locator('.cmdp-row').count()) >= 50, `${tag} コマンドの一覧に並ぶ (${await page.locator('.cmdp-row').count()})`);
+    await page.locator('.cmdp-row', { hasText: 'kubectl get' }).first().click();
+    await page.locator('.cmdp-inside').waitFor();
+    check((await page.locator('.cmdp-inside li').count()) >= 3, `${tag} コマンドのページに中で何が起きるかの段がある`);
+    check((await page.locator('.cmdp-api tbody tr').count()) >= 1 && (await page.locator('a[href^="https://github.com/kubernetes/kubectl/blob/"]').count()) >= 1, `${tag} コマンドのページに API の要求と実装へのリンクがある`);
+    check((await page.title()).startsWith('kubectl get の中身と使い方'), `${tag} コマンドのページの題名 (${await page.title()})`);
+    await noHorizontalOverflow(page, width, `${tag} コマンドのページ`);
+    // スマホでは全部のページの横のはみ出しを見る (長い API のパスなど、ページごとに中身が違うため)
+    if (width < 768) {
+      const ids = readdirSync(new URL('../src/content/commandPages/', import.meta.url)).flatMap((f) => JSON.parse(readFileSync(new URL(`../src/content/commandPages/${f}`, import.meta.url), 'utf8')).map((p) => p.id));
+      const wide = [];
+      for (const id of ids) {
+        await page.goto(`${BASE}commands/${id}/`);
+        await page.locator('.cmdp-inside').waitFor();
+        const sw = await page.evaluate(() => document.documentElement.scrollWidth);
+        if (sw > width) wide.push(`${id}:${sw}`);
+      }
+      check(wide.length === 0, `${tag} コマンドのページ ${ids.length} ページとも横にはみ出さない ${wide.join(' ')}`);
+    }
+    await page.goto(`${BASE}lesson/w1-l3/`);
+    await page.getByRole('textbox', { name: '空欄' }).fill('get');
+    await page.getByRole('textbox', { name: '空欄' }).press('Enter');
+    await page.locator('.cmd-notes').waitFor();
+    await page.locator('.cmd-notes a[href*="/commands/kubectl-get/"]').click();
+    await page.locator('.cmdp-inside').waitFor({ timeout: 5000 }).catch(() => {});
+    check(page.url().endsWith('/commands/kubectl-get/'), `${tag} 答えたあとの説明から、そのコマンドのページへ飛べる`);
+  }
+
   // 16. 戻る操作: 目次を下まで送ってトピックを開き、戻ると元の位置。新しく開いたページは先頭
   {
     const scrollTop = () => page.evaluate(() => (document.querySelector('.astryx-layout-content') ?? document.scrollingElement).scrollTop);
@@ -781,6 +813,9 @@ async function run(browser, name, width, height) {
     check(personal.includes('<meta name="robots" content="noindex"'), `${tag} 個人の記録の画面は検索に載せない (noindex)`);
     const map = await (await fetch(`${BASE}sitemap.xml`)).text();
     check(map.includes('/kcna-dojo/handbook/core-concepts/</loc>') && map.includes('/kcna-dojo/glossary/</loc>') && !map.includes('/progress/'), `${tag} sitemap にハンドブックと用語集があり、個人の画面は無い`);
+    // コマンドのページ: 書き出した HTML に中で何が起きるか・API の要求・実装の抜粋まで入り、sitemap に載る
+    const cmdHtml = await (await fetch(`${BASE}commands/kubectl-get/`)).text();
+    check(cmdHtml.includes('<h2>中で何が起きるか</h2>') && cmdHtml.includes('/api/v1/namespaces/{namespace}/pods') && cmdHtml.includes('github.com/kubernetes/kubectl/blob/') && map.includes('/kcna-dojo/commands/kubectl-get/</loc>'), `${tag} コマンドのページは書き出した HTML に中身と実装まであり、sitemap に載る`);
     // 比較表: 書き出した HTML に表まで入り、sitemap に載る
     const cmpHtml = await (await fetch(`${BASE}compare/workloads/`)).text();
     check(cmpHtml.includes('<table>') && cmpHtml.includes('<h2>取り違えやすい点</h2>') && map.includes('/kcna-dojo/compare/workloads/</loc>'), `${tag} 比較表のページは書き出した HTML に表まであり、sitemap に載る`);

@@ -4,6 +4,7 @@ import { Link } from '@astryxdesign/core/Link';
 import commands from '../content/commands.json';
 import type { Question } from '../content/types';
 import { commandUses, type CommandData, type CommandFlag } from '../lib/commandRefs';
+import { commandsHref } from '../lib/route';
 
 const DATA = commands as CommandData;
 
@@ -48,6 +49,12 @@ export default function CommandNotes({ question, open }: { question: Question; o
             {flags.some((f) => !f.absent) && <Flags label="この問題のオプション" flags={flags.filter((f) => !f.absent)} />}
             {flags.some((f) => f.absent) && <Flags label={`${entry.command} に無い指定 (誤りの選択肢に出てくるもの)`} flags={flags.filter((f) => f.absent)} />}
             <p className="cmd-note__source">
+              {!entry.absent && (
+                <>
+                  <a href={commandsHref(entry.id)}>中で何が起きるか・実行の例</a>
+                  {' · '}
+                </>
+              )}
               <Link href={entry.source} isExternalLink newTabLabel="(新しいタブで開きます)">
                 公式リファレンス ({new URL(entry.source).hostname})
               </Link>
