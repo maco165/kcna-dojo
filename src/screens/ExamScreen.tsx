@@ -122,7 +122,7 @@ function Intro({ progress, choice: picked, onChoice, onStart }: { progress: Prog
                 />
               );
             })}
-            <RadioListItem value="random" label="ランダム" description="毎回、全問から選び直します" />
+            <RadioListItem value="random" label="ランダム" description="毎回、第 1〜8 週の問題から選び直します" />
           </RadioList>
           <HStack>
             <Button variant="primary" label={`${choiceName(picked)}を始める`} onClick={() => onStart(picked)} />

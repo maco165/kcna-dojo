@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -17,10 +17,11 @@ function run(file?: string): { code: number; out: string } {
   }
 }
 
-function mutate(name: string, fn: (d: any) => void): string {
+function mutate(name: string, fn: (d: any) => void, sub?: string): string {
   const data = JSON.parse(readFileSync(WEEK1, 'utf8'));
   fn(data);
-  const dir = mkdtempSync(join(tmpdir(), 'kcna-content-'));
+  const dir = join(mkdtempSync(join(tmpdir(), 'kcna-content-')), sub ?? '');
+  mkdirSync(dir, { recursive: true });
   const file = join(dir, `${name}.json`);
   writeFileSync(file, JSON.stringify(data));
   return file;
@@ -34,18 +35,20 @@ describe('check-content', { timeout: 30_000 }, () => {
     expect(r.out).toContain('OK');
   });
 
-  it('模擬試験用のファイル (week 0) は、x- で始まる quiz だけを許す', () => {
-    const ok = mutate('exam-ok', (d) => {
+  it('模擬試験用のファイル (exam/ の下) は week 0 で、x- の quiz と x- の問題だけを許す', () => {
+    const toExam = (d: any) => {
       d.week = 0;
       d.lessons = d.lessons.filter((l: any) => l.kind === 'quiz').slice(0, 1).map((l: any) => ({ ...l, id: 'x-t', questions: l.questions.map((q: any, i: number) => ({ ...q, id: `x-t-${i}` })) }));
-    });
-    expect(run(ok).code).toBe(0);
-    const ng = mutate('exam-ng', (d) => {
-      d.week = 0;
-    });
-    const r = run(ng);
-    expect(r.code).toBe(1);
-    expect(r.out).toContain('x- で始まる quiz');
+    };
+    expect(run(mutate('exam-ok', toExam, 'exam')).code).toBe(0);
+    const notQuiz = run(mutate('exam-ng', (d) => (d.week = 0), 'exam'));
+    expect(notQuiz.code).toBe(1);
+    expect(notQuiz.out).toContain('x- で始まる quiz');
+    const plainId = run(mutate('exam-id', (d) => { toExam(d); d.lessons[0].questions[0].id = 'plain-1'; }, 'exam'));
+    expect(plainId.out).toContain('問題の id は x- で始めます');
+    expect(run(mutate('exam-week', (d) => { toExam(d); d.week = 3; }, 'exam')).out).toContain('week を 0 にします');
+    // 週のファイルは置き場所が exam/ でないので、week 0 は通さない
+    expect(run(mutate('week-zero', toExam)).out).toContain('week は 1 以上');
     expect(run(mutate('week-neg', (d) => (d.week = -1))).code).toBe(1);
   });
 

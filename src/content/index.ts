@@ -1,6 +1,7 @@
 import { WEEKS } from './curriculum';
 import type { Lesson, Question } from './types';
 import { dueReviewIds, type Progress } from '../lib/progress';
+import examSets from './examSets.json';
 
 export function findLesson(lessonId: string): { lesson: Lesson; week: number } | undefined {
   for (const w of WEEKS) {
@@ -41,8 +42,13 @@ export function dueQuestions(p: Progress, now: Date, find: (id: string) => Quest
     .filter((r): r is QuestionRef => r !== undefined);
 }
 
-/** 模擬試験用の問題の id か (データを読まずに見分ける) */
-export const isExamQuestionId = (id: string) => id.startsWith('x-');
+/**
+ * 模擬試験用の問題の id か (問題の本体を読まずに見分ける)。
+ * 第 4・5 回 (examSets.json) が模擬試験用の問題を全部持つことは tests/examSets.test.ts が保証するので、その id で引く。
+ * データから消えた x- の id は数えない (復習の画面で引けない問題をバッジに数えない)
+ */
+const EXAM_ONLY_IDS = new Set((examSets as { sets: { questions: string[] }[] }).sets.flatMap((s) => s.questions).filter((id) => id.startsWith('x-')));
+export const isExamQuestionId = (id: string) => EXAM_ONLY_IDS.has(id);
 
 /** 今日の復習の数 (タブのバッジ)。模擬試験用の問題も、データを読まずに数える */
 export const dueReviewCount = (p: Progress, now: Date) => dueReviewIds(p, now).filter((id) => isExamQuestionId(id) || findQuestion(id) !== undefined).length;

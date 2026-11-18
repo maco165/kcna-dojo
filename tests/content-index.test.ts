@@ -21,6 +21,8 @@ describe('復習の問題を問題データから引く', () => {
     p = recordAnswer(p, x, false, at('2026-11-23'));
     const day = at('2026-11-24');
     expect(dueReviewCount(p, day)).toBe(2);
+    // データから消えた x- の問題は数えない (復習の画面で引けないので)
+    expect(dueReviewCount(recordAnswer(p, 'x-gone-001', false, at('2026-11-23')), day)).toBe(2);
     expect(dueQuestions(p, day).map((r) => r.question.id)).toEqual(['w1-l1-q1']);
     const both = dueQuestions(p, day, (id) => findQuestion(id) ?? findExamQuestion(id));
     expect(both.map((r) => r.question.id).sort()).toEqual(['w1-l1-q1', x].sort());
