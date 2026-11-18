@@ -242,6 +242,23 @@ async function run(browser, name, width, height) {
     await page.goto(`${BASE}#/lesson/w8-l4`);
     await page.getByRole('button', { name: '確かめる' }).waitFor();
     check(await page.getByText('はじめて').first().isVisible(), `${tag} 初めての問題には「はじめて」と出る`);
+    // w1-l1 を全問正解で解き直す: 答えても見出しは始めたときのまま、結果の一覧は答えたあと、もう一度解くと 1 回分増える
+    await page.goto(`${BASE}lesson/w1-l1/`);
+    await page.getByRole('button', { name: '確かめる' }).waitFor();
+    const head = () => page.locator('.lesson__main').getByText(/はじめて|これまで \d+ 回/).first().innerText();
+    const times = (t) => Number(t.match(/これまで (\d+) 回/)?.[1] ?? 0);
+    const first = await head();
+    for (const [i, q] of l1.questions.entries()) {
+      await page.getByRole('radio', { name: choiceLabel(q, q.answer) }).check();
+      await page.getByRole('button', { name: '確かめる' }).click();
+      if (i === 0) check((await head()) === first, `${tag} 答えても、見出しの記録は始めたときのまま`);
+      await page.getByRole('button', { name: i === l1.questions.length - 1 ? '結果を見る' : '次へ' }).click();
+    }
+    await page.getByRole('heading', { name: 'レッスン完了' }).waitFor();
+    check(await page.getByText(new RegExp(`これまで ${times(first) + 1} 回`)).first().isVisible(), `${tag} 結果の一覧に、答えたあとの記録が出る`);
+    await page.getByRole('button', { name: 'もう一度解く' }).click();
+    await page.getByRole('button', { name: '確かめる' }).waitFor();
+    check(times(await head()) === times(first) + 1, `${tag} もう一度解くと、1 回目の分を入れた記録が出る (${first} → ${await head()})`);
     await page.goto(`${BASE}#/review`);
   }
 

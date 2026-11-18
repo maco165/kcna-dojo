@@ -122,7 +122,7 @@ export function QuestionRun({
   const [startedAt, setStartedAt] = useState(() => Date.now());
   const [elapsed, setElapsed] = useState(0);
   // 解いた記録は、始めたときのものを出す (答えるたびに数が変わると、どの回の話か分かりにくい)
-  const [before] = useState(() => progress.answers);
+  const [before, setBefore] = useState(() => progress.answers);
   // 4 択の選択肢は、開いたときと「もう一度解く」のたびに混ぜ直す (attempt が変わるたび)
   const questions = useMemo(() => source.map((question) => shuffleChoices(question)), [source, attempt]);
   const total = questions.length;
@@ -151,6 +151,8 @@ export function QuestionRun({
   }, [isLast, results, updateProgress, onFinish, total, startedAt]);
 
   const restart = () => {
+    // もう一度解くときは、1 回目に答えた分を入れた記録から出す
+    setBefore(progress.answers);
     setIndex(0);
     setResults([]);
     setFinished(false);

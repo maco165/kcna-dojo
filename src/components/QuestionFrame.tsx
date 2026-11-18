@@ -10,7 +10,7 @@ export function QuestionHead({ kind, domain, prompt, history }: { kind: string; 
     <VStack gap={1.5}>
       <Text type="supporting">
         {kind} · {domain}
-        {history && <span className="q-history"> · {history}</span>}
+        {history && ` · ${history}`}
       </Text>
       <h1 className="q-title">{prompt}</h1>
     </VStack>
