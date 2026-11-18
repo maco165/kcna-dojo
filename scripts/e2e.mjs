@@ -492,7 +492,7 @@ async function run(browser, name, width, height) {
   // 15c. ハンドブックの読んだ記録: 流れの段を画面に出すと記録され、目次に読みかけ、続きから・確認済みが使える
   {
     const hb = () => page.evaluate(() => JSON.parse(localStorage.getItem('kcna.v1') ?? '{}').handbook ?? {});
-    await page.goto(`${BASE}#/handbook/storage`);
+    await page.goto(`${BASE}handbook/storage/`);
     await page.getByRole('heading', { name: '全体の流れ' }).waitFor();
     const steps = await page.locator('[data-flow-step]').count();
     await page.waitForTimeout(300);
@@ -507,8 +507,10 @@ async function run(browser, name, width, height) {
     check(/読みかけ \d+ \/ \d+ 段/.test(await card.locator('.hb-topic__read').innerText()), `${tag} 目次のカードに読みかけと段の数が出る`);
     await card.click();
     await page.getByRole('button', { name: '続きから' }).click();
-    await page.waitForTimeout(800);
-    const top = await page.locator(`[data-flow-step="${seen}"]`).evaluate((el) => el.getBoundingClientRect().top - (document.querySelector('.astryx-layout-content')?.getBoundingClientRect().top ?? 0));
+    // なめらかなスクロールが止まるまで待つ (決まった時間ではなく、位置が落ち着くまで)
+    const stepTop = (n) => page.locator(`[data-flow-step="${n}"]`).evaluate((el) => el.getBoundingClientRect().top - (document.querySelector('.astryx-layout-content')?.getBoundingClientRect().top ?? 0));
+    await page.waitForFunction((n) => { const el = document.querySelector(`[data-flow-step="${n}"]`); const t = el.getBoundingClientRect().top - (document.querySelector('.astryx-layout-content')?.getBoundingClientRect().top ?? 0); return Math.abs(t) < 60; }, seen, { timeout: 5000 }).catch(() => {});
+    const top = await stepTop(seen);
     check(Math.abs(top) < 60, `${tag} 続きからで、前回の続きの段が画面の上に来る (${Math.round(top)})`);
     await page.locator(`[data-flow-step="${steps - 1}"]`).scrollIntoViewIfNeeded();
     await page.evaluate((n) => document.querySelector(`[data-flow-step="${n}"]`).scrollIntoView({ block: 'start' }), steps - 1);
@@ -602,13 +604,14 @@ async function run(browser, name, width, height) {
     check(personal.includes('<meta name="robots" content="noindex"'), `${tag} 個人の記録の画面は検索に載せない (noindex)`);
     const map = await (await fetch(`${BASE}sitemap.xml`)).text();
     check(map.includes('/kcna-dojo/handbook/core-concepts/</loc>') && map.includes('/kcna-dojo/glossary/</loc>') && !map.includes('/progress/'), `${tag} sitemap にハンドブックと用語集があり、個人の画面は無い`);
-    await page.goto(`${BASE}#/handbook/storage`);
+    await page.goto(`${BASE}handbook/storage/`);
     await page.getByRole('heading', { name: '全体の流れ' }).waitFor();
     check(new URL(page.url()).pathname === '/kcna-dojo/handbook/storage/' && !page.url().includes('#'), `${tag} 前の形の #/... の URL は、同じページの新しい URL になる (${page.url()})`);
     await page.evaluate(() => (window.__noReload = true));
     await page.locator('a[href="/kcna-dojo/handbook/"]').first().click();
     await page.getByRole('heading', { name: 'ハンドブック', level: 1 }).waitFor();
     check((await page.evaluate(() => window.__noReload)) === true, `${tag} サイトの中のリンクは、ページを読み直さずに切り替わる`);
+    check((await page.title()).startsWith('ハンドブック | クラネイ'), `${tag} サイトの中で移ると、題名もそのページのものになる (${await page.title()})`);
     await page.goBack();
     await page.getByRole('heading', { name: '全体の流れ' }).waitFor();
     check(new URL(page.url()).pathname === '/kcna-dojo/handbook/storage/', `${tag} 戻るで前のページに戻る`);

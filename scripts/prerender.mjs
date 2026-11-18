@@ -1,6 +1,6 @@
 // 作ったあと (vite build のあと) に、ページごとの index.html を dist に書き出す。
 // 検索エンジンと SNS が JS を動かさなくても、題名・説明・canonical・本文を読めるようにする。
-// 本文は画面に出るものと同じ中身 (問題の答えなど、画面で最初に見えないものは書かない)。
+// 本文は画面に出るものと同じ中身 (問題の答えと解説は、画面でも答えるまで出ないので書かない)。
 // 画面を描くと #root の中身は React が置き換える。
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -16,26 +16,52 @@ const url = (p) => `${ORIGIN}${BASE}${p}`;
 const link = (p, text) => `<a href="${BASE}${p}">${esc(text)}</a>`;
 const clip = (s, n = 120) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
-/** dist/index.html を型にして、1 ページ分の HTML を作る */
+/**
+ * 型の中の置き換える場所。合わなければ書き出しを止める (index.html の形が変わったのに、
+ * 全ページの canonical がトップのまま公開される、といったことを防ぐ)
+ */
+const SLOTS = {
+  title: /<title>[^<]*<\/title>/,
+  description: /(<meta name="description" content=")[^"]*(")/,
+  canonical: /(<link rel="canonical" href=")[^"]*(")/,
+  ogUrl: /(<meta property="og:url" content=")[^"]*(")/,
+  ogTitle: /(<meta property="og:title" content=")[^"]*(")/,
+  ogDescription: /(<meta property="og:description" content=")[^"]*(")/,
+  twitterTitle: /(<meta name="twitter:title" content=")[^"]*(")/,
+  twitterDescription: /(<meta name="twitter:description" content=")[^"]*(")/,
+  root: /<div id="root">[\s\S]*?<\/div>\s*(?=<script|<\/body>)/,
+};
+
+/** dist/index.html を型にして、1 ページ分の HTML を作る。置き換えは関数で渡す ($1 などを置き換えの記号として読ませない) */
 export function renderPage(template, { path: p, title, description, body, noindex = false, canonical }) {
   const full = title ? `${title} | クラネイ — KCNA-JP 対策` : 'クラネイ — KCNA-JP 対策';
   const can = url(canonical ?? p);
-  let html = template
-    .replace(/<title>[^<]*<\/title>/, `<title>${esc(full)}</title>`)
-    .replace(/(<meta name="description" content=")[^"]*(")/, `$1${esc(description)}$2`)
-    .replace(/(<link rel="canonical" href=")[^"]*(")/, `$1${can}$2`)
-    .replace(/(<meta property="og:url" content=")[^"]*(")/, `$1${url(p)}$2`)
-    .replace(/(<meta property="og:title" content=")[^"]*(")/, `$1${esc(full)}$2`)
-    .replace(/(<meta property="og:description" content=")[^"]*(")/, `$1${esc(description)}$2`)
-    .replace(/(<meta name="twitter:title" content=")[^"]*(")/, `$1${esc(full)}$2`)
-    .replace(/(<meta name="twitter:description" content=")[^"]*(")/, `$1${esc(description)}$2`)
-    .replace(/<div id="root">[\s\S]*?<\/div>\s*(?=<script|<\/body>)/, `<div id="root">\n      <main class="prerender">\n${body}\n      </main>\n    </div>\n    `);
-  if (noindex) html = html.replace('</title>', '</title>\n    <meta name="robots" content="noindex" />');
+  const attr = (v) => (_, a, b) => `${a}${v}${b}`;
+  const set = {
+    title: () => `<title>${esc(full)}</title>`,
+    description: attr(esc(description)),
+    canonical: attr(can),
+    ogUrl: attr(url(p)),
+    ogTitle: attr(esc(full)),
+    ogDescription: attr(esc(description)),
+    twitterTitle: attr(esc(full)),
+    twitterDescription: attr(esc(description)),
+    root: () => `<div id="root">\n      <main class="prerender">\n${body}\n      </main>\n    </div>\n    `,
+  };
+  let html = template;
+  for (const [k, re] of Object.entries(SLOTS)) {
+    if (!re.test(html)) throw new Error(`prerender: index.html に ${k} の場所が見つかりません (index.html の形が変わったら SLOTS を直す)`);
+    html = html.replace(re, set[k]);
+  }
+  if (noindex) html = html.replace('</title>', () => '</title>\n    <meta name="robots" content="noindex" />');
   return html;
 }
 
 /** すべてのページ (経路・題名・説明・本文・検索に載せるか) を、画面と同じデータから作る */
 export async function buildPages(load) {
+  const { pageTitle } = await load('/src/lib/pageMeta.ts');
+  const { parseRoute } = await load('/src/lib/route.ts');
+  const titleOf = (p) => pageTitle(parseRoute(`${BASE}${p}`));
   const { WEEKS } = await load('/src/content/curriculum.ts');
   const { HANDBOOK, HANDBOOK_TOPICS, APPENDIX } = await load('/src/content/handbook.ts');
   const { CURRICULUM, DEFINITION } = await load('/src/content/guide.ts');
@@ -127,12 +153,18 @@ export async function buildPages(load) {
     const personal = p !== 'about/' && p !== 'exam/';
     pages.push({ path: p, title, description: `クラネイの${title}の画面。`, body: `<h1>${esc(title)}</h1>`, noindex: personal, inSitemap: !personal });
   }
+  // 題名は画面と同じ関数で決める (サイトの中で移ったときの document.title と食い違わないように)
+  for (const page of pages) page.title = titleOf(page.path) ?? page.title;
+  // 第 1 週はトップと同じ画面なので、トップを正にして sitemap から外す
+  const week1 = pages.find((x) => x.path === 'week/1/');
+  if (week1) Object.assign(week1, { canonical: '', inSitemap: false });
   return pages;
 }
 
-export function sitemap(pages, lastmod) {
+/** lastmod は付けない (作るたびの日付では正しくなく、Google はいつも正しいときだけ使うため) */
+export function sitemap(pages) {
   const urls = [{ path: '' }, ...pages.filter((p) => p.inSitemap !== false && !p.noindex)];
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((p) => `  <url><loc>${url(p.path)}</loc><lastmod>${lastmod}</lastmod></url>`).join('\n')}\n</urlset>\n`;
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((p) => `  <url><loc>${url(p.path)}</loc></url>`).join('\n')}\n</urlset>\n`;
 }
 
 async function main() {
@@ -147,10 +179,9 @@ async function main() {
     }
     // 知らない URL は GitHub Pages が 404.html を返す。画面は JS で「見つからない」かトップを出す
     await writeFile(path.join(DIST, '404.html'), renderPage(template, { path: '', title: 'ページが見つかりません', description: 'クラネイ — KCNA-JP 対策', body: '<h1>ページが見つかりません</h1>', noindex: true }));
-    const lastmod = new Date().toISOString().slice(0, 10);
-    await writeFile(path.join(DIST, 'sitemap.xml'), sitemap(pages, lastmod));
+    await writeFile(path.join(DIST, 'sitemap.xml'), sitemap(pages));
     // robots.txt はドメインの直下 (maco165.github.io リポジトリ) にしか置けないので、そこの Sitemap の行からこの sitemap を指す
-    console.log(`prerender: ${pages.length} ページ・sitemap ${sitemap(pages, lastmod).split('<url>').length - 1} 件`);
+    console.log(`prerender: ${pages.length} ページ・sitemap ${sitemap(pages).split('<url>').length - 1} 件`);
   } finally {
     await server.close();
   }

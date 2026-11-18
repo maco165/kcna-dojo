@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { fullTitle } from './pageMeta';
 import { onRouteChanged, savePosition, startScrollMemory } from './scrollMemory';
 
 // 経路は # の無い URL (/kcna-dojo/handbook/core-concepts/ など) で、History API で切り替える。
@@ -50,7 +51,8 @@ export const glossaryHref = href('glossary');
 export const glossaryTermHref = (termId: string) => href(`glossary/${termId}`);
 export const guideHref = href('guide');
 export const handbookHref = (topicId?: string) => href(topicId ? `handbook/${topicId}` : 'handbook');
-export const weekHref = (week: number) => href(`week/${week}`);
+/** 第 1 週はトップと同じ画面なので、トップの URL を正にする (同じ画面の URL を 2 つにしない) */
+export const weekHref = (week: number) => (week === 1 ? BASE : href(`week/${week}`));
 
 /** サイトの中へのリンクなら、ページを読み直さずに切り替える (新しいタブ・修飾キー・外のサイト・同じページの中の印は除く) */
 function internalTarget(e: MouseEvent): string | null {
@@ -74,7 +76,10 @@ export function useRoute(): Route {
     let shown = window.location.pathname;
     const show = () => {
       shown = window.location.pathname;
-      setRoute(parseRoute(shown));
+      const next = parseRoute(shown);
+      setRoute(next);
+      // 書き出した HTML の題名はページごとなので、サイトの中で移ったときも合わせる
+      document.title = fullTitle(next);
       onRouteChanged();
     };
     const onPop = () => {
