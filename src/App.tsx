@@ -4,17 +4,12 @@ import jaJP from '@astryxdesign/core/locales/ja-JP.generated.js';
 import { kcnaTheme } from './themes/kcna/kcna.js';
 import { findLesson } from './content';
 import { useRoute } from './lib/route';
+import { isLazy, loadScreen, loadedScreen, reloadOnce } from './lib/screens';
+import { retryRestore } from './lib/scrollMemory';
+import { useEffect, useLayoutEffect, useReducer, useRef, type ReactNode } from 'react';
 import { colorMode } from './lib/progress';
 import { useProgress } from './lib/useProgress';
-import About from './screens/About';
 import Home from './screens/Home';
-import ExamScreen from './screens/ExamScreen';
-import Glossary from './screens/Glossary';
-import Guide from './screens/Guide';
-import Handbook from './screens/Handbook';
-import ProgressScreen from './screens/ProgressScreen';
-import Review from './screens/Review';
-import Settings from './screens/Settings';
 import LessonScreen from './screens/LessonScreen';
 
 export default function App() {
@@ -22,31 +17,41 @@ export default function App() {
   const [progress, updateProgress] = useProgress();
   const found = route.name === 'lesson' ? findLesson(route.lessonId) : undefined;
 
+  const [, rerender] = useReducer((n: number) => n + 1, 0);
+  const lazyName = isLazy(route.name) ? route.name : undefined;
+  const Screen = lazyName ? loadedScreen(lazyName) : undefined;
+  // まだ読んでいない画面なら読み、読み終えたら描き直す (その間は前の画面を出したままにして、白い画面を見せない)
+  useEffect(() => {
+    if (!lazyName || Screen) return;
+    document.documentElement.dataset.loading = 'true';
+    void loadScreen(lazyName).then(rerender, () => {
+      // 読めなければページごと読み直す (書き出した HTML が返る)。2 回目も読めなければ、そのまま前の画面を出しておく
+      reloadOnce();
+    });
+  }, [lazyName, Screen]);
+  // 開いたときに読む画面を描き終えたら、読み込み中の印を外し、戻せなかった位置をもう一度戻す
+  useLayoutEffect(() => {
+    if (lazyName && !Screen) return;
+    delete document.documentElement.dataset.loading;
+    retryRestore();
+  }, [lazyName, Screen]);
+  const last = useRef<ReactNode>(null);
+
+  let screen: ReactNode;
+  if (lazyName && !Screen) screen = last.current;
+  else if (Screen && route.name === 'handbook') screen = <Screen key={route.topicId ?? 'index'} progress={progress} updateProgress={updateProgress} topicId={route.topicId} />;
+  else if (Screen && route.name === 'glossary') screen = <Screen key={route.termId ?? 'index'} progress={progress} termId={route.termId} />;
+  else if (Screen && (route.name === 'guide' || route.name === 'progress' || route.name === 'about')) screen = <Screen progress={progress} />;
+  else if (Screen) screen = <Screen progress={progress} updateProgress={updateProgress} />;
+  else if (found) screen = <LessonScreen key={found.lesson.id} lesson={found.lesson} week={found.week} progress={progress} updateProgress={updateProgress} />;
+  else screen = <Home week={route.name === 'home' ? route.week : 1} progress={progress} />;
+  if (!(lazyName && !Screen)) last.current = screen;
+
   return (
     <InternationalizationProvider locale="ja-JP" messages={{ 'ja-JP': jaJP }}>
-    <Theme theme={kcnaTheme} mode={colorMode(progress)}>
-      {route.name === 'exam' ? (
-        <ExamScreen progress={progress} updateProgress={updateProgress} />
-      ) : route.name === 'handbook' ? (
-        <Handbook key={route.topicId ?? 'index'} progress={progress} updateProgress={updateProgress} topicId={route.topicId} />
-      ) : route.name === 'guide' ? (
-        <Guide progress={progress} />
-      ) : route.name === 'glossary' ? (
-        <Glossary key={route.termId ?? 'index'} progress={progress} termId={route.termId} />
-      ) : route.name === 'progress' ? (
-        <ProgressScreen progress={progress} />
-      ) : route.name === 'review' ? (
-        <Review progress={progress} updateProgress={updateProgress} />
-      ) : route.name === 'settings' ? (
-        <Settings progress={progress} updateProgress={updateProgress} />
-      ) : route.name === 'about' ? (
-        <About progress={progress} />
-      ) : found ? (
-        <LessonScreen key={found.lesson.id} lesson={found.lesson} week={found.week} progress={progress} updateProgress={updateProgress} />
-      ) : (
-        <Home week={route.name === 'home' ? route.week : 1} progress={progress} />
-      )}
-    </Theme>
+      <Theme theme={kcnaTheme} mode={colorMode(progress)}>
+        {screen}
+      </Theme>
     </InternationalizationProvider>
   );
 }

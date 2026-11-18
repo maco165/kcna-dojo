@@ -2204,3 +2204,26 @@ body {
 .gloss-detail__more a.gloss-term:hover {
   text-decoration-style: solid;
 }
+
+/* 開いたときに読む画面を読み込んでいる間、上の端に細い帯を出す (前の画面を出したままなので、移っている途中だと分かるように) */
+html[data-loading='true'] body::before {
+  content: '';
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: var(--color-text-blue);
+  z-index: 1000;
+  animation: kcna-loading 1.2s ease-in-out infinite;
+  transform-origin: left;
+}
+
+@keyframes kcna-loading {
+  0% { transform: scaleX(0.1); opacity: 1; }
+  100% { transform: scaleX(1); opacity: 0.3; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-loading='true'] body::before {
+    animation: none;
+  }
+}
