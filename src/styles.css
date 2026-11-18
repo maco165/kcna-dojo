@@ -2055,6 +2055,7 @@ body {
 
 .sv__obj {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: baseline;
   gap: 6px;
   padding: 2px 8px;
@@ -2084,6 +2085,8 @@ body {
 }
 
 .sv__kind {
+  flex: none;
+  white-space: nowrap;
   font-size: 12px;
   font-weight: 600;
 }

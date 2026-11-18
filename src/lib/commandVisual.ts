@@ -41,16 +41,30 @@ const KINDS: Record<string, string> = {
 /** 名前空間に属さない種類 */
 const CLUSTER_KINDS = new Set(['Namespace', 'Node', 'PV', 'StorageClass', 'ClusterRole', 'ClusterRoleBinding', 'IngressClass', 'API', 'クラスタ']);
 
+/** $(...) を置き換えた印。中のコマンドは SUBST に取っておく */
+const SUBST_RE = /^__SUBST(\d+)__$/;
+let SUBST: string[] = [];
+
 function kindOf(token: string | undefined): { kind: string; name?: string } {
   if (!token) return { kind: 'リソース' };
+  const sub = token.match(SUBST_RE);
+  if (sub) {
+    // $(kubectl get pods ...) のときは、中のコマンドの種類を使う (名前は出さない)
+    const inner = SUBST[Number(sub[1])].trim().split(/\s+/);
+    return { kind: inner[0] === 'kubectl' && inner[1] === 'get' ? kindOf(inner[2]).kind : 'リソース' };
+  }
   const [t, name] = token.split('/');
-  const first = t.split(',')[0].split('.')[0].toLowerCase();
-  return { kind: KINDS[first] ?? t, name };
+  // カンマで並べた種類は全部出す (deployment,replicaset,pod → Deployment・ReplicaSet・Pod)
+  const kinds = t.split(',').map((x) => KINDS[x.split('.')[0].toLowerCase()] ?? x);
+  return { kind: kinds.join('・'), name };
 }
+
+/** 名前に出さない語 ($(...) の印) を落とす */
+const nameOf = (token: string | undefined) => (token && !SUBST_RE.test(token) ? token : undefined);
 
 /** 引数を、位置の引数と旗に分ける (値を取る旗は値も食べる) */
 function splitArgs(tokens: string[]) {
-  const VALUE = new Set(['-n', '--namespace', '-f', '--filename', '-l', '--selector', '-o', '--output', '--for', '--image', '--replicas', '-c', '--container', '--type', '--port', '--target-port', '--name', '--min', '--max', '--cpu', '--cpu-percent', '--timeout', '--to-revision', '--target', '--profile', '--copy-to', '--as', '--types', '--sort-by', '--api-group', '-L', '--label-columns', '--hard', '--requests', '--limits', '--set', '-k', '--from-literal', '--serviceaccount', '--role', '--clusterrole', '--verb', '--resource', '--rule', '--class', '--restart', '--image-pull-policy', '-p', '--previous']);
+  const VALUE = new Set(['-n', '--namespace', '-f', '--filename', '-l', '--selector', '-o', '--output', '--for', '--image', '--replicas', '-c', '--container', '--type', '--port', '--target-port', '--name', '--min', '--max', '--cpu', '--cpu-percent', '--timeout', '--to-revision', '--target', '--profile', '--copy-to', '--as', '--types', '--sort-by', '--api-group', '-L', '--label-columns', '--hard', '--requests', '--limits', '--set', '-k', '--from-literal', '--serviceaccount', '--role', '--clusterrole', '--verb', '--resource', '--rule', '--class', '--restart', '--image-pull-policy', '--raw', '--dry-run']);
   const BOOL = new Set(['-p', '--previous', '-A', '--all-namespaces', '-i', '-it', '-t', '--rm', '-w', '--watch', '--wait', '--create-namespace']);
   const pos: string[] = [];
   const flags: Record<string, string | true> = {};
@@ -70,17 +84,18 @@ function splitArgs(tokens: string[]) {
 
 function whereOf(kind: string, flags: Record<string, string | true>): string {
   if (flags['-A'] || flags['--all-namespaces']) return 'すべての名前空間';
-  if (CLUSTER_KINDS.has(kind)) return 'クラスタ';
+  if (kind.split('・').every((k) => CLUSTER_KINDS.has(k))) return 'クラスタ';
   const ns = flags['-n'] ?? flags['--namespace'];
   return typeof ns === 'string' && ns ? ns : '今の名前空間';
 }
 
 /** heredoc の YAML から kind と metadata.name を拾う (行ごとに読む。正規表現の後戻りで止まらないように) */
-function manifestKinds(yaml: string): { kind: string; name?: string }[] {
-  const out: { kind: string; name?: string }[] = [];
+function manifestKinds(yaml: string): { kind: string; name?: string; namespace?: string }[] {
+  const out: { kind: string; name?: string; namespace?: string }[] = [];
   for (const doc of yaml.split(/^---\s*$/m)) {
     let kind: string | undefined;
     let name: string | undefined;
+    let namespace: string | undefined;
     let inMeta = false;
     for (const line of doc.split('\n')) {
       const k = line.match(/^kind:\s*(\S+)/);
@@ -91,18 +106,32 @@ function manifestKinds(yaml: string): { kind: string; name?: string }[] {
       }
       if (inMeta) {
         if (/^\S/.test(line)) inMeta = false;
-        else if (!name) {
+        else {
           const n = line.match(/^\s{2}name:\s*(\S+)/);
-          if (n) name = n[1];
+          if (n && !name) name = n[1];
+          const ns = line.match(/^\s{2}namespace:\s*(\S+)/);
+          if (ns && !namespace) namespace = ns[1];
         }
       }
     }
-    if (kind) out.push({ kind: KINDS[kind.toLowerCase()] ?? kind, name });
+    if (kind) out.push({ kind: KINDS[kind.toLowerCase()] ?? kind, name, namespace });
   }
   return out;
 }
 
+/** 同じコードの中で cat > ファイル <<EOF と書いたマニフェスト (ファイル名 → 中身) */
+let WRITTEN = new Map<string, string>();
+
 function kubectl(tokens: string[], heredoc: string): Action[] {
+  const all = kubectlActions(tokens, heredoc);
+  const { flags } = splitArgs(tokens.slice(2));
+  // --dry-run はクラスタに何も作らず、手元に書き出すだけ
+  if (flags['--dry-run'] !== undefined && flags['--dry-run'] !== 'none')
+    return all.map((x) => (x.op === 'create' || x.op === 'apply' ? { ...x, op: 'read', verb: '書き出す', where: '手元' } : x));
+  return all;
+}
+
+function kubectlActions(tokens: string[], heredoc: string): Action[] {
   const verb = tokens[1];
   const { pos, flags } = splitArgs(tokens.slice(2));
   const a = (op: Op, word: string, k: { kind: string; name?: string }, where?: string): Action => ({
@@ -110,14 +139,18 @@ function kubectl(tokens: string[], heredoc: string): Action[] {
     verb: word,
     tool: 'kubectl',
     kind: k.kind,
-    name: k.name,
+    name: k.name?.replace(/\uE000/g, ' '),
     where: where ?? whereOf(k.kind, flags),
   });
   const fromFile = (op: Op, word: string): Action[] => {
-    const kinds = heredoc ? manifestKinds(heredoc) : [];
-    if (kinds.length) return kinds.map((k) => a(op, word, k));
+    const file = typeof flags['-f'] === 'string' ? flags['-f'] : undefined;
+    const yaml = heredoc || (file ? WRITTEN.get(file) : undefined) || '';
+    const kinds = yaml ? manifestKinds(yaml) : [];
+    const ns = typeof flags['-n'] === 'string' ? flags['-n'] : undefined;
+    if (kinds.length) return kinds.map((k) => a(op, word, k, CLUSTER_KINDS.has(k.kind) ? 'クラスタ' : (ns ?? k.namespace ?? '今の名前空間')));
     const f = flags['-f'] ?? flags['-k'] ?? pos[0];
-    return [a(op, word, { kind: 'マニフェスト', name: typeof f === 'string' ? f : undefined })];
+    // 中身を読めないファイルで -n も無ければ、場所はマニフェストに書いてあるとおり
+    return [a(op, word, { kind: 'マニフェスト', name: typeof f === 'string' ? f : undefined }, ns ?? 'マニフェストのとおり')];
   };
   switch (verb) {
     case 'create': {
@@ -133,6 +166,8 @@ function kubectl(tokens: string[], heredoc: string): Action[] {
     case 'kustomize':
       return [a('read', '組み立てて見る', { kind: 'マニフェスト', name: pos[0] }, '手元')];
     case 'run':
+      // --rm は一時の Pod で命令を動かし、終われば消える
+      if (flags['--rm']) return [a('enter', '一時の Pod で動かす', { kind: 'Pod', name: pos[0] })];
       return [a('create', '作る', { kind: 'Pod', name: pos[0] })];
     case 'expose':
       return [a('create', '作る', { kind: 'Service', name: typeof flags['--name'] === 'string' ? flags['--name'] : (pos[1] ?? kindOf(pos[0]).name) })];
@@ -140,8 +175,9 @@ function kubectl(tokens: string[], heredoc: string): Action[] {
       return [a('create', '作る', { kind: 'HPA', name: pos[1] ?? kindOf(pos[0]).name })];
     case 'get':
     case 'describe': {
+      if (typeof flags['--raw'] === 'string') return [a('read', '見る', { kind: 'API', name: flags['--raw'] }, 'クラスタ')];
       const k = kindOf(pos[0]);
-      return [a('read', verb === 'get' ? '見る' : '詳しく見る', { kind: k.kind, name: k.name ?? pos[1] })];
+      return [a('read', verb === 'get' ? '見る' : '詳しく見る', { kind: k.kind, name: k.name ?? nameOf(pos[1]) })];
     }
     case 'events': {
       const target = typeof flags['--for'] === 'string' ? kindOf(flags['--for']) : { kind: 'Event' };
@@ -150,18 +186,18 @@ function kubectl(tokens: string[], heredoc: string): Action[] {
     case 'top':
       return [a('read', '使用量を見る', kindOf(pos[0]))];
     case 'logs':
-      return [a('logs', flags['-p'] || flags['--previous'] ? '前のログを読む' : 'ログを読む', { kind: 'Pod', ...pickName(pos[0]) })];
+      return [a('logs', flags['-p'] || flags['--previous'] ? '前のログを読む' : 'ログを読む', target(pos[0]))];
     case 'exec':
     case 'attach':
-      return [a('enter', '中で動かす', { kind: 'Pod', ...pickName(pos[0]) })];
+      return [a('enter', '中で動かす', target(pos[0]))];
     case 'debug':
-      return [a('enter', 'デバッグのコンテナを足す', { kind: 'Pod', ...pickName(pos[0]) })];
+      return [a('enter', 'デバッグのコンテナを足す', target(pos[0]))];
     case 'port-forward':
       return [a('enter', '手元へつなぐ', kindOf(pos[0]))];
     case 'delete': {
       const k = kindOf(pos[0]);
       if (flags['-f'] !== undefined) return fromFile('delete', '消す');
-      return [a('delete', '消す', { kind: k.kind, name: k.name ?? pos.slice(1).join(' ') })];
+      return [a('delete', '消す', { kind: k.kind, name: k.name ?? (pos.slice(1).map(nameOf).filter(Boolean).join(' ') || undefined) })];
     }
     case 'set':
       return [a('change', pos[0] === 'image' ? 'イメージを変える' : '設定を変える', kindOf(pos[1]).name ? kindOf(pos[1]) : { kind: kindOf(pos[1]).kind, name: pos[2] })];
@@ -173,7 +209,7 @@ function kubectl(tokens: string[], heredoc: string): Action[] {
     case 'patch': {
       const k = kindOf(pos[0]);
       const word = verb === 'label' ? 'ラベルを付ける' : verb === 'taint' ? 'taint を付ける' : verb === 'annotate' ? '注釈を付ける' : '一部を書き換える';
-      return [a('change', word, { kind: k.kind, name: k.name ?? pos[1] })];
+      return [a('change', word, { kind: k.kind, name: k.name ?? nameOf(pos[1]) })];
     }
     case 'rollout': {
       const k = kindOf(pos[1]);
@@ -186,8 +222,12 @@ function kubectl(tokens: string[], heredoc: string): Action[] {
       const k = kindOf(pos[0]);
       return [a('wait', '待つ', { kind: k.kind, name: k.name ?? pos[1] })];
     }
-    case 'auth':
-      return [a('read', '権限を確かめる', { kind: 'API' }, 'クラスタ')];
+    case 'auth': {
+      // auth can-i <動詞> <種類>: 動詞と種類と場所を出す
+      if (pos[0] !== 'can-i') return [a('read', '権限を確かめる', { kind: 'API' }, 'クラスタ')];
+      const k = kindOf(pos[2]);
+      return [a('read', `${pos[1]} できるか確かめる`, { kind: k.kind })];
+    }
     case 'config':
       return [a(pos[0]?.startsWith('set') || pos[0] === 'use-context' ? 'change' : 'read', pos[0] === 'use-context' ? '切り替える' : pos[0]?.startsWith('set') ? '設定を変える' : '見る', { kind: 'kubeconfig' }, '手元')];
     case 'explain':
@@ -201,9 +241,11 @@ function kubectl(tokens: string[], heredoc: string): Action[] {
   }
 }
 
-function pickName(token: string | undefined): { name?: string } {
-  if (!token) return {};
-  return { name: token.includes('/') ? token : token };
+/** logs・exec などの相手。種類/名前 (deploy/web) ならその種類、名前だけなら Pod */
+function target(token: string | undefined): { kind: string; name?: string } {
+  if (!token) return { kind: 'Pod' };
+  if (token.includes('/')) return kindOf(token);
+  return { kind: 'Pod', name: nameOf(token) };
 }
 
 function other(tokens: string[]): Action[] {
@@ -243,7 +285,14 @@ function other(tokens: string[]): Action[] {
 /** 手順のコードから、起きることを順に取り出す (コマンドの無い行・ファイル操作などは飛ばす) */
 export function commandActions(text: string, language: 'bash' | 'yaml'): Action[] {
   if (language !== 'bash') return [];
-  const lines = text.replace(/\\\n/g, ' ').split('\n');
+  SUBST = [];
+  WRITTEN = new Map();
+  // $(...) は 1 語の印に、<空白を含む置き字> は空白を私用の字に替えてから語に分ける
+  const prepared = text
+    .replace(/\\\n/g, ' ')
+    .replace(/\$\(([^()]*)\)/g, (_, inner: string) => `__SUBST${SUBST.push(inner) - 1}__`)
+    .replace(/<[^<>\n]*>/g, (m) => (m.startsWith('<<') ? m : m.replace(/ /g, '\uE000')));
+  const lines = prepared.split('\n');
   const out: Action[] = [];
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
@@ -256,6 +305,12 @@ export function commandActions(text: string, language: 'bash' | 'yaml'): Action[
       const body: string[] = [];
       while (++i < lines.length && lines[i].trim() !== end) body.push(lines[i]);
       heredoc = body.join('\n');
+      // cat > web.yaml <<EOF は、あとの kubectl apply -f web.yaml のために取っておく
+      const file = line.match(/^cat\s*>\s*(\S+)/);
+      if (file) {
+        WRITTEN.set(file[1], heredoc);
+        continue;
+      }
     }
     for (const seg of line.replace(/<<-?\s*'?\w+'?/, '').split(/\s*(?:&&|\|\||;|\|)\s*/)) {
       const tokens = seg
@@ -275,6 +330,9 @@ export function commandActions(text: string, language: 'bash' | 'yaml'): Action[
 
 /** 読み上げと見出しに使う 1 行 (例: 作る: Deployment web (名前空間 try-kcna)) */
 export function describeAction(a: Action): string {
-  const place = a.where === 'クラスタ' || a.where === '手元' || a.where === 'ノード' || a.where === 'すべての名前空間' || a.where === '今の名前空間' ? a.where : `名前空間 ${a.where}`;
+  const place = isPlaceWord(a.where) ? a.where : `名前空間 ${a.where}`;
   return `${a.verb}: ${a.kind}${a.name ? ` ${a.name}` : ''} (${place})`;
 }
+
+/** 名前空間の名前ではなく、場所を表す言葉か */
+export const isPlaceWord = (w: string) => ['クラスタ', '手元', 'ノード', 'すべての名前空間', '今の名前空間', 'マニフェストのとおり'].includes(w);

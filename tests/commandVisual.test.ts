@@ -32,6 +32,36 @@ describe('commandActions', () => {
   });
 });
 
+describe('レビューで見つかった読み違い', () => {
+  it('dry-run は手元に書き出すだけ', () => {
+    expect(one('kubectl create deployment web --image=nginx:1.27 --dry-run=client -o yaml > kust/base/deployment.yaml')).toEqual(['書き出す: Deployment web (手元)']);
+  });
+  it('auth can-i は動詞・種類・名前空間を出す', () => {
+    expect(one('kubectl auth can-i list pods -n default --as=system:serviceaccount:try-kcna:viewer')).toEqual(['list できるか確かめる: Pod (名前空間 default)']);
+  });
+  it('マニフェストの namespace を場所にする', () => {
+    const end = 'EO' + 'F';
+    expect(one(`kubectl apply -f - <<'${end}'\napiVersion: v1\nkind: Pod\nmetadata:\n  name: big\n  namespace: try-kcna\nspec: {}\n${end}`)).toEqual(['反映する: Pod big (名前空間 try-kcna)']);
+  });
+  it('cat > ファイル で書いたマニフェストを、あとの apply -f で読む。読めないファイルは「マニフェストのとおり」', () => {
+    const end = 'EO' + 'F';
+    expect(one(`cat > web.yaml <<'${end}'\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web\n  namespace: try-kcna\n${end}\nkubectl apply -f web.yaml`)).toEqual(['反映する: Deployment web (名前空間 try-kcna)']);
+    expect(one('kubectl apply -f web.yaml')).toEqual(['反映する: マニフェスト web.yaml (マニフェストのとおり)']);
+  });
+  it('$(...) は 1 語として扱い、名前に出さない', () => {
+    expect(one('kubectl label nodes "$(kubectl get nodes -o jsonpath=\'{.items[0].metadata.name}\')" disktype=ssd')).toEqual(['ラベルを付ける: Node (クラスタ)']);
+    expect(one('kubectl delete -n try-kcna $(kubectl get pods -n try-kcna -l app=web -o name | head -1)')).toEqual(['消す: Pod (名前空間 try-kcna)']);
+  });
+  it('--raw・種類/名前・複数の種類・空白を含む置き字・一時の Pod', () => {
+    expect(one('kubectl get --raw /metrics')).toEqual(['見る: API /metrics (クラスタ)']);
+    expect(one('kubectl logs deployment/web --tail=5')).toEqual(['ログを読む: Deployment web (今の名前空間)']);
+    expect(one('kubectl exec deploy/web -- cat /etc/resolv.conf')).toEqual(['中で動かす: Deployment web (今の名前空間)']);
+    expect(one('kubectl get deployment,replicaset,pod -n try-kcna')).toEqual(['見る: Deployment・ReplicaSet・Pod (名前空間 try-kcna)']);
+    expect(one('kubectl debug -it <動いている Pod 名> --image=busybox:1.36 --target=<調べたいコンテナ名>')).toEqual(['デバッグのコンテナを足す: Pod <動いている Pod 名> (今の名前空間)']);
+    expect(one('kubectl run tmp --rm -it --restart=Never --image=busybox:1.36 -n try-kcna -- wget -qO- http://web')).toEqual(['一時の Pod で動かす: Pod tmp (名前空間 try-kcna)']);
+  });
+});
+
 describe('ハンドブックの全手順', () => {
   const steps = HANDBOOK_TOPICS.flatMap((t) => [...t.flow, ...t.try.flatMap((x) => x.steps)].map((s) => ({ id: t.id, s })));
   it('bash のコードがある手順は、ほぼすべて絵になる (ならないものはファイル操作などだけ)', () => {
@@ -45,7 +75,13 @@ describe('ハンドブックの全手順', () => {
   it('種類が「リソース」(読めなかった) になる手順が無い', () => {
     for (const { id, s } of steps) {
       if (s.code?.language !== 'bash') continue;
-      for (const a of commandActions(s.code.text, 'bash')) expect(a.kind, `${id}: ${s.code.text.slice(0, 80)}`).not.toBe('リソース');
+      for (const a of commandActions(s.code.text, 'bash')) {
+        const where = `${id}: ${s.code.text.slice(0, 80)}`;
+        expect(a.kind, where).not.toBe('リソース');
+        // 崩れた読み方 (空の種類・$( の切れ端・閉じていない <) が出ない
+        expect(a.kind.trim(), where).not.toBe('');
+        expect(`${a.kind} ${a.name ?? ''}`, where).not.toMatch(/\$\(|__SUBST|<[^>]*$/);
+      }
     }
   });
 });
