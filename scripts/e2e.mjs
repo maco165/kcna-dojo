@@ -73,10 +73,10 @@ function checkFirstLoad() {
   const kb = Math.round(gz / 1024);
   check(kb <= 380, `最初に読む JS は gzip で 380KB まで (${kb}KB、${files.length} ファイル)`);
   // 名前だけでなく中身でも見る (静的に取り込まれて本体に混ざっても気づけるように)。それぞれのデータにしか無い文字で調べる
-  const marks = { ハンドブックのデータ: 'k3s-vs-kubernetes', 用語集のデータ: 'container-image', 説明のページ: '2026-03-22 の版', 模擬試験用の問題: 'のイメージを更新した直後に', コマンドの説明: 'リソースの一覧や状態を表で表示します' };
+  const marks = { ハンドブックのデータ: 'k3s-vs-kubernetes', 用語集のデータ: 'container-image', 説明のページ: '2026-03-22 の版', 模擬試験用の問題: 'のイメージを更新した直後に', 比較表のデータ: 'volumeClaimTemplates:  # Pod ごとに', コマンドの説明: 'リソースの一覧や状態を表で表示します' };
   const text = files.map((f) => readFileSync(new URL(`../dist/assets/${f}`, import.meta.url), 'utf8')).join('\n');
   const found = Object.entries(marks).filter(([, m]) => text.includes(m)).map(([k]) => k);
-  check(found.length === 0, `ハンドブック・用語集・説明のページ・模擬試験用の問題・コマンドの説明は最初に読まない ${found.join(',')}`);
+  check(found.length === 0, `ハンドブック・用語集・説明のページ・模擬試験用の問題・コマンドの説明・比較表は最初に読まない ${found.join(',')}`);
   // 書き出したハンドブックの目次も、画面と同じ 2 部 (h2) と段 (h3) の組みにする
   const hbHtml = readFileSync(new URL('../dist/handbook/index.html', import.meta.url), 'utf8');
   const hbHeads = [...hbHtml.matchAll(/<h([23])>([^<]*)<\/h\1>/g)].map((m) => `${m[1]}:${m[2]}`);
@@ -721,6 +721,16 @@ async function run(browser, name, width, height) {
     check(cols - 1 === rowCells && rowCells >= 2, `${tag} 比較表は列と行のセルの数がそろう (${rowCells} 列)`);
     check((await page.locator('.cmp-pitfalls li').count()) >= 1 && (await page.locator('.cmp-section pre, .cmp-section code').count()) >= 1, `${tag} 比較表に取り違えやすい点とコードがある`);
     await noHorizontalOverflow(page, width, `${tag} 比較表`);
+    // サイトの中で表へ移ると、題名が表の題名になり、ハンドブックのデータは読まない
+    const loaded = [];
+    const onReq = (r) => loaded.push(r.url());
+    page.on('request', onReq);
+    await page.goto(`${BASE}compare/`);
+    await page.locator('.cmp-card').nth(1).click();
+    await page.locator('.cmp-table').waitFor();
+    await page.waitForTimeout(500);
+    page.off('request', onReq);
+    check((await page.title()).includes('の違い') && !loaded.some((u) => /\/handbook-[^/]*\.js$/.test(u)), `${tag} 比較表へ移ると題名が表の題名になり、ハンドブックのデータは読まない (${await page.title()})`);
     await page.goto(`${BASE}glossary/deployment/`);
     await page.getByRole('heading', { name: '似た語と比べる' }).first().waitFor({ timeout: 5000 }).catch(() => {});
     check((await page.locator('a.gloss-chip[href*="/compare/"]').count()) >= 1, `${tag} 用語集の語から、その語の比較表へ飛べる`);

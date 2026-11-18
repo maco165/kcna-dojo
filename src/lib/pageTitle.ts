@@ -1,5 +1,5 @@
-// 題名のうち、本体にあるデータだけで決まるもの (ハンドブックのトピックと用語集の語を除く)。
-// ハンドブックと用語集の題名は pageMeta.ts が、そのデータと一緒に読んで決める
+// 題名のうち、本体にあるデータだけで決まるもの (ハンドブックのトピック・用語集の語・比較表の表を除く)。
+// ハンドブックと用語集の題名は pageMeta.ts が、比較表の表の題名は route.ts が比較表のデータだけを読んで決める
 import { WEEKS } from '../content/curriculum';
 import { findLesson } from '../content';
 import type { Route } from './route';
@@ -7,7 +7,7 @@ import type { Route } from './route';
 export const SITE_TITLE = 'クラネイ — KCNA-JP 対策';
 
 /** ハンドブックのトピックか用語集の語なら、題名に重いデータが要る */
-export const needsHeavyTitle = (route: Route) => (route.name === 'handbook' && !!route.topicId) || (route.name === 'glossary' && !!route.termId) || (route.name === 'compare' && !!route.tableId);
+export const needsHeavyTitle = (route: Route) => (route.name === 'handbook' && !!route.topicId) || (route.name === 'glossary' && !!route.termId);
 
 /** 画面の短い題名 (トップは undefined)。ハンドブックのトピックと用語集の語は、ここでは一覧の名前を返す */
 export function lightTitle(route: Route): string | undefined {

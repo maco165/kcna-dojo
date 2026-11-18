@@ -1,6 +1,5 @@
 // ページの題名 (ハンドブックのトピックと用語集の語まで)。書き出す HTML (scripts/prerender.mjs) と、
 // サイトの中でハンドブックのトピック・用語集の語へ移ったときの document.title が使う。データを持つので後から読む
-import compare from '../content/compare.json';
 import glossary from '../content/glossary.json';
 import { findTopic } from '../content/handbook';
 import type { GlossaryTerm } from './glossary';
@@ -16,7 +15,6 @@ export function pageTitle(route: Route): string | undefined {
     const t = (glossary as { terms: GlossaryTerm[] }).terms.find((x) => x.id === route.termId);
     return t ? `${t.term} (用語集)` : '用語集';
   }
-  if (route.name === 'compare' && route.tableId) return (compare as { id: string; title: string }[]).find((t) => t.id === route.tableId)?.title ?? '似た語の比較表';
   return lightTitle(route);
 }
 

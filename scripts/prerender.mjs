@@ -149,7 +149,7 @@ export async function buildPages(load) {
         `<p>${link('compare/', '似た語の比較表')}</p>`,
         `<h1>${esc(t.title)}</h1>`,
         `<p>${esc(t.lead)}</p>`,
-        `<table><thead><tr><th></th>${t.columns.map((c) => `<th>${esc(c.name)}</th>`).join('')}</tr></thead><tbody>${t.rows.map((r) => `<tr><th>${esc(r.label)}</th>${r.cells.map((c) => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>`,
+        `<table><thead><tr><th scope="col">観点</th>${t.columns.map((c) => `<th scope="col">${esc(c.name)}</th>`).join('')}</tr></thead><tbody>${t.rows.map((r) => `<tr><th scope="row">${esc(r.label)}</th>${r.cells.map((c) => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>`,
         '<h2>取り違えやすい点</h2>',
         `<ul>${t.pitfalls.map((p) => `<li>${esc(p)}</li>`).join('')}</ul>`,
         '<h2>違いが見えるコード</h2>',
