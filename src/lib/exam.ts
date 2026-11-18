@@ -1,7 +1,7 @@
 // 模擬試験: 問題を配点の割合で選び、最後にまとめて採点する
 import type { Domain, Question } from '../content/types';
 import { XP_PER_CORRECT, gradeChoice, gradeFill } from './grade';
-import { addExamRecord, completeReview, recordAnswer, type Progress } from './progress';
+import { addExamRecord, completeReview, recordAnswer, type ExamRecord, type Progress } from './progress';
 import { shuffleChoices } from './shuffle';
 
 export const EXAM_QUESTIONS = 60;
@@ -86,6 +86,23 @@ export function validateExamSets(sets: ExamSet[], bank: BankItem[], total: numbe
     for (const d of Object.keys(counts) as Domain[]) if (per[d] !== counts[d]) errors.push(`第 ${set.id} 回: ${d} が ${per[d]} 問です (配点どおりなら ${counts[d]} 問)`);
   });
   return errors;
+}
+
+/** 回の選択。決まった回は番号、毎回選び直す回は random */
+export type ExamChoice = number | 'random';
+
+/** 選んだ回の問題と、記録に残す回の番号 (ランダムには付けない) */
+export function startExam(choice: ExamChoice, sets: ExamSet[], bank: BankItem[], random: () => number = Math.random): { items: BankItem[]; set?: number } {
+  const chosen = choice === 'random' ? undefined : sets.find((x) => x.id === choice);
+  return chosen ? { items: examSetItems(bank, chosen, random), set: chosen.id } : { items: pickExamQuestions(bank, random) };
+}
+
+/** その回のいちばん新しい記録 (記録は新しい順) */
+export const lastExamOf = (exams: ExamRecord[] | undefined, set: number) => exams?.find((e) => e.set === set);
+
+/** 最初に選んでおく回: まだ解いていない最初の回。全部解いていればランダム */
+export function defaultChoice(exams: ExamRecord[] | undefined, sets: ExamSet[]): ExamChoice {
+  return sets.find((s) => !lastExamOf(exams, s.id))?.id ?? 'random';
 }
 
 export type ExamAnswer = string | undefined;

@@ -338,6 +338,8 @@ async function run(browser, name, width, height) {
     await tp.clock.fastForward('00:00:10');
     const after = await tp.evaluate(() => JSON.parse(localStorage.getItem('kcna.v1') ?? '{}').exams?.length ?? 0);
     check(after === before + 1, `${tag} 時間切れで 1 回だけ自動で採点する (${before} → ${after})`);
+    const lastSet = await tp.evaluate(() => JSON.parse(localStorage.getItem('kcna.v1') ?? '{}').exams?.[0]?.set);
+    check(lastSet === 2, `${tag} 時間切れの採点にも回の番号が残る (第 1 回を解いたあとは第 2 回が選ばれている: ${lastSet})`);
     await tp.close();
   }
 

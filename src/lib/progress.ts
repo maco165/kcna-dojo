@@ -127,8 +127,8 @@ export function normalizeProgress(raw: unknown): Progress | null {
   if (Array.isArray(raw.exams)) {
     out.exams = raw.exams
       .filter((e): e is Record<string, unknown> => isObject(e) && typeof e.at === 'string' && !Number.isNaN(Date.parse(e.at)) && isCount(e.correct) && isCount(e.total) && (e.total as number) > 0 && (e.correct as number) <= (e.total as number))
-      .slice(0, MAX_EXAM_RECORDS)
-      .map((e) => ({ at: e.at as string, correct: e.correct as number, total: e.total as number, ...(isCount(e.set) && (e.set as number) >= 1 ? { set: Math.floor(e.set as number) } : {}) }));
+      .map((e) => ({ at: e.at as string, correct: e.correct as number, total: e.total as number, ...(Number.isInteger(e.set) && (e.set as number) >= 1 ? { set: e.set as number } : {}) }));
+    out.exams = trimExamRecords(out.exams);
   }
   if (profile) {
     out.profile = {
@@ -305,7 +305,22 @@ export function exportFileName(now: Date): string {
   return `kcna-progress-${dayKey(now)}.json`;
 }
 
-/** 模擬試験の結果を残す (新しいものを先頭に、最大 20 件) */
+/**
+ * 新しい順の記録を上限の件数に切る。ただし決まった回 (set) ごとのいちばん新しい記録は、
+ * 上限より古くても 1 件ずつ残す (「前回の結果」が押し出されて消えないように)
+ */
+export function trimExamRecords(records: ExamRecord[]): ExamRecord[] {
+  const kept = records.slice(0, MAX_EXAM_RECORDS);
+  const sets = new Set(kept.map((e) => e.set).filter((n) => n !== undefined));
+  for (const e of records.slice(MAX_EXAM_RECORDS)) {
+    if (e.set === undefined || sets.has(e.set)) continue;
+    sets.add(e.set);
+    kept.push(e);
+  }
+  return kept;
+}
+
+/** 模擬試験の結果を残す (新しいものを先頭に、最大 20 件と、回ごとの最新) */
 export function addExamRecord(p: Progress, record: ExamRecord): Progress {
-  return { ...p, exams: [record, ...(p.exams ?? [])].slice(0, MAX_EXAM_RECORDS) };
+  return { ...p, exams: trimExamRecords([record, ...(p.exams ?? [])]) };
 }

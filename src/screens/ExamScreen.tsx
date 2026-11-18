@@ -31,9 +31,11 @@ import {
   gradeExam,
   isAnswered,
   isCorrect,
-  examSetItems,
-  pickExamQuestions,
+  defaultChoice,
+  lastExamOf,
   recordExam,
+  startExam,
+  type ExamChoice,
   type ExamSet,
   type BankItem,
   type ExamAnswer,
@@ -76,17 +78,15 @@ function Frame({ progress, children }: { progress: Progress; children: React.Rea
 }
 
 const EXAM_SETS = (examSets as { sets: ExamSet[] }).sets;
-/** 回の選択の値。決まった回は番号、毎回選び直す回は random */
-type ExamChoice = number | 'random';
 const choiceName = (c: ExamChoice) => (c === 'random' ? 'ランダム' : `第 ${c} 回`);
 
-function Intro({ progress, onStart }: { progress: Progress; onStart: (c: ExamChoice) => void }) {
+/** 選んだ回は ExamScreen が持つ (解き終えて戻っても、選んでいた回のまま) */
+function Intro({ progress, choice: picked, onChoice, onStart }: { progress: Progress; choice: ExamChoice; onChoice: (c: ExamChoice) => void; onStart: (c: ExamChoice) => void }) {
   const counts = domainCounts();
   const bankSize = questionBank().length;
-  const [choice, setChoice] = useState<string>(String(EXAM_SETS[0]?.id ?? 'random'));
-  const picked: ExamChoice = choice === 'random' ? 'random' : Number(choice);
-  /** 回ごとのいちばん新しい結果 (記録は新しい順) */
-  const last = (id: number) => progress.exams?.find((e) => e.set === id);
+  const choice = String(picked);
+  const setChoice = (v: string) => onChoice(v === 'random' ? 'random' : Number(v));
+  const last = (id: number) => lastExamOf(progress.exams, id);
   return (
     <VStack gap={6}>
       <VStack gap={1}>
@@ -373,10 +373,11 @@ export default function ExamScreen({ progress, updateProgress }: Props) {
   const [answers, setAnswers] = useState<ExamAnswer[]>([]);
   const result = useMemo(() => (phase === 'result' ? gradeExam(items, answers) : null), [phase, items, answers]);
 
+  const [choice, setChoice] = useState<ExamChoice>(() => defaultChoice(progress.exams, EXAM_SETS));
   const start = (c: ExamChoice) => {
-    const chosen = c === 'random' ? undefined : EXAM_SETS.find((x) => x.id === c);
-    setSet(chosen?.id);
-    setItems(chosen ? examSetItems(questionBank(), chosen) : pickExamQuestions(questionBank()));
+    const next = startExam(c, EXAM_SETS, questionBank());
+    setSet(next.set);
+    setItems(next.items);
     setAnswers([]);
     setPhase('running');
     window.scrollTo(0, 0);
@@ -396,7 +397,7 @@ export default function ExamScreen({ progress, updateProgress }: Props) {
       {phase === 'result' && result ? (
         <Result items={items} answers={answers} result={result} onRestart={() => setPhase('intro')} />
       ) : (
-        <Intro progress={progress} onStart={start} />
+        <Intro progress={progress} choice={choice} onChoice={setChoice} onStart={start} />
       )}
     </Frame>
   );
