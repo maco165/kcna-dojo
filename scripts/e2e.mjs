@@ -457,6 +457,42 @@ async function run(browser, name, width, height) {
   check(figureMissing.length === 0, `${tag} ハンドブックの 13 トピックすべてに図がある ${figureMissing.join(',')}`);
   check(allIds.length === 13 && widest.w <= width, `${tag} ハンドブックの 13 トピックが横にはみ出さない (いちばん広い ${widest.id} ${widest.w} <= ${width})`);
 
+  // 16. 戻る操作: 目次を下まで送ってトピックを開き、戻ると元の位置。新しく開いたページは先頭
+  {
+    const scrollTop = () => page.evaluate(() => (document.querySelector('.astryx-layout-content') ?? document.scrollingElement).scrollTop);
+    const scrollTo = (y) => page.evaluate((v) => ((document.querySelector('.astryx-layout-content') ?? document.scrollingElement).scrollTop = v), y);
+    await page.goto(`${BASE}#/handbook`);
+    await page.locator('.hb-topic').first().waitFor();
+    // 人が見えているカードを押すのと同じく、カードを画面に入れてから押す (押す直前の位置を覚えているか)
+    const card = page.locator('.hb-topic').nth(6);
+    await card.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(300);
+    const before = await scrollTop();
+    await card.click();
+    await page.getByRole('heading', { name: '全体の流れ' }).waitFor();
+    await page.waitForTimeout(300);
+    check((await scrollTop()) < 5, `${tag} 新しく開いたトピックは先頭から (${await scrollTop()})`);
+    await page.goBack();
+    await page.locator('.hb-topic').first().waitFor();
+    await page.waitForTimeout(600);
+    const after = await scrollTop();
+    check(before > 100 && Math.abs(after - before) < 5, `${tag} 戻ると目次の元の位置 (${before} → ${after})`);
+    // 進むと、トピックを送った位置に戻る
+    await page.goForward();
+    await page.getByRole('heading', { name: '全体の流れ' }).waitFor();
+    await page.waitForTimeout(600);
+    check((await scrollTop()) < 5, `${tag} 進むとトピックの離れた位置 (先頭) に戻る (${await scrollTop()})`);
+    await scrollTo(500);
+    await page.waitForTimeout(200);
+    await page.goBack();
+    await page.locator('.hb-topic').first().waitFor();
+    await page.goForward();
+    await page.getByRole('heading', { name: '全体の流れ' }).waitFor();
+    await page.waitForTimeout(600);
+    const fwd = await scrollTop();
+    check(Math.abs(fwd - 500) < 5, `${tag} トピックを 500 まで送って戻り、進むと 500 (${fwd})`);
+  }
+
   check(errors.length === 0, `${tag} ページのエラーが無い ${errors.length ? errors.join(' / ') : ''}`);
   await context.close();
 }
