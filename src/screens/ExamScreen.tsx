@@ -31,12 +31,15 @@ import {
   gradeExam,
   isAnswered,
   isCorrect,
+  examSetItems,
   pickExamQuestions,
   recordExam,
+  type ExamSet,
   type BankItem,
   type ExamAnswer,
   type ExamResult,
 } from '../lib/exam';
+import examSets from '../content/examSets.json';
 import { normalizeAnswer } from '../lib/grade';
 import type { Progress } from '../lib/progress';
 import { SITE_NAME } from '../lib/site';
@@ -72,16 +75,25 @@ function Frame({ progress, children }: { progress: Progress; children: React.Rea
   );
 }
 
-function Intro({ progress, onStart }: { progress: Progress; onStart: () => void }) {
+const EXAM_SETS = (examSets as { sets: ExamSet[] }).sets;
+/** 回の選択の値。決まった回は番号、毎回選び直す回は random */
+type ExamChoice = number | 'random';
+const choiceName = (c: ExamChoice) => (c === 'random' ? 'ランダム' : `第 ${c} 回`);
+
+function Intro({ progress, onStart }: { progress: Progress; onStart: (c: ExamChoice) => void }) {
   const counts = domainCounts();
   const bankSize = questionBank().length;
+  const [choice, setChoice] = useState<string>(String(EXAM_SETS[0]?.id ?? 'random'));
+  const picked: ExamChoice = choice === 'random' ? 'random' : Number(choice);
+  /** 回ごとのいちばん新しい結果 (記録は新しい順) */
+  const last = (id: number) => progress.exams?.find((e) => e.set === id);
   return (
     <VStack gap={6}>
       <VStack gap={1}>
         <Text type="supporting">{SITE_NAME}</Text>
         <h1 className="week-title">模擬試験</h1>
         <Text type="supporting">
-          第 1〜8 週の問題 ({bankSize} 問) から、本番と同じ 4 分野の配点の割合で {EXAM_QUESTIONS} 問を選びます。時間は {EXAM_MINUTES} 分で、途中では答えを見せず、最後にまとめて採点します。
+          第 1〜8 週の問題 ({bankSize} 問) から、本番と同じ 4 分野の配点の割合で {EXAM_QUESTIONS} 問を出します。問題が決まっていて互いに重ならない第 1〜{EXAM_SETS.length} 回と、毎回選び直すランダムがあります。時間は {EXAM_MINUTES} 分で、途中では答えを見せず、最後にまとめて採点します。
         </Text>
       </VStack>
       <Card padding={4}>
@@ -93,9 +105,23 @@ function Intro({ progress, onStart }: { progress: Progress; onStart: () => void 
             ))}
           </List>
           <Text type="supporting">合格の目安は {Math.round(PASS_MARK * 100)}% としています (LF の多肢選択式試験に共通の合格点です)。答えて間違えた問題は復習に入ります。</Text>
-          <div>
-            <Button variant="primary" label="模擬試験を始める" onClick={onStart} />
-          </div>
+          <RadioList label="回を選ぶ" value={choice} onChange={setChoice}>
+            {EXAM_SETS.map((set) => {
+              const e = last(set.id);
+              return (
+                <RadioListItem
+                  key={set.id}
+                  value={String(set.id)}
+                  label={choiceName(set.id)}
+                  description={e ? `前回 ${e.correct} / ${e.total} (${pct(e.correct, e.total)}%)` : 'まだ解いていません'}
+                />
+              );
+            })}
+            <RadioListItem value="random" label="ランダム" description="毎回、全問から選び直します" />
+          </RadioList>
+          <HStack>
+            <Button variant="primary" label={`${choiceName(picked)}を始める`} onClick={() => onStart(picked)} />
+          </HStack>
         </VStack>
       </Card>
       {progress.exams && progress.exams.length > 0 && (
@@ -103,7 +129,7 @@ function Intro({ progress, onStart }: { progress: Progress; onStart: () => void 
           {progress.exams.map((e, i) => (
             <ListItem
               key={`${e.at}-${i}`}
-              label={`${e.correct} / ${e.total} (${pct(e.correct, e.total)}%)`}
+              label={`${e.set ? choiceName(e.set) : 'ランダム'} · ${e.correct} / ${e.total} (${pct(e.correct, e.total)}%)`}
               description={new Date(e.at).toLocaleString('ja-JP')}
               startContent={
                 <StatusDot variant={e.correct / e.total >= PASS_MARK ? 'success' : 'warning'} label={e.correct / e.total >= PASS_MARK ? '目安に届いた' : '目安に届かない'} />
@@ -343,11 +369,14 @@ function Result({ items, answers, result, onRestart }: { items: BankItem[]; answ
 export default function ExamScreen({ progress, updateProgress }: Props) {
   const [phase, setPhase] = useState<'intro' | 'running' | 'result'>('intro');
   const [items, setItems] = useState<BankItem[]>([]);
+  const [set, setSet] = useState<number | undefined>(undefined);
   const [answers, setAnswers] = useState<ExamAnswer[]>([]);
   const result = useMemo(() => (phase === 'result' ? gradeExam(items, answers) : null), [phase, items, answers]);
 
-  const start = () => {
-    setItems(pickExamQuestions(questionBank()));
+  const start = (c: ExamChoice) => {
+    const chosen = c === 'random' ? undefined : EXAM_SETS.find((x) => x.id === c);
+    setSet(chosen?.id);
+    setItems(chosen ? examSetItems(questionBank(), chosen) : pickExamQuestions(questionBank()));
     setAnswers([]);
     setPhase('running');
     window.scrollTo(0, 0);
@@ -355,7 +384,7 @@ export default function ExamScreen({ progress, updateProgress }: Props) {
 
   const finish = (final: ExamAnswer[]) => {
     const now = new Date();
-    updateProgress((p) => recordExam(p, items, final, now));
+    updateProgress((p) => recordExam(p, items, final, now, set));
     setAnswers(final);
     setPhase('result');
     window.scrollTo(0, 0);

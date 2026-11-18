@@ -26,7 +26,8 @@ export const GOAL_CHOICES = [10, 20, 30, 50] as const;
 export const DEFAULT_EXAM_DATE = '2027-03-06';
 
 /** 模擬試験の結果 (新しい順に最大 20 件) */
-export type ExamRecord = { at: string; correct: number; total: number };
+/** set は決まった回 (第 n 回) の番号。ランダムに選んだ回には付けない */
+export type ExamRecord = { at: string; correct: number; total: number; set?: number };
 export const MAX_EXAM_RECORDS = 20;
 
 export type Progress = {
@@ -127,7 +128,7 @@ export function normalizeProgress(raw: unknown): Progress | null {
     out.exams = raw.exams
       .filter((e): e is Record<string, unknown> => isObject(e) && typeof e.at === 'string' && !Number.isNaN(Date.parse(e.at)) && isCount(e.correct) && isCount(e.total) && (e.total as number) > 0 && (e.correct as number) <= (e.total as number))
       .slice(0, MAX_EXAM_RECORDS)
-      .map((e) => ({ at: e.at as string, correct: e.correct as number, total: e.total as number }));
+      .map((e) => ({ at: e.at as string, correct: e.correct as number, total: e.total as number, ...(isCount(e.set) && (e.set as number) >= 1 ? { set: Math.floor(e.set as number) } : {}) }));
   }
   if (profile) {
     out.profile = {

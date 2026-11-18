@@ -290,7 +290,8 @@ async function run(browser, name, width, height) {
   await page.goto(`${BASE}#/exam`);
   await page.getByRole('heading', { name: '模擬試験' }).waitFor();
   const answersBefore = await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('kcna.v1') ?? '{}').answers ?? {}).length);
-  await page.getByRole('button', { name: '模擬試験を始める' }).click();
+  check((await page.getByRole('radio', { name: /^(第 [1-3] 回|ランダム)/ }).count()) === 4, `${tag} 模擬試験は第 1〜3 回とランダムから選べる`);
+  await page.getByRole('button', { name: '第 1 回を始める' }).click();
   check(await page.getByText(/模擬試験 · 1 \/ 60 問/).isVisible(), `${tag} 模擬試験は 60 問`);
   check(await page.getByText(/残り (90:00|89:5\d)/).isVisible(), `${tag} 残り時間が 90 分から始まる`);
   const firstRadio = page.getByRole('radio').first();
@@ -303,21 +304,23 @@ async function run(browser, name, width, height) {
   await page.getByRole('button', { name: '採点する' }).last().click();
   await page.getByRole('heading', { name: '結果' }).waitFor();
   const afterExam = await page.evaluate(() => JSON.parse(localStorage.getItem('kcna.v1') ?? 'null'));
-  check(afterExam?.exams?.length === 1 && afterExam.exams[0].total === 60, `${tag} 模擬試験の結果が記録に残る`);
+  check(afterExam?.exams?.length === 1 && afterExam.exams[0].total === 60 && afterExam.exams[0].set === 1, `${tag} 模擬試験の結果が回の番号つきで記録に残る`);
   const answersAdded = Object.keys(afterExam?.answers ?? {}).length - answersBefore;
   check(answersAdded <= 1, `${tag} 答えなしの問題は記録しない (増えた記録 ${answersAdded})`);
   await noHorizontalOverflow(page, width, `${tag} 模擬試験の結果`);
   await page.getByRole('button', { name: '模擬試験の最初へ戻る' }).click();
-  // やめるときは確かめる
-  await page.getByRole('button', { name: '模擬試験を始める' }).click();
+  check(await page.getByText(/前回 \d+ \/ 60/).first().isVisible(), `${tag} 第 1 回の前回の結果が回の選択に出る`);
+  // やめるときは確かめる (ランダムの回で)
+  await page.getByRole('radio', { name: /^ランダム/ }).check();
+  await page.getByRole('button', { name: 'ランダムを始める' }).click();
   await page.getByRole('button', { name: '模擬試験をやめる' }).click();
   check(await page.getByText('ここまでの答えは残らず').isVisible(), `${tag} 模擬試験をやめる前に確かめる`);
   await page.getByRole('button', { name: '続ける' }).click();
   check(await page.getByText(/模擬試験 · 1 \/ 60 問/).isVisible(), `${tag} 続けるを選ぶと試験に戻る`);
   await page.getByRole('button', { name: '模擬試験をやめる' }).click();
   await page.getByRole('button', { name: 'やめる', exact: true }).click();
-  await page.getByRole('button', { name: '模擬試験を始める' }).waitFor();
-  check(await page.getByText(/ \/ 60 \(\d+%\)/).first().isVisible(), `${tag} 模擬試験の画面にこれまでの結果が出る`);
+  await page.getByRole('button', { name: /を始める$/ }).waitFor();
+  check(await page.getByText(/第 1 回 · \d+ \/ 60 \(\d+%\)/).first().isVisible(), `${tag} 模擬試験の画面にこれまでの結果が回の名前つきで出る`);
   await page.goto(`${BASE}#/progress`);
   await page.getByRole('heading', { name: '進捗' }).waitFor();
   check(await page.getByText(/前回 \d+ \/ 60 問/).isVisible(), `${tag} 進捗の画面に模擬試験の前回の結果が出る`);
@@ -329,7 +332,7 @@ async function run(browser, name, width, height) {
     await tp.clock.install();
     await tp.goto(`${BASE}#/exam`);
     const before = await tp.evaluate(() => JSON.parse(localStorage.getItem('kcna.v1') ?? '{}').exams?.length ?? 0);
-    await tp.getByRole('button', { name: '模擬試験を始める' }).click();
+    await tp.getByRole('button', { name: /を始める$/ }).click();
     await tp.clock.fastForward('01:30:02');
     await tp.getByRole('heading', { name: '結果' }).waitFor();
     await tp.clock.fastForward('00:00:10');

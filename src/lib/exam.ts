@@ -53,6 +53,41 @@ export function pickExamQuestions(bank: BankItem[], random: () => number = Math.
   return shuffled(picked, random).map((b) => ({ ...b, question: shuffleChoices(b.question, random) }));
 }
 
+/** 決まった回: 問題の id の並び。正本は content/examSets.json、形は validateExamSets が検査する */
+export type ExamSet = { id: number; questions: string[] };
+
+/** 決まった回の問題を束から引き、並びと 4 択の選択肢を混ぜる (問題は毎回同じ、順番は変わる) */
+export function examSetItems(bank: BankItem[], set: ExamSet, random: () => number = Math.random): BankItem[] {
+  const byId = new Map(bank.map((b) => [b.question.id, b]));
+  const items = set.questions.map((id) => byId.get(id)).filter((b): b is BankItem => b !== undefined);
+  return shuffled(items, random).map((b) => ({ ...b, question: shuffleChoices(b.question, random) }));
+}
+
+/** 決まった回の検査: 回の番号が 1 から続く・どの回も 60 問で配点どおり・実在する問題・回どうしで重ならない */
+export function validateExamSets(sets: ExamSet[], bank: BankItem[], total: number = EXAM_QUESTIONS): string[] {
+  const errors: string[] = [];
+  const byId = new Map(bank.map((b) => [b.question.id, b]));
+  const counts = domainCounts(total);
+  const seen = new Map<string, number>();
+  sets.forEach((set, i) => {
+    if (set.id !== i + 1) errors.push(`${i + 1} 番目の回の id が ${set.id} です (1 から順に振ります)`);
+    if (set.questions.length !== total) errors.push(`第 ${set.id} 回: ${set.questions.length} 問です (${total} 問にします)`);
+    const per = Object.fromEntries(Object.keys(EXAM_WEIGHTS).map((d) => [d, 0])) as Record<Domain, number>;
+    for (const id of set.questions) {
+      const b = byId.get(id);
+      if (!b) {
+        errors.push(`第 ${set.id} 回: ${id} という問題はありません`);
+        continue;
+      }
+      per[b.domain]++;
+      if (seen.has(id)) errors.push(`第 ${set.id} 回: ${id} は第 ${seen.get(id)} 回と重なっています`);
+      else seen.set(id, set.id);
+    }
+    for (const d of Object.keys(counts) as Domain[]) if (per[d] !== counts[d]) errors.push(`第 ${set.id} 回: ${d} が ${per[d]} 問です (配点どおりなら ${counts[d]} 問)`);
+  });
+  return errors;
+}
+
 export type ExamAnswer = string | undefined;
 
 /** 答えたか (空白だけは答えなしとみなす) */
@@ -92,7 +127,7 @@ export function formatClock(seconds: number): string {
  * 採点の結果を記録に入れる。答えた問題だけを復習の規則で記録し (答えなしは記録しない。
  * 途中の復習の段階を戻さないため)、正解の数の XP と試験の結果を足す
  */
-export function recordExam(p: Progress, items: BankItem[], answers: ExamAnswer[], now: Date): Progress {
+export function recordExam(p: Progress, items: BankItem[], answers: ExamAnswer[], now: Date, set?: number): Progress {
   let next = p;
   let correct = 0;
   items.forEach((item, i) => {
@@ -103,5 +138,5 @@ export function recordExam(p: Progress, items: BankItem[], answers: ExamAnswer[]
     next = recordAnswer(next, item.question.id, ok, now);
   });
   next = completeReview(next, correct * XP_PER_CORRECT, now);
-  return addExamRecord(next, { at: now.toISOString(), correct, total: items.length });
+  return addExamRecord(next, { at: now.toISOString(), correct, total: items.length, ...(set ? { set } : {}) });
 }
