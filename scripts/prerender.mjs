@@ -132,6 +132,34 @@ export async function buildPages(load) {
     pages.push({ path: `glossary/${t.id}/`, canonical: 'glossary/', inSitemap: false, title: `${t.term} (用語集)`, description: clip(t.description), body: `<h1>${esc(t.term)}</h1>\n<p>${esc(t.description)}</p>\n<p>${link('glossary/', '用語集の一覧')}</p>` });
   }
 
+  // 似た語の比較表: 一覧と、表ごとのページ (表・取り違えやすい点・コード・出典まで、画面と同じ中身)
+  const tables = (await load('/src/content/compare.json')).default;
+  pages.push({
+    path: 'compare/',
+    title: '似た語の比較表',
+    description: `Deployment と StatefulSet、ConfigMap と Secret など、KCNA で取り違えやすい Kubernetes の語の違いを ${tables.length} の表にまとめ、公式の文書で確かめた出典を付けた。`,
+    body: ['<h1>似た語の比較表</h1>', `<ul>${tables.map((t) => `<li>${link(`compare/${t.id}/`, t.title)}: ${esc(t.lead)}</li>`).join('')}</ul>`].join('\n'),
+  });
+  for (const t of tables) {
+    pages.push({
+      path: `compare/${t.id}/`,
+      title: t.title,
+      description: clip(t.lead),
+      body: [
+        `<p>${link('compare/', '似た語の比較表')}</p>`,
+        `<h1>${esc(t.title)}</h1>`,
+        `<p>${esc(t.lead)}</p>`,
+        `<table><thead><tr><th scope="col">観点</th>${t.columns.map((c) => `<th scope="col">${esc(c.name)}</th>`).join('')}</tr></thead><tbody>${t.rows.map((r) => `<tr><th scope="row">${esc(r.label)}</th>${r.cells.map((c) => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>`,
+        '<h2>取り違えやすい点</h2>',
+        `<ul>${t.pitfalls.map((p) => `<li>${esc(p)}</li>`).join('')}</ul>`,
+        '<h2>違いが見えるコード</h2>',
+        ...t.example.map((e) => `<h3>${esc(e.title)}</h3><pre><code>${esc(e.code)}</code></pre>`),
+        '<h2>出典</h2>',
+        `<ul>${t.sources.map((x) => `<li><a href="${esc(x.url)}">${esc(x.label)}</a></li>`).join('')}</ul>`,
+      ].join('\n'),
+    });
+  }
+
   // 週とレッスン (問題文までを書き、答えと解説は書かない。画面でも答えるまで出ないため)
   for (const w of WEEKS) {
     const ls = lessonsOf(w);

@@ -29,7 +29,7 @@ import {
 import { downloadProgress } from '../lib/download';
 import { SITE_NAME } from '../lib/site';
 import { currentStreak, dayKey, daysBetween, examDate, goalXp, todayXp, type Progress } from '../lib/progress';
-import { aboutHref, examHref, glossaryHref, guideHref, handbookHref, lessonHref, reviewHref, weekHref } from '../lib/route';
+import { aboutHref, compareHref, examHref, glossaryHref, guideHref, handbookHref, lessonHref, reviewHref, weekHref } from '../lib/route';
 import { dueQuestions, dueReviewCount } from '../content';
 import { WIDE_QUERY, useMediaQuery } from '../lib/useMediaQuery';
 
@@ -198,6 +198,16 @@ function PhoneHome({ s, progress }: { s: Summary; progress: Progress }) {
               href={glossaryHref}
               label="用語集"
               description="問題に出る用語の短い説明と出典"
+              endContent={
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--color-icon-secondary)" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                  <path d="m9 6 6 6-6 6" />
+                </svg>
+              }
+            />
+            <ListItem
+              href={compareHref()}
+              label="似た語の比較表"
+              description="取り違えやすい語の違いを表で。出典つき"
               endContent={
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--color-icon-secondary)" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
                   <path d="m9 6 6 6-6 6" />

@@ -1,5 +1,5 @@
-// 題名のうち、本体にあるデータだけで決まるもの (ハンドブックのトピックと用語集の語を除く)。
-// ハンドブックと用語集の題名は pageMeta.ts が、そのデータと一緒に読んで決める
+// 題名のうち、本体にあるデータだけで決まるもの (ハンドブックのトピック・用語集の語・比較表の表を除く)。
+// ハンドブックと用語集の題名は pageMeta.ts が、比較表の表の題名は route.ts が比較表のデータだけを読んで決める
 import { WEEKS } from '../content/curriculum';
 import { findLesson } from '../content';
 import type { Route } from './route';
@@ -25,6 +25,8 @@ export function lightTitle(route: Route): string | undefined {
       return 'ハンドブック';
     case 'glossary':
       return '用語集';
+    case 'compare':
+      return '似た語の比較表';
     case 'guide':
       return 'Kubernetes とこのサイト';
     case 'review':

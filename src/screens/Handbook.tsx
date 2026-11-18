@@ -17,7 +17,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Button } from '@astryxdesign/core/Button';
 import { HStack } from '@astryxdesign/core/Stack';
 import { StatusDot } from '@astryxdesign/core/StatusDot';
-import { glossaryTermHref, guideHref, handbookHref, lessonHref } from '../lib/route';
+import { compareHref, glossaryTermHref, guideHref, handbookHref, lessonHref } from '../lib/route';
 import glossary from '../content/glossary.json';
 import type { GlossaryTerm } from '../lib/glossary';
 import { makeTermLinker, termNames, type TermPiece } from '../lib/termLinks';
@@ -166,7 +166,7 @@ function Index({ progress }: { progress: Progress }) {
           の中で試して後片付けまでできます。問題を解く前の下調べにも、間違えたあとの見直しにも使えます。
         </p>
         <p className="hb-lead hb-muted">
-          学習要領そのものと出典の考え方は <a href={guideHref}>Kubernetes とこのサイト</a> にあります。
+          学習要領そのものと出典の考え方は <a href={guideHref}>Kubernetes とこのサイト</a> に、取り違えやすい語の違いは <a href={compareHref()}>似た語の比較表</a> にあります。
         </p>
         <nav aria-label="ハンドブックの部" className="hb-parts">
           {parts.map((p) => (
