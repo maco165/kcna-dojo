@@ -1,14 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { WEEKS } from '../src/content/curriculum';
 import glossary from '../src/content/glossary.json';
-import { searchTerms, sortTerms, termDomain, validateGlossary, type GlossaryTerm } from '../src/lib/glossary';
+import { HANDBOOK_TOPICS } from '../src/content/handbook';
+import { searchTerms, sortTerms, termDomain, termQuestion, validateGlossary, type GlossaryTerm } from '../src/lib/glossary';
+import { aiLinks } from '../src/lib/askAi';
 
 const lessonIds = new Set(WEEKS.flatMap((w) => (w.content?.lessons ?? []).map((l) => l.id)));
 const terms = (glossary as { terms: GlossaryTerm[] }).terms;
 
 describe('用語集のデータ', () => {
   it('検査を通る (id の重複・欄の欠け・https でない出典・無いレッスン・用語の重なりが無い)', () => {
-    expect(validateGlossary(glossary, lessonIds)).toEqual([]);
+    expect(validateGlossary(glossary, lessonIds, new Set(HANDBOOK_TOPICS.map((t) => t.id)))).toEqual([]);
   });
   it('80 語ほどある', () => {
     expect(terms.length).toBeGreaterThanOrEqual(70);
@@ -31,6 +33,27 @@ describe('validateGlossary', () => {
     expect(check([{ ...ok, alias: ['ポッド'] }])[0]).toMatch(/alias という欄/);
     expect(check([{ ...ok, lessons: ['w1-l1', 'w1-l1'] }])[0]).toMatch(/重なって/);
     expect(check([null])[0]).toMatch(/オブジェクト/);
+  });
+  it('詳しい説明・出典・ハンドブックのトピックの欄を検査する (範囲外の語はレッスンの代わりにトピックを持つ)', () => {
+    const topics = new Set(['k3s-vs-kubernetes']);
+    const c = (t: unknown[]) => validateGlossary({ terms: t }, new Set(['w1-l1']), topics);
+    expect(c([{ ...ok, detail: 'くわしい説明', sources: [{ label: 'k8s', url: 'https://kubernetes.io/' }] }])).toEqual([]);
+    expect(c([{ ...ok, detail: '' }])[0]).toMatch(/detail/);
+    expect(c([{ ...ok, sources: [{ label: 'x', url: 'http://x/' }] }])[0]).toMatch(/https/);
+    expect(c([{ ...ok, sources: 'x' }])[0]).toMatch(/配列/);
+    expect(c([{ ...ok, lessons: [], topics: ['k3s-vs-kubernetes'] }])).toEqual([]);
+    expect(c([{ ...ok, lessons: [], topics: ['no-such'] }]).join()).toMatch(/no-such というトピック/);
+    expect(c([{ ...ok, lessons: [] }])[0]).toMatch(/topics を付ける/);
+    expect(c([{ ...ok, lessons: [], topics: [] }])[0]).toMatch(/topics を付ける/);
+    expect(c([{ ...ok, topics: ['k3s-vs-kubernetes', 'k3s-vs-kubernetes'] }])[0]).toMatch(/同じトピック/);
+    expect(c([{ ...ok, sources: [{ label: 'a', url: 'https://k/' }, { label: 'b', url: 'https://k/' }] }])[0]).toMatch(/同じ URL/);
+  });
+  it('AI に聞く文は、語と説明を入れ、初学者向けにやさしく聞く (サイトからは送らず、開いた先の入力欄に入る)', () => {
+    const q = termQuestion({ term: 'Pod', description: 'コンテナの最小の単位' });
+    expect(q).toContain('「Pod」');
+    expect(q).toContain('コンテナの最小の単位');
+    expect(aiLinks(q).claude).toMatch(/^https:\/\/claude\.ai\/new\?q=/);
+    expect(decodeURIComponent(aiLinks(q).chatgpt.split('?q=')[1])).toBe(q);
   });
 });
 

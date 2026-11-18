@@ -2184,3 +2184,11 @@ body {
 .hb-resume {
   margin-top: 8px;
 }
+
+/* 用語集の詳しい説明: 短い説明の下に、読みやすい長さ (1 行 40 字まで) で */
+.gloss-detail__more {
+  margin: 0;
+  max-width: 40em;
+  line-height: 1.8;
+  color: var(--color-text-primary);
+}
