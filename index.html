@@ -39,6 +39,14 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="theme-color" content="#0064E0" />
     <title>クラネイ — KCNA-JP 対策</title>
+    <script>
+      // 画面の色を選んだ人には、最初の描画から選んだ色で描く (JS が動くまで端末の色で一瞬描かれるのを防ぐ)
+      try {
+        var m = JSON.parse(localStorage.getItem('kcna.v1') || 'null');
+        m = m && m.profile && m.profile.colorMode;
+        if (m === 'light' || m === 'dark') document.documentElement.setAttribute('data-theme', m);
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <!-- JavaScript を動かさない読み手 (一部の検索エンジンや SNS) 向けの説明。画面を描くと置き換わる -->

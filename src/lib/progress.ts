@@ -13,8 +13,11 @@ export type AnswerRecord = { right: number; wrong: number; last: string; stage?:
 /** 復習の間隔 (日)。間違えたら翌日、復習で続けて正解するたびに 3 日後・7 日後、その次の正解で終わる */
 export const REVIEW_INTERVALS = [1, 3, 7] as const;
 
-/** 設定 (目標と受験日)。無ければ既定の値を使う */
-export type Profile = { dailyGoalXp: number; examDate: string };
+/** 画面の色。system は端末の設定に合わせる */
+export type ColorMode = 'system' | 'light' | 'dark';
+export const COLOR_MODES: readonly ColorMode[] = ['system', 'light', 'dark'];
+/** 設定 (目標・受験日・画面の色)。無ければ既定の値を使う */
+export type Profile = { dailyGoalXp: number; examDate: string; colorMode?: ColorMode };
 
 /** 1 日の目標の XP の既定と選べる値 */
 export const DEFAULT_GOAL_XP = 30;
@@ -131,6 +134,7 @@ export function normalizeProgress(raw: unknown): Progress | null {
       dailyGoalXp: (GOAL_CHOICES as readonly number[]).includes(profile.dailyGoalXp as number) ? (profile.dailyGoalXp as number) : DEFAULT_GOAL_XP,
       examDate: isValidDay(profile.examDate) ? profile.examDate : DEFAULT_EXAM_DATE,
     };
+    if ((COLOR_MODES as readonly unknown[]).includes(profile.colorMode) && profile.colorMode !== 'system') out.profile.colorMode = profile.colorMode as ColorMode;
   }
   return out;
 }
@@ -277,11 +281,18 @@ export function examDate(p: Progress): string {
   return p.profile?.examDate ?? DEFAULT_EXAM_DATE;
 }
 
-export function setProfile(p: Progress, change: Partial<Profile>): Progress {
-  return { ...p, profile: { dailyGoalXp: goalXp(p), examDate: examDate(p), ...change } };
+export function colorMode(p: Progress): ColorMode {
+  return p.profile?.colorMode ?? 'system';
 }
 
-/** 記録を消す。目標と受験日の設定は残す */
+export function setProfile(p: Progress, change: Partial<Profile>): Progress {
+  const next: Profile = { ...p.profile, dailyGoalXp: goalXp(p), examDate: examDate(p), ...change };
+  // 既定 (端末に合わせる) は持たない
+  if (next.colorMode === 'system') delete next.colorMode;
+  return { ...p, profile: next };
+}
+
+/** 記録を消す。目標・受験日・画面の色の設定は残す */
 export function resetProgress(p: Progress): Progress {
   const next = emptyProgress();
   if (p.profile) next.profile = { ...p.profile };
