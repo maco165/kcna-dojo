@@ -1,18 +1,18 @@
 import { Badge } from '@astryxdesign/core/Badge';
 import { SideNav, SideNavHeading, SideNavItem, SideNavSection } from '@astryxdesign/core/SideNav';
 import { Text } from '@astryxdesign/core/Text';
-import { AcademicCapIcon, AdjustmentsHorizontalIcon, ArrowPathIcon, BookOpenIcon, ChartBarIcon, CommandLineIcon, InformationCircleIcon, QueueListIcon, TableCellsIcon } from '@heroicons/react/24/outline';
+import { AcademicCapIcon, AdjustmentsHorizontalIcon, ArrowPathIcon, BookOpenIcon, ChartBarIcon, CodeBracketIcon, CommandLineIcon, InformationCircleIcon, QueueListIcon, TableCellsIcon } from '@heroicons/react/24/outline';
 import { WEEKS } from '../content/curriculum';
 import SiteLogo from './SiteLogo';
 import type { Progress } from '../lib/progress';
 import { dueReviewCount } from '../content';
 import { REPO_URL } from '../lib/links';
 import { SITE_NAME, SITE_TAGLINE } from '../lib/site';
-import { aboutHref, compareHref, examHref, glossaryHref, guideHref, handbookHref, progressHref, reviewHref, settingsHref, weekHref } from '../lib/route';
+import { aboutHref, commandsHref, compareHref, examHref, glossaryHref, guideHref, handbookHref, progressHref, reviewHref, settingsHref, weekHref } from '../lib/route';
 import { GitHubMark } from './RepoLink';
 
 /** PC の左の一覧 */
-export default function AppSideNav({ current, week, progress }: { current: 'learn' | 'about' | 'settings' | 'review' | 'progress' | 'exam' | 'glossary' | 'guide' | 'handbook' | 'compare'; week?: number; progress: Progress }) {
+export default function AppSideNav({ current, week, progress }: { current: 'learn' | 'about' | 'settings' | 'review' | 'progress' | 'exam' | 'glossary' | 'guide' | 'handbook' | 'compare' | 'commands'; week?: number; progress: Progress }) {
   const reviewCount = dueReviewCount(progress, new Date());
   return (
     <SideNav
@@ -42,6 +42,7 @@ export default function AppSideNav({ current, week, progress }: { current: 'lear
         <SideNavItem label="ハンドブック" icon={CommandLineIcon} href={handbookHref()} isSelected={current === 'handbook'} />
         <SideNavItem label="用語集" icon={BookOpenIcon} href={glossaryHref} isSelected={current === 'glossary'} />
         <SideNavItem label="似た語の比較表" icon={TableCellsIcon} href={compareHref()} isSelected={current === 'compare'} />
+        <SideNavItem label="コマンド" icon={CodeBracketIcon} href={commandsHref()} isSelected={current === 'commands'} />
       </SideNavSection>
       <SideNavSection title="週">
         {WEEKS.map((w) => {

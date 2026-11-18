@@ -7,7 +7,7 @@ import type { Route } from './route';
 export const SITE_TITLE = 'クラネイ — KCNA-JP 対策';
 
 /** ハンドブックのトピックか用語集の語なら、題名に重いデータが要る */
-export const needsHeavyTitle = (route: Route) => (route.name === 'handbook' && !!route.topicId) || (route.name === 'glossary' && !!route.termId) || (route.name === 'compare' && !!route.tableId);
+export const needsHeavyTitle = (route: Route) => (route.name === 'handbook' && !!route.topicId) || (route.name === 'glossary' && !!route.termId) || (route.name === 'compare' && !!route.tableId) || (route.name === 'commands' && !!route.commandId);
 
 /** 画面の短い題名 (トップは undefined)。ハンドブックのトピックと用語集の語は、ここでは一覧の名前を返す */
 export function lightTitle(route: Route): string | undefined {
@@ -27,6 +27,8 @@ export function lightTitle(route: Route): string | undefined {
       return '用語集';
     case 'compare':
       return '似た語の比較表';
+    case 'commands':
+      return 'コマンド';
     case 'guide':
       return 'Kubernetes とこのサイト';
     case 'review':

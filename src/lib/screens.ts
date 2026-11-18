@@ -9,6 +9,7 @@ const LOADERS = {
   guide: () => import('../screens/Guide'),
   glossary: () => import('../screens/Glossary'),
   compare: () => import('../screens/Compare'),
+  commands: () => import('../screens/Commands'),
   progress: () => import('../screens/ProgressScreen'),
   review: () => import('../screens/Review'),
   settings: () => import('../screens/Settings'),
