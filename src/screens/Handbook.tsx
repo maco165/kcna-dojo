@@ -3,11 +3,13 @@ import { CodeBlock } from '@astryxdesign/core/CodeBlock';
 import { Link } from '@astryxdesign/core/Link';
 import { Text } from '@astryxdesign/core/Text';
 import AppSideNav from '../components/AppSideNav';
+import Diagram, { DiagramThumb } from '../components/Diagram';
 import BottomTabs from '../components/BottomTabs';
 import RepoLink from '../components/RepoLink';
 import SiteLogo from '../components/SiteLogo';
 import { dueQuestions, findLesson } from '../content';
 import { HANDBOOK, findTopic, type HandbookStep } from '../content/handbook';
+import { HANDBOOK_FIGURES } from '../content/handbookFigures';
 import { EXAM_WEIGHTS } from '../lib/exam';
 import type { Progress } from '../lib/progress';
 import { guideHref, handbookHref, lessonHref } from '../lib/route';
@@ -55,6 +57,11 @@ function Index() {
             {d.topics.map((t) => (
               <li key={t.id}>
                 <a className="hb-topic" href={handbookHref(t.id)}>
+                  {HANDBOOK_FIGURES[t.id] && (
+                    <span className="hb-topic__thumb">
+                      <DiagramThumb spec={HANDBOOK_FIGURES[t.id]} />
+                    </span>
+                  )}
                   <span className="hb-topic__en" lang="en">
                     {t.competency}
                   </span>
@@ -107,6 +114,7 @@ function Topic({ id }: { id: string }) {
         </h1>
         <p className="hb-lead">{t.summary}</p>
       </div>
+      {HANDBOOK_FIGURES[t.id] && <Diagram spec={HANDBOOK_FIGURES[t.id]} id={t.id} />}
 
       <section aria-labelledby="hb-flow" className="hb-section">
         <h2 id="hb-flow" className="hb-h2">
