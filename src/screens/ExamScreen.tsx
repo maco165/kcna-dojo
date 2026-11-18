@@ -99,7 +99,7 @@ function Intro({ progress, choice: picked, onChoice, onStart }: { progress: Prog
       <Card padding={4}>
         <VStack gap={3}>
           <h2 className="h-sm">出る問題の数</h2>
-          <List hasDividers>
+          <List hasDividers edge="flush">
             {(Object.keys(EXAM_WEIGHTS) as Domain[]).map((d) => (
               <ListItem key={d} label={d} endContent={<Text type="supporting">{`配点 ${EXAM_WEIGHTS[d]}% · ${counts[d]} 問`}</Text>} />
             ))}
@@ -125,7 +125,7 @@ function Intro({ progress, choice: picked, onChoice, onStart }: { progress: Prog
         </VStack>
       </Card>
       {progress.exams && progress.exams.length > 0 && (
-        <List hasDividers header={<h2 className="h-sm">これまでの結果</h2>}>
+        <List hasDividers edge="flush" header={<h2 className="h-sm">これまでの結果</h2>}>
           {progress.exams.map((e, i) => (
             <ListItem
               key={`${e.at}-${i}`}

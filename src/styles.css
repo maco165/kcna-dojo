@@ -167,7 +167,7 @@ body {
   align-items: flex-end;
   justify-content: space-between;
   gap: var(--spacing-4);
-  padding: var(--spacing-6) var(--spacing-8) var(--spacing-4);
+  padding: var(--spacing-8) var(--spacing-8) var(--spacing-4);
 }
 
 .desk__body {
@@ -254,7 +254,7 @@ body {
 .fill-code__ln {
   color: var(--color-text-disabled);
   text-align: right;
-  padding-right: 10px;
+  padding-right: 12px;
   user-select: none;
 }
 
@@ -285,7 +285,7 @@ body {
 }
 
 .stats__item {
-  padding: 14px var(--spacing-4);
+  padding: var(--spacing-4);
   border-right: 1px solid var(--color-border);
 }
 
@@ -377,8 +377,16 @@ body {
 }
 
 .about {
-  max-width: 760px;
+  /* 1 列の画面も、学習・用語集と同じ欄の幅 (上限 1080px) に広げる。段落だけは読みやすい長さで折り返す */
+  max-width: 1080px;
   padding: var(--spacing-8);
+}
+
+/* 見出しの下の説明と本文の段落は、欄が広くても読みやすい長さ (幅 640px) で折り返す */
+.about .week-title ~ *,
+.hb-lead,
+.hb-step__text {
+  max-width: 40rem;
 }
 
 .topbar__brand {
@@ -402,7 +410,7 @@ body {
 .tabs__badge {
   display: inline-block;
   min-width: 16px;
-  margin-left: 3px;
+  margin-left: 4px;
   padding: 0 4px;
   border-radius: var(--radius-full);
   background: var(--color-accent);
@@ -468,7 +476,7 @@ body {
 
 .gloss-filters {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   overflow-x: auto;
   padding-bottom: 2px;
 }
@@ -528,7 +536,7 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 16px;
+  padding: 12px 16px;
   border: 0;
   background: transparent;
   color: inherit;
@@ -626,14 +634,14 @@ body {
 .gloss-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
 }
 
 .gloss-chip {
   display: inline-flex;
   align-items: center;
   min-height: 28px;
-  padding: 2px 10px;
+  padding: 2px 12px;
   border-radius: 9999px;
   background: var(--color-accent-muted);
   /* 薄い青の地に 4.5:1 以上で読める濃い青 */
@@ -664,7 +672,7 @@ body {
 
 .gloss-index__head {
   margin: 0;
-  padding: 12px 14px 4px;
+  padding: 12px 12px 4px;
   font-size: 12px;
   font-weight: 600;
   color: var(--color-text-secondary);
@@ -676,7 +684,7 @@ body {
   align-items: baseline;
   justify-content: space-between;
   gap: 8px;
-  padding: 9px 14px;
+  padding: 8px 12px;
   border: 0;
   border-bottom: 1px solid var(--color-border);
   background: transparent;
@@ -729,7 +737,7 @@ body {
   overflow: hidden;
   /* スマホは見本の問題の下にアニメーションが見えるだけの高さ */
   min-height: 880px;
-  padding: 24px 20px 40px;
+  padding: 24px 16px 40px;
   background: #0a1317;
   color: #dfe2e5;
 }
@@ -757,7 +765,7 @@ body {
   padding: 0;
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
 }
 
 .guide-tags li {
@@ -778,22 +786,23 @@ body {
 
 .guide-hero__caption {
   position: absolute;
-  left: 20px;
-  right: 20px;
-  bottom: 10px;
+  /* 図の左右の余白 (.guide-hero の padding) に揃える */
+  left: 16px;
+  right: 16px;
+  bottom: 12px;
   margin: 0;
   font-size: 10px;
   color: #8a9099;
 }
 
 .guide-sample {
-  padding: 14px;
+  padding: 16px;
   border-radius: 12px;
   background: #1f1f22;
   border: 1px solid #f2f4f619;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .guide-sample__meta {
@@ -809,7 +818,7 @@ body {
 
 .guide-sample__code {
   margin: 0;
-  padding: 10px 12px;
+  padding: 12px;
   border-radius: 8px;
   background: #111112;
   color: #dfe2e5;
@@ -837,7 +846,7 @@ body {
 .guide-sample__choices {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
 }
 
 .guide-choice {
@@ -864,7 +873,7 @@ body {
 
 .guide-sample__fb:empty {
   /* 読み上げの領域は消さずに残し、高さだけ 0 にする */
-  margin-top: -10px;
+  margin-top: -12px;
 }
 
 .guide-sample__fb--ok {
@@ -942,8 +951,8 @@ body {
 .guide-origin {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 16px 20px;
+  gap: 16px;
+  padding: 16px 16px;
   background: #0a1317;
   color: #dfe2e5;
 }
@@ -1001,7 +1010,7 @@ body {
 }
 
 .guide-body {
-  padding: 8px 20px 24px;
+  padding: 8px 16px 24px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -1019,8 +1028,8 @@ body {
 }
 
 .guide-section--card {
-  margin: 8px -20px;
-  padding: 24px 20px 20px;
+  margin: 8px -16px;
+  padding: 24px 16px 20px;
   background: var(--color-background-card);
   border-top: 1px solid var(--color-border);
   border-bottom: 1px solid var(--color-border);
@@ -1051,7 +1060,7 @@ body {
 
 .guide-quote {
   margin: 0;
-  padding-left: 14px;
+  padding-left: 16px;
   border-left: 3px solid var(--color-accent);
   font-size: 15px;
 }
@@ -1062,11 +1071,11 @@ body {
   padding: 0;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
+  gap: 8px;
 }
 
 .guide-eras li {
-  padding: 10px;
+  padding: 12px;
   border-radius: 8px;
   background: var(--color-background-card);
   border: 1px solid var(--color-border);
@@ -1093,8 +1102,8 @@ body {
 .guide-state {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 14px;
+  gap: 12px;
+  padding: 16px;
   border-radius: 12px;
   background: var(--color-background-card);
   border: 1px solid var(--color-border);
@@ -1127,7 +1136,7 @@ body {
 .guide-rows li {
   display: flex;
   flex-direction: column;
-  padding: 10px 14px;
+  padding: 12px 16px;
 }
 
 .guide-rows li + li,
@@ -1142,7 +1151,7 @@ body {
 .guide-path li {
   display: grid;
   grid-template-columns: 34px minmax(0, 1fr);
-  column-gap: 10px;
+  column-gap: 12px;
   padding: 8px 0;
 }
 
@@ -1168,7 +1177,7 @@ body {
   display: grid;
   grid-template-columns: 84px minmax(0, 1fr);
   gap: 12px;
-  padding: 9px 0;
+  padding: 8px 0;
   border-bottom: 1px solid var(--color-border);
 }
 
@@ -1189,7 +1198,7 @@ body {
 .guide-domains li {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 4px;
 }
 
 .guide-domains__head {
@@ -1222,7 +1231,7 @@ body {
 }
 
 .guide-note {
-  padding: 12px 14px;
+  padding: 12px 16px;
   border-radius: 8px;
   background: var(--color-background-card);
   border: 1px solid var(--color-border);
@@ -1266,7 +1275,7 @@ body {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  padding: 6px 0;
+  padding: 8px 0;
   border-bottom: 1px solid var(--color-border);
 }
 
@@ -1295,7 +1304,7 @@ body {
 
 .guide-outline__head {
   margin: 0;
-  padding: 10px 14px;
+  padding: 12px 16px;
   display: flex;
   justify-content: space-between;
   gap: 8px;
@@ -1311,7 +1320,7 @@ body {
 }
 
 .guide-outline__table th {
-  padding: 6px 14px;
+  padding: 8px 16px;
   text-align: left;
   font-size: 11px;
   font-weight: 600;
@@ -1319,7 +1328,7 @@ body {
 }
 
 .guide-outline__table td {
-  padding: 8px 14px;
+  padding: 8px 16px;
   border-top: 1px solid var(--color-border);
   vertical-align: top;
 }
@@ -1377,7 +1386,12 @@ body {
 @media (min-width: 768px) {
   .guide-hero {
     min-height: 620px;
-    padding: 40px 40px 48px;
+    padding: 40px 32px 48px;
+  }
+
+  .guide-hero__caption {
+    left: 32px;
+    right: 32px;
   }
 
   .guide-hero__fg {
@@ -1409,13 +1423,13 @@ body {
 
   .guide-origin,
   .guide-body {
-    padding-left: 40px;
-    padding-right: 40px;
+    padding-left: 32px;
+    padding-right: 32px;
   }
 
   .guide-section--card {
-    margin: 8px -40px;
-    padding: 28px 40px 24px;
+    margin: 8px -32px;
+    padding: 28px 32px 24px;
   }
 }
 
@@ -1524,7 +1538,7 @@ body {
 
 /* ハンドブック (#/handbook) */
 .hb {
-  max-width: 820px;
+  max-width: 1080px;
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -1537,7 +1551,7 @@ body {
 .hb-head {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
 .hb-lead {
@@ -1606,7 +1620,7 @@ body {
 .hb-topics {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
-  gap: 10px;
+  gap: 12px;
 }
 
 .hb .hb-topic {
@@ -1615,7 +1629,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 14px 16px;
+  padding: 16px;
   border-radius: var(--radius-container);
   border: 1px solid var(--color-border);
   background: var(--color-background-card);
@@ -1649,7 +1663,7 @@ body {
 .hb-section {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .hb-h2 {
@@ -1669,7 +1683,7 @@ body {
   counter-increment: hb;
   display: grid;
   grid-template-columns: 28px minmax(0, 1fr);
-  column-gap: 10px;
+  column-gap: 12px;
 }
 
 .hb-flow > li::before {
@@ -1708,7 +1722,7 @@ body {
 }
 
 .hb-output figcaption {
-  padding: 4px 10px;
+  padding: 4px 12px;
   font-size: 11px;
   color: var(--color-text-secondary);
   border-bottom: 1px dashed var(--color-border-emphasized);
@@ -1716,7 +1730,7 @@ body {
 
 .hb-output pre {
   margin: 0;
-  padding: 8px 10px;
+  padding: 8px 12px;
   overflow-x: auto;
   font-family: var(--font-family-code, 'SF Mono', Monaco, Consolas, monospace);
   font-size: 12px;
@@ -1728,7 +1742,7 @@ body {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-container);
   background: var(--color-background-card);
-  padding: 0 14px;
+  padding: 0 16px;
 }
 
 .hb-try > summary {
@@ -1743,7 +1757,7 @@ body {
 }
 
 .hb-try > .hb-flow {
-  padding-bottom: 14px;
+  padding-bottom: 16px;
 }
 
 .hb-sources {
@@ -1871,7 +1885,7 @@ body {
 }
 
 .dg__links li {
-  padding: 5px 0;
+  padding: 4px 0;
   border-bottom: 1px solid var(--color-border);
   overflow-wrap: anywhere;
 }
@@ -1901,7 +1915,7 @@ body {
 /* 目次のカードのサムネイル (図の箱と矢印だけ) */
 .hb-topic__thumb {
   display: block;
-  margin: -14px -16px 8px;
+  margin: -16px -16px 8px;
   padding: 12px 16px;
   height: 112px;
   box-sizing: border-box;
@@ -1956,7 +1970,7 @@ body {
 .sv {
   list-style: none;
   margin: 0;
-  padding: 10px 12px;
+  padding: 12px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -1969,11 +1983,11 @@ body {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 6px 8px;
+  gap: 8px;
 }
 
 .sv__tool {
-  padding: 3px 8px;
+  padding: 4px 8px;
   border-radius: 6px;
   background: var(--color-background-inverted);
   /* 反転した地 (ライトは濃い・ダークは白) に、いつも逆の色の字 */
@@ -1992,7 +2006,7 @@ body {
 }
 
 .sv__verb {
-  padding: 2px 10px;
+  padding: 2px 12px;
   border-radius: 9999px;
   font-size: 12px;
   font-weight: 600;
@@ -2057,7 +2071,7 @@ body {
   display: inline-flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: 6px;
+  gap: 8px;
   padding: 2px 8px;
   border-radius: 6px;
   border: 1.5px solid var(--color-border-gray);
@@ -2107,9 +2121,9 @@ body {
   display: flex;
   align-items: baseline;
   flex-wrap: wrap;
-  gap: 6px 8px;
+  gap: 8px;
   margin-top: 2px;
-  padding: 6px 10px;
+  padding: 8px 12px;
   border-radius: 8px;
   font-size: 13px;
   border-left: 3px solid var(--color-border-green);

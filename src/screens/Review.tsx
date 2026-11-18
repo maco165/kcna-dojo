@@ -95,7 +95,7 @@ function Overview({ progress, onStart, random }: { progress: Progress; onStart: 
       <RandomCard {...random} />
 
       {due.length > 0 && (
-        <List hasDividers header={<h2 className="h-sm">今日の問題</h2>}>
+        <List hasDividers edge="flush" header={<h2 className="h-sm">今日の問題</h2>}>
           {due.map((r) => (
             <ListItem key={r.question.id} label={r.question.prompt} description={`第 ${r.week} 週 · ${r.lesson.title}`} />
           ))}
