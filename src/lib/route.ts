@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { lightTitle, needsHeavyTitle, withSite } from './pageTitle';
 import { onRouteChanged, savePosition, startScrollMemory } from './scrollMemory';
 
 // 経路は # の無い URL (/kcna-dojo/handbook/core-concepts/ など) で、History API で切り替える。
@@ -77,8 +78,11 @@ export function useRoute(): Route {
       shown = window.location.pathname;
       const next = parseRoute(shown);
       setRoute(next);
-      // 書き出した HTML の題名はページごとなので、サイトの中で移ったときも合わせる (題名の部品はデータを持つので後から読む)
-      void import('./pageMeta').then((m) => (document.title = m.fullTitle(next)));
+      // 書き出した HTML の題名はページごとなので、サイトの中で移ったときも合わせる。
+      // ハンドブックのトピックと用語集の語だけは、題名に重いデータが要るので後から読む (読み終えたときに、まだ同じページにいるときだけ書く)
+      const at = shown;
+      if (needsHeavyTitle(next)) void import('./pageMeta').then((m) => shown === at && (document.title = m.fullTitle(next)));
+      else document.title = withSite(lightTitle(next));
       onRouteChanged();
     };
     const onPop = () => {

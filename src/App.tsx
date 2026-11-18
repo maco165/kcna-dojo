@@ -4,8 +4,9 @@ import jaJP from '@astryxdesign/core/locales/ja-JP.generated.js';
 import { kcnaTheme } from './themes/kcna/kcna.js';
 import { findLesson } from './content';
 import { useRoute } from './lib/route';
-import { isLazy, loadScreen, loadedScreen } from './lib/screens';
-import { useEffect, useReducer, useRef, type ReactNode } from 'react';
+import { isLazy, loadScreen, loadedScreen, reloadOnce } from './lib/screens';
+import { retryRestore } from './lib/scrollMemory';
+import { useEffect, useLayoutEffect, useReducer, useRef, type ReactNode } from 'react';
 import { colorMode } from './lib/progress';
 import { useProgress } from './lib/useProgress';
 import Home from './screens/Home';
@@ -21,7 +22,18 @@ export default function App() {
   const Screen = lazyName ? loadedScreen(lazyName) : undefined;
   // まだ読んでいない画面なら読み、読み終えたら描き直す (その間は前の画面を出したままにして、白い画面を見せない)
   useEffect(() => {
-    if (lazyName && !Screen) void loadScreen(lazyName).then(rerender);
+    if (!lazyName || Screen) return;
+    document.documentElement.dataset.loading = 'true';
+    void loadScreen(lazyName).then(rerender, () => {
+      // 読めなければページごと読み直す (書き出した HTML が返る)。2 回目も読めなければ、そのまま前の画面を出しておく
+      reloadOnce();
+    });
+  }, [lazyName, Screen]);
+  // 開いたときに読む画面を描き終えたら、読み込み中の印を外し、戻せなかった位置をもう一度戻す
+  useLayoutEffect(() => {
+    if (lazyName && !Screen) return;
+    delete document.documentElement.dataset.loading;
+    retryRestore();
   }, [lazyName, Screen]);
   const last = useRef<ReactNode>(null);
 

@@ -72,8 +72,11 @@ function checkFirstLoad() {
   const gz = files.reduce((n, f) => n + gzipSync(readFileSync(new URL(`../dist/assets/${f}`, import.meta.url))).length, 0);
   const kb = Math.round(gz / 1024);
   check(kb <= 380, `最初に読む JS は gzip で 380KB まで (${kb}KB、${files.length} ファイル)`);
-  const heavy = files.filter((f) => /^(handbook|Handbook|Glossary|Guide)-/.test(f));
-  check(heavy.length === 0, `ハンドブック・用語集・説明のページは最初に読まない ${heavy.join(',')}`);
+  // 名前だけでなく中身でも見る (静的に取り込まれて本体に混ざっても気づけるように)。それぞれのデータにしか無い文字で調べる
+  const marks = { ハンドブックのデータ: 'k3s-vs-kubernetes', 用語集のデータ: 'container-image', 説明のページ: '2026-03-22 の版' };
+  const text = files.map((f) => readFileSync(new URL(`../dist/assets/${f}`, import.meta.url), 'utf8')).join('\n');
+  const found = Object.entries(marks).filter(([, m]) => text.includes(m)).map(([k]) => k);
+  check(found.length === 0, `ハンドブック・用語集・説明のページは最初に読まない ${found.join(',')}`);
 }
 
 async function run(browser, name, width, height) {
@@ -391,6 +394,8 @@ async function run(browser, name, width, height) {
   await page.getByRole('heading', { name: '用語集', level: 1 }).waitFor();
   const isWide = width >= 768;
   const termButtons = isWide ? page.getByRole('navigation', { name: '用語の一覧' }).getByRole('button') : page.locator('.gloss-row__head');
+  // 画面の部品は開いたときに読むので、一覧が出るまで待つ
+  await termButtons.first().waitFor();
   check((await termButtons.count()) >= 70, `${tag} 用語集に 70 語以上ある`);
   {
     // 範囲外の札で、試験の範囲の外の語 (レッスンに出ない語) だけに絞れる

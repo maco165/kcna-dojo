@@ -25,6 +25,22 @@ export const isLazy = (name: Route['name']): name is LazyScreen => name in LOADE
 /** 読み終えた画面の部品 (まだなら undefined) */
 export const loadedScreen = (name: LazyScreen) => loaded.get(name);
 
+/**
+ * 画面の部品を読めなかったとき (回線が切れた・新しい版を出して古い部品が無くなった) は、ページごと読み直す。
+ * 同じ URL で 2 回目も読めなければ false を返す (読み直しを繰り返さない)
+ */
+export function reloadOnce(): boolean {
+  const key = `kcna.reload:${window.location.pathname}`;
+  try {
+    if (sessionStorage.getItem(key)) return false;
+    sessionStorage.setItem(key, '1');
+  } catch {
+    return false;
+  }
+  window.location.reload();
+  return true;
+}
+
 /** 画面の部品を読む (2 回目からはすぐ返る) */
 export async function loadScreen(name: LazyScreen): Promise<AnyScreen> {
   const hit = loaded.get(name);

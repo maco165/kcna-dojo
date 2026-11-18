@@ -52,13 +52,24 @@ export function savePosition() {
   writeStore();
 }
 
+/** 戻したい位置 (まだ戻せていなければ残る)。開いたときに読む画面は、描き終えたときに retryRestore でもう一度試す */
+let pending: number | null = null;
+
 /** 画面が描かれるのを待ってから位置を戻す (長いページは描き終わるまで高さが足りない)。1 秒まで試す */
 function restore(top: number, until = performance.now() + 1000) {
+  pending = top;
   requestAnimationFrame(() => {
+    if (pending !== top) return;
     const el = scroller();
     el.scrollTop = top;
-    if (Math.abs(el.scrollTop - top) > 2 && performance.now() < until) restore(top, until);
+    if (Math.abs(el.scrollTop - top) <= 2) pending = null;
+    else if (performance.now() < until) restore(top, until);
   });
+}
+
+/** 開いたときに読む画面を描き終えたら呼ぶ。読み込みに 1 秒以上かかって戻せなかった位置を、もう一度戻す */
+export function retryRestore() {
+  if (pending !== null) restore(pending);
 }
 
 /** 起動のときに呼ぶ (2 回呼ばれても 1 回だけ働く) */
@@ -80,6 +91,7 @@ export function onRouteChanged() {
   current = key;
   lastFresh = fresh;
   if (fresh) {
+    pending = null;
     window.scrollTo(0, 0);
     requestAnimationFrame(() => (scroller().scrollTop = 0));
     return;
