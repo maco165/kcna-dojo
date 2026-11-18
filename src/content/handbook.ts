@@ -48,3 +48,9 @@ export function findTopic(id: string) {
 
 /** 細目の原文からトピックを引く (説明のページの学習要領の表から飛ぶため) */
 export const topicByCompetency = (competency: string) => HANDBOOK_TOPICS.find((t) => !isAppendixDomain(t.domain) && t.competency === competency);
+
+/** 目次の 2 部 (試験の範囲と範囲外)。画面と書き出す HTML で共通 */
+export const HANDBOOK_PARTS = [
+  { id: 'hb-part-scope', title: '試験の範囲', lead: 'KCNA-JP の学習要領の細目です。配点の高い分野から並べています。', extra: false },
+  { id: 'hb-part-extra', title: '範囲外: 一緒に知っておくと役立つこと', lead: '試験には出ません。Kubernetes を実際に動かすときや、試験のあとに進むときに役立つことです。', extra: true },
+].map((p) => ({ ...p, domains: HANDBOOK.filter((d) => isAppendixDomain(d.domain) === p.extra) }));

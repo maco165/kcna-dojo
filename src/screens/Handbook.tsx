@@ -9,7 +9,7 @@ import BottomTabs from '../components/BottomTabs';
 import RepoLink from '../components/RepoLink';
 import SiteLogo from '../components/SiteLogo';
 import { dueReviewCount, findLesson } from '../content';
-import { HANDBOOK, isAppendixDomain, sectionName, findTopic, type HandbookStep } from '../content/handbook';
+import { HANDBOOK, HANDBOOK_PARTS, isAppendixDomain, sectionName, findTopic, type HandbookStep } from '../content/handbook';
 import { HANDBOOK_FIGURES } from '../content/handbookFigures';
 import { EXAM_WEIGHTS } from '../lib/exam';
 import { markHandbookSeen, setHandbookDone, type HandbookRecord, type Progress } from '../lib/progress';
@@ -111,7 +111,7 @@ function DomainSection({ d, di, progress }: { d: (typeof HANDBOOK)[number]; di: 
       <ul className="hb-topics">
         {d.topics.map((t) => (
           <li key={t.id}>
-            <a className={appendix ? 'hb-topic hb-topic--extra' : 'hb-topic'} href={handbookHref(t.id)}>
+            <a className="hb-topic" href={handbookHref(t.id)}>
               {HANDBOOK_FIGURES[t.id] && (
                 <span className="hb-topic__thumb">
                   <DiagramThumb spec={HANDBOOK_FIGURES[t.id]} />
@@ -147,23 +147,15 @@ function ScopeTag({ extra }: { extra: boolean }) {
 
 /** 目次: 試験の範囲 (分野ごとの細目) と範囲外の 2 部に分けて並べる */
 function Index({ progress }: { progress: Progress }) {
-  const parts = [
-    {
-      id: 'hb-part-scope',
-      title: '試験の範囲',
-      lead: 'KCNA-JP の学習要領の細目です。配点の高い分野から並べています。',
-      domains: HANDBOOK.map((d, di) => ({ d, di })).filter(({ d }) => !isAppendixDomain(d.domain)),
-    },
-    {
-      id: 'hb-part-extra',
-      title: '範囲外: 一緒に知っておくと役立つこと',
-      lead: '試験には出ません。Kubernetes を実際に動かすときや、試験のあとに進むときに役立つことです。',
-      domains: HANDBOOK.map((d, di) => ({ d, di })).filter(({ d }) => isAppendixDomain(d.domain)),
-    },
-  ].map((p) => {
-    const topics = p.domains.flatMap(({ d }) => d.topics);
-    return { ...p, total: topics.length, done: topics.filter((t) => progress.handbook?.[t.id]?.done).length };
+  const parts = HANDBOOK_PARTS.map((p) => {
+    const topics = p.domains.flatMap((d) => d.topics);
+    return { ...p, domains: p.domains.map((d) => ({ d, di: HANDBOOK.indexOf(d) })), total: topics.length, done: topics.filter((t) => progress.handbook?.[t.id]?.done).length };
   });
+  // # 付きの URL (handbook/#hb-part-extra) で来たときは、描いたあとにその部へ送る (書き出した HTML には部が無いため)
+  useEffect(() => {
+    const id = window.location.hash.slice(1);
+    if (id.startsWith('hb-part-')) document.getElementById(id)?.scrollIntoView({ block: 'start' });
+  }, []);
   return (
     <div className="hb">
       <div className="hb-head">
@@ -177,9 +169,18 @@ function Index({ progress }: { progress: Progress }) {
           学習要領そのものと出典の考え方は <a href={guideHref}>Kubernetes とこのサイト</a> にあります。
         </p>
         <nav aria-label="ハンドブックの部" className="hb-parts">
-          {parts.map((p, i) => (
-            <a key={p.id} className="hb-parts__link" href={`#${p.id}`}>
-              <ScopeTag extra={i === 1} />
+          {parts.map((p) => (
+            <a
+              key={p.id}
+              className="hb-parts__link"
+              href={`#${p.id}`}
+              // 履歴を足さずに送る (# の履歴を足すと、カードを開いて戻ったときに位置を覚えておらず先頭に戻るため)
+              onClick={(e) => {
+                e.preventDefault();
+                document.getElementById(p.id)?.scrollIntoView({ block: 'start' });
+              }}
+            >
+              <ScopeTag extra={p.extra} />
               <span className="hb-parts__count">
                 {p.total} トピック · 確認済み {p.done}
               </span>
@@ -187,8 +188,8 @@ function Index({ progress }: { progress: Progress }) {
           ))}
         </nav>
       </div>
-      {parts.map((p, i) => (
-        <section key={p.id} id={p.id} className={i === 1 ? 'hb-part hb-part--extra' : 'hb-part'} aria-labelledby={`${p.id}-title`}>
+      {parts.map((p) => (
+        <section key={p.id} id={p.id} className={p.extra ? 'hb-part hb-part--extra' : 'hb-part'} aria-labelledby={`${p.id}-title`}>
           <div className="hb-part__head">
             <h2 id={`${p.id}-title`} className="hb-part__title">
               {p.title}

@@ -1636,7 +1636,6 @@ body {
   border-radius: var(--radius-container);
   border: 1px solid var(--color-border);
   background: var(--color-background-card);
-  color: var(--color-text-primary);
   text-decoration: none;
   font-size: 14px;
 }
@@ -1685,7 +1684,8 @@ body {
   border-radius: 6px;
   border: 1px solid var(--color-border-blue);
   background: var(--color-accent-muted);
-  color: var(--color-text-accent);
+  /* 薄い青の地には 4.5:1 以上の text-blue (text-accent は 4.2 前後で足りない) */
+  color: var(--color-text-blue);
   font-size: 12px;
   line-height: 20px;
   font-weight: 500;

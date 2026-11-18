@@ -77,6 +77,10 @@ function checkFirstLoad() {
   const text = files.map((f) => readFileSync(new URL(`../dist/assets/${f}`, import.meta.url), 'utf8')).join('\n');
   const found = Object.entries(marks).filter(([, m]) => text.includes(m)).map(([k]) => k);
   check(found.length === 0, `ハンドブック・用語集・説明のページ・模擬試験用の問題は最初に読まない ${found.join(',')}`);
+  // 書き出したハンドブックの目次も、画面と同じ 2 部 (h2) と段 (h3) の組みにする
+  const hbHtml = readFileSync(new URL('../dist/handbook/index.html', import.meta.url), 'utf8');
+  const hbHeads = [...hbHtml.matchAll(/<h([23])>([^<]*)<\/h\1>/g)].map((m) => `${m[1]}:${m[2]}`);
+  check(hbHeads.filter((h) => h.startsWith('2:')).join('|') === '2:試験の範囲|2:範囲外: 一緒に知っておくと役立つこと' && hbHeads.filter((h) => h.startsWith('3:')).length === 9 && hbHtml.includes('<section id="hb-part-extra">'), `書き出したハンドブックの目次は 2 部 (h2) と 9 段 (h3) (${hbHeads.length})`);
 }
 
 async function run(browser, name, width, height) {
@@ -544,6 +548,18 @@ async function run(browser, name, width, height) {
   await page.waitForTimeout(400);
   const partTop = await page.locator('#hb-part-extra').evaluate((el) => el.getBoundingClientRect().top);
   check(partTop >= 0 && partTop < 200, `${tag} 上の範囲外のリンクで範囲外の部へ飛ぶ (${Math.round(partTop)})`);
+  // 飛んだ位置でカードを開いて戻ると、飛んだ位置に戻る (先頭へ戻さない)
+  const hbScroller = () => page.evaluate(() => (document.querySelector('.astryx-layout-content') ?? document.scrollingElement).scrollTop);
+  const jumped = await hbScroller();
+  await page.locator('#hb-part-extra .hb-topic').first().click();
+  await page.locator('#hb-title').waitFor();
+  check((await page.locator('.hb-head .hb-scope').innerText()) === '範囲外', `${tag} 範囲外のトピックの頭に範囲外の札が付く`);
+  await page.goBack();
+  await page.locator('.hb-topic').first().waitFor();
+  await page.waitForTimeout(800);
+  check(Math.abs((await hbScroller()) - jumped) <= 2, `${tag} 部へ飛んでからカードを開いて戻ると、飛んだ位置に戻る (${jumped} → ${await hbScroller()})`);
+  // 見出しの組み: 部が h2、段が h3
+  check((await page.getByRole('heading', { level: 2, name: '試験の範囲', exact: true }).count()) === 1 && (await page.locator('.hb-domain__head').evaluateAll((els) => els.filter((e) => e.tagName === 'H3').length)) === 9, `${tag} 部は h2、段は h3 (9 個)`);
   await page.goto(`${BASE}handbook/`);
   await page.locator('.hb-topic').first().waitFor();
   check(await page.getByRole('region', { name: /範囲外: クラウド/ }).isVisible(), `${tag} 目次の段は、段の名前で読み上げられる`);
