@@ -70,6 +70,8 @@ export function startScrollMemory() {
   current = k.key;
   lastFresh = k.fresh;
   window.addEventListener('pagehide', savePosition);
+  // 別のページ (外のサイトや、書き出した別の HTML) から戻る・進むで来たときも、覚えた位置に戻す
+  if (!k.fresh && positions.has(k.key)) restore(positions.get(k.key)!);
 }
 
 /** 経路が変わったあとに呼ぶ。戻る・進むなら元の位置へ、新しいページなら先頭へ */
