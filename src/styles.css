@@ -1620,6 +1620,90 @@ body {
   font-weight: 600;
 }
 
+/* 目次の 2 部 (試験の範囲と範囲外)。部の頭に札と数を並べ、範囲外の部は区切り線で離す */
+.hb-parts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.hb-parts__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: var(--radius-container);
+  border: 1px solid var(--color-border);
+  background: var(--color-background-card);
+  color: var(--color-text-primary);
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.hb-parts__link:hover {
+  border-color: var(--color-accent);
+}
+
+.hb-parts__count {
+  color: var(--color-text-secondary);
+}
+
+.hb-part {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  scroll-margin-top: 16px;
+}
+
+.hb-part--extra {
+  margin-top: 16px;
+  padding-top: 32px;
+  border-top: 1px solid var(--color-border-emphasized);
+}
+
+.hb-part__head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hb-part__head p {
+  margin: 0;
+}
+
+.hb-part__title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+}
+
+/* 範囲の札。試験の範囲は主役の色、範囲外は灰色の点線で、色だけに頼らず文字でも分ける */
+.hb-scope {
+  flex: none;
+  padding: 0 8px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border-blue);
+  background: var(--color-accent-muted);
+  color: var(--color-text-accent);
+  font-size: 12px;
+  line-height: 20px;
+  font-weight: 500;
+}
+
+.hb-scope--extra {
+  border: 1px dashed var(--color-border-emphasized);
+  background: var(--color-background-muted);
+  color: var(--color-text-secondary);
+}
+
+.hb-topic__kicker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+
 .hb-topics,
 .hb-flow,
 .hb-sources {

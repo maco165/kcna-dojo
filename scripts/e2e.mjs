@@ -510,7 +510,17 @@ async function run(browser, name, width, height) {
   await page.getByRole('heading', { name: 'ハンドブック', level: 1 }).waitFor();
   check((await page.locator('.hb-topic').count()) === 26, `${tag} ハンドブックの目次に学習要領の 13 トピックと範囲外の 13`);
   const heads = await page.locator('.hb-domain__head').allInnerTexts();
-  check(heads.slice(-5).every((h) => h.startsWith('範囲外: ') && h.includes('資格の範囲の外')) && heads.length === 9, `${tag} 範囲外は 5 つの段で目次の最後に並び、配点の代わりに範囲の外と出る`);
+  check(heads.slice(-5).every((h) => h.startsWith('範囲外: ') && /\d+ トピック/.test(h)) && heads.length === 9, `${tag} 範囲外は 5 つの段で目次の最後に並び、配点の代わりにトピックの数が出る`);
+  // 範囲内と範囲外は別の部に分かれ、カードの札でも見分けられる
+  const partOf = (name) => page.getByRole('region', { name, exact: true });
+  check((await partOf('試験の範囲').locator('.hb-topic').count()) === 13 && (await partOf('範囲外: 一緒に知っておくと役立つこと').locator('.hb-topic').count()) === 13, `${tag} 目次は試験の範囲 13 と範囲外 13 の 2 部に分かれる`);
+  check((await page.locator('.hb-topic .hb-scope--extra').count()) === 13 && (await page.locator('.hb-topic .hb-scope:not(.hb-scope--extra)').count()) === 13, `${tag} カードに試験の範囲か範囲外かの札が付く`);
+  await page.getByRole('navigation', { name: 'ハンドブックの部' }).getByRole('link', { name: /範囲外/ }).click();
+  await page.waitForTimeout(400);
+  const partTop = await page.locator('#hb-part-extra').evaluate((el) => el.getBoundingClientRect().top);
+  check(partTop >= 0 && partTop < 200, `${tag} 上の範囲外のリンクで範囲外の部へ飛ぶ (${Math.round(partTop)})`);
+  await page.goto(`${BASE}handbook/`);
+  await page.locator('.hb-topic').first().waitFor();
   check(await page.getByRole('region', { name: /範囲外: クラウド/ }).isVisible(), `${tag} 目次の段は、段の名前で読み上げられる`);
   check((await page.locator('.hb-topic .dg-thumb').count()) === 26, `${tag} 目次の 26 トピックすべてにサムネイルがある`);
   await page.locator('.hb-topic').filter({ hasText: 'Debugging' }).click();
@@ -582,7 +592,7 @@ async function run(browser, name, width, height) {
     check(await page.evaluate(() => document.activeElement?.textContent?.includes('確認済みを取り消す')), `${tag} 確認済みにしてもフォーカスはボタンに残る`);
     check((await hb()).storage?.done === true, `${tag} 確認済みにすると記録に残る`);
     await page.goto(`${BASE}#/handbook`);
-    check((await card.locator('.hb-topic__read').innerText()) === '確認済み' && (await page.getByText(/確認済み 1 \/ 26 トピック/).isVisible()), `${tag} 目次に確認済みと、確認済みの数が出る`);
+    check((await card.locator('.hb-topic__read').innerText()) === '確認済み' && (await page.getByRole('navigation', { name: 'ハンドブックの部' }).getByText(/13 トピック · 確認済み 1/).isVisible()), `${tag} 目次に確認済みと、確認済みの数が出る`);
   }
 
   // 15b. ハンドブックの本文の用語: 強調され、押すと用語集のその語が開く

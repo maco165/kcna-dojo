@@ -99,10 +99,71 @@ function SeenTracker({ topicId, seen, updateProgress }: { topicId: string; seen:
   return null;
 }
 
-/** 目次: 分野ごとに細目のトピックを並べる */
+/** 目次の 1 段 (分野か、範囲外の段) */
+function DomainSection({ d, di, progress }: { d: (typeof HANDBOOK)[number]; di: number; progress: Progress }) {
+  const appendix = isAppendixDomain(d.domain);
+  return (
+    <section className="hb-domain" aria-labelledby={`hb-domain-${di}`}>
+      <h3 id={`hb-domain-${di}`} className="hb-domain__head">
+        <span>{sectionName(d.domain)}</span>
+        <span className="hb-muted">{isAppendixDomain(d.domain) ? `${d.topics.length} トピック` : `配点 ${EXAM_WEIGHTS[d.domain]}%`}</span>
+      </h3>
+      <ul className="hb-topics">
+        {d.topics.map((t) => (
+          <li key={t.id}>
+            <a className={appendix ? 'hb-topic hb-topic--extra' : 'hb-topic'} href={handbookHref(t.id)}>
+              {HANDBOOK_FIGURES[t.id] && (
+                <span className="hb-topic__thumb">
+                  <DiagramThumb spec={HANDBOOK_FIGURES[t.id]} />
+                </span>
+              )}
+              <span className="hb-topic__kicker">
+                <ScopeTag extra={appendix} />
+                <span className="hb-topic__en" lang={appendix ? undefined : 'en'}>
+                  {competencyLabel(d.domain, t.competency)}
+                </span>
+              </span>
+              <span className="hb-topic__title">{t.title}</span>
+              <span className="hb-topic__summary">{t.summary}</span>
+              <span className="hb-muted">
+                流れ {t.flow.length} 段 · 試す手順 {t.try.length} つ
+              </span>
+              <span className={progress.handbook?.[t.id]?.done ? 'hb-topic__read hb-topic__read--done' : 'hb-topic__read'}>{readingLabel(progress.handbook?.[t.id], t.flow.length)}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/** カードとトピックの頭の小さな見出し。範囲外は札が付くので「付録: 」を省く */
+const competencyLabel = (domain: string, competency: string) => (isAppendixDomain(domain) ? competency.replace(/^付録: /, '') : competency);
+
+/** 試験の範囲か範囲外かの札 (目次のカードとトピックの頭で共通) */
+function ScopeTag({ extra }: { extra: boolean }) {
+  return <span className={extra ? 'hb-scope hb-scope--extra' : 'hb-scope'}>{extra ? '範囲外' : '試験の範囲'}</span>;
+}
+
+/** 目次: 試験の範囲 (分野ごとの細目) と範囲外の 2 部に分けて並べる */
 function Index({ progress }: { progress: Progress }) {
-  const total = HANDBOOK.reduce((n, d) => n + d.topics.length, 0);
-  const done = HANDBOOK.reduce((n, d) => n + d.topics.filter((t) => progress.handbook?.[t.id]?.done).length, 0);
+  const parts = [
+    {
+      id: 'hb-part-scope',
+      title: '試験の範囲',
+      lead: 'KCNA-JP の学習要領の細目です。配点の高い分野から並べています。',
+      domains: HANDBOOK.map((d, di) => ({ d, di })).filter(({ d }) => !isAppendixDomain(d.domain)),
+    },
+    {
+      id: 'hb-part-extra',
+      title: '範囲外: 一緒に知っておくと役立つこと',
+      lead: '試験には出ません。Kubernetes を実際に動かすときや、試験のあとに進むときに役立つことです。',
+      domains: HANDBOOK.map((d, di) => ({ d, di })).filter(({ d }) => isAppendixDomain(d.domain)),
+    },
+  ].map((p) => {
+    const topics = p.domains.flatMap(({ d }) => d.topics);
+    return { ...p, total: topics.length, done: topics.filter((t) => progress.handbook?.[t.id]?.done).length };
+  });
   return (
     <div className="hb">
       <div className="hb-head">
@@ -115,38 +176,28 @@ function Index({ progress }: { progress: Progress }) {
         <p className="hb-lead hb-muted">
           学習要領そのものと出典の考え方は <a href={guideHref}>Kubernetes とこのサイト</a> にあります。
         </p>
-        <p className="hb-muted">
-          確認済み {done} / {total} トピック
-        </p>
+        <nav aria-label="ハンドブックの部" className="hb-parts">
+          {parts.map((p, i) => (
+            <a key={p.id} className="hb-parts__link" href={`#${p.id}`}>
+              <ScopeTag extra={i === 1} />
+              <span className="hb-parts__count">
+                {p.total} トピック · 確認済み {p.done}
+              </span>
+            </a>
+          ))}
+        </nav>
       </div>
-      {HANDBOOK.map((d, di) => (
-        <section key={d.domain} className="hb-domain" aria-labelledby={`hb-domain-${di}`}>
-          <h2 id={`hb-domain-${di}`} className="hb-domain__head">
-            <span>{sectionName(d.domain)}</span>
-            <span className="hb-muted">{isAppendixDomain(d.domain) ? '資格の範囲の外' : `配点 ${EXAM_WEIGHTS[d.domain]}%`}</span>
-          </h2>
-          <ul className="hb-topics">
-            {d.topics.map((t) => (
-              <li key={t.id}>
-                <a className="hb-topic" href={handbookHref(t.id)}>
-                  {HANDBOOK_FIGURES[t.id] && (
-                    <span className="hb-topic__thumb">
-                      <DiagramThumb spec={HANDBOOK_FIGURES[t.id]} />
-                    </span>
-                  )}
-                  <span className="hb-topic__en" lang={isAppendixDomain(d.domain) ? undefined : 'en'}>
-                    {t.competency}
-                  </span>
-                  <span className="hb-topic__title">{t.title}</span>
-                  <span className="hb-topic__summary">{t.summary}</span>
-                  <span className="hb-muted">
-                    流れ {t.flow.length} 段 · 試す手順 {t.try.length} つ
-                  </span>
-                  <span className={progress.handbook?.[t.id]?.done ? 'hb-topic__read hb-topic__read--done' : 'hb-topic__read'}>{readingLabel(progress.handbook?.[t.id], t.flow.length)}</span>
-                </a>
-              </li>
-            ))}
-          </ul>
+      {parts.map((p, i) => (
+        <section key={p.id} id={p.id} className={i === 1 ? 'hb-part hb-part--extra' : 'hb-part'} aria-labelledby={`${p.id}-title`}>
+          <div className="hb-part__head">
+            <h2 id={`${p.id}-title`} className="hb-part__title">
+              {p.title}
+            </h2>
+            <p className="hb-muted">{p.lead}</p>
+          </div>
+          {p.domains.map(({ d, di }) => (
+            <DomainSection key={d.domain} d={d} di={di} progress={progress} />
+          ))}
         </section>
       ))}
     </div>
@@ -186,8 +237,11 @@ function Topic({ id, progress, updateProgress }: { id: string; progress: Progres
         </ol>
       </nav>
       <div className="hb-head">
-        <span className="hb-topic__en" lang={isAppendixDomain(t.domain) ? undefined : 'en'}>
-          {t.competency}
+        <span className="hb-topic__kicker">
+          <ScopeTag extra={isAppendixDomain(t.domain)} />
+          <span className="hb-topic__en" lang={isAppendixDomain(t.domain) ? undefined : 'en'}>
+            {competencyLabel(t.domain, t.competency)}
+          </span>
         </span>
         <h1 id="hb-title" className="week-title">
           {t.title}
