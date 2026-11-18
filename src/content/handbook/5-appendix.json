@@ -208,10 +208,10 @@
           }
         },
         {
-          "text": "k3s.yaml は root の持ち物で、既定では root だけが読める設定 (mode 600) で書かれます。一般ユーザーの kubectl から使うには、このファイルを自分のホームの ~/.kube/config に写して自分だけが読める持ち物にし、KUBECONFIG の環境変数で指します。すでに ~/.kube/config があると上書きされるので、先に .bak に残します。k3s が入れた kubectl は、KUBECONFIG も --kubeconfig も無いと ~/.kube/config ではなく /etc/rancher/k3s/k3s.yaml を読みに行き、読めずに止まります。そのため KUBECONFIG は端末ごとに要るので、~/.bashrc にも書いておきます。この写しを使うなら、ほかのトピックで k3s.yaml を KUBECONFIG に指す場面があっても打たずに飛ばします (打つと読めずに permission denied で止まります)。このファイルは system:masters のグループとして何でもできる管理者の資格なので、人に渡さないようにします。k3s は起動のたびに k3s.yaml の中の証明書を更新しますが、写しは更新されません。証明書が切れないよう、ときどき同じ手順で写し直します。",
+          "text": "k3s.yaml は root の持ち物で、既定では root だけが読める設定 (mode 600) で書かれます。一般ユーザーの kubectl から使うには、このファイルを自分のホームの ~/.kube/config に写して自分だけが読める持ち物にし、KUBECONFIG の環境変数で指します。すでに ~/.kube/config があると上書きされるので、先に .bak に残します。k3s が入れた kubectl は、KUBECONFIG も --kubeconfig も無いと ~/.kube/config ではなく /etc/rancher/k3s/k3s.yaml を読みに行き、読めずに止まります。そのため KUBECONFIG は端末ごとに要るので、~/.bashrc にも書いておきます。この写しを使うなら、ほかのトピックで k3s.yaml を KUBECONFIG に指す場面があっても打たずに飛ばします (打つと読めずに permission denied で止まります)。このファイルは system:masters のグループとして何でもできる管理者の資格なので、人に渡さないようにします。k3s は起動のたびに k3s.yaml の中の証明書を更新しますが、写しは更新されません。証明書が切れないよう、ときどき写し直します。写し直すときは、sudo cp・sudo chown・chmod の 3 行だけを打ちます (2 行目をもう一度打つと、残した .bak が k3s の写しで上書きされます)。",
           "code": {
             "language": "bash",
-            "text": "mkdir -p ~/.kube\n[ -e ~/.kube/config ] && cp ~/.kube/config ~/.kube/config.bak\nsudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config\nsudo chown \"$(id -u):$(id -g)\" ~/.kube/config\nchmod 600 ~/.kube/config\nexport KUBECONFIG=~/.kube/config\necho 'export KUBECONFIG=~/.kube/config' >> ~/.bashrc"
+            "text": "mkdir -p ~/.kube\n[ -e ~/.kube/config ] && [ ! -e ~/.kube/config.bak ] && cp ~/.kube/config ~/.kube/config.bak\nsudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config\nsudo chown \"$(id -u):$(id -g)\" ~/.kube/config\nchmod 600 ~/.kube/config\nexport KUBECONFIG=~/.kube/config\ngrep -qs 'KUBECONFIG=~/.kube/config' ~/.bashrc || echo 'export KUBECONFIG=~/.kube/config' >> ~/.bashrc"
           }
         },
         {
