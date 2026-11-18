@@ -279,6 +279,9 @@ function other(tokens: string[]): Action[] {
     return [];
   }
   if (tool === 'ctr' && sub === 'images' && arg === 'import') return act('create', '取り込む', 'イメージ', undefined, 'ノード');
+  // k3s を消すスクリプト (インストールのときに /usr/local/bin に置かれる)
+  if (/(^|\/)k3s-uninstall\.sh$/.test(tool)) return [{ op: 'delete', verb: '消す', tool: 'k3s', kind: 'k3s server', where: 'ノード' }];
+  if (/(^|\/)k3s-agent-uninstall\.sh$/.test(tool)) return [{ op: 'delete', verb: '消す', tool: 'k3s', kind: 'k3s agent', where: 'ノード' }];
   // ノードの上で直に見るもの (k3s の付録)。デバッグ用コンテナの中の素の ps は飛ばす
   if (tool === 'ls' && sub?.startsWith('/')) return act('read', '見る', 'ファイル', sub, 'ノード');
   if (tool === 'ps' && sub?.startsWith('-')) return act('read', '見る', 'プロセス', undefined, 'ノード');

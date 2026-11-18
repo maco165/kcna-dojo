@@ -64,10 +64,10 @@
           "goal": "ローリング更新と巻き戻しを確かめたいなら",
           "steps": [
             {
-              "text": "試す場所として名前空間 (namespace、クラスタの中を区切る名前の範囲) try-kcna を作ります。k3s で kubectl が設定ファイルを見つけられないときは、k3s が置く /etc/rancher/k3s/k3s.yaml を KUBECONFIG で指します (このファイルは既定では root が持ち主で、ほかの利用者は読めないので sudo が要ります)。名前空間を作る権限が無い利用者では、この手順は失敗します。",
+              "text": "試す場所として名前空間 (namespace、クラスタの中を区切る名前の範囲) try-kcna を作ります。kubectl がクラスタにつながらないときは、付録の「ハンドブックを試すための k3s の入れ方」のとおり、一般ユーザーの kubectl から使えるようにしておきます。名前空間を作る権限が無い利用者では、この手順は失敗します。",
               "code": {
                 "language": "bash",
-                "text": "# 必要なときだけ: export KUBECONFIG=/etc/rancher/k3s/k3s.yaml\nkubectl create namespace try-kcna"
+                "text": "kubectl create namespace try-kcna"
               },
               "output": "namespace/try-kcna created"
             },
@@ -113,10 +113,10 @@
           "goal": "Kustomize のベースとオーバーレイを確かめたいなら",
           "steps": [
             {
-              "text": "試す場所として名前空間 (namespace、クラスタの中を区切る名前の範囲) try-kcna を作ります。k3s で kubectl が設定ファイルを見つけられないときは、k3s が置く /etc/rancher/k3s/k3s.yaml を KUBECONFIG で指します (このファイルは既定では root が持ち主で、ほかの利用者は読めないので sudo が要ります)。名前空間を作る権限が無い利用者では、この手順は失敗します。",
+              "text": "試す場所として名前空間 (namespace、クラスタの中を区切る名前の範囲) try-kcna を作ります。kubectl がクラスタにつながらないときは、付録の「ハンドブックを試すための k3s の入れ方」のとおり、一般ユーザーの kubectl から使えるようにしておきます。名前空間を作る権限が無い利用者では、この手順は失敗します。",
               "code": {
                 "language": "bash",
-                "text": "# 必要なときだけ: export KUBECONFIG=/etc/rancher/k3s/k3s.yaml\nkubectl create namespace try-kcna"
+                "text": "kubectl create namespace try-kcna"
               },
               "output": "namespace/try-kcna created"
             },
@@ -156,10 +156,10 @@
           "goal": "Helm のリリースとリビジョンを確かめたいなら",
           "steps": [
             {
-              "text": "helm を入れておきます (入れ方は helm.sh の Installing Helm にあります)。k3s に付いてくる kubectl は /etc/rancher/k3s/k3s.yaml を既定で読みますが、別に入れた helm は読まないので、KUBECONFIG でこのファイルを指します (このファイルは既定では root が持ち主で、ほかの利用者は読めません。sudo で読める端末で試します)。見本のチャートのひな形を作ります。",
+              "text": "helm を入れておきます (入れ方は helm.sh の Installing Helm にあります)。別に入れた helm は、kubectl と同じく KUBECONFIG で指した kubeconfig を読みます。付録の「ハンドブックを試すための k3s の入れ方」のとおり ~/.kube/config に写して KUBECONFIG で指していれば、そのまま使えます。見本のチャートのひな形を作ります。",
               "code": {
                 "language": "bash",
-                "text": "export KUBECONFIG=/etc/rancher/k3s/k3s.yaml\nhelm create hello"
+                "text": "helm create hello"
               },
               "output": "Creating hello"
             },
@@ -364,10 +364,10 @@
           "goal": "イメージが取れないとき (ImagePullBackOff) の読み方を確かめたいなら",
           "steps": [
             {
-              "text": "試す場所として名前空間 (namespace、クラスタの中を区切る名前の範囲) try-kcna を作ります。k3s で kubectl が設定ファイルを見つけられないときは、k3s が置く /etc/rancher/k3s/k3s.yaml を KUBECONFIG で指します (このファイルは既定では root が持ち主で、ほかの利用者は読めないので sudo が要ります)。名前空間を作る権限が無い利用者では、この手順は失敗します。",
+              "text": "試す場所として名前空間 (namespace、クラスタの中を区切る名前の範囲) try-kcna を作ります。kubectl がクラスタにつながらないときは、付録の「ハンドブックを試すための k3s の入れ方」のとおり、一般ユーザーの kubectl から使えるようにしておきます。名前空間を作る権限が無い利用者では、この手順は失敗します。",
               "code": {
                 "language": "bash",
-                "text": "# 必要なときだけ: export KUBECONFIG=/etc/rancher/k3s/k3s.yaml\nkubectl create namespace try-kcna"
+                "text": "kubectl create namespace try-kcna"
               },
               "output": "namespace/try-kcna created"
             },
@@ -413,10 +413,10 @@
           "goal": "落ちては再起動する Pod (CrashLoopBackOff) のログを確かめたいなら",
           "steps": [
             {
-              "text": "試す場所として名前空間 (namespace、クラスタの中を区切る名前の範囲) try-kcna を作ります。k3s で kubectl が設定ファイルを見つけられないときは、k3s が置く /etc/rancher/k3s/k3s.yaml を KUBECONFIG で指します (このファイルは既定では root が持ち主で、ほかの利用者は読めないので sudo が要ります)。名前空間を作る権限が無い利用者では、この手順は失敗します。",
+              "text": "試す場所として名前空間 (namespace、クラスタの中を区切る名前の範囲) try-kcna を作ります。kubectl がクラスタにつながらないときは、付録の「ハンドブックを試すための k3s の入れ方」のとおり、一般ユーザーの kubectl から使えるようにしておきます。名前空間を作る権限が無い利用者では、この手順は失敗します。",
               "code": {
                 "language": "bash",
-                "text": "# 必要なときだけ: export KUBECONFIG=/etc/rancher/k3s/k3s.yaml\nkubectl create namespace try-kcna"
+                "text": "kubectl create namespace try-kcna"
               },
               "output": "namespace/try-kcna created"
             },
@@ -462,10 +462,10 @@
           "goal": "置けない Pod (Pending) の理由を確かめたいなら",
           "steps": [
             {
-              "text": "試す場所として名前空間 (namespace、クラスタの中を区切る名前の範囲) try-kcna を作ります。k3s で kubectl が設定ファイルを見つけられないときは、k3s が置く /etc/rancher/k3s/k3s.yaml を KUBECONFIG で指します (このファイルは既定では root が持ち主で、ほかの利用者は読めないので sudo が要ります)。名前空間を作る権限が無い利用者では、この手順は失敗します。",
+              "text": "試す場所として名前空間 (namespace、クラスタの中を区切る名前の範囲) try-kcna を作ります。kubectl がクラスタにつながらないときは、付録の「ハンドブックを試すための k3s の入れ方」のとおり、一般ユーザーの kubectl から使えるようにしておきます。名前空間を作る権限が無い利用者では、この手順は失敗します。",
               "code": {
                 "language": "bash",
-                "text": "# 必要なときだけ: export KUBECONFIG=/etc/rancher/k3s/k3s.yaml\nkubectl create namespace try-kcna"
+                "text": "kubectl create namespace try-kcna"
               },
               "output": "namespace/try-kcna created"
             },
@@ -503,10 +503,10 @@
           "goal": "道具の無いイメージを kubectl debug で調べたいなら",
           "steps": [
             {
-              "text": "試す場所として名前空間 (namespace、クラスタの中を区切る名前の範囲) try-kcna を作ります。k3s で kubectl が設定ファイルを見つけられないときは、k3s が置く /etc/rancher/k3s/k3s.yaml を KUBECONFIG で指します (このファイルは既定では root が持ち主で、ほかの利用者は読めないので sudo が要ります)。名前空間を作る権限が無い利用者では、この手順は失敗します。",
+              "text": "試す場所として名前空間 (namespace、クラスタの中を区切る名前の範囲) try-kcna を作ります。kubectl がクラスタにつながらないときは、付録の「ハンドブックを試すための k3s の入れ方」のとおり、一般ユーザーの kubectl から使えるようにしておきます。名前空間を作る権限が無い利用者では、この手順は失敗します。",
               "code": {
                 "language": "bash",
-                "text": "# 必要なときだけ: export KUBECONFIG=/etc/rancher/k3s/k3s.yaml\nkubectl create namespace try-kcna"
+                "text": "kubectl create namespace try-kcna"
               },
               "output": "namespace/try-kcna created"
             },
