@@ -37,7 +37,7 @@
       "id": "kubectl-get",
       "command": "kubectl get",
       "summary": "リソースの一覧や状態を表で表示します。",
-      "detail": "Pod・Node・Service など種類を指定して、主な情報を 1 行ずつ出します。名前を付けるとその 1 つだけを出します。名前空間を指定しないと、今の名前空間の分だけが出ます。",
+      "detail": "Pod・Node・Service など種類を指定して、主な情報を 1 行ずつ出します。名前を付けるとその 1 つだけを出します。名前空間に属する種類 (Pod・Service など) は、名前空間を指定しないと今の名前空間の分だけが出ます。",
       "usage": "kubectl get <種類> [名前] [オプション]",
       "flags": [
         {
@@ -93,7 +93,8 @@
           "flags": [
             "--output-directory"
           ],
-          "text": "describe にはこのオプションはありません (ファイルに書き出すのは kubectl cluster-info dump の --output-directory)"
+          "text": "describe にこの指定はありません (ファイルに書き出すのは kubectl cluster-info dump の --output-directory)",
+          "absent": true
         }
       ],
       "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_describe/"
@@ -178,7 +179,13 @@
           "text": "持ち物 (Deployment の Pod など) の消し方を選ぶ。background (既定) は先に本体を消して後から持ち物を消す、foreground は持ち物を消し終えてから本体を消す、orphan は持ち物を残す"
         }
       ],
-      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_delete/"
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_delete/",
+      "refs": [
+        {
+          "label": "Garbage Collection (--cascade)",
+          "url": "https://kubernetes.io/docs/concepts/architecture/garbage-collection/"
+        }
+      ]
     },
     {
       "id": "kubectl-exec",
@@ -232,7 +239,13 @@
           "text": "cpu か memory を指定して、その使用量の順に並べる"
         }
       ],
-      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_top/"
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_top/kubectl_top_pod/",
+      "refs": [
+        {
+          "label": "kubectl top",
+          "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_top/"
+        }
+      ]
     },
     {
       "id": "kubectl-create-job",
@@ -254,7 +267,7 @@
       "id": "kubectl-create-secret-generic",
       "command": "kubectl create secret generic",
       "summary": "キーと値を入れた Secret を作ります。",
-      "detail": "値はファイル・フォルダ・コマンドに直接書いた文字から入れられます。Secret の値は Base64 で書かれるだけで暗号化ではないので、扱いに注意します。",
+      "detail": "値はファイル・フォルダ・コマンドに直接書いた文字から入れられます。Secret の値は Base64 で符号化されるだけで暗号化ではなく、既定では etcd にも暗号化されずに保存されます (保存時の暗号化は別に設定します)。",
       "usage": "kubectl create secret generic <名前> [--from-file=[キー=]<ファイル>] [--from-literal=<キー>=<値>] [オプション]",
       "flags": [
         {
@@ -264,15 +277,27 @@
           "text": "入れるキーと値をコマンドに直接書く (例: --from-literal=password=xxx)"
         }
       ],
-      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_create/kubectl_create_secret_generic/"
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_create/kubectl_create_secret_generic/",
+      "refs": [
+        {
+          "label": "Secrets",
+          "url": "https://kubernetes.io/docs/concepts/configuration/secret/"
+        }
+      ]
     },
     {
       "id": "kubectl-create-secret-docker-registry",
       "command": "kubectl create secret docker-registry",
       "summary": "コンテナレジストリにログインするための Secret を作ります。",
-      "detail": "認証の要るレジストリからイメージを取るときに使います。作った Secret を Pod の imagePullSecrets かサービスアカウントに付けると、Node がその情報でイメージを取れます。",
-      "usage": "kubectl create secret docker-registry <名前> --docker-server=<サーバー> --docker-username=<ユーザー> --docker-password=<パスワード> [オプション]",
-      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_create/kubectl_create_secret_docker-registry/"
+      "detail": "認証の要るレジストリからイメージを取るときに使います。作った Secret を Pod の imagePullSecrets かサービスアカウントに付けると、Node がその情報でイメージを取れます。imagePullSecrets に書ける Secret は、Pod と同じ名前空間にあるものだけです。",
+      "usage": "kubectl create secret docker-registry <名前> [--docker-server=<サーバー>] --docker-username=<ユーザー> --docker-password=<パスワード> [オプション]",
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_create/kubectl_create_secret_docker-registry/",
+      "refs": [
+        {
+          "label": "Images (imagePullSecrets と名前空間)",
+          "url": "https://kubernetes.io/docs/concepts/containers/images/"
+        }
+      ]
     },
     {
       "id": "kubectl-create-rolebinding",
@@ -294,7 +319,13 @@
           "text": "権限を渡すサービスアカウントを <名前空間>:<名前> の形で指定する"
         }
       ],
-      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_create/kubectl_create_rolebinding/"
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_create/kubectl_create_rolebinding/",
+      "refs": [
+        {
+          "label": "Using RBAC Authorization",
+          "url": "https://kubernetes.io/docs/reference/access-authn-authz/rbac/"
+        }
+      ]
     },
     {
       "id": "kubectl-events",
@@ -348,7 +379,7 @@
             "-c",
             "--container"
           ],
-          "text": "調べるために作るコンテナの名前"
+          "text": "調べるためのコンテナの名前。--copy-to と一緒に元からあるコンテナの名前を指定すると、写しの中のそのコンテナのコマンドを -- の後ろのものに替える"
         }
       ],
       "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_debug/"
@@ -357,7 +388,7 @@
       "id": "kubectl-taint",
       "command": "kubectl taint",
       "summary": "Node にテイント (Pod を置かせない印) を付けます。",
-      "detail": "キー=値:効果 の形で書きます。効果は NoSchedule (新しい Pod を置かない)・PreferNoSchedule (なるべく置かない)・NoExecute (置かず、動いている Pod も追い出す) の 3 つです。同じテイントへの容認 (toleration) を持つ Pod だけが置けます。",
+      "detail": "キー=値:効果 の形で書きます。効果は NoSchedule (新しい Pod を置かない)・PreferNoSchedule (なるべく置かない)・NoExecute (置かず、動いている Pod も追い出す) の 3 つです。NoSchedule と NoExecute では、合う容認 (toleration) を持つ Pod だけが置けます。PreferNoSchedule はなるべく避けるだけで、置かれることもあります。",
       "usage": "kubectl taint nodes <Node 名> <キー>=<値>:<効果> [オプション]",
       "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_taint/"
     },
@@ -515,7 +546,7 @@
       "id": "kubectl-kustomize",
       "command": "kubectl kustomize",
       "summary": "kustomization.yaml を元に、マニフェストを組み立てて表示します。",
-      "detail": "組み立てた結果を画面に出すだけで、クラスタには反映しません。反映するときは kubectl apply -k を使います。",
+      "detail": "組み立てた結果を出す (既定は画面、-o でファイル) だけで、クラスタには反映しません。反映するときは kubectl apply -k を使います。",
       "usage": "kubectl kustomize <フォルダ> [オプション]",
       "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_kustomize/"
     },
@@ -623,9 +654,15 @@
       "id": "kubectl-api-resources",
       "command": "kubectl api-resources",
       "summary": "クラスタで使えるリソースの種類を一覧で表示します。",
-      "detail": "種類の名前・短い名前 (po など)・API グループ・名前空間に属するかが出ます。get や explain に書く種類の名前を調べるときに使います。",
+      "detail": "NAME (種類の名前)・SHORTNAMES (短い名前、po など)・APIVERSION (API グループと版、例: apps/v1)・NAMESPACED (名前空間に属するか)・KIND の列が出ます。get や explain に書く種類の名前を調べるときに使います。",
       "usage": "kubectl api-resources [オプション]",
-      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_api-resources/"
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_api-resources/",
+      "refs": [
+        {
+          "label": "kubectl の実装 (apiresources.go の列)",
+          "url": "https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/cmd/apiresources/apiresources.go"
+        }
+      ]
     },
     {
       "id": "kubectl-rollout-status",
@@ -778,7 +815,7 @@
       "id": "k3s-crictl-images",
       "command": "k3s crictl images",
       "summary": "ノードのランタイムにあるイメージを一覧します。",
-      "detail": "IMAGE・TAG・IMAGE ID・SIZE の表が出ます。イメージがノードにあるかだけを示し、コンテナが動いているかは分かりません (それは crictl ps)。crictl は CRI のランタイムを見るので、Docker Engine のイメージは出ません。",
+      "detail": "IMAGE・TAG・IMAGE ID・SIZE の表が出ます。イメージがノードにあるかだけを示し、コンテナが動いているかは分かりません (それは crictl ps)。k3s crictl は k3s の containerd を見るので、同じマシンの Docker Engine に入れたイメージは出ません。",
       "usage": "k3s crictl images [リポジトリ] [オプション]",
       "source": "https://kubernetes.io/docs/tasks/debug/debug-cluster/crictl/"
     },
@@ -786,9 +823,9 @@
       "id": "etcdctl",
       "command": "etcdctl",
       "summary": "etcd を操作する、etcd に付属のコマンドです。",
-      "detail": "問題に出てくる etcdctl snapshot save <ファイル> は、動いているメンバーからその時点のデータのスナップショットをファイルに取ります。戻すときは snapshot restore を使います。v3.4 より前の版では v3 の API を使うために ETCDCTL_API=3 を付けます。",
+      "detail": "問題に出てくる etcdctl snapshot save <ファイル> は、動いているメンバーからその時点のデータのスナップショットをファイルに取ります。戻すときは etcdutl snapshot restore を使います (etcdctl の snapshot restore は v3.6 で除かれました)。v3.4 より前の版では v3 の API を使うために ETCDCTL_API=3 を付けます。",
       "usage": "etcdctl [共通のオプション] <コマンド> [引数]",
-      "source": "https://etcd.io/docs/v3.6/op-guide/recovery/"
+      "source": "https://etcd.io/docs/v3.7/op-guide/recovery/"
     },
     {
       "id": "curl",
@@ -812,7 +849,70 @@
       "summary": "DNS に名前を問い合わせ、IP アドレスを引きます。",
       "detail": "最初の引数に引きたい名前を渡すと、答えを 1 回出して終わります。2 つ目の引数で問い合わせる DNS サーバーを選べます。Pod の中で Service の名前が引けるかを確かめるときに使い、Server の行に答えた DNS (クラスターでは CoreDNS の Service) が出ます。",
       "usage": "nslookup [-オプション] <名前> [DNS サーバー]",
-      "source": "https://github.com/isc-projects/bind9/blob/main/bin/dig/nslookup.rst"
+      "source": "https://bind9.readthedocs.io/en/latest/manpages.html#man-nslookup",
+      "refs": [
+        {
+          "label": "Debugging DNS Resolution (Server の行)",
+          "url": "https://kubernetes.io/docs/tasks/administer-cluster/dns-debugging-resolution/"
+        }
+      ]
+    },
+    {
+      "id": "kubectl-helm",
+      "command": "kubectl helm",
+      "summary": "kubectl に helm というサブコマンドはありません。",
+      "detail": "Helm は kubectl とは別の道具で、helm install のように helm コマンドで使います。kubectl が直接扱えるのは、マニフェストを組み立てる kubectl kustomize (apply -k) です。",
+      "usage": "kubectl helm という形は無い (Helm は helm <コマンド> [引数] で使う)",
+      "source": "https://helm.sh/docs/helm/helm/",
+      "absent": true
+    },
+    {
+      "id": "k3s-ctr-images-import",
+      "command": "k3s ctr images import",
+      "summary": "イメージの tar を k3s の containerd に取り込みます。",
+      "detail": "docker save などで作ったイメージの tar を読み、k3s のノードの containerd のイメージの置き場に入れます。ファイル名の代わりに - を渡すと標準入力から読むので、docker save の出力をパイプでそのまま渡せます。k3s ctr は既定で k3s の containerd の名前空間 k8s.io を使うので、取り込んだイメージは kubelet からも見えます。取り込むのはコマンドを打ったノードだけです。",
+      "usage": "k3s ctr images import [オプション] <tar のファイル | ->",
+      "source": "https://docs.k3s.io/cli",
+      "refs": [
+        {
+          "label": "K3s: Import Images",
+          "url": "https://docs.k3s.io/add-ons/import-images"
+        },
+        {
+          "label": "K3s: Embedded Registry Mirror (docker save の tar を ctr -n k8s.io image import で読み込む)",
+          "url": "https://docs.k3s.io/installation/registry-mirror"
+        },
+        {
+          "label": "containerd v2.3.7: cmd/ctr/commands/images/import.go (import の使い方と - の扱い)",
+          "url": "https://github.com/containerd/containerd/blob/v2.3.7/cmd/ctr/commands/images/import.go"
+        },
+        {
+          "label": "k3s v1.36.6+k3s1: pkg/ctr/main.go (k3s ctr の既定のソケットと名前空間)",
+          "url": "https://github.com/k3s-io/k3s/blob/v1.36.6%2Bk3s1/pkg/ctr/main.go"
+        }
+      ]
+    },
+    {
+      "id": "k3s-agent",
+      "command": "k3s agent",
+      "summary": "k3s のエージェントのノードとして動かします。",
+      "detail": "server のノードにつないでクラスターに加わり、containerd・Flannel・kube-router のネットワークポリシーのコントローラー・kubelet・kube-proxy を動かします。API サーバーやデータストアは動かしません。つなぐ先は --server (K3S_URL)、加わるための合言葉は --token (K3S_TOKEN) で渡します。導入スクリプトに K3S_URL を渡すと、この k3s agent をサービス (k3s-agent) として動かすように入ります。",
+      "usage": "k3s agent --server <server の URL> --token <トークン> [オプション]",
+      "source": "https://docs.k3s.io/cli/agent",
+      "refs": [
+        {
+          "label": "K3s: Architecture",
+          "url": "https://docs.k3s.io/architecture"
+        },
+        {
+          "label": "K3s: CLI Tools",
+          "url": "https://docs.k3s.io/cli"
+        },
+        {
+          "label": "K3s: Quick-Start Guide (K3S_URL と K3S_TOKEN で agent として入れる)",
+          "url": "https://docs.k3s.io/quick-start"
+        }
+      ]
     }
   ]
 }

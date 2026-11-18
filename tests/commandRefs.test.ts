@@ -8,7 +8,14 @@ import type { Question } from '../src/content/types';
 const DATA = commands as CommandData;
 const QUESTIONS = [...allQuestions(), ...EXAM_ONLY].map((r) => r.question);
 /** 公式のリファレンスとして使ってよい所 */
-const OFFICIAL = ['kubernetes.io', 'helm.sh', 'docs.docker.com', 'docs.k3s.io', 'etcd.io', 'argo-cd.readthedocs.io', 'fluxcd.io', 'kubectl.docs.kubernetes.io', 'curl.se', 'man7.org', 'github.com'];
+const OFFICIAL = ['kubernetes.io', 'helm.sh', 'docs.docker.com', 'docs.k3s.io', 'etcd.io', 'argo-cd.readthedocs.io', 'fluxcd.io', 'kubectl.docs.kubernetes.io', 'curl.se', 'man7.org', 'bind9.readthedocs.io'];
+/** GitHub は公式の組織のリポジトリだけ (個人のリポジトリを出典にしない) */
+const OFFICIAL_GITHUB = ['kubernetes', 'kubernetes-sigs', 'helm', 'docker', 'etcd-io', 'k3s-io', 'containerd', 'isc-projects', 'curl'];
+const isOfficial = (url: string) => {
+  const u = new URL(url);
+  if (u.hostname === 'github.com') return OFFICIAL_GITHUB.includes(u.pathname.split('/')[1]);
+  return OFFICIAL.some((h) => u.hostname === h || u.hostname.endsWith(`.${h}`));
+};
 
 describe('コマンドの説明のデータ', () => {
   it('問題に出てくるコマンドとオプションには、すべて説明がある', () => {
@@ -28,9 +35,10 @@ describe('コマンドの説明のデータ', () => {
       expect(TOOLS as readonly string[], c.id).toContain(c.command.split(' ')[0]);
       expect(c.summary.length, c.id).toBeGreaterThan(5);
       expect(c.usage.startsWith(c.command.split(' ')[0]), c.id).toBe(true);
-      const u = new URL(c.source);
-      expect(u.protocol, c.id).toBe('https:');
-      expect(OFFICIAL.some((h) => u.hostname === h || u.hostname.endsWith(`.${h}`)), `${c.id}: ${u.hostname}`).toBe(true);
+      for (const url of [c.source, ...(c.refs ?? []).map((r) => r.url)]) {
+        expect(new URL(url).protocol, c.id).toBe('https:');
+        expect(isOfficial(url), `${c.id}: ${url}`).toBe(true);
+      }
       for (const f of c.flags ?? []) {
         expect(f.flags.every((x) => /^--?[a-zA-Z]/.test(x)), `${c.id} ${f.flags}`).toBe(true);
         expect(f.text.length, `${c.id} ${f.flags}`).toBeGreaterThan(3);
@@ -63,9 +71,19 @@ describe('コマンドの見つけ方', () => {
     expect(matchLine('kubectl -n kube-system get pods', data).use?.entry.id).toBe('kubectl-get');
     expect(matchLine('kubectl --namespace=web rollout undo deploy/web', data).use?.entry.id).toBe('kubectl-rollout-undo');
   });
+  it('日本語の句読点の後ろのコマンドと、パイプの後ろの 2 つ目のコマンドも拾う', () => {
+    expect(commandLines('docker save hello:0.1 | sudo k3s ctr images import -')).toEqual(['docker save hello:0.1', 'k3s ctr images import -']);
+    expect(commandLines('落ちているので、kubectl logs --previous を見る')).toEqual(['kubectl logs --previous']);
+    expect(commandLines('helm install し、helm upgrade を試す')).toEqual(['helm install', 'helm upgrade']);
+  });
+  it('公式の出典の判定: GitHub は公式の組織だけ', () => {
+    expect(isOfficial('https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/cmd/get/get.go')).toBe(true);
+    expect(isOfficial('https://github.com/someone/my-blog/blob/main/x.md')).toBe(false);
+  });
   it('矢印や日本語の文はコマンドとして読まず、パイプの後ろは切る', () => {
     expect(commandLines('kubectl → kube-apiserver')).toEqual([]);
     expect(commandLines('$ kubectl get pods -o wide | grep web')).toEqual(['kubectl get pods -o wide']);
+    expect(commandLines('kubectl → kube-apiserver → etcd')).toEqual([]);
     expect(commandLines('まず kubectl get pods で一覧を見る')).toEqual(['kubectl get pods']);
   });
   it('穴埋めの空欄は正解で埋めてから読み、同じコマンドは 1 つにまとめる', () => {
