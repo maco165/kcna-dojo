@@ -63,8 +63,18 @@ export function commandLines(text: string): string[] {
 export function matchLine(line: string, data: CommandData): { use?: CommandUse; unknown: Unknown[] } {
   const words = line.split(/\s+/);
   const tool = words[0];
+  // サブコマンドの語を読む。前に置いたオプション (etcdctl --endpoints $X snapshot save、kubectl -n ns get) は値ごと飛ばす
   const plain: string[] = [tool];
+  let skipValue = false;
   for (const w of words.slice(1)) {
+    if (w.startsWith('-')) {
+      skipValue = !w.includes('=');
+      continue;
+    }
+    if (skipValue) {
+      skipValue = false;
+      continue;
+    }
     if (!/^[a-z][a-z0-9-]*$/.test(w)) break;
     plain.push(w);
   }

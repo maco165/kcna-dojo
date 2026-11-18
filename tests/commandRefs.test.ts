@@ -56,6 +56,9 @@ describe('コマンドの見つけ方', () => {
     expect(get.use?.flags.map((f) => f.flags[0])).toEqual(['-n', '-o']);
     expect(matchLine('kubectl get pods --watch', data).unknown.map((u) => u.token)).toEqual(['kubectl get --watch']);
     expect(matchLine('kubectl exec web', data).unknown[0].reason).toBe('command');
+    // 前に置いたオプションは値ごと飛ばしてサブコマンドを読む
+    expect(matchLine('kubectl -n kube-system get pods', data).use?.entry.id).toBe('kubectl-get');
+    expect(matchLine('kubectl --namespace=web rollout undo deploy/web', data).use?.entry.id).toBe('kubectl-rollout-undo');
   });
   it('矢印や日本語の文はコマンドとして読まず、パイプの後ろは切る', () => {
     expect(commandLines('kubectl → kube-apiserver')).toEqual([]);
