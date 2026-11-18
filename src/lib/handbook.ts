@@ -1,5 +1,5 @@
 // ハンドブックのデータの検査。違反を文で返す (空なら OK)
-const TOPIC_KEYS = new Set(['id', 'competency', 'title', 'summary', 'flow', 'try', 'lessons', 'sources']);
+const TOPIC_KEYS = new Set(['id', 'competency', 'title', 'summary', 'flow', 'try', 'lessons', 'sources', 'noTermLinks']);
 const STEP_KEYS = new Set(['text', 'code', 'output', 'result']);
 const RESULT_KEYS = new Set(['text', 'tone']);
 /** 結果の文の長さの上限 (絵の 1 行に収める) */
@@ -7,8 +7,12 @@ export const RESULT_MAX = 40;
 const CODE_KEYS = new Set(['language', 'text']);
 const TRY_KEYS = new Set(['goal', 'steps']);
 const FILE_KEYS = new Set(['domain', 'topics']);
-/** 学習要領の外のトピックを置くファイルの domain (細目の原文とは照らさない) */
+/** 学習要領の外のトピックを置くファイルの domain (細目の原文とは照らさない)。「付録: Linux とコンテナ」のように段の名前を付けられる */
 export const APPENDIX_DOMAIN = '付録' as const;
+export type AppendixDomain = typeof APPENDIX_DOMAIN | `${typeof APPENDIX_DOMAIN}: ${string}`;
+export const isAppendixDomain = (d: unknown): d is AppendixDomain => typeof d === 'string' && (d === APPENDIX_DOMAIN || (d.startsWith(`${APPENDIX_DOMAIN}: `) && d.slice(APPENDIX_DOMAIN.length + 2).trim() !== ''));
+/** 目次に出す段の名前 (「付録: Linux とコンテナ」→「Linux とコンテナ」) */
+export const appendixGroup = (d: AppendixDomain) => (d === APPENDIX_DOMAIN ? '' : d.slice(APPENDIX_DOMAIN.length + 2));
 
 function unknownKeys(obj: Record<string, unknown>, allowed: Set<string>, where: string, errors: string[]) {
   for (const k of Object.keys(obj)) if (!allowed.has(k)) errors.push(`${where}: ${k} という欄は使いません`);
@@ -52,16 +56,16 @@ export function validateHandbook(data: unknown[], domains: Map<string, string[]>
   const covered = new Set<string>();
   const seenDomains = new Set<string>();
   for (const [fi, file] of data.entries()) {
-    const appendix = isObj(file) && file.domain === APPENDIX_DOMAIN;
+    const appendix = isObj(file) && isAppendixDomain(file.domain);
     if (!isObj(file) || !(appendix || domains.has(file.domain as string)) || !Array.isArray(file.topics)) {
-      errors.push(`ファイル ${fi}: domain (4 分野のどれかか ${APPENDIX_DOMAIN}) と topics の配列が要ります`);
+      errors.push(`ファイル ${fi}: domain (4 分野のどれかか、${APPENDIX_DOMAIN} か「${APPENDIX_DOMAIN}: 段の名前」) と topics の配列が要ります`);
       continue;
     }
     unknownKeys(file, FILE_KEYS, `ファイル ${fi}`, errors);
     if (seenDomains.has(file.domain as string)) errors.push(`ファイル ${fi}: ${file.domain} のファイルが 2 つあります`);
     seenDomains.add(file.domain as string);
     const competencies = appendix ? [] : domains.get(file.domain as string)!;
-    if (appendix && file.topics.length === 0) errors.push(`${APPENDIX_DOMAIN}: トピックが 1 つ以上要ります`);
+    if (appendix && file.topics.length === 0) errors.push(`${file.domain}: トピックが 1 つ以上要ります`);
     for (const t of file.topics as unknown[]) {
       if (!isObj(t)) {
         errors.push(`${file.domain}: トピックがオブジェクトではありません`);

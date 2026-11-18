@@ -2,7 +2,7 @@
 // 正本は src/content/handbook/*.json (分野ごとに 1 ファイル)。形は lib/handbook.ts の validateHandbook が検査する
 import type { Domain } from './types';
 import { DOMAINS } from '../lib/lessonStatus';
-import { APPENDIX_DOMAIN } from '../lib/handbook';
+import { appendixGroup, isAppendixDomain, type AppendixDomain } from '../lib/handbook';
 
 export type HandbookCode = { language: 'bash' | 'yaml'; text: string };
 /** 手順のあとクラスタの中で起きること (本文に書いてある結果を短く)。ok は思いどおり、warn は失敗・止まる */
@@ -17,18 +17,26 @@ export type HandbookTopic = {
   flow: HandbookStep[];
   try: HandbookTry[];
   lessons: string[];
+  /** このトピックの本文ではリンクにしない用語集の語の id (AWS の IAM のロールが Kubernetes の Role に当たる、など別の意味で使う語) */
+  noTermLinks?: string[];
   sources: { label: string; url: string }[];
 };
-/** 学習要領の外の話 (k3s と Kubernetes の違いなど)。配点は無く、目次の最後に並べる */
-export const APPENDIX = APPENDIX_DOMAIN;
-export type HandbookSection = Domain | typeof APPENDIX;
+/** 学習要領の外の話 (資格の範囲の外だが、一緒に知っておいて損がないこと)。配点は無く、目次の最後に段ごとに並べる */
+export { appendixGroup, isAppendixDomain };
+
+/** 目次・パンくず・書き出す HTML に出す段の名前。付録は「範囲外: Linux とコンテナ」の形 */
+export const sectionName = (d: string) => (isAppendixDomain(d) ? (appendixGroup(d) ? `範囲外: ${appendixGroup(d)}` : '範囲外') : d);
+export type HandbookSection = Domain | AppendixDomain;
 export type HandbookDomain = { domain: HandbookSection; topics: HandbookTopic[] };
 
 const FILES = import.meta.glob<HandbookDomain>('./handbook/*.json', { eager: true, import: 'default' });
-const ORDER: HandbookSection[] = [...DOMAINS.map((d) => d.name), APPENDIX];
+const ORDER: string[] = DOMAINS.map((d) => d.name);
+// 付録の段はファイルの名前の順 (5-1-…, 5-2-…) で、4 分野のあとに並べる
+const FILE_ORDER = Object.keys(FILES).sort();
+const rank = (d: HandbookDomain) => (isAppendixDomain(d.domain) ? ORDER.length + FILE_ORDER.findIndex((k) => FILES[k] === d) : ORDER.indexOf(d.domain));
 
-/** 分野の並び (配点の順) にそろえ、付録を最後に置いたハンドブック */
-export const HANDBOOK: HandbookDomain[] = Object.values(FILES).sort((a, b) => ORDER.indexOf(a.domain) - ORDER.indexOf(b.domain));
+/** 分野の並び (配点の順) にそろえ、付録の段を最後に置いたハンドブック */
+export const HANDBOOK: HandbookDomain[] = Object.values(FILES).sort((a, b) => rank(a) - rank(b));
 
 export const HANDBOOK_TOPICS: (HandbookTopic & { domain: HandbookSection })[] = HANDBOOK.flatMap((d) => d.topics.map((t) => ({ ...t, domain: d.domain })));
 
@@ -39,4 +47,4 @@ export function findTopic(id: string) {
 }
 
 /** 細目の原文からトピックを引く (説明のページの学習要領の表から飛ぶため) */
-export const topicByCompetency = (competency: string) => HANDBOOK_TOPICS.find((t) => t.domain !== APPENDIX && t.competency === competency);
+export const topicByCompetency = (competency: string) => HANDBOOK_TOPICS.find((t) => !isAppendixDomain(t.domain) && t.competency === competency);

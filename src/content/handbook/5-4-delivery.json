@@ -1,0 +1,402 @@
+{
+  "domain": "付録: 作って届ける",
+  "topics": [
+    {
+      "id": "authn-authz-basics",
+      "competency": "付録: 認証と認可",
+      "title": "認証と認可の基本: 証明書・TLS・OAuth 2.0・OpenID Connect と Kubernetes",
+      "summary": "認証 (authentication) は「誰か」を確かめること、認可 (authorization) は「何をしてよいか」を決めることです。Kubernetes の API サーバーは、TLS でつながったリクエストをまず認証し、名前とグループなどを決めてから、RBAC などの認可に渡します。ここでは、その下にある公開鍵と証明書・TLS・OAuth 2.0・OpenID Connect の考え方と、Kubernetes での使われ方 (X.509 のクライアント証明書・OIDC・ServiceAccount のトークン) をまとめます。",
+      "flow": [
+        {
+          "text": "kubernetes.io によると、API へのリクエストは、TLS でつながったあと、認証 (Authentication)・認可 (Authorization)・アドミッション制御 (Admission control) の順に進みます。認証に失敗すれば 401 で断られます (資格情報を出さないリクエストは、匿名を許す設定なら system:anonymous として扱われ、認可に進みます)。認可で許されなければ 403 で断られます。アドミッション制御は、作る・変える・消すなどのリクエストだけにかかり、読むだけのリクエストにはかかりません。認証と認可は別の仕組みで、認証が決めるのは、ユーザー名・UID・グループ・追加の情報 (extra) です。認可はそれを見て判断します。"
+        },
+        {
+          "text": "証明書の土台は公開鍵暗号です。秘密鍵 (本人だけが持つ鍵) で署名したものは、対になる公開鍵 (配ってよい鍵) で確かめられます。X.509 の証明書 (RFC 5280、2008 年 5 月) は、「この公開鍵は誰のものか」を CA (認証局。証明書に署名する役) が署名して示すものです。ある CA を信じると決めておけば、その CA が署名した証明書の持ち主を確かめられます。"
+        },
+        {
+          "text": "TLS は、通信の中身を守る決まりです。TLS 1.3 は RFC 8446 (2018 年 8 月) で、二者の間に安全な通り道を作ることを目的にし、相手の確認・盗み見の防止・書き換えの検出を挙げています。RFC 8446 では、サーバー側は必ず確かめられ、クライアント側の確認は任意です。クライアントも証明書を出して、両方が互いを確かめる形を mTLS (相互 TLS) と呼びます。"
+        },
+        {
+          "text": "Kubernetes は、部品どうしの TLS の認証に証明書を使います。PKI のページには、API サーバー・etcd・kubelet のサーバー証明書と、kubelet・スケジューラー・kube-proxy などが API サーバーに名乗るクライアント証明書が並びます。人がクライアント証明書で名乗るときは、証明書の subject の commonName (CN) がユーザー名に、organization (O) がグループになります。Kubernetes には普通のユーザーを表すオブジェクトが無く、API でユーザーを足すこともできません。"
+        },
+        {
+          "text": "自分の kubeconfig を見ると、どの CA を信じ、何で名乗っているかが分かります。certificate-authority-data は API サーバーの証明書を確かめるための CA、client-certificate-data と client-key-data (ファイルを指すときは client-certificate と client-key) は、自分が名乗るための証明書と秘密鍵です。中身は DATA+OMITTED と伏せて表示されます。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl config view --minify"
+          },
+          "output": "apiVersion: v1\nclusters:\n- cluster:\n    certificate-authority-data: DATA+OMITTED\n    server: https://192.168.0.10:6443\n  name: default\n...\nusers:\n- name: default\n  user:\n    client-certificate-data: DATA+OMITTED\n    client-key-data: DATA+OMITTED",
+          "result": {
+            "text": "CA と自分の証明書の置き場所が分かる",
+            "tone": "ok"
+          }
+        },
+        {
+          "text": "OAuth 2.0 (RFC 6749、2012 年 10 月) は、第三者のアプリが HTTP のサービスへの限られたアクセスを得るための枠組みです。役は 4 つで、資源の持ち主 (resource owner)・資源を持つサーバー (resource server)・アクセスするアプリ (client)・アクセストークンを出す認可サーバー (authorization server) です。アクセストークンは「何をしてよいか」を表す許可証で、OAuth 2.0 そのものは「誰か」を伝える仕組みではありません。"
+        },
+        {
+          "text": "OpenID Connect (OIDC) は、OAuth 2.0 の上に「誰か」を確かめる層を足したものです。OpenID Foundation の Core 1.0 (今の文書は 2023 年 12 月の errata set 2 を含む版) は、認可サーバーが行った認証をもとに、アプリが利用者を確かめられるようにすると書いています。そのために足されるのが ID トークンで、JWT (RFC 7519、2015 年 5 月。署名付きの JSON の小さな証票) の形をとります。"
+        },
+        {
+          "text": "Kubernetes の API サーバーは OIDC の ID トークンで人を認証できます。kubernetes.io によると、使うのは access_token ではなく id_token で、kubectl がそれを Authorization ヘッダーに載せて送ります。API サーバー側には発行者の URL (--oidc-issuer-url。https だけ) とクライアント ID (--oidc-client-id) を設定するか、v1.34 で stable になった AuthenticationConfiguration のファイルに書きます。id_token は取り消せないので、数分の短い期限にするよう書かれています。",
+          "code": {
+            "language": "yaml",
+            "text": "apiVersion: apiserver.config.k8s.io/v1\nkind: AuthenticationConfiguration\njwt:\n- issuer:\n    url: https://example.com   # --oidc-issuer-url と同じ\n    audiences:\n    - my-app                   # --oidc-client-id と同じ"
+          }
+        },
+        {
+          "text": "ServiceAccount は、Kubernetes の API が管理する、名前空間ごとの利用者です。Pod の中のプログラムが API を呼ぶときに使い、ユーザー名は system:serviceaccount:<名前空間>:<名前>、グループは system:serviceaccounts と system:serviceaccounts:<名前空間> になります。v1.22 からは、TokenRequest API で取った短い期限で自動で入れ替わるトークンが、projected volume として Pod に入ります。トークンは JWT で、Pod などのオブジェクトに結び付けられた bound token です。"
+        },
+        {
+          "text": "ServiceAccount のトークンは、クラスターの外でも確かめられます。API サーバーは、OIDC と互換の形 (厳密に準拠するものではありません) で、発行者の情報を /.well-known/openid-configuration に、署名を確かめる公開鍵の組 (JWKS) を /openid/v1/jwks に出します (v1.21 で stable)。外のシステムはこの公開鍵でトークンを確かめられ、クラウドの IAM が Pod に権限を渡す仕組み (AWS のコラムの IRSA) もこれを使います。ただし kubernetes.io は TokenReview API で確かめる方を勧めています。TokenReview なら Pod を消したときにすぐ無効と分かりますが、公開鍵で確かめる方法では期限が来るまで有効に見えるからです。"
+        },
+        {
+          "text": "認証で決まった名前とグループに、何を許すかを決めるのが認可で、多くのクラスターでは RBAC (Role と RoleBinding) が受け持ちます。同じ証明書や同じトークンでも、RoleBinding が変われば、できることが変わります。自分に許されているかどうかは kubectl auth can-i で聞けます。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl auth can-i list pods -n kube-system\nkubectl auth can-i list secrets -n kube-system"
+          },
+          "output": "yes\nno",
+          "result": {
+            "text": "認証は同じでも、認可の答えは資源ごとに違う",
+            "tone": "ok"
+          }
+        }
+      ],
+      "try": [
+        {
+          "goal": "自分がどの名前とグループで認証されているかを確かめたいなら",
+          "steps": [
+            {
+              "text": "この手順は読むだけで何も作らないので、名前空間 try-kcna は作らず、後片付けもありません。kubectl auth whoami は SelfSubjectReview API (v1.28 で stable) に聞き、API サーバーが自分をどう見ているかを出します。クライアント証明書で名乗っていれば、Username に証明書の CN が出ます。証明書に O があれば、Groups に O の値と system:authenticated が出ます (下の例は O の無い証明書です)。手元の k3s で証明書を使って試したときは、Extra に X509SHA256= で始まる値も出ました。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl auth whoami"
+              },
+              "output": "ATTRIBUTE                                           VALUE\nUsername                                            alice\nGroups                                              [system:authenticated]\nExtra: authentication.kubernetes.io/credential-id   [X509SHA256=74f8...]"
+            },
+            {
+              "text": "次に、名前空間 default の ServiceAccount を見ます。名前空間を作ると default という ServiceAccount が自動で作られ、Pod に serviceAccountName を書かなければ、これが使われます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl get serviceaccounts -n default"
+              },
+              "output": "NAME      AGE\ndefault   20d"
+            },
+            {
+              "text": "公式の Authenticating のページの「OpenID Connect Tokens」の節で、id_token を受け取ってから API サーバーが確かめるまでの流れ (図の 1 から 9) を読みます。続けて、Managing Service Accounts のページの「Bound service account tokens」の節で、トークンを Pod に結び付けたときにトークンの中に何が入るかを見ます。"
+            }
+          ]
+        }
+      ],
+      "lessons": [
+        "w4-l1",
+        "w6-l1",
+        "w6-l2"
+      ],
+      "sources": [
+        {
+          "label": "kubernetes.io の Authenticating (X.509・OIDC・ServiceAccount・whoami)",
+          "url": "https://kubernetes.io/docs/reference/access-authn-authz/authentication/"
+        },
+        {
+          "label": "kubernetes.io の Controlling Access to the Kubernetes API (認証・認可・アドミッション)",
+          "url": "https://kubernetes.io/docs/concepts/security/controlling-access/"
+        },
+        {
+          "label": "kubernetes.io の PKI certificates and requirements",
+          "url": "https://kubernetes.io/docs/setup/best-practices/certificates/"
+        },
+        {
+          "label": "kubernetes.io の Service Accounts (TokenRequest・projected volume)",
+          "url": "https://kubernetes.io/docs/concepts/security/service-accounts/"
+        },
+        {
+          "label": "kubernetes.io の Managing Service Accounts (bound token)",
+          "url": "https://kubernetes.io/docs/reference/access-authn-authz/service-accounts-admin/"
+        },
+        {
+          "label": "kubernetes.io の Configure Service Accounts for Pods (issuer discovery)",
+          "url": "https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/"
+        },
+        {
+          "label": "RFC 5280 (X.509 の証明書のプロファイル)",
+          "url": "https://datatracker.ietf.org/doc/html/rfc5280"
+        },
+        {
+          "label": "RFC 8446 (TLS 1.3)",
+          "url": "https://datatracker.ietf.org/doc/html/rfc8446"
+        },
+        {
+          "label": "RFC 8705 (OAuth 2.0 Mutual-TLS)",
+          "url": "https://datatracker.ietf.org/doc/html/rfc8705"
+        },
+        {
+          "label": "RFC 6749 (OAuth 2.0)",
+          "url": "https://datatracker.ietf.org/doc/html/rfc6749"
+        },
+        {
+          "label": "RFC 7519 (JWT)",
+          "url": "https://datatracker.ietf.org/doc/html/rfc7519"
+        },
+        {
+          "label": "oauth.net の OAuth 2.0",
+          "url": "https://oauth.net/2/"
+        },
+        {
+          "label": "openid.net の OpenID Connect Core 1.0",
+          "url": "https://openid.net/specs/openid-connect-core-1_0.html"
+        },
+        {
+          "label": "oauth.net の User Authentication with OAuth 2.0",
+          "url": "https://oauth.net/articles/authentication/"
+        }
+      ],
+      "noTermLinks": [
+        "service"
+      ]
+    },
+    {
+      "id": "cicd-pipeline",
+      "competency": "付録: CI/CD をもう一歩",
+      "title": "CI/CD をもう一歩: コミットから本番までの流れ",
+      "summary": "CI/CD は、コミットをきっかけに、ビルド・テスト・イメージのビルドと署名・レジストリへの保存・デプロイを自動で進める仕組みです。この付録では、パイプラインの部品 (GitHub Actions を例に、ワークフロー・ジョブ・ステップ・ランナー)、イメージをタグではなくダイジェストで指す理由、Kubernetes への届け方 (kubectl apply・Helm・GitOps) の違いと、GitOps の自動同期で何が起きるかをまとめます。",
+      "flow": [
+        {
+          "text": "コミットから本番までの流れは、おおよそ次の順です。(1) コードを push する。(2) CI (継続的インテグレーション) がビルドとテストを流す。(3) コンテナのイメージを作り、署名して、レジストリ (イメージの置き場所) に push する。(4) CD (継続的デリバリー・デプロイ) が、そのイメージを使うマニフェストをクラスターへ届ける。途中で落ちた段があれば、その先には進みません。"
+        },
+        {
+          "text": "GitHub Actions の文書は、これを CI/CD のプラットフォームと呼び、部品を次のように説明しています。ワークフローは 1 つ以上のジョブを動かす自動の手順で、リポジトリの .github/workflows に置く YAML で書きます。イベント (push や pull request など) がワークフローを起こします。ジョブは同じランナー (ワークフローを動かすサーバー) で動くステップの集まりで、ステップはシェルの命令かアクション (再利用できる部品) です。ジョブは、依存を書かなければ並んで動きます。"
+        },
+        {
+          "text": "このサイトのリポジトリのワークフローを読むと、build のジョブで npm ci・内容の検査・テスト・ビルドを順に流し、main への push のときだけ、できたファイルをアップロードします。deploy のジョブは needs: build で build の後に動き、if で push のときだけに絞っています。pull request ではテストまで流れて、公開はされません。",
+          "code": {
+            "language": "bash",
+            "text": "cat .github/workflows/deploy.yml"
+          },
+          "output": "name: Deploy to GitHub Pages\non:\n  push:\n    branches: [main]\n  pull_request:\npermissions:\n  contents: read\n...\n  deploy:\n    if: github.event_name == 'push'\n    needs: build\n    permissions:\n      pages: write\n      id-token: write"
+        },
+        {
+          "text": "権限は必要な分だけにします。このワークフローは全体を contents: read にし、deploy のジョブだけに pages: write と id-token: write を足しています。GitHub Pages の文書は、デプロイのジョブに少なくともこの 2 つが要ると書いています。id-token: write は、GitHub の OIDC (付録の「認証と認可の基本」) の短い期限のトークンを取るための権限で、ほかの資源への書き込みは許しません。クラウドへのデプロイでも、長く使える鍵を秘密として置かずに、このトークンをクラウドのロールと交換する方法があります。"
+        },
+        {
+          "text": "イメージの指し方にも気を付けます。kubernetes.io によると、タグ (1.27 など) は別のイメージを指すように動かせますが、ダイジェスト (sha256: で始まるハッシュ) はイメージの中身から作られ、変わりません。テストしたものと同じものを本番で動かしたいときは、マニフェストでダイジェストを指します。Kubernetes のプロジェクトは自分のイメージを cosign (Sigstore の署名の道具) で署名していて、公式の文書に確かめる手順があります (v1.26 から beta)。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl get pods -n kube-system -o jsonpath='{.items[*].status.containerStatuses[0].imageID}'"
+          },
+          "output": "docker.io/rancher/mirrored-coredns-coredns@sha256:... docker.io/rancher/local-path-provisioner@sha256:... docker.io/rancher/mirrored-metrics-server@sha256:...",
+          "result": {
+            "text": "動いているイメージのダイジェストが分かる",
+            "tone": "ok"
+          }
+        },
+        {
+          "text": "クラスターへの届け方は大きく 3 つです。kubectl apply は、手元や CI からマニフェストを API サーバーへ送ります (push 型)。Helm はマニフェストをチャートにまとめ、入れる・上げる・戻すたびにリリースの版 (revision) を 1 つ進め、helm rollback で前の版に戻せます。GitOps では、クラスターの中のエージェントが Git から望ましい状態を取りに行きます (pull 型)。push 型では CI にクラスターの書き込みの権限を渡しますが、pull 型ではその権限をクラスターの中に置いたままにできます。"
+        },
+        {
+          "text": "GitOps の原則 (OpenGitOps 1.0.0。CNCF の GitOps の作業部会がまとめたもの) は 4 つです。望ましい状態を宣言で書く・変えられない形で版を残す・エージェントが自動で取りに行く・実際の状態を見続けて望ましい状態に寄せる。Argo CD の自動同期は、Git のマニフェストとクラスターの状態がずれると同期します。ただし既定では、Git から消した資源を消す prune と、クラスターを直接変えたずれを戻す self-heal は切ってあり、Git を見に行く間隔は既定で 120 秒 (最大 3 分) です。"
+        },
+        {
+          "text": "イメージの更新を Git に戻す仕組みもあります。Flux の image-reflector-controller はイメージのリポジトリを見てその情報をクラスターの資源に写し、image-automation-controller は新しいイメージに合わせて YAML を書き換え、Git にコミットします。こうすると「何が動いているか」の正本が Git に残ります。CI がイメージを作り、GitOps のエージェントがそれを届ける、という分担です。"
+        }
+      ],
+      "try": [
+        {
+          "goal": "動いているアプリが、どの版で、どう更新されてきたかを読みたいなら",
+          "steps": [
+            {
+              "text": "この手順は読むだけで何も作らないので、名前空間 try-kcna は作らず、後片付けもありません。kube-system の CoreDNS の Deployment の更新の履歴を見ます。REVISION はマニフェストの Pod のひな形が変わるたびに増えます。CHANGE-CAUSE は、kubernetes.io/change-cause の注釈が無ければ <none> です。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl rollout history deployment/coredns -n kube-system"
+              },
+              "output": "deployment.apps/coredns\nREVISION  CHANGE-CAUSE\n2         <none>"
+            },
+            {
+              "text": "その Deployment が指しているイメージを見ます。タグで指しているか、ダイジェストで指しているかを確かめます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl get deployment coredns -n kube-system -o jsonpath='{.spec.template.spec.containers[0].image}'"
+              },
+              "output": "rancher/mirrored-coredns-coredns:1.14.7"
+            },
+            {
+              "text": "このサイトのリポジトリの .github/workflows/deploy.yml を読み、on (いつ動くか)・jobs の build と deploy・needs・if・permissions がそれぞれどこにあるかを確かめます。そのあと、GitHub Actions の文書の「Understanding GitHub Actions」で、ワークフロー・イベント・ジョブ・ステップ・ランナーの説明と見比べます。"
+            }
+          ]
+        }
+      ],
+      "lessons": [
+        "w1-l2",
+        "w7-l1",
+        "w7-l2",
+        "w7-l4"
+      ],
+      "sources": [
+        {
+          "label": "docs.github.com の Understanding GitHub Actions",
+          "url": "https://docs.github.com/en/actions/get-started/understand-github-actions"
+        },
+        {
+          "label": "docs.github.com の OpenID Connect (Actions の OIDC)",
+          "url": "https://docs.github.com/en/actions/concepts/security/openid-connect"
+        },
+        {
+          "label": "docs.github.com の OpenID Connect reference (id-token: write)",
+          "url": "https://docs.github.com/en/actions/reference/security/oidc"
+        },
+        {
+          "label": "docs.github.com の Using custom workflows with GitHub Pages",
+          "url": "https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages"
+        },
+        {
+          "label": "kubernetes.io の Images (タグとダイジェスト)",
+          "url": "https://kubernetes.io/docs/concepts/containers/images/"
+        },
+        {
+          "label": "kubernetes.io の Verify Signed Kubernetes Artifacts (cosign)",
+          "url": "https://kubernetes.io/docs/tasks/administer-cluster/verify-signed-artifacts/"
+        },
+        {
+          "label": "helm.sh の Using Helm (release・upgrade・rollback)",
+          "url": "https://helm.sh/docs/intro/using_helm/"
+        },
+        {
+          "label": "OpenGitOps (GitOps の原則)",
+          "url": "https://opengitops.dev/"
+        },
+        {
+          "label": "Argo CD の Automated Sync Policy",
+          "url": "https://argo-cd.readthedocs.io/en/stable/user-guide/auto_sync/"
+        },
+        {
+          "label": "Flux の Image reflector and automation controllers",
+          "url": "https://fluxcd.io/flux/components/image/"
+        }
+      ],
+      "noTermLinks": [
+        "job",
+        "role"
+      ]
+    },
+    {
+      "id": "infrastructure-as-code",
+      "competency": "付録: インフラのコード (IaC)",
+      "title": "インフラのコード (IaC): 宣言・状態・plan と apply",
+      "summary": "IaC (Infrastructure as Code) は、サーバーやネットワークなどのインフラを、人が手で操作する代わりに、読める設定ファイルに書いて作り・変え・版を残すやり方です。Terraform と OpenTofu は、設定を書き (Write)、変更の計画を見て (Plan)、承認して反映する (Apply) という流れで動き、実物と設定をつなぐために状態 (state) を持ちます。Kubernetes のマニフェストも宣言的ですが、状態の置き場所と、ずれを直す仕組みが違います。",
+      "flow": [
+        {
+          "text": "宣言的 (declarative) な書き方では、「どうするか」の手順ではなく「どうなっていてほしいか」を書きます。HashiCorp の文書は Terraform を、クラウドやオンプレミスの資源を作り・変え・版を残すための IaC の道具で、人が読める設定ファイルを使うと説明しています。設定ファイルは Git で版を残し、使い回し、共有できます。プロバイダー (provider) という部品が、API を持つ各サービスとのやりとりを受け持ちます。"
+        },
+        {
+          "text": "Terraform の基本の流れは 3 段です。Write で資源を定義し、Plan で今のインフラと設定を比べて「何を作り・変え・消すか」の実行計画を出し、Apply で承認された計画を、資源どうしの依存を守った順に実行します。terraform plan だけでは実物は変わりません。-out で計画をファイルに保存し、それを terraform apply に渡す 2 段の使い方は、主に自動化のためのものです。保存した計画には秘密の値が平文で入ることがあります。"
+        },
+        {
+          "text": "Terraform は、実物の資源と設定をつなぐために状態 (state) を保存します。既定では、ワークスペース (Terraform で状態を分ける単位) ごとに terraform.tfstate というローカルのファイルに置き、Terraform は操作の前に refresh をして、状態を実物に合わせます。チームで使うときは、ロックと権限のある遠隔の保存先 (remote backend) が勧められています。状態のファイルには秘密が入ることがあるので、そのまま Git に入れないようにします。"
+        },
+        {
+          "text": "OpenTofu は、HashiCorp が Terraform のライセンスをオープンソースから BUSL に変えたことを受けて始まった Terraform のフォークで、2025 年 4 月 23 日に CNCF の Sandbox のプロジェクトになりました (CNCF は Linux Foundation の一部です)。公式のサイトは、今の Terraform の使い方と設定をそのまま使える置き換えを目指すと書いています。命令は tofu で、tofu plan も計画を見せるだけで実物を変えません。この付録はどちらかを勧めるものではありません。"
+        },
+        {
+          "text": "Kubernetes のマニフェストも宣言的です。共通点は、望ましい状態をファイルに書き、Git で版を残し、反映の前に差分を見られることです。kubectl diff は、サーバー側の dry-run (試しに通すだけで保存しない) で「適用したらどうなるか」との差を YAML で出します。差があれば終了コードは 1 です。Terraform の plan に近い役ですが、何も保存されません。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl diff -f https://k8s.io/examples/application/simple_deployment.yaml"
+          },
+          "output": "diff -u -N /tmp/LIVE-.../apps.v1.Deployment.default.nginx-deployment /tmp/MERGED-.../apps.v1.Deployment.default.nginx-deployment\n--- /tmp/LIVE-.../apps.v1.Deployment.default.nginx-deployment\n+++ /tmp/MERGED-.../apps.v1.Deployment.default.nginx-deployment\n@@ -0,0 +1,42 @@\n+apiVersion: apps/v1\n+kind: Deployment\n+metadata:\n+  name: nginx-deployment\n...",
+          "result": {
+            "text": "適用したときの差だけが出て、何も作られない",
+            "tone": "ok"
+          }
+        },
+        {
+          "text": "違いは 2 つです。1 つめは状態の置き場所で、Terraform は状態を自分のファイルに持ちますが、Kubernetes では望ましい状態 (spec) も今の状態 (status) も API サーバーの奥の保存先 (ふつうは etcd。k3s の 1 台構成の既定は SQLite) にあります。2 つめはずれの直し方で、Terraform は plan と apply を走らせたときに実物と比べますが、Kubernetes のコントローラーは、サーモスタットのように今の状態を見続け、望ましい状態に近づけます。"
+        },
+        {
+          "text": "分担の例です。クラスターの外にあるクラウドの資源 (ネットワーク・ロードバランサーの土台・データベース・クラスターそのものなど) は Terraform や OpenTofu で、クラスターの中の資源 (Deployment・Service など) はマニフェスト・Helm・GitOps で扱う、という分け方があります。どちらで持つかを資源ごとに 1 つに決めておかないと、2 つの道具が同じものを書き換え合います。"
+        }
+      ],
+      "try": [
+        {
+          "goal": "望ましい状態 (spec) と今の状態 (status) の違いを、クラスターで読みたいなら",
+          "steps": [
+            {
+              "text": "この手順は読むだけで何も作らないので、名前空間 try-kcna は作らず、後片付けもありません。CoreDNS の Deployment の spec の replicas (望ましい数) と、status の readyReplicas (準備のできた数) を並べて出します。2 つが同じなら、コントローラーが望ましい状態に追い付いています。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl get deployment coredns -n kube-system -o jsonpath='{.spec.replicas} {.status.readyReplicas}{\"\\n\"}'"
+              },
+              "output": "1 1"
+            },
+            {
+              "text": "公式のサンプルのマニフェストを、クラスターに入れずに差分だけ見ます。まだ無い Deployment なので、全体が + の行で出ます。サーバー側の dry-run を使うので、その名前空間で Deployment を作る・変える権限 (create・update・patch) が要ります。権限が無ければ Forbidden で失敗します。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl diff -f https://k8s.io/examples/application/simple_deployment.yaml"
+              }
+            },
+            {
+              "text": "Terraform の文書の「What is Terraform?」と「State」のページで、Write・Plan・Apply の 3 段と、terraform.tfstate の役目を読みます。OpenTofu の文書の tofu plan のページも見て、同じ流れであることを確かめます。どちらも、この手順のために入れる必要はありません。"
+            }
+          ]
+        }
+      ],
+      "lessons": [
+        "w2-l3",
+        "w3-l1",
+        "w7-l1"
+      ],
+      "sources": [
+        {
+          "label": "developer.hashicorp.com の What is Terraform?",
+          "url": "https://developer.hashicorp.com/terraform/intro"
+        },
+        {
+          "label": "developer.hashicorp.com の State",
+          "url": "https://developer.hashicorp.com/terraform/language/state"
+        },
+        {
+          "label": "developer.hashicorp.com の terraform plan",
+          "url": "https://developer.hashicorp.com/terraform/cli/commands/plan"
+        },
+        {
+          "label": "opentofu.org のトップ",
+          "url": "https://opentofu.org/"
+        },
+        {
+          "label": "opentofu.org の FAQ",
+          "url": "https://opentofu.org/faq/"
+        },
+        {
+          "label": "opentofu.org の Introduction",
+          "url": "https://opentofu.org/docs/intro/"
+        },
+        {
+          "label": "opentofu.org の tofu plan",
+          "url": "https://opentofu.org/docs/cli/commands/plan/"
+        },
+        {
+          "label": "kubernetes.io の Declarative Management of Kubernetes Objects Using Configuration Files (kubectl diff)",
+          "url": "https://kubernetes.io/docs/tasks/manage-kubernetes-objects/declarative-config/"
+        },
+        {
+          "label": "kubernetes.io の Controllers",
+          "url": "https://kubernetes.io/docs/concepts/architecture/controller/"
+        },
+        {
+          "label": "kubernetes.io の kubectl diff",
+          "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_diff/"
+        },
+        {
+          "label": "docs.k3s.io の Cluster Datastore (SQLite が既定)",
+          "url": "https://docs.k3s.io/datastore"
+        },
+        {
+          "label": "cncf.io: OpenTofu (CNCF のプロジェクト)",
+          "url": "https://www.cncf.io/projects/opentofu/"
+        }
+      ]
+    }
+  ]
+}

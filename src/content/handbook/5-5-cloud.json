@@ -1,0 +1,250 @@
+{
+  "domain": "付録: クラウド",
+  "topics": [
+    {
+      "id": "cloud-aws-column",
+      "competency": "付録: クラウドと Kubernetes (AWS)",
+      "title": "コラム: クラウドと Kubernetes (AWS の場合)",
+      "summary": "クラウドは、計算機・ネットワーク・保存先などを、使う分だけ借りる仕組みです。AWS を例に、IaaS・PaaS・SaaS の違い、基本の部品 (リージョン・AZ・VPC・EC2・IAM)、EKS (コントロールプレーンを AWS が持つ Kubernetes)、IAM のロールを ServiceAccount に結び付ける IRSA と EKS Pod Identity、k3s との違いを短くまとめます。クラウドの資源を作ると料金がかかるので、ここでは作る手順を書きません。",
+      "flow": [
+        {
+          "text": "AWS は、クラウドのモデルを 3 つに分けて説明しています。IaaS はネットワーク・計算機・保存先などの基本の部品を借りる形で、利用者が持てる自由が最も大きいものです。PaaS は下のハードウェアや OS の管理を事業者に任せ、アプリのデプロイと管理に集中する形です。SaaS は、事業者が動かして管理する完成したアプリを使う形で、Web のメールが例です。マネージドサービスは、運用の一部を事業者が受け持つサービスのことです。"
+        },
+        {
+          "text": "AWS の場所の単位は 2 つです。リージョンは地理的に分かれた地域で、ほかのリージョンから切り離されるように作られています。アベイラビリティゾーン (AZ) はリージョンの中の分かれた場所で、それぞれが電源とネットワークを冗長に持つ 1 つ以上のデータセンターでできています。AZ どうしは低い遅延の回線でつながり、火事などがあっても影響は 1 つの AZ に留まるように作られています。AWS は、複数の AZ に分けて置くことを勧めています。"
+        },
+        {
+          "text": "基本の部品を 3 つ挙げます。VPC は、自分で定めた、論理的に切り離された仮想のネットワークで、その中のサブネット (IP アドレスの範囲) は 1 つの AZ に属します。EC2 は仮想サーバー (インスタンス) を必要な数だけ借りるサービスで、インスタンスの型で CPU やメモリの組み合わせが決まります。IAM は、誰が認証され (サインインし)、何を許されているか (権限) を決めるサービスで、Kubernetes の認証と RBAC に当たる役を AWS の資源について受け持ちます。"
+        },
+        {
+          "text": "EKS (Amazon Elastic Kubernetes Service) は、AWS のマネージドの Kubernetes です。標準の EKS では、クラスターを作ると、Kubernetes のコントロールプレーン (API サーバー・etcd・スケジューラーなど) を AWS が管理します。ノードは EC2 などで利用者が用意し、EKS Auto Mode ではノードの管理も EKS が受け持ちます。EKS は Kubernetes の適合性の認定を受けているので、このサイトで学ぶ API と kubectl の使い方の多くはそのまま通じます。ただし StorageClass やロードバランサーのように、k3s が同梱の部品で受け持つところは、EKS では別の仕組みになります (この付録の下の段)。"
+        },
+        {
+          "text": "Pod の中のアプリが AWS の API を呼ぶには資格情報が要ります。IRSA (IAM roles for service accounts) は、IAM のロールを Kubernetes の ServiceAccount に結び付けます。EKS はクラスターごとに公開の OIDC の発行者を持ち、IAM はそこで ServiceAccount のトークン (付録の「認証と認可の基本」) を確かめ、AssumeRoleWithWebIdentity で一時的な資格情報に換えます。ServiceAccount には eks.amazonaws.com/role-arn の注釈でロールを書きます。",
+          "code": {
+            "language": "yaml",
+            "text": "apiVersion: v1\nkind: ServiceAccount\nmetadata:\n  name: my-service-account\n  namespace: default\n  annotations:\n    eks.amazonaws.com/role-arn: arn:aws:iam::111122223333:role/my-role"
+          }
+        },
+        {
+          "text": "EKS Pod Identity は、OIDC の発行者を使わない、より簡単な方法です。名前空間と ServiceAccount と IAM のロールの組 (association) を EKS の側で登録し、各ノードで DaemonSet として動く EKS Pod Identity Agent が、同じノードの Pod に資格情報を渡します。どちらの方法でも、権限をその ServiceAccount を使う Pod に絞れます。ただしノードのメタデータ (IMDS) への接続を絞っておかないと、Pod からノードのロールの資格情報も取れてしまいます。Pod Identity は EKS の中の Linux の EC2 のノードで使え、EC2 に自分で組んだクラスターでは使えません。"
+        },
+        {
+          "text": "k3s との違いです。k3s では、コントロールプレーンも自分のマシンで動かし、etcd や SQLite のデータも自分で守ります。クラウドの部品が無いので、LoadBalancer の Service は ServiceLB がノードの IP で受け、PV は Local Path Provisioner がノードのディスクに作ります。EKS では、これらをクラウドのロードバランサーやディスクが受け持ち、使った分の料金がかかります。ノードの spec.providerID を見ると、どの仕組みのノードかが分かります。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl get nodes -o custom-columns=NAME:.metadata.name,PROVIDER:.spec.providerID"
+          },
+          "output": "NAME    PROVIDER\nnode1   k3s://node1\nnode2   k3s://node2",
+          "result": {
+            "text": "k3s のノードは k3s:// で始まる",
+            "tone": "ok"
+          }
+        }
+      ],
+      "try": [
+        {
+          "goal": "クラスターのノードが、どの場所や型の情報を持っているかを読みたいなら",
+          "steps": [
+            {
+              "text": "この手順は読むだけで何も作らないので、名前空間 try-kcna は作らず、後片付けもありません。よく使われるラベル topology.kubernetes.io/zone (AZ など) と node.kubernetes.io/instance-type (インスタンスの型) を列にしてノードを出します。クラウドのノードでは、ここに AZ の名前やインスタンスの型が入ります。k3s では zone は空で、instance-type には k3s と出ます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl get nodes -L topology.kubernetes.io/zone,node.kubernetes.io/instance-type"
+              },
+              "output": "NAME    STATUS   ROLES           AGE   VERSION        ZONE   INSTANCE-TYPE\nnode1   Ready    control-plane   20d   v1.34.1+k3s1          k3s\nnode2   Ready    <none>          20d   v1.34.1+k3s1          k3s"
+            },
+            {
+              "text": "AWS の文書の「What is Amazon EKS?」で、標準の EKS と EKS Auto Mode で AWS が管理する範囲の違いを読みます。続けて「IAM roles for service accounts」の「IAM, Kubernetes, and OpenID Connect (OIDC) background information」の節と、「Learn how EKS Pod Identity grants pods access to AWS services」のページで、2 つの方法の違いを見比べます。どちらも読むだけで、AWS のアカウントは要りません。"
+            }
+          ]
+        }
+      ],
+      "lessons": [
+        "w2-l1",
+        "w2-l4",
+        "w6-l1"
+      ],
+      "sources": [
+        {
+          "label": "aws.amazon.com の Types of Cloud Computing (IaaS・PaaS・SaaS)",
+          "url": "https://aws.amazon.com/types-of-cloud-computing/"
+        },
+        {
+          "label": "docs.aws.amazon.com の AWS Regions and Availability Zones",
+          "url": "https://docs.aws.amazon.com/global-infrastructure/latest/regions/aws-regions-availability-zones.html"
+        },
+        {
+          "label": "docs.aws.amazon.com の What is Amazon VPC?",
+          "url": "https://docs.aws.amazon.com/vpc/latest/userguide/what-is-amazon-vpc.html"
+        },
+        {
+          "label": "docs.aws.amazon.com の What is Amazon EC2?",
+          "url": "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/concepts.html"
+        },
+        {
+          "label": "docs.aws.amazon.com の What is IAM?",
+          "url": "https://docs.aws.amazon.com/IAM/latest/UserGuide/introduction.html"
+        },
+        {
+          "label": "docs.aws.amazon.com の What is Amazon EKS?",
+          "url": "https://docs.aws.amazon.com/eks/latest/userguide/what-is-eks.html"
+        },
+        {
+          "label": "docs.aws.amazon.com の IAM roles for service accounts",
+          "url": "https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html"
+        },
+        {
+          "label": "docs.aws.amazon.com の Assign IAM roles to Kubernetes service accounts",
+          "url": "https://docs.aws.amazon.com/eks/latest/userguide/associate-service-account-role.html"
+        },
+        {
+          "label": "docs.aws.amazon.com の EKS Pod Identity",
+          "url": "https://docs.aws.amazon.com/eks/latest/userguide/pod-identities.html"
+        },
+        {
+          "label": "kubernetes.io の Well-Known Labels (topology.kubernetes.io/zone など)",
+          "url": "https://kubernetes.io/docs/reference/labels-annotations-taints/"
+        },
+        {
+          "label": "docs.k3s.io の Networking Services (ServiceLB)",
+          "url": "https://docs.k3s.io/networking/networking-services"
+        }
+      ],
+      "noTermLinks": [
+        "role",
+        "service"
+      ]
+    },
+    {
+      "id": "load-balancers",
+      "competency": "付録: ロードバランサー (L4 と L7)",
+      "title": "ロードバランサー: L4 と L7、AWS の NLB と ALB、Kubernetes とのつながり",
+      "summary": "ロードバランサーは、届いた通信を複数の宛先に振り分け、宛先の健康を見て、健康なものにだけ送ります。L4 (トランスポート層) で振り分けるものは TCP や UDP の接続を見て、L7 (アプリケーション層) で振り分けるものは HTTP のホストやパスまで見ます。AWS では NLB が L4、ALB が L7 です。Kubernetes では、LoadBalancer の Service がクラウドのロードバランサーを作り、Ingress や Gateway API から L7 のロードバランサーを作ります。k3s では ServiceLB がその役をノードの上で受け持ちます。",
+      "flow": [
+        {
+          "text": "OSI 参照モデルは、通信を 7 つの層に分けて考える見方です。L4 のトランスポート層は、データが正しい順で、欠けや誤りなく届くこと (または直せること) を主に受け持ちます。ここに当たる TCP は接続を作ってほぼ欠けなく届け、UDP は接続を作らず、欠けることがあります。L7 のアプリケーション層は、アプリの種類ごとの決まった通信の仕方を受け持ち、HTTP がここに当たります。L4 のロードバランサーは宛先の IP とポートと接続を見て振り分け、L7 のロードバランサーは HTTP のリクエストの中身 (ホスト名・パス・ヘッダー) まで読んで振り分けます。"
+        },
+        {
+          "text": "AWS の Elastic Load Balancing の文書は、共通の部品を次のように説明しています。リスナーは、決めたプロトコルとポートで接続を待つ部分です。ターゲットグループは、EC2 のインスタンスや IP アドレスなどの宛先の集まりで、ヘルスチェック (宛先の健康の確認) はターゲットグループごとに決めます。健康でない宛先には送らず、戻れば再び送ります。AZ を有効にするとその AZ にロードバランサーのノードができ、複数の AZ を有効にすることが勧められています。"
+        },
+        {
+          "text": "ALB (Application Load Balancer) は、OSI の第 7 層で動きます。リクエストを受けると、リスナーのルールを優先順に調べ、条件に合ったルールのターゲットグループに送ります。条件には、URL のパス・HTTP のホスト・ヘッダー・メソッド・クエリーなどが使えるので、1 つの ALB で複数のドメインやサービスに振り分けられます。ALB は少なくとも 2 つの AZ を有効にする必要があります。"
+        },
+        {
+          "text": "NLB (Network Load Balancer) は、OSI の第 4 層で動き、毎秒数百万のリクエストを扱えると書かれています。ターゲットグループは TCP・UDP・TLS・QUIC などに対応し、TCP の接続は、プロトコル・送り元と宛先の IP とポートなどから計算したハッシュで 1 つの宛先に決まり、接続が続く間は同じ宛先に送られます。有効にした AZ ごとに固定の IP アドレスを持ち、インターネット向けなら Elastic IP を 1 つずつ付けられます。"
+        },
+        {
+          "text": "Kubernetes では、Service の type を LoadBalancer にすると、外のロードバランサーが用意されます。kubernetes.io によると、まず NodePort の Service と同じ準備をし、cloud-controller-manager がクラウドの API を呼んで、外のロードバランサーをそのノードのポートへ向けます。どのロードバランサーで受けるかは、クラウドの実装か .spec.loadBalancerClass で決まります。ロードバランサーのアドレスは Service の EXTERNAL-IP の列に出ます。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl get svc -A"
+          },
+          "output": "NAMESPACE     NAME         TYPE           CLUSTER-IP     EXTERNAL-IP    PORT(S)                      AGE\ndefault       kubernetes   ClusterIP      10.43.0.1      <none>         443/TCP                      20d\nkube-system   kube-dns     ClusterIP      10.43.0.10     <none>         53/UDP,53/TCP,9153/TCP       20d\nkube-system   traefik      LoadBalancer   10.43.0.100    192.168.0.10   80:30080/TCP,443:30443/TCP   20d",
+          "result": {
+            "text": "LoadBalancer の Service と外のアドレスが分かる",
+            "tone": "ok"
+          }
+        },
+        {
+          "text": "EKS で AWS Load Balancer Controller (kubernetes-sigs のオープンソース) を入れると、LoadBalancer の Service から NLB を、alb のクラス (kubernetes.io/ingress.class: alb など) を付けた Ingress から ALB を作ります。v2.5 からは既定で、新しく作る LoadBalancer の Service の spec.loadBalancerClass に service.k8s.aws/nlb を書き込んで受け持ちます (Helm の設定で切れます)。入れなければ、昔からある AWS 用の実装が Classic Load Balancer を作り、AWS はそれを避けるよう勧めています。v2.14.0 からは、Gateway API の Gateway からも ALB を作れます。"
+        },
+        {
+          "text": "L7 の振り分けを Kubernetes の側で書くのが Ingress と Gateway API です。ALB を Ingress から作るときは、Pod を直接宛先にする ip のモードと、ノードの NodePort を宛先にする instance のモード (既定) を注釈で選べます。Gateway API は役割ごとに分けた API で、GatewayClass がコントローラーを、Gateway が入り口を、HTTPRoute などのルートが振り分けを表します。Ingress では注釈で書いていた設定の多くを、Gateway API は仕様として持っています。"
+        },
+        {
+          "text": "k3s には、クラウドが無くても LoadBalancer の Service を使えるように ServiceLB が入っています。ServiceLB は LoadBalancer の Service ごとに kube-system に DaemonSet を作り、その Pod が hostPort でサービスのポートを受け、ノードの IP を Service の外のアドレスとして書きます。HTTP のホストやパスでの振り分けは、同梱の Traefik (Ingress コントローラー) が受け持ちます。--disable=servicelb で外すと、MetalLB などの別の実装を使えます。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl get pods -n kube-system -l svccontroller.k3s.cattle.io/svcname=traefik"
+          },
+          "output": "NAME                           READY   STATUS    RESTARTS   AGE\nsvclb-traefik-xxxxxxxx-aaaaa   2/2     Running   0          20d\nsvclb-traefik-xxxxxxxx-bbbbb   2/2     Running   0          20d",
+          "result": {
+            "text": "ノードごとに ServiceLB の Pod が動いている",
+            "tone": "ok"
+          }
+        }
+      ],
+      "try": [
+        {
+          "goal": "クラスターの L4 と L7 の入り口を読みたいなら",
+          "steps": [
+            {
+              "text": "この手順は読むだけで何も作らないので、名前空間 try-kcna は作らず、後片付けもありません。traefik の Service を詳しく見ます。Type が LoadBalancer、LoadBalancer Ingress にノードの IP、Port と NodePort の組が出ます。これが L4 の入り口です。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl describe service traefik -n kube-system"
+              },
+              "output": "Name:                     traefik\nNamespace:                kube-system\n...\nType:                     LoadBalancer\nIP:                       10.43.0.100\nLoadBalancer Ingress:     192.168.0.10 (VIP)\nPort:                     web  80/TCP\nTargetPort:               web/TCP\nNodePort:                 web  30080/TCP\nEndpoints:                10.42.0.10:8000\n..."
+            },
+            {
+              "text": "L7 の入り口を見ます。IngressClass はクラスター全体の資源なので、名前空間ごとの権限しか無い kubeconfig では Forbidden で失敗します。そのときは k3s の server ノードで sudo k3s kubectl get ingressclass を使います。k3s の既定なら traefik が出ます。続けて、Gateway API の資源がクラスターに入っているかを api-resources で確かめます (入っていなければ、NAME などの見出しの行だけが出ます)。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl get ingressclass\nkubectl api-resources --api-group=gateway.networking.k8s.io"
+              }
+            },
+            {
+              "text": "AWS の文書の「Route TCP and UDP traffic with Network Load Balancers」と「Route application and HTTP traffic with Application Load Balancers」で、Service の注釈 service.beta.kubernetes.io/aws-load-balancer-type: external と、Ingress の target-type の ip と instance の違いを読みます。読むだけで、ロードバランサーは作りません (作ると料金がかかります)。"
+            }
+          ]
+        }
+      ],
+      "lessons": [
+        "w2-l4",
+        "w5-l1",
+        "w5-l3"
+      ],
+      "sources": [
+        {
+          "label": "aws.amazon.com の What is the OSI Model?",
+          "url": "https://aws.amazon.com/what-is/osi-model/"
+        },
+        {
+          "label": "docs.aws.amazon.com の How Elastic Load Balancing works",
+          "url": "https://docs.aws.amazon.com/elasticloadbalancing/latest/userguide/how-elastic-load-balancing-works.html"
+        },
+        {
+          "label": "docs.aws.amazon.com の What is an Application Load Balancer?",
+          "url": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/introduction.html"
+        },
+        {
+          "label": "docs.aws.amazon.com の What is a Network Load Balancer?",
+          "url": "https://docs.aws.amazon.com/elasticloadbalancing/latest/network/introduction.html"
+        },
+        {
+          "label": "docs.aws.amazon.com の Route internet traffic with AWS Load Balancer Controller",
+          "url": "https://docs.aws.amazon.com/eks/latest/userguide/aws-load-balancer-controller.html"
+        },
+        {
+          "label": "docs.aws.amazon.com の Route TCP and UDP traffic with Network Load Balancers",
+          "url": "https://docs.aws.amazon.com/eks/latest/userguide/network-load-balancing.html"
+        },
+        {
+          "label": "docs.aws.amazon.com の Route application and HTTP traffic with Application Load Balancers",
+          "url": "https://docs.aws.amazon.com/eks/latest/userguide/alb-ingress.html"
+        },
+        {
+          "label": "kubernetes-sigs の AWS Load Balancer Controller の文書",
+          "url": "https://kubernetes-sigs.github.io/aws-load-balancer-controller/latest/"
+        },
+        {
+          "label": "kubernetes.io の Service (type: LoadBalancer・loadBalancerClass)",
+          "url": "https://kubernetes.io/docs/concepts/services-networking/service/"
+        },
+        {
+          "label": "kubernetes.io の Cloud Controller Manager (Service controller)",
+          "url": "https://kubernetes.io/docs/concepts/architecture/cloud-controller/"
+        },
+        {
+          "label": "kubernetes.io の Gateway API",
+          "url": "https://kubernetes.io/docs/concepts/services-networking/gateway/"
+        },
+        {
+          "label": "docs.k3s.io の Networking Services (ServiceLB・Traefik)",
+          "url": "https://docs.k3s.io/networking/networking-services"
+        }
+      ]
+    }
+  ]
+}

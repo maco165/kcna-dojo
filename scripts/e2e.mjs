@@ -478,12 +478,14 @@ async function run(browser, name, width, height) {
     await darkCtx.close();
   }
 
-  // 15. ハンドブック: 目次の 13 トピックと付録の 2 つ、1 トピックの流れ・試す手順・練習のレッスン、説明のページの学習要領から飛べる
+  // 15. ハンドブック: 目次の 13 トピックと範囲外の 13、1 トピックの流れ・試す手順・練習のレッスン、説明のページの学習要領から飛べる
   await page.goto(`${BASE}handbook/`);
   await page.getByRole('heading', { name: 'ハンドブック', level: 1 }).waitFor();
-  check((await page.locator('.hb-topic').count()) === 15, `${tag} ハンドブックの目次に学習要領の 13 トピックと付録の 2 つ`);
-  check((await page.locator('.hb-domain').last().locator('.hb-domain__head').innerText()).includes('資格の範囲の外'), `${tag} 付録は目次の最後で、配点の代わりに範囲の外と出る`);
-  check((await page.locator('.hb-topic .dg-thumb').count()) === 15, `${tag} 目次の 15 トピックすべてにサムネイルがある`);
+  check((await page.locator('.hb-topic').count()) === 26, `${tag} ハンドブックの目次に学習要領の 13 トピックと範囲外の 13`);
+  const heads = await page.locator('.hb-domain__head').allInnerTexts();
+  check(heads.slice(-5).every((h) => h.startsWith('範囲外: ') && h.includes('資格の範囲の外')) && heads.length === 9, `${tag} 範囲外は 5 つの段で目次の最後に並び、配点の代わりに範囲の外と出る`);
+  check(await page.getByRole('region', { name: /範囲外: クラウド/ }).isVisible(), `${tag} 目次の段は、段の名前で読み上げられる`);
+  check((await page.locator('.hb-topic .dg-thumb').count()) === 26, `${tag} 目次の 26 トピックすべてにサムネイルがある`);
   await page.locator('.hb-topic').filter({ hasText: 'Debugging' }).click();
   await page.getByRole('heading', { name: '全体の流れ' }).waitFor();
   check(page.url().includes('/handbook/debugging/'), `${tag} 目次からトピックへ飛べる`);
@@ -497,7 +499,7 @@ async function run(browser, name, width, height) {
   await page.getByRole('link', { name: 'Kubernetes Core Concepts' }).click();
   await page.waitForURL(/\/handbook\/core-concepts\//);
   check(true, `${tag} 説明のページの学習要領の表からハンドブックへ飛べる`);
-  // 15 トピックすべてを、試す手順を全部開いた形で、横にはみ出さないか測る
+  // 26 トピックすべてを、試す手順を全部開いた形で、横にはみ出さないか測る
   await page.goto(`${BASE}handbook/`);
   const allIds = await page.locator('.hb-topic').evaluateAll((els) => els.map((a) => a.getAttribute('href').split('/').filter(Boolean).pop()));
   let widest = { id: '', w: 0 };
@@ -514,8 +516,8 @@ async function run(browser, name, width, height) {
     if (w > widest.w) widest = { id, w };
   }
   check(figureScroll.length === 0, `${tag} 図が横にスクロールせず幅に収まる ${figureScroll.join(',')}`);
-  check(figureMissing.length === 0, `${tag} ハンドブックの 15 トピックすべてに図がある ${figureMissing.join(',')}`);
-  check(allIds.length === 15 && widest.w <= width, `${tag} ハンドブックの 15 トピックが横にはみ出さない (いちばん広い ${widest.id} ${widest.w} <= ${width})`);
+  check(figureMissing.length === 0, `${tag} ハンドブックの 26 トピックすべてに図がある ${figureMissing.join(',')}`);
+  check(allIds.length === 26 && widest.w <= width, `${tag} ハンドブックの 26 トピックが横にはみ出さない (いちばん広い ${widest.id} ${widest.w} <= ${width})`);
 
   // 15c. ハンドブックの読んだ記録: 流れの段を画面に出すと記録され、目次に読みかけ、続きから・確認済みが使える
   {
@@ -551,7 +553,7 @@ async function run(browser, name, width, height) {
     check(await page.evaluate(() => document.activeElement?.textContent?.includes('確認済みを取り消す')), `${tag} 確認済みにしてもフォーカスはボタンに残る`);
     check((await hb()).storage?.done === true, `${tag} 確認済みにすると記録に残る`);
     await page.goto(`${BASE}#/handbook`);
-    check((await card.locator('.hb-topic__read').innerText()) === '確認済み' && (await page.getByText(/確認済み 1 \/ 15 トピック/).isVisible()), `${tag} 目次に確認済みと、確認済みの数が出る`);
+    check((await card.locator('.hb-topic__read').innerText()) === '確認済み' && (await page.getByText(/確認済み 1 \/ 26 トピック/).isVisible()), `${tag} 目次に確認済みと、確認済みの数が出る`);
   }
 
   // 15b. ハンドブックの本文の用語: 強調され、押すと用語集のその語が開く

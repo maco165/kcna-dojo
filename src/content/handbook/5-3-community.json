@@ -1,0 +1,121 @@
+{
+  "domain": "付録: コミュニティ",
+  "topics": [
+    {
+      "id": "linux-foundation-cncf",
+      "competency": "付録: Linux Foundation と CNCF",
+      "title": "Linux Foundation と CNCF の仕組み",
+      "summary": "Linux Foundation (LF) は、オープンソースのプロジェクトに中立の置き場所を出す米国の非営利の団体で、その下に CNCF や OpenSSF などの財団があります。CNCF は Kubernetes などを持ち、事業とお金は Governing Board、技術は TOC が決め、プロジェクトは Sandbox・Incubating・Graduated の段階で育ちます。KCNA の試験は、LF の教育と認定の部門 Linux Foundation Education (training.linuxfoundation.org) が出しています。",
+      "flow": [
+        {
+          "text": "Linux Foundation (LF) は、米国の税の決まりで業界団体に当たる 501(c)(6) という形の非営利の団体です。公式のページは自分を「開発者がオープンな技術のプロジェクトを書き、管理し、大きくするための、中立で信頼できる拠点」と説明しています。LF の倫理規程は、LF が「すべての人のために、オープンソースの革新と共同作業を支える、続いていく生態系を作ること」に取り組むと書き、自分の使命を「中立で、包摂的 (誰も締め出さない) で、透明な、世界規模の共同作業の場を育てること」としています。"
+        },
+        {
+          "text": "LF は自分のやり方を「The Linux Foundation Method」と呼び、4 つの仕事を挙げます。コードと共同作業の中立の置き場所、生態系の整理とコミュニティ作り、プロジェクトを企業でも使える形に育てる支え (開発者の支援・運営・研修と認定・宣伝とイベント・会員集め)、プロジェクトを管理するクラウドの道具と分析です。2020 年の LF のブログは、LF を共同作業の進め方の「ベンダー中立の世話役 (steward)」と呼んでいます。"
+        },
+        {
+          "text": "LF の下には、分野ごとの財団やプロジェクトがあります。LF のプロジェクトのページには、CNCF・PyTorch Foundation・OpenSSF (オープンソースのセキュリティ)・OpenJS Foundation・LF Networking・Linux カーネルなどが並びます。企業は会員 (Corporate Members) として、個人は支援者 (Individual Supporters) として加わります。CNCF の Silver・Gold・Platinum の会員になるには、LF の会員であることも要ります。"
+        },
+        {
+          "text": "CNCF (Cloud Native Computing Foundation) は、LF の一部です。使命は「クラウドネイティブのコンピューティングをどこにでもあるものにすること」で、オープンソースでベンダー中立のプロジェクトの生態系を育てます。2015 年に Kubernetes 1.0 とともに、LF の新しい部門として作られました。Kubernetes は TOC が最初に受け入れたプロジェクトです。"
+        },
+        {
+          "text": "CNCF の運営は、事業と技術で分かれています。Governing Board (GB、理事会) は、宣伝などの事業の監督と予算を決めます。GB は、TOC と CNCF の扱う範囲を決めること以外の技術の決定はしません。会員のページによると、Platinum の会員は GB の席を持ち、GB の一覧には Gold と Silver の会員の代表の席もあります。"
+        },
+        {
+          "text": "TOC (Technical Oversight Committee、技術監督委員会) は CNCF の技術の面を治める機関で、技術の方向を決め、GB が決めた範囲の中で新しいプロジェクトを受け入れ、見守ります。投票権のある委員は 11 人です。TOC の下には TAG (Technical Advisory Group、技術の助言の集まり) があり、今は Developer Experience・Infrastructure・Operational Resilience・Security and Compliance・Workloads Foundation の 5 つです。TAG はプロジェクトの審査で TOC を手伝います。"
+        },
+        {
+          "text": "プロジェクトは成熟度の段階で分かれます。Sandbox は実験の段階で、本番ではまだ広く試されていないもの、Incubating は少数の利用者が本番で使い、貢献者が健全にいるもの、Graduated は安定して広く使われ、本番に使えるものです。役目を終えたものは Archived になります。上の段階へは、申請・TOC の担当 (sponsor) が付いての調査 (due diligence、利用者への聞き取りを含む)・2 週間の公開の意見の受付を経て、TOC の 3 分の 2 以上の賛成で上がります。2026 年 11 月の CNCF のページでは Graduated が 41、Incubating が 38 です。"
+        },
+        {
+          "text": "KCNA (Kubernetes and Cloud Native Associate) は、Kubernetes とクラウドネイティブの基礎の知識を確かめる試験です。CNCF のページから、LF の教育と認定の部門 (Linux Foundation Education。training.linuxfoundation.org) の申し込みへつながり、試験のページの提供者は The Linux Foundation です。オンラインで試験官の付く選択式で、90 分、認定は 2 年有効です。日本語版 (KCNA-JP) は問題が日本語で、試験官は英語を話します。"
+        }
+      ],
+      "try": [
+        {
+          "goal": "LF と CNCF の形を、公式のページで確かめたいなら",
+          "steps": [
+            {
+              "text": "この手順は読むだけで、クラスタも使いません。LF の About のページ (linuxfoundation.org/about) で、LF が自分をどう説明しているか (中立の拠点・非営利) と、The Linux Foundation Method の 4 つの仕事を見ます。プロジェクトのページ (linuxfoundation.org/projects) では、LF の下にある財団やプロジェクトの例が並びます。"
+            },
+            {
+              "text": "CNCF の Who We Are のページ (cncf.io/about/who-we-are) で、CNCF が LF の一部であることと使命を見ます。Governing Board のページ (cncf.io/people/governing-board) では、GB の仕事と、どの会社の誰が席にいるかが分かります。"
+            },
+            {
+              "text": "TOC のリポジトリ (github.com/cncf/toc) の README で、TOC の委員と今の TAG の一覧を見ます。process のフォルダには、段階を上がる申請から投票までの手順があります。cncf.io/projects では、Graduated と Incubating のプロジェクトが段階ごとに並び、各プロジェクトのページに受け入れと卒業の日付があります。"
+            },
+            {
+              "text": "KCNA の CNCF のページ (cncf.io/training/certification/kcna) と、申し込み先の Linux Foundation Education のページで、試験の形・時間・有効期間と、日本語版の扱いを見ます。値段や配点は変わることがあるので、受ける前にこのページで確かめます。"
+            }
+          ]
+        }
+      ],
+      "lessons": [
+        "w8-l4"
+      ],
+      "sources": [
+        {
+          "label": "Linux Foundation: About",
+          "url": "https://www.linuxfoundation.org/about"
+        },
+        {
+          "label": "Linux Foundation: Code of Ethics",
+          "url": "https://www.linuxfoundation.org/legal/code-of-ethics"
+        },
+        {
+          "label": "Linux Foundation Blog: Introducing the Open Governance Network Model (2020-10)",
+          "url": "https://linuxfoundation.org/blog/2020/10/introducing-the-open-governance-network-model"
+        },
+        {
+          "label": "Linux Foundation: Projects",
+          "url": "https://www.linuxfoundation.org/projects"
+        },
+        {
+          "label": "CNCF: Who We Are",
+          "url": "https://www.cncf.io/about/who-we-are/"
+        },
+        {
+          "label": "CNCF: Governing Board",
+          "url": "https://www.cncf.io/people/governing-board/"
+        },
+        {
+          "label": "CNCF: Join (会員の種類)",
+          "url": "https://www.cncf.io/about/join/"
+        },
+        {
+          "label": "CNCF TOC (GitHub)",
+          "url": "https://github.com/cncf/toc"
+        },
+        {
+          "label": "CNCF TOC: Process (段階を上がる手順)",
+          "url": "https://github.com/cncf/toc/blob/main/process/README.md"
+        },
+        {
+          "label": "CNCF: Projects (成熟度)",
+          "url": "https://www.cncf.io/projects/"
+        },
+        {
+          "label": "CNCF: Kubernetes が最初の卒業プロジェクトになった発表 (2018-03-06)",
+          "url": "https://www.cncf.io/announcements/2018/03/06/cloud-native-computing-foundation-announces-kubernetes-first-graduated-project/"
+        },
+        {
+          "label": "CNCF: KCNA",
+          "url": "https://www.cncf.io/training/certification/kcna/"
+        },
+        {
+          "label": "Linux Foundation Education: KCNA",
+          "url": "https://training.linuxfoundation.org/certification/kubernetes-cloud-native-associate/"
+        },
+        {
+          "label": "Linux Foundation Education: KCNA-JP",
+          "url": "https://training.linuxfoundation.org/certification/kubernetes-and-cloud-native-associate-kcna-jp/"
+        },
+        {
+          "label": "Kubernetes Blog: 10 Years of Kubernetes (2024-06-06)",
+          "url": "https://kubernetes.io/blog/2024/06/06/10-years-of-kubernetes/"
+        }
+      ]
+    }
+  ]
+}

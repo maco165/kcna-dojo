@@ -74,6 +74,13 @@ describe('ノードの上のコマンド (付録)', () => {
     expect(one('kubectl get pods && kubectl get nodes')).toHaveLength(2);
     expect(one('/usr/local/bin/k3s-uninstall.sh')).toEqual(['消す: k3s server (ノード)']);
     expect(one('/usr/local/bin/k3s-agent-uninstall.sh')).toEqual(['消す: k3s agent (ノード)']);
+    expect(one('stat -fc %T /sys/fs/cgroup/')).toEqual(['見る: ファイルシステムの種類 /sys/fs/cgroup/ (ノード)']);
+    expect(one('findmnt -t proc,cgroup2')).toEqual(['見る: マウント (ノード)']);
+    expect(one('lsns')).toEqual(['見る: namespace (ノード)']);
+    expect(one('kubectl auth whoami')).toEqual(['名乗りを確かめる: 自分のユーザー (クラスタ)']);
+    // server 側の dry-run は API サーバーまで送るが保存しない。client 側は手元に書き出すだけ
+    expect(one('kubectl apply --server-side --dry-run=server -f cm.yaml')[0]).toMatch(/^試しに送る \(保存しない\): .* \((マニフェストのとおり|今の名前空間|クラスタ)\)$/);
+    expect(one('kubectl create deployment web --image=nginx --dry-run=client -o yaml')[0]).toMatch(/^書き出す: .*\(手元\)$/);
   });
 });
 

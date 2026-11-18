@@ -1,5 +1,5 @@
 {
-  "domain": "付録",
+  "domain": "付録: Kubernetes をもっと知る",
   "topics": [
     {
       "id": "k3s-vs-kubernetes",
@@ -320,6 +320,343 @@
         {
           "label": "Kubernetes: Share a Cluster with Namespaces",
           "url": "https://kubernetes.io/docs/tasks/administer-cluster/namespaces/"
+        }
+      ]
+    },
+    {
+      "id": "kubernetes-history",
+      "competency": "付録: Kubernetes の歴史",
+      "title": "Kubernetes の歴史と版の数え方",
+      "summary": "Kubernetes は、Google の社内のクラスタ管理の仕組み Borg と Omega の経験から生まれ、2014 年 6 月に公開されました。2015 年 7 月の 1.0 とともに、新しくできた CNCF に寄贈され、2018 年 3 月に CNCF で最初の卒業 (Graduated) のプロジェクトになりました。今は年に 3 回ほど新しい版が出て、新しい 3 つの minor の版が直しを受けます。",
+      "flow": [
+        {
+          "text": "Google の Borg は、2000 年代の半ばにできた Linux のコンテナを早くから取り入れ、大きな規模でアプリを動かしてきた社内のクラスタ管理の仕組みです。Google はその後、Omega という新しい版にも取り組みました。2015 年の公式ブログは「Kubernetes は Borg の直系」と書き、Kubernetes を作る Google の開発者の多くが Borg の出身で、Borg のよい考えを取り入れ、使う人が困っていた点を直そうとしたと説明しています。"
+        },
+        {
+          "text": "Docker でコンテナが広まるのを見た、Borg と Omega を知る Google の技術者たちが、2013 年の秋に小さなチームで作り始めたのが Kubernetes です。2014 年 6 月 6 日に最初のコミットが GitHub に push され、6 月 10 日の DockerCon 2014 の基調講演で発表されました。公開のときの機能はごく基本のものだけでした。"
+        },
+        {
+          "text": "それから 1 年ほどかけて機能を足して直し、2015 年 7 月 21 日に 1.0 が出ました (OSCON 2015 で発表)。1.0 と同時に Google は、Linux Foundation の下に新しくできる CNCF (Cloud Native Computing Foundation) に Kubernetes を寄贈すると発表しました。CNCF のプロジェクトのページでは、Kubernetes は 2016 年 3 月 10 日に Incubating (育成中) の段階で受け入れられています。"
+        },
+        {
+          "text": "2018 年 3 月 6 日、Kubernetes は CNCF で最初に卒業 (Graduated) したプロジェクトになりました。発表によると、卒業には広く使われていることと、文書になった運営の決まりが要り、Kubernetes は CNCF の行動規範を取り入れ、自分の運営の形を決めて Steering Committee (運営委員会) を置き、CII のベストプラクティスのバッジを取りました。段階の決まりは付録の「Linux Foundation と CNCF」にあります。"
+        },
+        {
+          "text": "リリースの周期も変わってきました。2020 年 8 月の 1.19 から、1 つの版が直し (パッチ) を受ける期間がおよそ 1 年に延びました。2021 年 4 月 23 日には、年に 4 回 (四半期ごと) から年に 3 回にする提案 (KEP) が取り込まれました。今の公式の説明では、1 回の周期はおよそ 15 週です。11 週目までが普通の開発、12 週目ごろから約 2 週間がコードの凍結 (重大な直しだけを受ける) で、その後の約 2 週間で残った重大な問題を片付けて出ます。"
+        },
+        {
+          "text": "dockershim の削除も大きな出来事でした。Docker Engine はランタイムとつなぐ決まり CRI (Container Runtime Interface) を実装していないので、Kubernetes は橋渡しのコード dockershim を自分の中に持っていました。名前のとおり一時的なもので、1.20 (2020 年 12 月) で削除が告げられ、1.24 (2022 年 5 月) で消えました。docker build で作ったイメージは、どの CRI の実装でもそのまま動きます。ランタイムには containerd や CRI-O などを使います。"
+        },
+        {
+          "text": "版は x.y.z と書き、x が major、y が minor、z が patch です (Semantic Versioning の呼び方)。プロジェクトは新しい 3 つの minor の版にブランチを持って直しを出し、2026 年 11 月の公式のページでは 1.37・1.36・1.35 です。kubectl は API サーバーと minor が 1 つ違いまで (古くても新しくても) が対応の範囲です。手元の版は kubectl version で見られます。k3s の版は 1.36.5+k3s1 のように、upstream の版の後ろに k3s の印が付きます。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl version"
+          },
+          "output": "Client Version: v1.37.2\nKustomize Version: v5.8.1\nServer Version: v1.36.5+k3s1",
+          "result": {
+            "text": "手元とサーバーの版が分かる",
+            "tone": "ok"
+          }
+        }
+      ],
+      "try": [
+        {
+          "goal": "使っているクラスタの版が、まだ直しを受けられる版かを確かめたいなら",
+          "steps": [
+            {
+              "text": "この手順は読むだけで何も作らないので、名前空間 try-kcna は作らず、後片付けもありません。まず kubectl version で、手元の kubectl (Client) と API サーバー (Server) の版を見ます。minor (2 つ目の数) の差が 1 より大きければ、kubectl を入れ直す目安です。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl version"
+              },
+              "output": "Client Version: v1.37.2\nKustomize Version: v5.8.1\nServer Version: v1.36.5+k3s1",
+              "result": {
+                "text": "minor の差が 1 以内なら対応の範囲",
+                "tone": "ok"
+              }
+            },
+            {
+              "text": "同じ情報は API サーバーの /version からも読めます。major と minor が分かれて出るので、スクリプトで比べるときに使いやすい形です。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl get --raw /version"
+              },
+              "output": "{\n  \"major\": \"1\",\n  \"minor\": \"36\",\n  ...\n  \"gitVersion\": \"v1.36.5+k3s1\",\n  ...\n  \"platform\": \"linux/arm64\"\n}",
+              "result": {
+                "text": "API サーバーの版を JSON で読める",
+                "tone": "ok"
+              }
+            },
+            {
+              "text": "公式の Releases のページ (kubernetes.io/releases) を見ます。ページの冒頭に、直しを受けている 3 つの minor の版 (今は 1.37・1.36・1.35) が書かれ、下の一覧に版ごとの最新の patch と End of Life (直しが終わる日) があります。自分のクラスタの minor が冒頭の 3 つに無いか、End of Life の日を過ぎていれば、もう直しが出ない版です。CNCF の Kubernetes のページ (cncf.io/projects/kubernetes) では、受け入れと卒業の日付が見られます。"
+            }
+          ]
+        }
+      ],
+      "lessons": [
+        "w1-l3",
+        "w8-l4"
+      ],
+      "sources": [
+        {
+          "label": "Kubernetes Blog: 10 Years of Kubernetes (2024-06-06)",
+          "url": "https://kubernetes.io/blog/2024/06/06/10-years-of-kubernetes/"
+        },
+        {
+          "label": "Kubernetes Blog: Borg: The Predecessor to Kubernetes (2015-04-23)",
+          "url": "https://kubernetes.io/blog/2015/04/borg-predecessor-to-kubernetes/"
+        },
+        {
+          "label": "Kubernetes Blog: The History of Kubernetes & the Community Behind It (2018-07-20)",
+          "url": "https://kubernetes.io/blog/2018/07/20/the-history-of-kubernetes-the-community-behind-it/"
+        },
+        {
+          "label": "CNCF: Kubernetes が最初の卒業プロジェクトになった発表 (2018-03-06)",
+          "url": "https://www.cncf.io/announcements/2018/03/06/cloud-native-computing-foundation-announces-kubernetes-first-graduated-project/"
+        },
+        {
+          "label": "CNCF: Kubernetes のプロジェクトのページ",
+          "url": "https://www.cncf.io/projects/kubernetes/"
+        },
+        {
+          "label": "Kubernetes Blog: Kubernetes Release Cadence Change (2021-07-20)",
+          "url": "https://kubernetes.io/blog/2021/07/20/new-kubernetes-release-cadence/"
+        },
+        {
+          "label": "Kubernetes: Kubernetes Release Cycle",
+          "url": "https://kubernetes.io/releases/release/"
+        },
+        {
+          "label": "Kubernetes Blog: Updated: Dockershim Removal FAQ (2022-02-17)",
+          "url": "https://kubernetes.io/blog/2022/02/17/dockershim-faq/"
+        },
+        {
+          "label": "Kubernetes: Releases",
+          "url": "https://kubernetes.io/releases/"
+        },
+        {
+          "label": "Kubernetes: Version Skew Policy",
+          "url": "https://kubernetes.io/releases/version-skew-policy/"
+        }
+      ]
+    },
+    {
+      "id": "kubectl-internals",
+      "competency": "付録: kubectl の中身",
+      "title": "kubectl の中身: コマンドが HTTP の要求になるまで",
+      "summary": "kubectl は、kubeconfig から行き先のクラスタと自分の資格情報を読み、コマンドを API サーバーへの HTTP の要求 (GET・POST・PATCH・DELETE など) に変えて送ります。API サーバーは要求を認証・認可・アドミッションの順に通し、検証してから保存先 (etcd) に書きます。-v=6 や -v=8 を付けると、送った要求の URL と動詞が見えます。",
+      "flow": [
+        {
+          "text": "kubectl はまず kubeconfig (クラスタへのつなぎ方を書いたファイル) を読みます。既定は $HOME/.kube/config で、環境変数 KUBECONFIG か --kubeconfig で別のファイルを指せます。中身はクラスタ (API サーバーの URL と CA)・ユーザー (資格情報)・コンテキスト (クラスタ・名前空間・ユーザーの組) で、普段は current-context の組が使われます。config view は証明書などを DATA+OMITTED と伏せて出します。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl config view --minify"
+          },
+          "output": "apiVersion: v1\nclusters:\n- cluster:\n    certificate-authority-data: DATA+OMITTED\n    server: https://192.168.0.10:6443\n  name: home\ncontexts:\n- context:\n    cluster: home\n    user: kcna-user\n  name: home\ncurrent-context: home\nkind: Config\nusers:\n- name: kcna-user\n  user:\n    client-certificate-data: DATA+OMITTED\n    client-key-data: DATA+OMITTED",
+          "result": {
+            "text": "行き先と使う資格情報が分かる",
+            "tone": "ok"
+          }
+        },
+        {
+          "text": "Pod の中で動く kubectl は、少し違う道をたどります。公式の文書によると、環境変数 KUBERNETES_SERVICE_HOST と KUBERNETES_SERVICE_PORT と、ServiceAccount のトークンのファイル (/var/run/secrets/kubernetes.io/serviceaccount/token) の 3 つがそろっていれば、クラスタの中にいるとみなし、そのトークンで API サーバーにつなぎます。"
+        },
+        {
+          "text": "Kubernetes の API は、HTTP の上の資源ごとの (RESTful な) 決まりです。HTTP の動詞 GET・POST・PUT・PATCH・DELETE で、資源を読み・作り・変え・消します。URL は、名前空間に属す資源なら /apis/グループ/版/namespaces/名前空間/種類 の形で、Pod などの core の資源は /apis の代わりに /api を使い、グループを省きます (例: /api/v1/namespaces/default/pods)。Kubernetes は自分の動詞も使い、1 つを読むのを get、一覧を list、?watch を付けた GET を watch と呼びます。"
+        },
+        {
+          "text": "kubectl に -v (ログの細かさ) を付けると、送った要求が見えます。公式の早見表では、-v=6 が要求した資源、-v=7 が要求のヘッダー、-v=8 が要求の中身を出します。kubectl get pods の本体の要求は、GET /api/v1/namespaces/default/pods?limit=500 の 1 本です。Accept のヘッダーで表の形 (Table) を頼み、返ってきた表を kubectl が整えて画面に出しています。初めて動かすときや手元のキャッシュ (~/.kube/cache) が古いときは、先に API の一覧を読む /api と /apis への GET も出ます。API サーバーは既定で 6443 番のポートで TLS で待ちます。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl get pods -n default -v=8"
+          },
+          "output": "I1118 13:21:31.475875 1860395 loader.go:408] Config loaded from file:  /home/user/.kube/config\n...\nI1118 13:21:31.522672 1860395 round_trippers.go:527] \"Request\" verb=\"GET\" url=\"https://192.168.0.10:6443/api/v1/namespaces/default/pods?limit=500\" headers=<\n\tAccept: application/json;as=Table;v=v1;g=meta.k8s.io,application/json;as=Table;v=v1beta1;g=meta.k8s.io,application/json\n\tUser-Agent: kubectl/v1.37.2 (linux/amd64) kubernetes/c50e539\n >\nI1118 13:21:31.543478 1860395 round_trippers.go:632] \"Response\" status=\"200 OK\" headers=<\n\tContent-Type: application/json\n\t...\n > milliseconds=20\nI1118 13:21:31.543661 1860395 helper.go:113] \"Response Body\" body=\"{\\\"kind\\\":\\\"Table\\\",\\\"apiVersion\\\":\\\"meta.k8s.io/v1\\\", ... [truncated 2181 chars]\"\nNo resources found in default namespace.",
+          "result": {
+            "text": "GET と URL と 200 OK が見える",
+            "tone": "ok"
+          }
+        },
+        {
+          "text": "API サーバーに届いた要求は、順に関所を通ります。1. 認証 (誰か) で失敗すると 401、2. 認可 (その操作をしてよいか、RBAC など) で失敗すると 403 で返されます。3. アドミッションでは、先に mutating (値を足したり変えたり) の、次に validating (受け入れるか決める) のコントローラーが動き、1 つでも断れば要求はすぐ断られます。読むだけの要求 (get・watch・list) はアドミッションを通りません。最後に API の型どおりかを検証し、保存先に書きます。保存先の etcd は、API サーバーのすべてのデータを持つキーバリューストアです。"
+        },
+        {
+          "text": "どんな資源が使えるかは api-resources で見ます。名前・略称・API の版・名前空間に属すか・種類 (KIND) が出ます。kubectl get --raw は、URL を直に GET して、整える前の JSON を返します。さっきの get pods と同じ URL を読むと、PodList という一覧の形が見えます。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl api-resources\nkubectl get --raw /api/v1/namespaces/default/pods"
+          },
+          "output": "NAME                                SHORTNAMES   APIVERSION                        NAMESPACED   KIND\nbindings                                         v1                                true         Binding\ncomponentstatuses                   cs           v1                                false        ComponentStatus\nconfigmaps                          cm           v1                                true         ConfigMap\n...\npods                                po           v1                                true         Pod\n...\n{\"kind\":\"PodList\",\"apiVersion\":\"v1\",\"metadata\":{\"resourceVersion\":\"1773999\"},\"items\":[]}",
+          "result": {
+            "text": "資源の一覧と生の JSON が読める",
+            "tone": "ok"
+          }
+        },
+        {
+          "text": "kubectl apply には 2 つのやり方があります。client-side apply (既定) は、kubectl が今の形を GET で読み、前に当てた形を注釈 kubectl.kubernetes.io/last-applied-configuration に残して、差を手元で計算して送ります。公式の文書は、この注釈のやり方を古い (legacy) 方法と呼んでいます。"
+        },
+        {
+          "text": "server-side apply (--server-side) は、本体の要求としてマニフェストを PATCH (Content-Type: application/apply-patch+yaml) の 1 本で送り、どの欄を誰 (field manager。kubectl の既定は kubectl) が持つかを API サーバーが managedFields に記録します。他の持ち主の欄を変えようとすると conflict になり、--force-conflicts で上書きできます。--dry-run=server なら検査だけで保存しません。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl apply --server-side --dry-run=server -f cm.yaml -v=6"
+          },
+          "output": "... \"Response\" verb=\"PATCH\" url=\"https://192.168.0.10:6443/api/v1/namespaces/default/configmaps/demo?dryRun=All&fieldManager=kubectl&fieldValidation=Strict&force=false\" status=\"201 Created\" milliseconds=10\nconfigmap/demo serverside-applied (server dry run)",
+          "result": {
+            "text": "本体は PATCH の 1 本で、保存はしない",
+            "tone": "ok"
+          }
+        },
+        {
+          "text": "同じマニフェストを --server-side 無しで流すと、本体の要求は、まず GET で探して 404 (まだ無い) を受け、次に POST で作る、の 2 本になります (dry-run なので保存はされません)。最後に kubectl explain は、資源の欄の説明を API サーバーから OpenAPI の形で取ってきて見せます。フィールドの名前は pod.spec.containers のように . でつなぎます。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl explain pod.spec.containers"
+          },
+          "output": "KIND:       Pod\nVERSION:    v1\n\nFIELD: containers <[]Container>\n\nDESCRIPTION:\n    List of containers belonging to the pod. Containers cannot currently be\n    added or removed. There must be at least one container in a Pod. Cannot be\n    updated.\n    ...\nFIELDS:\n  args\t<[]string>\n  ...",
+          "result": {
+            "text": "欄の型と説明をサーバーから読める",
+            "tone": "ok"
+          }
+        }
+      ],
+      "try": [
+        {
+          "goal": "kubectl が送る要求の URL と動詞を見たいなら",
+          "steps": [
+            {
+              "text": "この手順は読むだけで何も作らないので、名前空間 try-kcna は作らず、後片付けもありません。-v=6 では要求 1 本が 1 行にまとまり、動詞 (verb)・URL・応答の状態が見えます。名前空間を変えると URL の namespaces/ の後ろが変わることも確かめます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl get pods -n default -v=6"
+              },
+              "output": "I1118 13:26:11.474484 1868056 loader.go:408] Config loaded from file:  /home/user/.kube/config\nI1118 13:26:11.526868 1868056 round_trippers.go:632] \"Response\" verb=\"GET\" url=\"https://192.168.0.10:6443/api/v1/namespaces/default/pods?limit=500\" status=\"200 OK\" milliseconds=22\nNo resources found in default namespace.",
+              "result": {
+                "text": "1 行で動詞と URL と状態が分かる",
+                "tone": "ok"
+              }
+            },
+            {
+              "text": "-v=8 にすると、要求のヘッダー (Accept など) と応答のヘッダーと中身も出ます。長いので、まず \"Request\" と \"Response\" の行だけ追うと読みやすくなります。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl get pods -n kube-system -v=8"
+              },
+              "result": {
+                "text": "ヘッダーと応答の中身まで見える",
+                "tone": "ok"
+              }
+            },
+            {
+              "text": "認証のあと、API サーバーが自分を誰とみなしたかは auth whoami で読めます。Username と Groups が、認可 (RBAC) で照らされる名前です。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl auth whoami"
+              },
+              "output": "ATTRIBUTE                                           VALUE\nUsername                                            kcna-user\nGroups                                              [system:authenticated]\nExtra: authentication.kubernetes.io/credential-id   [X509SHA256=<伏せ字>]",
+              "result": {
+                "text": "認証された名前とグループが分かる",
+                "tone": "ok"
+              }
+            }
+          ]
+        },
+        {
+          "goal": "API にどんな資源があり、生の JSON がどう見えるかを読みたいなら",
+          "steps": [
+            {
+              "text": "これも読むだけです。api-resources に --namespaced=false を付けると、Node や Namespace のように、どの名前空間にも属さない (クラスタ全体で共有する) 種類の資源だけが出ます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl api-resources --namespaced=false"
+              },
+              "output": "NAME                                SHORTNAMES   APIVERSION                        NAMESPACED   KIND\ncomponentstatuses                   cs           v1                                false        ComponentStatus\nnamespaces                          ns           v1                                false        Namespace\nnodes                               no           v1                                false        Node\npersistentvolumes                   pv           v1                                false        PersistentVolume\n...",
+              "result": {
+                "text": "名前空間に属さない種類だけが並ぶ",
+                "tone": "ok"
+              }
+            },
+            {
+              "text": "get --raw で URL を直に読みます。kubectl get pods -v=6 に出た URL と同じ形です。Pod が無ければ items は空の配列です。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl get --raw /api/v1/namespaces/default/pods"
+              },
+              "output": "{\"kind\":\"PodList\",\"apiVersion\":\"v1\",\"metadata\":{\"resourceVersion\":\"1773999\"},\"items\":[]}",
+              "result": {
+                "text": "整える前の PodList が読める",
+                "tone": "ok"
+              }
+            },
+            {
+              "text": "explain で、マニフェストに書く欄の型と説明を読みます。--recursive を付けると、下の欄をまとめて木の形で出します。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl explain pod.spec.containers"
+              },
+              "output": "KIND:       Pod\nVERSION:    v1\n\nFIELD: containers <[]Container>\n...",
+              "result": {
+                "text": "欄の型と説明が分かる",
+                "tone": "ok"
+              }
+            }
+          ]
+        }
+      ],
+      "lessons": [
+        "w2-l1",
+        "w2-l3",
+        "w4-l1",
+        "w6-l1"
+      ],
+      "sources": [
+        {
+          "label": "Kubernetes: Organizing Cluster Access Using kubeconfig Files",
+          "url": "https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/"
+        },
+        {
+          "label": "Kubernetes: Command line tool (kubectl)",
+          "url": "https://kubernetes.io/docs/reference/kubectl/"
+        },
+        {
+          "label": "Kubernetes: kubectl Quick Reference (Kubectl output verbosity and debugging)",
+          "url": "https://kubernetes.io/docs/reference/kubectl/quick-reference/"
+        },
+        {
+          "label": "Kubernetes: Kubernetes API Concepts",
+          "url": "https://kubernetes.io/docs/reference/using-api/api-concepts/"
+        },
+        {
+          "label": "Kubernetes: Controlling Access to the Kubernetes API",
+          "url": "https://kubernetes.io/docs/concepts/security/controlling-access/"
+        },
+        {
+          "label": "Kubernetes: Admission Control in Kubernetes",
+          "url": "https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/"
+        },
+        {
+          "label": "Kubernetes: Kubernetes Components",
+          "url": "https://kubernetes.io/docs/concepts/overview/components/"
+        },
+        {
+          "label": "Kubernetes: Server-Side Apply",
+          "url": "https://kubernetes.io/docs/reference/using-api/server-side-apply/"
+        },
+        {
+          "label": "Kubernetes: Declarative Management of Kubernetes Objects Using Configuration Files",
+          "url": "https://kubernetes.io/docs/tasks/manage-kubernetes-objects/declarative-config/"
+        },
+        {
+          "label": "KEP-555 Server-side apply",
+          "url": "https://github.com/kubernetes/enhancements/tree/master/keps/sig-api-machinery/555-server-side-apply"
+        },
+        {
+          "label": "Kubernetes: kubectl api-resources",
+          "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_api-resources/"
+        },
+        {
+          "label": "Kubernetes: kubectl explain",
+          "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_explain/"
         }
       ]
     }
