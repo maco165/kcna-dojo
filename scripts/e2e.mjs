@@ -383,6 +383,48 @@ async function run(browser, name, width, height) {
   check(await page.getByRole('link', { name: /Kubernetes の公式ドキュメント/ }).first().isVisible(), `${tag} 主な情報源に名前とリンクがある`);
   await noHorizontalOverflow(page, width, `${tag} 説明のページ`);
 
+  // 14. 画面の色: 設定で選ぶと、端末の設定に関わらずその色になり、記録に残る
+  await page.goto(`${BASE}#/settings`);
+  await page.getByRole('heading', { name: '設定' }).waitFor();
+  const bodyBg = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  const bgBefore = await bodyBg();
+  await page.getByRole('radio', { name: 'ダーク' }).click();
+  await page.waitForTimeout(200);
+  const darkBg = await bodyBg();
+  check(darkBg !== bgBefore && darkBg === 'rgb(17, 17, 18)', `${tag} ダークを選ぶと地が暗くなる (${bgBefore} → ${darkBg})`);
+  await page.reload();
+  await page.getByRole('heading', { name: '設定' }).waitFor();
+  check((await bodyBg()) === 'rgb(17, 17, 18)', `${tag} 読み込み直してもダークのまま`);
+  await page.getByRole('radio', { name: 'ライト' }).click();
+  await page.waitForTimeout(200);
+  check((await bodyBg()) === 'rgb(241, 244, 247)', `${tag} ライトを選ぶと地が明るくなる`);
+  await page.getByRole('radio', { name: '端末に合わせる' }).click();
+  const savedMode = await page.evaluate(() => JSON.parse(localStorage.getItem('kcna.v1') ?? '{}').profile?.colorMode);
+  check(savedMode === undefined, `${tag} 端末に合わせるに戻すと記録から消える`);
+  // 端末がダークのときにライトを選ぶ。ダイアログ (記録を消す) の地も選んだ色に従う
+  {
+    const darkCtx = await browser.newContext({ viewport: { width, height }, colorScheme: 'dark' });
+    const dp = await darkCtx.newPage();
+    dp.on('pageerror', (e) => errors.push(e.message));
+    await dp.goto(`${BASE}#/settings`);
+    await dp.getByRole('heading', { name: '設定' }).waitFor();
+    const bg = () => dp.evaluate(() => getComputedStyle(document.body).backgroundColor);
+    check((await bg()) === 'rgb(17, 17, 18)', `${tag} 端末がダークで何も選ばなければ暗い地`);
+    await dp.getByRole('radio', { name: 'ライト' }).click();
+    await dp.waitForTimeout(200);
+    check((await bg()) === 'rgb(241, 244, 247)', `${tag} 端末がダークでもライトを選ぶと明るい地`);
+    await dp.getByRole('button', { name: '記録を消す' }).click();
+    const dlgBg = await dp.getByRole('alertdialog').evaluate((el) => getComputedStyle(el).backgroundColor);
+    check(dlgBg === 'rgb(255, 255, 255)', `${tag} ライトを選ぶとダイアログも明るい (${dlgBg})`);
+    await dp.getByRole('button', { name: 'やめる' }).click();
+    // 読み込み直したとき、最初の描画から選んだ色 (index.html の小さな script)
+    await dp.route('**/assets/*.js', (r) => r.abort());
+    await dp.reload();
+    const preJs = await dp.evaluate(() => document.documentElement.getAttribute('data-theme'));
+    check(preJs === 'light', `${tag} JS が動く前から選んだ色が付いている (${preJs})`);
+    await darkCtx.close();
+  }
+
   check(errors.length === 0, `${tag} ページのエラーが無い ${errors.length ? errors.join(' / ') : ''}`);
   await context.close();
 }
