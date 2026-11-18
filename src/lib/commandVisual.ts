@@ -125,7 +125,8 @@ let WRITTEN = new Map<string, string>();
 function kubectl(tokens: string[], heredoc: string): Action[] {
   const all = kubectlActions(tokens, heredoc);
   const { flags } = splitArgs(tokens.slice(2));
-  // --dry-run はクラスタに何も作らず、手元に書き出すだけ
+  // --dry-run=server は API サーバーまで送って確かめるが保存しない。client (や値なし) はクラスタに送らず、手元に書き出すだけ
+  if (flags['--dry-run'] === 'server') return all.map((x) => (x.op === 'create' || x.op === 'apply' ? { ...x, op: 'read', verb: '試しに送る (保存しない)' } : x));
   if (flags['--dry-run'] !== undefined && flags['--dry-run'] !== 'none')
     return all.map((x) => (x.op === 'create' || x.op === 'apply' ? { ...x, op: 'read', verb: '書き出す', where: '手元' } : x));
   return all;

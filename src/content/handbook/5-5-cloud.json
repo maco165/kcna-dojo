@@ -110,6 +110,10 @@
           "label": "docs.k3s.io の Networking Services (ServiceLB)",
           "url": "https://docs.k3s.io/networking/networking-services"
         }
+      ],
+      "noTermLinks": [
+        "role",
+        "service"
       ]
     },
     {

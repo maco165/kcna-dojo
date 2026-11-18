@@ -151,6 +151,9 @@
           "label": "oauth.net の User Authentication with OAuth 2.0",
           "url": "https://oauth.net/articles/authentication/"
         }
+      ],
+      "noTermLinks": [
+        "service"
       ]
     },
     {
@@ -271,6 +274,10 @@
           "label": "Flux の Image reflector and automation controllers",
           "url": "https://fluxcd.io/flux/components/image/"
         }
+      ],
+      "noTermLinks": [
+        "job",
+        "role"
       ]
     },
     {

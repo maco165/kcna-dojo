@@ -86,4 +86,11 @@ describe('本文の用語を用語集へのリンクにする', () => {
     // 87 語のどれでも、自分へのリンクは出ない
     for (const t of TERMS) expect(linkDetail(names, t).flat().some((p) => typeof p !== 'string' && p.id === t.id), t.id).toBe(false);
   });
+  it('トピックの noTermLinks の語は、そのトピックではリンクにしない (AWS の IAM のロールを Kubernetes の Role にしない)', () => {
+    const aws = HANDBOOK_TOPICS.find((t) => t.id === 'cloud-aws-column')!;
+    const link = makeTermLinker(names, aws.noTermLinks ?? []);
+    const ids = [aws.summary, ...aws.flow.map((s) => s.text)].flatMap(link).filter((p) => typeof p !== 'string').map((p) => p.id);
+    expect(ids).not.toContain('role');
+    expect(ids).not.toContain('service');
+  });
 });

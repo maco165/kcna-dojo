@@ -1,5 +1,4 @@
 // ハンドブックの範囲外の付録のトピックの図。中身は各トピックの本文 (src/content/handbook/5-*.json) に合わせる
-// 付録 (範囲外) のトピックの図。統括が src/content/handbookFigures.ts の HANDBOOK_FIGURES に移す
 import type { DiagramSpec } from '../components/Diagram';
 
 export const APPENDIX_FIGURES: Record<string, DiagramSpec> = {

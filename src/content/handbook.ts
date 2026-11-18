@@ -2,7 +2,7 @@
 // 正本は src/content/handbook/*.json (分野ごとに 1 ファイル)。形は lib/handbook.ts の validateHandbook が検査する
 import type { Domain } from './types';
 import { DOMAINS } from '../lib/lessonStatus';
-import { APPENDIX_DOMAIN, appendixGroup, isAppendixDomain, type AppendixDomain } from '../lib/handbook';
+import { appendixGroup, isAppendixDomain, type AppendixDomain } from '../lib/handbook';
 
 export type HandbookCode = { language: 'bash' | 'yaml'; text: string };
 /** 手順のあとクラスタの中で起きること (本文に書いてある結果を短く)。ok は思いどおり、warn は失敗・止まる */
@@ -17,11 +17,15 @@ export type HandbookTopic = {
   flow: HandbookStep[];
   try: HandbookTry[];
   lessons: string[];
+  /** このトピックの本文ではリンクにしない用語集の語の id (AWS の IAM のロールが Kubernetes の Role に当たる、など別の意味で使う語) */
+  noTermLinks?: string[];
   sources: { label: string; url: string }[];
 };
 /** 学習要領の外の話 (資格の範囲の外だが、一緒に知っておいて損がないこと)。配点は無く、目次の最後に段ごとに並べる */
-export const APPENDIX = APPENDIX_DOMAIN;
 export { appendixGroup, isAppendixDomain };
+
+/** 目次・パンくず・書き出す HTML に出す段の名前。付録は「範囲外: Linux とコンテナ」の形 */
+export const sectionName = (d: string) => (isAppendixDomain(d) ? (appendixGroup(d) ? `範囲外: ${appendixGroup(d)}` : '範囲外') : d);
 export type HandbookSection = Domain | AppendixDomain;
 export type HandbookDomain = { domain: HandbookSection; topics: HandbookTopic[] };
 

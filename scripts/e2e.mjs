@@ -484,6 +484,7 @@ async function run(browser, name, width, height) {
   check((await page.locator('.hb-topic').count()) === 26, `${tag} ハンドブックの目次に学習要領の 13 トピックと範囲外の 13`);
   const heads = await page.locator('.hb-domain__head').allInnerTexts();
   check(heads.slice(-5).every((h) => h.startsWith('範囲外: ') && h.includes('資格の範囲の外')) && heads.length === 9, `${tag} 範囲外は 5 つの段で目次の最後に並び、配点の代わりに範囲の外と出る`);
+  check(await page.getByRole('region', { name: /範囲外: クラウド/ }).isVisible(), `${tag} 目次の段は、段の名前で読み上げられる`);
   check((await page.locator('.hb-topic .dg-thumb').count()) === 26, `${tag} 目次の 26 トピックすべてにサムネイルがある`);
   await page.locator('.hb-topic').filter({ hasText: 'Debugging' }).click();
   await page.getByRole('heading', { name: '全体の流れ' }).waitFor();

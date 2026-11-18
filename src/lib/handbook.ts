@@ -1,5 +1,5 @@
 // ハンドブックのデータの検査。違反を文で返す (空なら OK)
-const TOPIC_KEYS = new Set(['id', 'competency', 'title', 'summary', 'flow', 'try', 'lessons', 'sources']);
+const TOPIC_KEYS = new Set(['id', 'competency', 'title', 'summary', 'flow', 'try', 'lessons', 'sources', 'noTermLinks']);
 const STEP_KEYS = new Set(['text', 'code', 'output', 'result']);
 const RESULT_KEYS = new Set(['text', 'tone']);
 /** 結果の文の長さの上限 (絵の 1 行に収める) */
@@ -10,7 +10,7 @@ const FILE_KEYS = new Set(['domain', 'topics']);
 /** 学習要領の外のトピックを置くファイルの domain (細目の原文とは照らさない)。「付録: Linux とコンテナ」のように段の名前を付けられる */
 export const APPENDIX_DOMAIN = '付録' as const;
 export type AppendixDomain = typeof APPENDIX_DOMAIN | `${typeof APPENDIX_DOMAIN}: ${string}`;
-export const isAppendixDomain = (d: unknown): d is AppendixDomain => typeof d === 'string' && (d === APPENDIX_DOMAIN || (d.startsWith(`${APPENDIX_DOMAIN}: `) && d.length > APPENDIX_DOMAIN.length + 2));
+export const isAppendixDomain = (d: unknown): d is AppendixDomain => typeof d === 'string' && (d === APPENDIX_DOMAIN || (d.startsWith(`${APPENDIX_DOMAIN}: `) && d.slice(APPENDIX_DOMAIN.length + 2).trim() !== ''));
 /** 目次に出す段の名前 (「付録: Linux とコンテナ」→「Linux とコンテナ」) */
 export const appendixGroup = (d: AppendixDomain) => (d === APPENDIX_DOMAIN ? '' : d.slice(APPENDIX_DOMAIN.length + 2));
 

@@ -63,8 +63,8 @@ export async function buildPages(load) {
   const { parseRoute } = await load('/src/lib/route.ts');
   const titleOf = (p) => pageTitle(parseRoute(`${BASE}${p}`));
   const { WEEKS } = await load('/src/content/curriculum.ts');
-  const { HANDBOOK, HANDBOOK_TOPICS, isAppendixDomain, appendixGroup } = await load('/src/content/handbook.ts');
-  const sectionName = (d) => (isAppendixDomain(d) ? `範囲外${appendixGroup(d) ? `: ${appendixGroup(d)}` : ''} (資格の範囲の外)` : d);
+  const { HANDBOOK, HANDBOOK_TOPICS, isAppendixDomain, sectionName: shortName } = await load('/src/content/handbook.ts');
+  const sectionName = (d) => (isAppendixDomain(d) ? `${shortName(d)} (資格の範囲の外)` : d);
   const { CURRICULUM, DEFINITION } = await load('/src/content/guide.ts');
   const glossary = (await load('/src/content/glossary.json')).default;
   const pages = [];

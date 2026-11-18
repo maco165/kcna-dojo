@@ -311,6 +311,9 @@
           "label": "docker.com の What is a Container?",
           "url": "https://www.docker.com/resources/what-container/"
         }
+      ],
+      "noTermLinks": [
+        "controller"
       ]
     },
     {
@@ -350,7 +353,7 @@
           "text": "OCI (Open Container Initiative) は、コンテナの形式とランタイムの業界の標準を作るために、2015 年 6 月 22 日に Docker・CoreOS などが Linux Foundation の下で始めました。Docker は、コンテナの形式とランタイムの runC を OCI に寄付しました。runC は、libcontainer の中身を Docker から独立させたものです。"
         },
         {
-          "text": "OCI の仕様は 3 つです。Image Specification はイメージの形 (イメージのマニフェスト・任意のイメージのインデックス・ファイルシステムのレイヤー・設定) を、Runtime Specification はディスクに展開した「ファイルシステムのバンドル」(config.json とコンテナのルートのファイルシステム) の動かし方を、Distribution Specification はイメージを配る API を決めています。Runtime Specification は、ランタイムが state・create・start・kill・delete の操作を備えることを求めています。"
+          "text": "OCI の仕様は 3 つです。Image Specification はイメージの形 (イメージマニフェスト・任意のイメージのインデックス・ファイルシステムのレイヤー・設定) を、Runtime Specification はディスクに展開した「ファイルシステムのバンドル」(config.json とコンテナのルートのファイルシステム) の動かし方を、Distribution Specification はイメージを配る API を決めています。Runtime Specification は、ランタイムが state・create・start・kill・delete の操作を備えることを求めています。"
         },
         {
           "text": "runc は、OCI の仕様に沿って Linux でコンテナを作って動かすコマンドの道具です。containerd は、README で自らを「業界の標準のコンテナランタイム」と説明しています。Linux と Windows でデーモン (常に動く裏方のプログラム) として動き、イメージの取得と保存から、コンテナの実行と見張りまで、コンテナの一生を受け持ちます。containerd の README によると、Linux のコンテナの機能とのやりとりは主に runc が受け持ちます。containerd は 2019 年 2 月 28 日に CNCF の Graduated (いちばん上の段階) のプロジェクトになりました。k3s は containerd を同梱しています。"

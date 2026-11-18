@@ -9,7 +9,7 @@ import BottomTabs from '../components/BottomTabs';
 import RepoLink from '../components/RepoLink';
 import SiteLogo from '../components/SiteLogo';
 import { dueQuestions, findLesson } from '../content';
-import { HANDBOOK, appendixGroup, isAppendixDomain, findTopic, type HandbookStep } from '../content/handbook';
+import { HANDBOOK, isAppendixDomain, sectionName, findTopic, type HandbookStep } from '../content/handbook';
 import { HANDBOOK_FIGURES } from '../content/handbookFigures';
 import { EXAM_WEIGHTS } from '../lib/exam';
 import { markHandbookSeen, setHandbookDone, type HandbookRecord, type Progress } from '../lib/progress';
@@ -64,8 +64,6 @@ function Step({ step, text }: { step: HandbookStep; text: TermPiece[] }) {
 
 type Update = (fn: (p: Progress) => Progress) => void;
 
-/** 目次とパンくずに出す段の名前。付録は「範囲外: Linux とコンテナ」の形 */
-const sectionName = (d: string) => (isAppendixDomain(d) ? (appendixGroup(d) ? `範囲外: ${appendixGroup(d)}` : '範囲外') : d);
 
 /** 目次のカードに添える読んだ記録 */
 function readingLabel(rec: HandbookRecord | undefined, steps: number): string {
@@ -121,9 +119,9 @@ function Index({ progress }: { progress: Progress }) {
           確認済み {done} / {total} トピック
         </p>
       </div>
-      {HANDBOOK.map((d) => (
-        <section key={d.domain} className="hb-domain" aria-labelledby={`hb-${d.domain}`}>
-          <h2 id={`hb-${d.domain}`} className="hb-domain__head">
+      {HANDBOOK.map((d, di) => (
+        <section key={d.domain} className="hb-domain" aria-labelledby={`hb-domain-${di}`}>
+          <h2 id={`hb-domain-${di}`} className="hb-domain__head">
             <span>{sectionName(d.domain)}</span>
             <span className="hb-muted">{isAppendixDomain(d.domain) ? '資格の範囲の外' : `配点 ${EXAM_WEIGHTS[d.domain]}%`}</span>
           </h2>
@@ -171,7 +169,7 @@ function Topic({ id, progress, updateProgress }: { id: string; progress: Progres
   const { topic: t, prev, next } = found;
   const lessons = t.lessons.map((l) => findLesson(l)).filter((x) => x !== undefined);
   // 本文の順に、語ごとに最初の 1 回だけリンクにする (描く前にまとめて決めるので、何度描いても同じ)
-  const link = makeTermLinker(TERM_NAMES);
+  const link = makeTermLinker(TERM_NAMES, t.noTermLinks ?? []);
   const rec = progress.handbook?.[t.id];
   // 続きからの案内は、開いたときの記録で出す (読み進めるたびに出し入れすると、本文がずれる)
   const opened = openedRecord;
