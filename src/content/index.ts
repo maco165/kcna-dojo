@@ -24,6 +24,13 @@ export function findQuestion(questionId: string): QuestionRef | undefined {
   return undefined;
 }
 
+/** すべての週の 4 択と穴埋め (ランダム出題で使う) */
+export function allQuestions(): (QuestionRef & { domain: Lesson['domain'] })[] {
+  return WEEKS.flatMap((w) =>
+    (w.content?.lessons ?? []).flatMap((lesson) => (lesson.kind === 'quiz' ? lesson.questions.map((question) => ({ question, lesson, week: w.week, domain: lesson.domain })) : [])),
+  );
+}
+
 /** 今日の復習の問題。問題データから消えた id は飛ばす (件数のバッジもこれで数える) */
 export function dueQuestions(p: Progress, now: Date): QuestionRef[] {
   return dueReviewIds(p, now)
