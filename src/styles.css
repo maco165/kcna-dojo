@@ -2131,3 +2131,14 @@ body {
   font-weight: 600;
   color: var(--color-text-secondary);
 }
+
+/* ハンドブックの本文の中の用語集の語: 太字と点線の下線で強調し、押すと用語集のその語へ */
+.hb a.hb-term {
+  font-weight: 600;
+  color: var(--color-text-blue);
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+.hb a.hb-term:hover {
+  text-decoration-style: solid;
+}

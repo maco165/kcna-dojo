@@ -448,12 +448,12 @@ async function run(browser, name, width, height) {
     await darkCtx.close();
   }
 
-  // 15. ハンドブック: 目次の 13 トピックと付録、1 トピックの流れ・試す手順・練習のレッスン、説明のページの学習要領から飛べる
+  // 15. ハンドブック: 目次の 13 トピックと付録の 2 つ、1 トピックの流れ・試す手順・練習のレッスン、説明のページの学習要領から飛べる
   await page.goto(`${BASE}#/handbook`);
   await page.getByRole('heading', { name: 'ハンドブック', level: 1 }).waitFor();
-  check((await page.locator('.hb-topic').count()) === 14, `${tag} ハンドブックの目次に学習要領の 13 トピックと付録の 1 つ`);
+  check((await page.locator('.hb-topic').count()) === 15, `${tag} ハンドブックの目次に学習要領の 13 トピックと付録の 2 つ`);
   check((await page.locator('.hb-domain').last().locator('.hb-domain__head').innerText()).includes('資格の範囲の外'), `${tag} 付録は目次の最後で、配点の代わりに範囲の外と出る`);
-  check((await page.locator('.hb-topic .dg-thumb').count()) === 14, `${tag} 目次の 14 トピックすべてにサムネイルがある`);
+  check((await page.locator('.hb-topic .dg-thumb').count()) === 15, `${tag} 目次の 15 トピックすべてにサムネイルがある`);
   await page.locator('.hb-topic').filter({ hasText: 'Debugging' }).click();
   await page.getByRole('heading', { name: '全体の流れ' }).waitFor();
   check(page.url().includes('#/handbook/debugging'), `${tag} 目次からトピックへ飛べる`);
@@ -467,7 +467,7 @@ async function run(browser, name, width, height) {
   await page.getByRole('link', { name: 'Kubernetes Core Concepts' }).click();
   await page.waitForURL(/#\/handbook\/core-concepts/);
   check(true, `${tag} 説明のページの学習要領の表からハンドブックへ飛べる`);
-  // 14 トピックすべてを、試す手順を全部開いた形で、横にはみ出さないか測る
+  // 15 トピックすべてを、試す手順を全部開いた形で、横にはみ出さないか測る
   await page.goto(`${BASE}#/handbook`);
   const allIds = await page.locator('.hb-topic').evaluateAll((els) => els.map((a) => a.getAttribute('href').split('/').pop()));
   let widest = { id: '', w: 0 };
@@ -484,8 +484,41 @@ async function run(browser, name, width, height) {
     if (w > widest.w) widest = { id, w };
   }
   check(figureScroll.length === 0, `${tag} 図が横にスクロールせず幅に収まる ${figureScroll.join(',')}`);
-  check(figureMissing.length === 0, `${tag} ハンドブックの 14 トピックすべてに図がある ${figureMissing.join(',')}`);
-  check(allIds.length === 14 && widest.w <= width, `${tag} ハンドブックの 14 トピックが横にはみ出さない (いちばん広い ${widest.id} ${widest.w} <= ${width})`);
+  check(figureMissing.length === 0, `${tag} ハンドブックの 15 トピックすべてに図がある ${figureMissing.join(',')}`);
+  check(allIds.length === 15 && widest.w <= width, `${tag} ハンドブックの 15 トピックが横にはみ出さない (いちばん広い ${widest.id} ${widest.w} <= ${width})`);
+
+  // 15b. ハンドブックの本文の用語: 強調され、押すと用語集のその語が開く
+  {
+    await page.goto(`${BASE}#/handbook/core-concepts`);
+    await page.getByRole('heading', { name: '全体の流れ' }).waitFor();
+    const terms = page.locator('a.hb-term');
+    check((await terms.count()) >= 10, `${tag} ハンドブックの本文の用語集の語がリンクになる (${await terms.count()} 語)`);
+    const weight = await terms.first().evaluate((el) => getComputedStyle(el).fontWeight);
+    check(Number(weight) >= 600, `${tag} 用語のリンクは太字で強調される (${weight})`);
+    const etcd = page.locator('a.hb-term', { hasText: /^etcd$/ });
+    await etcd.first().click();
+    await page.waitForURL(/#\/glossary\/etcd$/);
+    if (width >= 768) {
+      await page.locator('#gloss-pane-term').waitFor();
+      check((await page.locator('#gloss-pane-term').innerText()).trim() === 'etcd', `${tag} 用語集でその語 (etcd) の説明が開く`);
+    } else {
+      const head = page.locator('#gloss-row-etcd button[aria-expanded]');
+      await head.waitFor();
+      await page.waitForTimeout(300);
+      const box = await head.boundingBox();
+      const vh = page.viewportSize().height;
+      check((await head.getAttribute('aria-expanded')) === 'true' && box && box.y >= 0 && box.y < vh, `${tag} 用語集でその語 (etcd) が開いて画面の中に見える (y ${box?.y})`);
+      // 戻る・進むで来たときは、覚えた位置に戻す (その語へ送り直さない)
+      const scrollTop = () => page.evaluate(() => (document.querySelector('.astryx-layout-content') ?? document.scrollingElement).scrollTop);
+      await page.evaluate(() => ((document.querySelector('.astryx-layout-content') ?? document.scrollingElement).scrollTop = 1500));
+      await page.waitForTimeout(200);
+      const saved = await scrollTop();
+      await page.goto(`${BASE}#/about`);
+      await page.goBack();
+      await page.waitForTimeout(600);
+      check(Math.abs((await scrollTop()) - saved) <= 2, `${tag} 用語集へ戻ると覚えた位置 (${saved} → ${await scrollTop()})`);
+    }
+  }
 
   // 16. 戻る操作: 目次を下まで送ってトピックを開き、戻ると元の位置。新しく開いたページは先頭
   {

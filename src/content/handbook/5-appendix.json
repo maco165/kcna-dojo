@@ -44,12 +44,12 @@
           "output": "ccm.yaml  coredns.yaml  local-storage.yaml  metrics-server  rolebindings.yaml  runtimes.yaml  traefik.yaml"
         },
         {
-          "text": "ファイルの置き場所と道具も違います。k3s の管理者の kubeconfig は /etc/rancher/k3s/k3s.yaml で、k3s に付いている kubectl はここを読みます。別に入れた kubectl や helm を使うときは、KUBECONFIG の環境変数か --kubeconfig でこのファイルを指します。k3s のバイナリには kubectl・crictl (CRI のランタイムを見る道具)・ctr (containerd を直接操作する道具) が入っていて、k3s kubectl・k3s crictl・k3s ctr として使えます。このファイルは root だけが読める設定 (mode 600) で書かれるので、一般ユーザーで読むには sudo k3s kubectl を使うか、server を --write-kubeconfig-mode 644 で起こします。",
+          "text": "ファイルの置き場所と道具も違います。k3s の管理者の kubeconfig は /etc/rancher/k3s/k3s.yaml で、k3s に付いている kubectl はここを読みます。別に入れた kubectl や helm を使うときは、KUBECONFIG の環境変数か --kubeconfig でこのファイルを指します。k3s のバイナリには kubectl・crictl (CRI のランタイムを見る道具)・ctr (containerd を直接操作する道具) が入っていて、k3s kubectl・k3s crictl・k3s ctr として使えます。このファイルは root だけが読める設定 (mode 600) で書かれるので、root で動く sudo k3s kubectl なら読めます。一般ユーザーの kubectl から使う手順は、付録の「ハンドブックを試すための k3s の入れ方」にあります。",
           "code": {
             "language": "bash",
-            "text": "export KUBECONFIG=/etc/rancher/k3s/k3s.yaml\nkubectl get nodes\nsudo k3s crictl ps"
+            "text": "sudo k3s kubectl get nodes\nsudo k3s crictl ps"
           },
-          "output": "NAME    STATUS   ROLES                  AGE   VERSION\nnode1   Ready    control-plane,master   20d   v1.34.1+k3s1"
+          "output": "NAME    STATUS   ROLES           AGE   VERSION\nnode1   Ready    control-plane   20d   v1.34.1+k3s1"
         },
         {
           "text": "手軽な入れ方は、公式のインストールスクリプトを流すことです。systemd か openrc のサービスとして入り、再起動やプロセスが落ちたときに自動で起き直します。kubectl・crictl・ctr・k3s-killall.sh・k3s-uninstall.sh も入ります。agent を足すときは K3S_URL と K3S_TOKEN を渡し、トークンは server の /var/lib/rancher/k3s/server/node-token にあります。今の文書の最低の要件は、server が 2 コア・2 GB、agent が 1 コア・512 MB で、アーキテクチャは x86_64・armhf・arm64/aarch64、OS は今の Linux の多くです。Windows には今のところ対応していません。ノードのホスト名は重ならないようにします。",
@@ -77,7 +77,7 @@
                 "language": "bash",
                 "text": "kubectl get nodes -o wide"
               },
-              "output": "NAME    STATUS   ROLES                  AGE   VERSION        INTERNAL-IP    ...   CONTAINER-RUNTIME\nnode1   Ready    control-plane,master   20d   v1.34.1+k3s1   192.168.0.10   ...   containerd://2.1.4-k3s2"
+              "output": "NAME    STATUS   ROLES           AGE   VERSION        INTERNAL-IP    ...   CONTAINER-RUNTIME\nnode1   Ready    control-plane   20d   v1.34.1+k3s1   192.168.0.10   ...   containerd://2.1.4-k3s2"
             },
             {
               "text": "server ノードに入り、コントロールプレーンが 1 つの k3s server のプロセスとして動いていることを確かめます (agent ノードでは k3s agent が出ます)。systemd で入れた場合、そのログは journalctl -u k3s で読めます (読むには sudo が要ることがあります)。agent ノードでは journalctl -u k3s-agent です。",
@@ -181,6 +181,145 @@
         {
           "label": "CNCF の k8s-conformance の k3s v1.34 の提出",
           "url": "https://github.com/cncf/k8s-conformance/tree/master/v1.34/k3s"
+        }
+      ]
+    },
+    {
+      "id": "setup-k3s",
+      "competency": "付録: ハンドブックを試す準備",
+      "title": "ハンドブックを試すための k3s の入れ方",
+      "summary": "ハンドブックの「試したいなら」の手順の多くは、kubectl で話しかけられる Kubernetes のクラスターが 1 つあれば試せます (一部は k3s のノードで sudo を使い、helm や docker を別に入れます)。ここでは、Linux のマシン 1 台に k3s の公式のインストールスクリプトで server を入れ、一般ユーザーの kubectl から使えるようにし、名前空間 try-kcna で手順を試せることを確かめ、最後に片付けるまでをまとめます。",
+      "flow": [
+        {
+          "text": "用意するのは Linux のマシン 1 台です。k3s の文書の最低の要件は server が 2 コア・2 GB で、アーキテクチャは x86_64・armhf・arm64/aarch64 です。この数は k3s と同梱の部品の分で、動かすワークロードの分は含みません。OS によっては追加の準備が要ります (Raspberry Pi OS では cgroups を有効にするなど。Requirements の Operating Systems を見ます)。server を 1 台入れるだけで、データストア・コントロールプレーン・kubelet・コンテナランタイムがそろった、Pod を動かせるクラスターになります (agent は足さなくてもかまいません)。ノードを足すときは、ホスト名が重ならないようにします。"
+        },
+        {
+          "text": "ファイアウォールの ufw が有効なら、文書は ufw を止めることを勧めています。有効のまま使うときは、既定では API サーバーの 6443/tcp と、Pod の 10.42.0.0/16・Service の 10.43.0.0/16 からの通信を許す設定 (ufw allow 6443/tcp など) が要ります。firewalld も同じで、止めることが勧められています。ただし文書は、Flannel の VXLAN の 8472/udp を外に開けず、ファイアウォールの内側でノードを動かすよう求めています。インターネットから直接届くマシン (VPS など) では ufw を止めず、上の許可を足して使います。"
+        },
+        {
+          "text": "公式のインストールスクリプトで server を入れます。k3s は systemd か openrc のサービスとして入り、再起動やプロセスが落ちたときに自動で起き直します。kubectl・crictl・ctr・k3s-killall.sh・k3s-uninstall.sh も入り、管理者の kubeconfig が /etc/rancher/k3s/k3s.yaml に書かれます。スクリプトに渡した設定は、入れ直すときにもう一度渡さないと消えます。",
+          "code": {
+            "language": "bash",
+            "text": "curl -sfL https://get.k3s.io | sh -"
+          },
+          "result": {
+            "text": "k3s server がサービスとして動き出す",
+            "tone": "ok"
+          }
+        },
+        {
+          "text": "k3s.yaml は root の持ち物で、既定では root だけが読める設定 (mode 600) で書かれます。一般ユーザーの kubectl から使うには、このファイルを自分のホームの ~/.kube/config に写して自分だけが読める持ち物にし、KUBECONFIG の環境変数で指します。すでに ~/.kube/config があると上書きされるので、先に .bak に残します。k3s が入れた kubectl は、KUBECONFIG も --kubeconfig も無いと ~/.kube/config ではなく /etc/rancher/k3s/k3s.yaml を読みに行き、読めずに止まります。そのため KUBECONFIG は端末ごとに要るので、~/.bashrc にも書いておきます。この写しを使うなら、ほかのトピックで k3s.yaml を KUBECONFIG に指す場面があっても打たずに飛ばします (打つと読めずに permission denied で止まります)。このファイルは system:masters のグループとして何でもできる管理者の資格なので、人に渡さないようにします。k3s は起動のたびに k3s.yaml の中の証明書を更新しますが、写しは更新されません。証明書が切れないよう、ときどき写し直します。写し直すときは、sudo cp・sudo chown・chmod の 3 行だけを打ちます (2 行目をもう一度打つと、残した .bak が k3s の写しで上書きされます)。",
+          "code": {
+            "language": "bash",
+            "text": "mkdir -p ~/.kube\n[ -e ~/.kube/config ] && [ ! -e ~/.kube/config.bak ] && cp ~/.kube/config ~/.kube/config.bak\nsudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config\nsudo chown \"$(id -u):$(id -g)\" ~/.kube/config\nchmod 600 ~/.kube/config\nexport KUBECONFIG=~/.kube/config\ngrep -qs 'KUBECONFIG=~/.kube/config' ~/.bashrc || echo 'export KUBECONFIG=~/.kube/config' >> ~/.bashrc"
+          }
+        },
+        {
+          "text": "代わりに、インストールのときに K3S_KUBECONFIG_MODE=\"644\" を渡して、k3s.yaml を誰でも読めるように書かせる方法もあります。手軽ですが、そのマシンのほかの利用者にも管理者の資格が読めてしまうので、自分だけが使う練習用のマシンに限ります。この方法では写しは作りません。k3s が入れた kubectl はそのまま k3s.yaml を読み、別に入れた kubectl や helm は export KUBECONFIG=/etc/rancher/k3s/k3s.yaml で指します。ファイルは root のものなので、kubeconfig を書き換える手順 (kubectl config set-context など) は失敗します。",
+          "code": {
+            "language": "bash",
+            "text": "curl -sfL https://get.k3s.io | K3S_KUBECONFIG_MODE=\"644\" sh -"
+          }
+        },
+        {
+          "text": "ノードが Ready になり、kube-system に CoreDNS などの Pod が動いていれば準備ができています。helm-install- で始まる Pod は、同梱の部品を入れ終えると Completed のままになるもので、正常です。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl get nodes\nkubectl get pods -n kube-system"
+          },
+          "output": "NAME    STATUS   ROLES           AGE   VERSION\nnode1   Ready    control-plane   90s   v1.34.1+k3s1"
+        },
+        {
+          "text": "ハンドブックの「試したいなら」の手順は、名前空間 try-kcna を作り、その中で試し、最後に名前空間ごと消して片付けます。名前空間を消すと、その中の Deployment や Service などはまとめて消えます。StorageClass・Node・PersistentVolume のようなクラスター全体のものは名前空間に入らないので、消しても残ります。手順の途中でやめたときも、最後の kubectl delete namespace try-kcna だけは打っておきます。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl create namespace try-kcna\n# ここでトピックの手順を試す\nkubectl delete namespace try-kcna"
+          }
+        },
+        {
+          "text": "k3s そのものを消すときは、インストールのときに作られたアンインストールのスクリプトを流します。k3s と動いている Pod を止め、手元のデータストア・Local Storage の PV のデータ・ノードの設定・スクリプトと道具を消すので、データが失われます。外部のデータストアや外部の PV のデータは消しません。自分で写した ~/.kube/config と ~/.bashrc に足した行は残るので、要らなければ自分で消します。agent のノードでは k3s-agent-uninstall.sh を使います。",
+          "code": {
+            "language": "bash",
+            "text": "/usr/local/bin/k3s-uninstall.sh"
+          },
+          "result": {
+            "text": "k3s と手元のクラスターのデータが消える",
+            "tone": "warn"
+          }
+        }
+      ],
+      "try": [
+        {
+          "goal": "入れたクラスターでハンドブックの手順を試せるかを確かめたいなら",
+          "steps": [
+            {
+              "text": "名前空間 try-kcna を作り、その中に Deployment を作る権限があるかを聞きます。yes と出れば試せます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl create namespace try-kcna\nkubectl auth can-i create deployments -n try-kcna"
+              },
+              "output": "namespace/try-kcna created\nyes"
+            },
+            {
+              "text": "nginx の Deployment を作り、Pod が動き出すまで待ちます。イメージを取ってくるので、初めては少し時間がかかります。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl create deployment hello --image=nginx:1.27-alpine -n try-kcna\nkubectl rollout status deployment/hello -n try-kcna"
+              },
+              "output": "deployment.apps/hello created\nWaiting for deployment \"hello\" rollout to finish: 0 of 1 updated replicas are available...\ndeployment \"hello\" successfully rolled out",
+              "result": {
+                "text": "Pod が 1 つ動き、Deployment が使える状態になる",
+                "tone": "ok"
+              }
+            },
+            {
+              "text": "名前空間ごと消して片付けます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl delete namespace try-kcna"
+              }
+            }
+          ]
+        }
+      ],
+      "lessons": [
+        "w1-l4",
+        "w2-l4",
+        "w2-lab",
+        "w4-l1"
+      ],
+      "sources": [
+        {
+          "label": "K3s: Quick-Start Guide",
+          "url": "https://docs.k3s.io/quick-start"
+        },
+        {
+          "label": "K3s: Requirements",
+          "url": "https://docs.k3s.io/installation/requirements"
+        },
+        {
+          "label": "K3s: Configuration Options",
+          "url": "https://docs.k3s.io/installation/configuration"
+        },
+        {
+          "label": "K3s: Cluster Access",
+          "url": "https://docs.k3s.io/cluster-access"
+        },
+        {
+          "label": "K3s: k3s server (--write-kubeconfig-mode)",
+          "url": "https://docs.k3s.io/cli/server"
+        },
+        {
+          "label": "K3s: Uninstalling K3s",
+          "url": "https://docs.k3s.io/installation/uninstall"
+        },
+        {
+          "label": "Kubernetes: Namespaces",
+          "url": "https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/"
+        },
+        {
+          "label": "Kubernetes: Share a Cluster with Namespaces",
+          "url": "https://kubernetes.io/docs/tasks/administer-cluster/namespaces/"
         }
       ]
     }

@@ -12,6 +12,7 @@ import SiteLogo from '../components/SiteLogo';
 import { dueQuestions, findLesson } from '../content';
 import glossary from '../content/glossary.json';
 import type { Domain } from '../content/types';
+import { isFreshVisit } from '../lib/scrollMemory';
 import { searchTerms, sortTerms, termDomain, type GlossaryTerm } from '../lib/glossary';
 import { DOMAINS } from '../lib/lessonStatus';
 import type { Progress } from '../lib/progress';
@@ -84,8 +85,14 @@ function Filters({ value, onChange, counts }: { value: Domain | 'all'; onChange:
 }
 
 /** スマホ: 語と説明の 1 行目だけの閉じた一覧。押すと開く */
-function PhoneList({ hits }: { hits: Entry[] }) {
-  const [open, setOpen] = useState<string | null>(null);
+function PhoneList({ hits, initial }: { hits: Entry[]; initial?: string }) {
+  const [open, setOpen] = useState<string | null>(initial ?? null);
+  // ほかのページの用語のリンクから来たときは、その語を開いて見える所へ送る
+  useEffect(() => {
+    // 経路が変わったときの「先頭へ戻す」(lib/scrollMemory) のあとに送る
+    // 戻る・進むで来たときは、覚えた位置に戻すほうを優先する (送り直さない)
+    if (initial) requestAnimationFrame(() => requestAnimationFrame(() => isFreshVisit() && document.getElementById(`gloss-row-${initial}`)?.scrollIntoView({ block: 'start' })));
+  }, [initial]);
   // 検索や絞り込みで消えた語は閉じたことにする (戻したときに勝手に開かない)
   useEffect(() => {
     if (open && !hits.some((t) => t.id === open)) setOpen(null);
@@ -95,7 +102,7 @@ function PhoneList({ hits }: { hits: Entry[] }) {
       {hits.map((t) => {
         const isOpen = open === t.id;
         return (
-          <li key={t.id} className="gloss-row">
+          <li key={t.id} className="gloss-row" id={`gloss-row-${t.id}`}>
             <h2 className="gloss-row__h">
             <button type="button" className="gloss-row__head" aria-expanded={isOpen} aria-controls={`gloss-body-${t.id}`} onClick={() => setOpen(isOpen ? null : t.id)}>
               <span className="gloss-row__text">
@@ -126,9 +133,13 @@ function PhoneList({ hits }: { hits: Entry[] }) {
 }
 
 /** PC: 左に分野ごとの語の一覧、右に選んだ語の説明 */
-function DeskList({ hits }: { hits: Entry[] }) {
-  const [picked, setPicked] = useState<string | null>(null);
+function DeskList({ hits, initial }: { hits: Entry[]; initial?: string }) {
+  const [picked, setPicked] = useState<string | null>(initial ?? null);
   const buttons = useRef(new Map<string, HTMLButtonElement>());
+  // ほかのページの用語のリンクから来たときは、一覧のその語を見える所へ送る
+  useEffect(() => {
+    if (initial) buttons.current.get(initial)?.scrollIntoView({ block: 'nearest' });
+  }, [initial]);
   // 検索や絞り込みで消えた語の選択は外す (戻したときに勝手に戻らない)
   useEffect(() => {
     if (picked && !hits.some((t) => t.id === picked)) setPicked(null);
@@ -196,7 +207,13 @@ function DeskList({ hits }: { hits: Entry[] }) {
   );
 }
 
-function Body({ isWide }: { isWide: boolean }) {
+function Body({ isWide, termId }: { isWide: boolean; termId?: string }) {
+  // リンクから来た語は、最初に一覧を出すときだけ開く (検索で一覧が出し直されても、もう一度は開かない)
+  const pending = useRef(termId && TERMS.some((t) => t.id === termId) ? termId : undefined);
+  useEffect(() => {
+    pending.current = undefined;
+  }, []);
+  const initial = pending.current;
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<Domain | 'all'>('all');
   const found = useMemo(() => searchTerms(TERMS, query), [query]);
@@ -229,22 +246,22 @@ function Body({ isWide }: { isWide: boolean }) {
       {hits.length === 0 ? (
         <Text type="supporting">見つかりませんでした。別の言い方 (英語・略語) でも探せます。</Text>
       ) : isWide ? (
-        <DeskList hits={hits} />
+        <DeskList hits={hits} initial={initial} />
       ) : (
-        <PhoneList hits={hits} />
+        <PhoneList hits={hits} initial={initial} />
       )}
     </VStack>
   );
 }
 
-export default function Glossary({ progress }: { progress: Progress }) {
+export default function Glossary({ progress, termId }: { progress: Progress; termId?: string }) {
   const isWide = useMediaQuery(WIDE_QUERY);
   if (isWide) {
     return (
       <AppShell contentPadding={0} variant="section" sideNav={<AppSideNav current="glossary" progress={progress} />}>
         <div className="desk">
           <div className="gloss-page">
-            <Body isWide />
+            <Body isWide termId={termId} />
           </div>
         </div>
       </AppShell>
@@ -260,7 +277,7 @@ export default function Glossary({ progress }: { progress: Progress }) {
         <RepoLink />
       </header>
       <main className="page__section">
-        <Body isWide={false} />
+        <Body isWide={false} termId={termId} />
       </main>
       <BottomTabs current="glossary" reviewCount={dueQuestions(progress, new Date()).length} />
     </div>

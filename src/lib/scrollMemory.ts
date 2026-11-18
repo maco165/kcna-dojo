@@ -40,6 +40,10 @@ export function ensureKey(): { key: string; fresh: boolean } {
 
 let current = '';
 let started = false;
+let lastFresh = true;
+
+/** 今のページが新しく開いたページか (戻る・進むで来たのではないか)。ページの中で特定の場所へ送るかを決めるのに使う */
+export const isFreshVisit = () => lastFresh;
 
 /** 今のページの位置を覚える。ページを離れる直前 (前の画面がまだあるうち) と、閉じる・再読み込みの前に呼ぶ */
 export function savePosition() {
@@ -62,7 +66,9 @@ export function startScrollMemory() {
   if (started) return;
   started = true;
   if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
-  current = ensureKey().key;
+  const k = ensureKey();
+  current = k.key;
+  lastFresh = k.fresh;
   window.addEventListener('pagehide', savePosition);
 }
 
@@ -70,6 +76,7 @@ export function startScrollMemory() {
 export function onRouteChanged() {
   const { key, fresh } = ensureKey();
   current = key;
+  lastFresh = fresh;
   if (fresh) {
     window.scrollTo(0, 0);
     requestAnimationFrame(() => (scroller().scrollTop = 0));
