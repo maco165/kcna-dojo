@@ -160,6 +160,7 @@ try {
   });
   await shoot('glossary-phone', phone, `${BASE}#/glossary`, async (page) => {
     await page.getByRole('searchbox', { name: '用語を探す' }).fill('Pod');
+    await page.locator('.gloss-row__head').first().click();
   });
   await shoot('settings-phone', phone, `${BASE}#/settings`);
   console.log(`書き出した: ${OUT}`);

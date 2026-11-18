@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
 // GitHub Pages ではサーバーで経路を振り分けられないので、URL の # の後ろで画面を決める。
-export type Route = { name: 'home'; week: number } | { name: 'lesson'; lessonId: string } | { name: 'about' } | { name: 'settings' } | { name: 'review' } | { name: 'progress' } | { name: 'exam' } | { name: 'glossary' };
+export type Route = { name: 'home'; week: number } | { name: 'lesson'; lessonId: string } | { name: 'about' } | { name: 'settings' } | { name: 'review' } | { name: 'progress' } | { name: 'exam' } | { name: 'glossary' } | { name: 'guide' };
 
 export function parseRoute(hash: string): Route {
   const path = hash.replace(/^#/, '');
@@ -13,6 +13,7 @@ export function parseRoute(hash: string): Route {
   if (path === '/progress') return { name: 'progress' };
   if (path === '/exam') return { name: 'exam' };
   if (path === '/glossary') return { name: 'glossary' };
+  if (path === '/guide') return { name: 'guide' };
   const week = path.match(/^\/week\/(\d+)$/);
   if (week) return { name: 'home', week: Number(week[1]) };
   return { name: 'home', week: 1 };
@@ -25,6 +26,7 @@ export const reviewHref = '#/review';
 export const progressHref = '#/progress';
 export const examHref = '#/exam';
 export const glossaryHref = '#/glossary';
+export const guideHref = '#/guide';
 export const weekHref = (week: number) => `#/week/${week}`;
 
 export function useRoute(): Route {

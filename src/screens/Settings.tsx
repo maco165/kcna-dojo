@@ -147,8 +147,10 @@ function Body({ progress, updateProgress }: Props) {
                     variant="primary"
                     label="置き換える"
                     onClick={() => {
-                      // 目標と受験日を変えたことの無い端末の書き出しなら、今の設定を引き継ぐ
-                      const next = loaded.profile ? loaded : { ...loaded, profile: progress.profile };
+                      // 目標と受験日を変えたことの無い端末の書き出しなら、今の設定を引き継ぐ。
+                      // 画面の色はこの端末の見た目の設定なので、読み込んでも今の端末の色を残す
+                      const base = loaded.profile ? loaded : { ...loaded, profile: progress.profile };
+                      const next = base.profile ? setProfile(base, { colorMode: colorMode(progress) }) : base;
                       if (!saveProgress(next)) {
                         setLoadError('このブラウザに保存できませんでした (容量の上限やプライベートモードなど)。今の記録はそのままです。');
                         setLoaded(null);
@@ -175,7 +177,7 @@ function Body({ progress, updateProgress }: Props) {
         isOpen={confirmReset}
         onOpenChange={setConfirmReset}
         title="記録を消しますか?"
-        description="完了したレッスン・XP・連続日数・問題ごとの正誤を消します。目標と受験日の設定は残ります。消す前に書き出しておくと、あとで読み込んで戻せます。"
+        description="完了したレッスン・XP・連続日数・問題ごとの正誤を消します。目標・受験日・画面の色の設定は残ります。消す前に書き出しておくと、あとで読み込んで戻せます。"
         actionLabel="消す"
         cancelLabel="やめる"
         onAction={() => {

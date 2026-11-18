@@ -39,10 +39,10 @@ function nameRank(names: string[], words: string[]): number {
  * 用語・別名・説明から探す。空白で区切った語をすべて含むものを、
  * 用語か別名に当たるものを先に、説明だけに当たるものを後に並べる
  */
-export function searchTerms(terms: GlossaryTerm[], query: string): GlossaryTerm[] {
+export function searchTerms<T extends GlossaryTerm>(terms: T[], query: string): T[] {
   const words = normalizeText(query).split(' ').filter(Boolean);
   if (words.length === 0) return terms;
-  const hits: { t: GlossaryTerm; rank: number; i: number }[] = [];
+  const hits: { t: T; rank: number; i: number }[] = [];
   terms.forEach((t, i) => {
     const names = [t.term, ...(t.aliases ?? [])].map(normalizeText);
     const all = `${names.join(' ')} ${normalizeText(t.description)}`;
@@ -54,7 +54,7 @@ export function searchTerms(terms: GlossaryTerm[], query: string): GlossaryTerm[
 }
 
 /** 読みの順 (日本語の並び) に並べる */
-export function sortTerms(terms: GlossaryTerm[]): GlossaryTerm[] {
+export function sortTerms<T extends GlossaryTerm>(terms: T[]): T[] {
   return [...terms].sort((a, b) => a.term.localeCompare(b.term, 'ja'));
 }
 
@@ -103,4 +103,19 @@ export function validateGlossary(data: unknown, knownLessonIds: Set<string>): st
     }
   });
   return errors;
+}
+
+/**
+ * 語の分野。その語が出てくるレッスンの分野でいちばん多いもの (同じ数なら order の順で先のもの)。
+ * レッスンが 1 つも見つからなければ undefined
+ */
+export function termDomain<D extends string>(t: GlossaryTerm, domainOf: (lessonId: string) => D | undefined, order: readonly D[]): D | undefined {
+  const count = new Map<D, number>();
+  for (const id of t.lessons) {
+    const d = domainOf(id);
+    if (d) count.set(d, (count.get(d) ?? 0) + 1);
+  }
+  let best: D | undefined;
+  for (const d of order) if ((count.get(d) ?? 0) > 0 && (best === undefined || count.get(d)! > count.get(best)!)) best = d;
+  return best;
 }

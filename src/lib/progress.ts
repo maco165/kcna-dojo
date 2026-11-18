@@ -13,10 +13,10 @@ export type AnswerRecord = { right: number; wrong: number; last: string; stage?:
 /** 復習の間隔 (日)。間違えたら翌日、復習で続けて正解するたびに 3 日後・7 日後、その次の正解で終わる */
 export const REVIEW_INTERVALS = [1, 3, 7] as const;
 
-/** 設定 (目標と受験日)。無ければ既定の値を使う */
 /** 画面の色。system は端末の設定に合わせる */
 export type ColorMode = 'system' | 'light' | 'dark';
 export const COLOR_MODES: readonly ColorMode[] = ['system', 'light', 'dark'];
+/** 設定 (目標・受験日・画面の色)。無ければ既定の値を使う */
 export type Profile = { dailyGoalXp: number; examDate: string; colorMode?: ColorMode };
 
 /** 1 日の目標の XP の既定と選べる値 */
@@ -292,7 +292,7 @@ export function setProfile(p: Progress, change: Partial<Profile>): Progress {
   return { ...p, profile: next };
 }
 
-/** 記録を消す。目標と受験日の設定は残す */
+/** 記録を消す。目標・受験日・画面の色の設定は残す */
 export function resetProgress(p: Progress): Progress {
   const next = emptyProgress();
   if (p.profile) next.profile = { ...p.profile };
