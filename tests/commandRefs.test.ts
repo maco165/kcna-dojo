@@ -56,6 +56,9 @@ describe('コマンドの見つけ方', () => {
     expect(get.use?.flags.map((f) => f.flags[0])).toEqual(['-n', '-o']);
     expect(matchLine('kubectl get pods --watch', data).unknown.map((u) => u.token)).toEqual(['kubectl get --watch']);
     expect(matchLine('kubectl exec web', data).unknown[0].reason).toBe('command');
+    // -- より後ろはコンテナの中のコマンド、閉じかっこは語に含めない
+    expect(matchLine("kubectl get pods -- sh -c 'ls -la'", data).unknown).toEqual([]);
+    expect(matchLine('kubectl get pods -o)', data).use?.flags.map((f) => f.flags[0])).toEqual(['-o']);
     // 前に置いたオプションは値ごと飛ばしてサブコマンドを読む
     expect(matchLine('kubectl -n kube-system get pods', data).use?.entry.id).toBe('kubectl-get');
     expect(matchLine('kubectl --namespace=web rollout undo deploy/web', data).use?.entry.id).toBe('kubectl-rollout-undo');

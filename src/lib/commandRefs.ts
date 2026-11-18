@@ -61,7 +61,10 @@ export function commandLines(text: string): string[] {
 
 /** 1 行のコマンドを、説明のデータに当てる。サブコマンドはいちばん長く一致するもの */
 export function matchLine(line: string, data: CommandData): { use?: CommandUse; unknown: Unknown[] } {
-  const words = line.split(/\s+/);
+  // -- より後ろはコンテナの中で動かすコマンドなので読まない。語の終わりの閉じかっこは落とす (「(kubectl logs --previous)」など)
+  const all = line.split(/\s+/).map((w) => w.replace(/[)）」]+$/, ''));
+  const end = all.indexOf('--');
+  const words = end === -1 ? all : all.slice(0, end);
   const tool = words[0];
   // サブコマンドの語を読む。前に置いたオプション (etcdctl --endpoints $X snapshot save、kubectl -n ns get) は値ごと飛ばす
   const plain: string[] = [tool];
