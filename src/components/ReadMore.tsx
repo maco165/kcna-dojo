@@ -1,5 +1,5 @@
 // 答えたあと、解説の下に出す「読み直す」。ハンドブックのトピックと用語集の語へのリンク。
-// ハンドブックと用語集のデータはこの部品と一緒に、答えたあとに読む (Feedback が lazy で読む)
+// ハンドブックと用語集のデータはこの部品と一緒に、答えたあとに読む (問題の部品が lazy で読み、「次へ」の下に出すので、後から出ても次へはずれない)
 import glossary from '../content/glossary.json';
 import { HANDBOOK_TOPICS } from '../content/handbook';
 import type { Question } from '../content/types';
@@ -11,9 +11,10 @@ import { termNames } from '../lib/termLinks';
 const TERMS = (glossary as { terms: GlossaryTerm[] }).terms;
 const NAMES = termNames(TERMS);
 
-export default function ReadMore({ question }: { question: Question }) {
+/** domain: 問題の分野 (同じ分野の範囲内のトピックを先に出す) */
+export default function ReadMore({ question, domain }: { question: Question; domain?: string }) {
   const termIds = termsInQuestion(question, NAMES);
-  const topicIds = topicsForQuestion(question, termIds, TERMS, HANDBOOK_TOPICS);
+  const topicIds = topicsForQuestion(question, termIds, TERMS, HANDBOOK_TOPICS, domain);
   if (termIds.length === 0 && topicIds.length === 0) return null;
   return (
     <nav className="read-more" aria-label="読み直す">

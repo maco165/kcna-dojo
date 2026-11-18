@@ -21,26 +21,7 @@ import RepoLink from '../components/RepoLink';
 import SiteLogo from '../components/SiteLogo';
 import { dueReviewCount, questionBank } from '../content';
 import type { Domain, Question } from '../content/types';
-import {
-  EXAM_MINUTES,
-  EXAM_QUESTIONS,
-  EXAM_WEIGHTS,
-  PASS_MARK,
-  domainCounts,
-  formatClock,
-  gradeExam,
-  isAnswered,
-  isCorrect,
-  defaultChoice,
-  lastExamOf,
-  recordExam,
-  startExam,
-  type ExamChoice,
-  type ExamSet,
-  type BankItem,
-  type ExamAnswer,
-  type ExamResult,
-} from '../lib/exam';
+import { EXAM_MINUTES, EXAM_QUESTIONS, EXAM_WEIGHTS, PASS_MARK, domainCounts, formatClock, gradeExam, isAnswered, isCorrect, defaultChoice, lastExamOf, recordExam, startExam, type ExamChoice, type ExamSet, type BankItem, type ExamAnswer, type ExamResult, weakDomains } from '../lib/exam';
 import examSets from '../content/examSets.json';
 import { EXAM_ONLY } from '../content/examBank';
 import { normalizeAnswer } from '../lib/grade';
@@ -50,6 +31,7 @@ import { WIDE_QUERY, useMediaQuery } from '../lib/useMediaQuery';
 
 // 弱い分野の読み直す先 (ハンドブックのデータ) は、結果を出すときに読む
 const WeakDomains = lazy(() => import('../components/WeakDomains'));
+const ReadMore = lazy(() => import('../components/ReadMore'));
 
 type Props = { progress: Progress; updateProgress: (fn: (p: Progress) => Progress) => void };
 
@@ -326,7 +308,7 @@ function Result({ items, answers, result, onRestart }: { items: BankItem[]; answ
             );
           })}
           <Suspense fallback={null}>
-            <WeakDomains domains={(Object.keys(result.byDomain) as Domain[]).filter((d) => result.byDomain[d].total > 0 && result.byDomain[d].right / result.byDomain[d].total < PASS_MARK)} />
+            <WeakDomains domains={weakDomains(result)} />
           </Suspense>
         </VStack>
       </Card>
@@ -363,6 +345,9 @@ function Result({ items, answers, result, onRestart }: { items: BankItem[]; answ
                   {q.type === 'fill' && <CodeBlock code={q.code.replace('{{blank}}', '____')} width="100%" size="sm" hasCopyButton={false} />}
                   <Text type="supporting">あなたの答え: {mine}</Text>
                   <Feedback correct={false} correctAnswer={correctAnswer} explanation={q.explanation} note={q.type === 'choice' ? q.choices.find((c) => c.id === answer)?.why : q.wrongNotes?.[normalizeAnswer(answer ?? '')]} source={q.source} question={q} notesOpen={false} />
+                  <Suspense fallback={null}>
+                    <ReadMore question={q} domain={item.domain} />
+                  </Suspense>
                   <AskAi question={q} answered={isAnswered(answer) ? { picked: answer, correct: false } : undefined} />
                 </VStack>
               </Card>

@@ -2439,8 +2439,8 @@ html[data-loading='true'] body::before {
 }
 
 .read-more__label {
-  flex: none;
-  min-width: 6em;
+  /* ラベルは札の上に置く (札が折り返しても揃う) */
+  flex: 0 0 100%;
 .cmd-note__absent {
   padding: 0 6px;
   border-radius: 6px;

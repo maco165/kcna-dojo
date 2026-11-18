@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { Button } from '@astryxdesign/core/Button';
 import { CodeBlock } from '@astryxdesign/core/CodeBlock';
 import { HStack, VStack } from '@astryxdesign/core/Stack';
@@ -10,6 +10,9 @@ import AskAi from './AskAi';
 import Feedback from './Feedback';
 import { ActionArea, PrimaryAction, QuestionHead } from './QuestionFrame';
 import { preloadNotes } from '../lib/preloadNotes';
+
+// 読み直す先 (ハンドブックと用語集) は、そのデータと一緒に答えたあとに読む
+const ReadMore = lazy(() => import('./ReadMore'));
 
 const LANGUAGE_LABEL: Record<FillQuestion['language'], string> = {
   bash: 'bash',
@@ -162,6 +165,9 @@ export default function FillQuestionView({
               extra={result && question.output ? <CodeBlock code={question.output} title="実行結果の例 (列の一部)" width="100%" size="sm" hasCopyButton={false} /> : undefined}
             />
             <PrimaryAction label={nextLabel} onClick={onNext} kbdHint="Enter で次へ" />
+            <Suspense fallback={null}>
+              <ReadMore question={question} domain={domain} />
+            </Suspense>
             <AskAi question={question} answered={{ picked: typed, correct: result }} />
           </>
         )}
