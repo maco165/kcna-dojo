@@ -1,0 +1,1750 @@
+[
+ {
+  "id": "image-and-runtime",
+  "terms": [
+   "cri",
+   "containerd",
+   "crictl",
+   "container-image",
+   "oci"
+  ],
+  "spec": {
+   "caption": "kubelet は CRI という共通の決まりでコンテナランタイムの containerd に頼み、containerd はレジストリからコンテナイメージを取って runc で起動します。OCI はイメージと実行の形式を決め、crictl はノードの上で CRI の口に直接つないで調べる道具です。",
+   "width": 640,
+   "height": 330,
+   "nodes": [
+    {
+     "id": "kubelet",
+     "x": 20,
+     "y": 30,
+     "w": 140,
+     "h": 52,
+     "label": "kubelet",
+     "sub": "Pod を動かす係",
+     "tone": "muted"
+    },
+    {
+     "id": "cri",
+     "x": 230,
+     "y": 30,
+     "w": 150,
+     "h": 52,
+     "label": "CRI",
+     "sub": "会話の共通の決まり",
+     "term": "cri"
+    },
+    {
+     "id": "containerd",
+     "x": 450,
+     "y": 30,
+     "w": 170,
+     "h": 52,
+     "label": "containerd",
+     "sub": "コンテナランタイム",
+     "term": "containerd"
+    },
+    {
+     "id": "crictl",
+     "x": 20,
+     "y": 140,
+     "w": 140,
+     "h": 52,
+     "label": "crictl",
+     "sub": "ノードで調べる",
+     "term": "crictl"
+    },
+    {
+     "id": "runc",
+     "x": 450,
+     "y": 150,
+     "w": 170,
+     "h": 52,
+     "label": "runc",
+     "sub": "コンテナを起動",
+     "tone": "muted"
+    },
+    {
+     "id": "registry",
+     "x": 20,
+     "y": 260,
+     "w": 140,
+     "h": 52,
+     "label": "レジストリ",
+     "sub": "イメージの置き場",
+     "tone": "muted"
+    },
+    {
+     "id": "image",
+     "x": 230,
+     "y": 260,
+     "w": 150,
+     "h": 52,
+     "label": "コンテナイメージ",
+     "sub": "アプリと依存の包み",
+     "term": "container-image"
+    },
+    {
+     "id": "oci",
+     "x": 450,
+     "y": 260,
+     "w": 170,
+     "h": 52,
+     "label": "OCI",
+     "sub": "イメージと実行の形式",
+     "term": "oci"
+    }
+   ],
+   "edges": [
+    {
+     "from": "kubelet",
+     "to": "cri",
+     "label": "gRPC"
+    },
+    {
+     "from": "cri",
+     "to": "containerd"
+    },
+    {
+     "from": "crictl",
+     "to": "cri",
+     "label": "直接つなぐ"
+    },
+    {
+     "from": "containerd",
+     "to": "runc",
+     "label": "起動を頼む"
+    },
+    {
+     "from": "registry",
+     "to": "image",
+     "label": "nginx:1.27"
+    },
+    {
+     "from": "image",
+     "to": "containerd",
+     "label": "取得",
+     "fromSide": "top",
+     "toSide": "bottom"
+    },
+    {
+     "from": "oci",
+     "to": "runc",
+     "dashed": true
+    },
+    {
+     "from": "oci",
+     "to": "image",
+     "label": "形式を決める",
+     "dashed": true
+    }
+   ]
+  }
+ },
+ {
+  "id": "k3s-bundle",
+  "terms": [
+   "k3s"
+  ],
+  "spec": {
+   "caption": "k3s server はコントロールプレーンの部品を 1 つのバイナリにまとめ、containerd・Flannel・CoreDNS・Traefik を同梱し、データは既定で sqlite3 に置きます。k3s agent を動かすホストがエージェントとして加わります。",
+   "width": 640,
+   "height": 200,
+   "nodes": [
+    {
+     "id": "tools",
+     "x": 10,
+     "y": 20,
+     "w": 150,
+     "h": 52,
+     "label": "kubectl・crictl",
+     "sub": "一緒に入る",
+     "tone": "muted"
+    },
+    {
+     "id": "server",
+     "x": 220,
+     "y": 20,
+     "w": 200,
+     "h": 52,
+     "label": "k3s server",
+     "sub": "1 つのバイナリ",
+     "term": "k3s"
+    },
+    {
+     "id": "agent",
+     "x": 470,
+     "y": 20,
+     "w": 160,
+     "h": 52,
+     "label": "k3s agent",
+     "sub": "エージェントのホスト",
+     "term": "k3s"
+    },
+    {
+     "id": "ctrd",
+     "x": 10,
+     "y": 130,
+     "w": 112,
+     "h": 52,
+     "label": "containerd",
+     "sub": "ランタイム",
+     "tone": "muted"
+    },
+    {
+     "id": "flannel",
+     "x": 136,
+     "y": 130,
+     "w": 112,
+     "h": 52,
+     "label": "Flannel",
+     "sub": "CNI",
+     "tone": "muted"
+    },
+    {
+     "id": "dns",
+     "x": 262,
+     "y": 130,
+     "w": 112,
+     "h": 52,
+     "label": "CoreDNS",
+     "sub": "DNS",
+     "tone": "muted"
+    },
+    {
+     "id": "traefik",
+     "x": 388,
+     "y": 130,
+     "w": 112,
+     "h": 52,
+     "label": "Traefik",
+     "sub": "Ingress",
+     "tone": "muted"
+    },
+    {
+     "id": "sqlite",
+     "x": 514,
+     "y": 130,
+     "w": 116,
+     "h": 52,
+     "label": "sqlite3",
+     "sub": "データの置き場",
+     "tone": "muted"
+    }
+   ],
+   "edges": [
+    {
+     "from": "server",
+     "to": "tools",
+     "dashed": true
+    },
+    {
+     "from": "agent",
+     "to": "server",
+     "label": "加わる"
+    },
+    {
+     "from": "server",
+     "to": "ctrd",
+     "dashed": true,
+     "fromSide": "bottom",
+     "toSide": "top"
+    },
+    {
+     "from": "server",
+     "to": "flannel",
+     "dashed": true,
+     "fromSide": "bottom",
+     "toSide": "top"
+    },
+    {
+     "from": "server",
+     "to": "dns",
+     "dashed": true,
+     "fromSide": "bottom",
+     "toSide": "top"
+    },
+    {
+     "from": "server",
+     "to": "traefik",
+     "dashed": true,
+     "fromSide": "bottom",
+     "toSide": "top"
+    },
+    {
+     "from": "server",
+     "to": "sqlite",
+     "dashed": true,
+     "fromSide": "bottom",
+     "toSide": "top"
+    }
+   ]
+  }
+ },
+ {
+  "id": "control-plane-parts",
+  "terms": [
+   "kube-apiserver",
+   "etcd",
+   "kube-scheduler",
+   "kube-controller-manager"
+  ],
+  "spec": {
+   "caption": "kubectl もほかの部品も kube-apiserver を通して読み書きし、API サーバーのデータはすべて etcd に保存されます。kube-scheduler は Pod の置き場所を、kube-controller-manager の中のコントローラーは必要な Pod を、API サーバーに伝えます。",
+   "width": 640,
+   "height": 320,
+   "groups": [
+    {
+     "x": 10,
+     "y": 74,
+     "w": 624,
+     "h": 160,
+     "label": "コントロールプレーン"
+    }
+   ],
+   "nodes": [
+    {
+     "id": "kubectl",
+     "x": 250,
+     "y": 14,
+     "w": 140,
+     "h": 44,
+     "label": "kubectl",
+     "tone": "muted"
+    },
+    {
+     "id": "api",
+     "x": 240,
+     "y": 112,
+     "w": 160,
+     "h": 52,
+     "label": "kube-apiserver",
+     "sub": "API の受付窓口",
+     "term": "kube-apiserver"
+    },
+    {
+     "id": "etcd",
+     "x": 30,
+     "y": 112,
+     "w": 150,
+     "h": 52,
+     "label": "etcd",
+     "sub": "すべてのデータ",
+     "term": "etcd"
+    },
+    {
+     "id": "sched",
+     "x": 444,
+     "y": 96,
+     "w": 180,
+     "h": 52,
+     "label": "kube-scheduler",
+     "sub": "置くノードを決める",
+     "term": "kube-scheduler"
+    },
+    {
+     "id": "cm",
+     "x": 444,
+     "y": 166,
+     "w": 180,
+     "h": 52,
+     "label": "kube-controller-manager",
+     "sub": "望む状態に近づける",
+     "term": "kube-controller-manager"
+    },
+    {
+     "id": "kubelet",
+     "x": 240,
+     "y": 262,
+     "w": 160,
+     "h": 44,
+     "label": "ノードの kubelet",
+     "tone": "muted"
+    }
+   ],
+   "edges": [
+    {
+     "from": "kubectl",
+     "to": "api",
+     "label": "apply"
+    },
+    {
+     "from": "api",
+     "to": "etcd",
+     "label": "保存"
+    },
+    {
+     "from": "sched",
+     "to": "api",
+     "fromSide": "left",
+     "toSide": "right"
+    },
+    {
+     "from": "cm",
+     "to": "api"
+    },
+    {
+     "from": "kubelet",
+     "to": "api",
+     "label": "割り当てを見る"
+    }
+   ]
+  }
+ },
+ {
+  "id": "node-components",
+  "terms": [
+   "control-plane",
+   "kubelet",
+   "kube-proxy",
+   "node"
+  ],
+  "spec": {
+   "caption": "コントロールプレーンが決めた Pod の中身を、ノードの kubelet が受け取り、CRI でコンテナランタイムに起動を頼みます。kube-proxy は Service の転送の規則をノードに書き込みます。Node はこれらが CPU とメモリを使う 1 台のマシンです。",
+   "width": 640,
+   "height": 320,
+   "groups": [
+    {
+     "x": 180,
+     "y": 16,
+     "w": 456,
+     "h": 300,
+     "label": "1 台のノード"
+    }
+   ],
+   "nodes": [
+    {
+     "id": "cp",
+     "x": 10,
+     "y": 110,
+     "w": 150,
+     "h": 60,
+     "label": "コントロールプレーン",
+     "sub": "司令塔",
+     "term": "control-plane"
+    },
+    {
+     "id": "kubelet",
+     "x": 196,
+     "y": 56,
+     "w": 110,
+     "h": 52,
+     "label": "kubelet",
+     "sub": "Pod を動かす",
+     "term": "kubelet"
+    },
+    {
+     "id": "rt",
+     "x": 340,
+     "y": 56,
+     "w": 140,
+     "h": 52,
+     "label": "コンテナランタイム",
+     "sub": "containerd など",
+     "tone": "muted"
+    },
+    {
+     "id": "pod",
+     "x": 516,
+     "y": 56,
+     "w": 110,
+     "h": 52,
+     "label": "Pod",
+     "sub": "コンテナの組",
+     "tone": "muted"
+    },
+    {
+     "id": "proxy",
+     "x": 196,
+     "y": 156,
+     "w": 150,
+     "h": 52,
+     "label": "kube-proxy",
+     "sub": "Service の転送",
+     "term": "kube-proxy"
+    },
+    {
+     "id": "node",
+     "x": 196,
+     "y": 252,
+     "w": 430,
+     "h": 52,
+     "label": "Node",
+     "sub": "VM か物理マシン",
+     "term": "node"
+    }
+   ],
+   "edges": [
+    {
+     "from": "cp",
+     "to": "kubelet",
+     "label": "Pod の中身",
+     "fromSide": "top",
+     "toSide": "left"
+    },
+    {
+     "from": "proxy",
+     "to": "cp",
+     "fromSide": "left",
+     "toSide": "bottom"
+    },
+    {
+     "from": "kubelet",
+     "to": "rt",
+     "label": "CRI"
+    },
+    {
+     "from": "rt",
+     "to": "pod",
+     "label": "起動"
+    },
+    {
+     "from": "pod",
+     "to": "node",
+     "label": "CPU とメモリ",
+     "dashed": true,
+     "fromSide": "bottom",
+     "toSide": "top"
+    }
+   ]
+  }
+ },
+ {
+  "id": "declarative-flow",
+  "terms": [
+   "manifest",
+   "kubectl",
+   "kubeconfig",
+   "controller"
+  ],
+  "spec": {
+   "caption": "マニフェストに望ましい状態を書き、kubectl が kubeconfig の接続先へ送ります。API サーバーが受け付けた望ましい状態と今の状態のずれを、コントローラーが見つけて直し続けます。",
+   "width": 640,
+   "height": 300,
+   "nodes": [
+    {
+     "id": "manifest",
+     "x": 10,
+     "y": 20,
+     "w": 150,
+     "h": 52,
+     "label": "マニフェスト",
+     "sub": "YAML の注文書",
+     "term": "manifest"
+    },
+    {
+     "id": "kubectl",
+     "x": 240,
+     "y": 20,
+     "w": 150,
+     "h": 52,
+     "label": "kubectl",
+     "sub": "API を呼ぶ道具",
+     "term": "kubectl"
+    },
+    {
+     "id": "api",
+     "x": 470,
+     "y": 20,
+     "w": 160,
+     "h": 52,
+     "label": "kube-apiserver",
+     "sub": "望む状態を保存",
+     "tone": "muted"
+    },
+    {
+     "id": "kubeconfig",
+     "x": 240,
+     "y": 130,
+     "w": 150,
+     "h": 52,
+     "label": "kubeconfig",
+     "sub": "どこに誰として",
+     "term": "kubeconfig"
+    },
+    {
+     "id": "current",
+     "x": 240,
+     "y": 236,
+     "w": 150,
+     "h": 52,
+     "label": "今の状態",
+     "sub": "Pod が 2 つ",
+     "tone": "muted"
+    },
+    {
+     "id": "controller",
+     "x": 470,
+     "y": 236,
+     "w": 160,
+     "h": 52,
+     "label": "コントローラー",
+     "sub": "ずれを直す",
+     "term": "controller"
+    }
+   ],
+   "edges": [
+    {
+     "from": "manifest",
+     "to": "kubectl",
+     "label": "apply -f"
+    },
+    {
+     "from": "kubeconfig",
+     "to": "kubectl",
+     "label": "接続先"
+    },
+    {
+     "from": "kubectl",
+     "to": "api",
+     "label": "HTTP"
+    },
+    {
+     "from": "api",
+     "to": "controller",
+     "label": "望む状態"
+    },
+    {
+     "from": "controller",
+     "to": "current",
+     "label": "Pod を足す"
+    }
+   ]
+  }
+ },
+ {
+  "id": "pod-inside",
+  "terms": [
+   "pod"
+  ],
+  "spec": {
+   "caption": "Pod は 1 つ以上のコンテナを包む最小の単位で、中のコンテナは IP を共有して localhost でつながり、ボリュームも共有します。ふつうは Deployment などのワークロードに作らせます。",
+   "width": 560,
+   "height": 320,
+   "nodes": [
+    {
+     "id": "wl",
+     "x": 10,
+     "y": 30,
+     "w": 160,
+     "h": 52,
+     "label": "Deployment など",
+     "sub": "Pod を作らせる",
+     "tone": "muted"
+    },
+    {
+     "id": "pod",
+     "x": 250,
+     "y": 30,
+     "w": 160,
+     "h": 52,
+     "label": "Pod",
+     "sub": "IP を 1 つ持つ",
+     "term": "pod"
+    },
+    {
+     "id": "a",
+     "x": 160,
+     "y": 150,
+     "w": 140,
+     "h": 52,
+     "label": "コンテナ A",
+     "sub": "アプリ"
+    },
+    {
+     "id": "b",
+     "x": 380,
+     "y": 150,
+     "w": 140,
+     "h": 52,
+     "label": "コンテナ B",
+     "sub": "補助"
+    },
+    {
+     "id": "vol",
+     "x": 270,
+     "y": 256,
+     "w": 140,
+     "h": 52,
+     "label": "共有のボリューム",
+     "tone": "muted"
+    }
+   ],
+   "edges": [
+    {
+     "from": "wl",
+     "to": "pod",
+     "label": "作る"
+    },
+    {
+     "from": "pod",
+     "to": "a",
+     "label": "包む"
+    },
+    {
+     "from": "pod",
+     "to": "b"
+    },
+    {
+     "from": "a",
+     "to": "b",
+     "label": "localhost"
+    },
+    {
+     "from": "a",
+     "to": "vol",
+     "dashed": true
+    },
+    {
+     "from": "b",
+     "to": "vol",
+     "dashed": true
+    }
+   ]
+  }
+ },
+ {
+  "id": "deployment-rollout",
+  "terms": [
+   "deployment",
+   "replicaset",
+   "rolling-update"
+  ],
+  "spec": {
+   "caption": "Deployment は版ごとに ReplicaSet を持ち、ローリングアップデートでは新しい ReplicaSet の Pod を少しずつ増やしながら、古い ReplicaSet の Pod を減らして、止めずに入れ替えます。",
+   "width": 640,
+   "height": 290,
+   "nodes": [
+    {
+     "id": "dep",
+     "x": 230,
+     "y": 16,
+     "w": 180,
+     "h": 52,
+     "label": "Deployment",
+     "sub": "版の更新を管理",
+     "term": "deployment"
+    },
+    {
+     "id": "rsold",
+     "x": 20,
+     "y": 120,
+     "w": 170,
+     "h": 52,
+     "label": "ReplicaSet (旧)",
+     "sub": "古い版",
+     "term": "replicaset"
+    },
+    {
+     "id": "roll",
+     "x": 240,
+     "y": 120,
+     "w": 160,
+     "h": 52,
+     "label": "ローリングアップデート",
+     "sub": "止めずに入れ替え",
+     "term": "rolling-update"
+    },
+    {
+     "id": "rsnew",
+     "x": 450,
+     "y": 120,
+     "w": 170,
+     "h": 52,
+     "label": "ReplicaSet (新)",
+     "sub": "新しい版",
+     "term": "replicaset"
+    },
+    {
+     "id": "podold",
+     "x": 20,
+     "y": 224,
+     "w": 170,
+     "h": 52,
+     "label": "Pod (v1)",
+     "sub": "少しずつ減る",
+     "tone": "muted"
+    },
+    {
+     "id": "podnew",
+     "x": 450,
+     "y": 224,
+     "w": 170,
+     "h": 52,
+     "label": "Pod (v2)",
+     "sub": "少しずつ増える"
+    }
+   ],
+   "edges": [
+    {
+     "from": "dep",
+     "to": "rsold"
+    },
+    {
+     "from": "dep",
+     "to": "rsnew"
+    },
+    {
+     "from": "rsold",
+     "to": "roll",
+     "dashed": true
+    },
+    {
+     "from": "roll",
+     "to": "rsnew",
+     "dashed": true
+    },
+    {
+     "from": "rsold",
+     "to": "podold",
+     "label": "減らす"
+    },
+    {
+     "from": "rsnew",
+     "to": "podnew",
+     "label": "増やす"
+    }
+   ]
+  }
+ },
+ {
+  "id": "statefulset-daemonset",
+  "terms": [
+   "statefulset",
+   "daemonset"
+  ],
+  "spec": {
+   "caption": "StatefulSet は Pod に web-0・web-1 のような変わらない名前と、Pod ごとの保存先を持たせます。DaemonSet は各ノードに Pod を 1 つずつ置き、ノードが加わるとそのノードにも足します。",
+   "width": 640,
+   "height": 300,
+   "nodes": [
+    {
+     "id": "sts",
+     "x": 70,
+     "y": 16,
+     "w": 180,
+     "h": 52,
+     "label": "StatefulSet",
+     "sub": "名前と保存先が固定",
+     "term": "statefulset"
+    },
+    {
+     "id": "web0",
+     "x": 10,
+     "y": 140,
+     "w": 140,
+     "h": 52,
+     "label": "Pod web-0",
+     "sub": "専用の PVC"
+    },
+    {
+     "id": "web1",
+     "x": 170,
+     "y": 140,
+     "w": 140,
+     "h": 52,
+     "label": "Pod web-1",
+     "sub": "専用の PVC"
+    },
+    {
+     "id": "ds",
+     "x": 390,
+     "y": 16,
+     "w": 180,
+     "h": 52,
+     "label": "DaemonSet",
+     "sub": "各ノードに 1 つ",
+     "term": "daemonset"
+    },
+    {
+     "id": "n1",
+     "x": 330,
+     "y": 140,
+     "w": 125,
+     "h": 52,
+     "label": "ノード 1 の Pod"
+    },
+    {
+     "id": "n2",
+     "x": 505,
+     "y": 140,
+     "w": 125,
+     "h": 52,
+     "label": "ノード 2 の Pod"
+    },
+    {
+     "id": "n3",
+     "x": 400,
+     "y": 234,
+     "w": 160,
+     "h": 52,
+     "label": "新しいノードの Pod",
+     "sub": "加わると足す",
+     "tone": "muted"
+    }
+   ],
+   "edges": [
+    {
+     "from": "sts",
+     "to": "web0",
+     "label": "0 番"
+    },
+    {
+     "from": "sts",
+     "to": "web1",
+     "label": "1 番"
+    },
+    {
+     "from": "ds",
+     "to": "n1"
+    },
+    {
+     "from": "ds",
+     "to": "n2"
+    },
+    {
+     "from": "ds",
+     "to": "n3",
+     "dashed": true,
+     "fromSide": "bottom",
+     "toSide": "top"
+    }
+   ]
+  }
+ },
+ {
+  "id": "cronjob-job",
+  "terms": [
+   "cronjob",
+   "job"
+  ],
+  "spec": {
+   "caption": "CronJob は予定の時刻ごとに Job を作り、Job は Pod を作って、決めた数が成功するまで見届けます。失敗すると backoffLimit (既定 6) まで作り直します。",
+   "width": 640,
+   "height": 230,
+   "nodes": [
+    {
+     "id": "cron",
+     "x": 10,
+     "y": 30,
+     "w": 150,
+     "h": 52,
+     "label": "CronJob",
+     "sub": "予定で Job を作る",
+     "term": "cronjob"
+    },
+    {
+     "id": "job",
+     "x": 225,
+     "y": 30,
+     "w": 150,
+     "h": 52,
+     "label": "Job",
+     "sub": "成功まで見届ける",
+     "term": "job"
+    },
+    {
+     "id": "pod",
+     "x": 450,
+     "y": 30,
+     "w": 170,
+     "h": 52,
+     "label": "Pod",
+     "sub": "バッチの処理",
+     "tone": "muted"
+    },
+    {
+     "id": "fail",
+     "x": 225,
+     "y": 160,
+     "w": 150,
+     "h": 52,
+     "label": "Pod の失敗",
+     "sub": "backoffLimit まで",
+     "tone": "warn"
+    },
+    {
+     "id": "done",
+     "x": 450,
+     "y": 160,
+     "w": 170,
+     "h": 52,
+     "label": "完了",
+     "sub": "completions に届く"
+    }
+   ],
+   "edges": [
+    {
+     "from": "cron",
+     "to": "job",
+     "label": "schedule"
+    },
+    {
+     "from": "job",
+     "to": "pod",
+     "label": "作る"
+    },
+    {
+     "from": "pod",
+     "to": "done",
+     "label": "成功"
+    },
+    {
+     "from": "pod",
+     "to": "fail",
+     "dashed": true
+    },
+    {
+     "from": "fail",
+     "to": "job",
+     "label": "作り直す"
+    }
+   ]
+  }
+ },
+ {
+  "id": "namespace-scope",
+  "terms": [
+   "namespace"
+  ],
+  "spec": {
+   "caption": "Namespace は 1 つのクラスタの中を区切り、名前は Namespace の中で一意なら足ります。Node や PersistentVolume のように、どの Namespace にも属さないリソースもあります。",
+   "width": 600,
+   "height": 250,
+   "groups": [
+    {
+     "x": 10,
+     "y": 10,
+     "w": 580,
+     "h": 230,
+     "label": "1 つのクラスタ"
+    }
+   ],
+   "nodes": [
+    {
+     "id": "dev",
+     "x": 30,
+     "y": 50,
+     "w": 170,
+     "h": 52,
+     "label": "Namespace dev",
+     "sub": "チームごとの区切り",
+     "term": "namespace"
+    },
+    {
+     "id": "prod",
+     "x": 220,
+     "y": 50,
+     "w": 170,
+     "h": 52,
+     "label": "Namespace prod",
+     "sub": "別の区切り",
+     "term": "namespace"
+    },
+    {
+     "id": "cl",
+     "x": 420,
+     "y": 50,
+     "w": 160,
+     "h": 52,
+     "label": "Node・PV など",
+     "sub": "どこにも属さない",
+     "tone": "muted"
+    },
+    {
+     "id": "pdev",
+     "x": 30,
+     "y": 160,
+     "w": 170,
+     "h": 52,
+     "label": "Pod web",
+     "sub": "dev の中で一意"
+    },
+    {
+     "id": "pprod",
+     "x": 220,
+     "y": 160,
+     "w": 170,
+     "h": 52,
+     "label": "Pod web",
+     "sub": "同じ名前でよい"
+    }
+   ],
+   "edges": [
+    {
+     "from": "dev",
+     "to": "pdev",
+     "label": "含む"
+    },
+    {
+     "from": "prod",
+     "to": "pprod",
+     "label": "含む"
+    }
+   ]
+  }
+ },
+ {
+  "id": "label-selector-match",
+  "terms": [
+   "label-selector"
+  ],
+  "spec": {
+   "caption": "Pod にはキーと値のラベルを付け、Service や Deployment はセレクターの条件 app=web に合う Pod だけを選びます。ラベルが違う Pod は選ばれません。",
+   "width": 600,
+   "height": 230,
+   "nodes": [
+    {
+     "id": "user",
+     "x": 20,
+     "y": 30,
+     "w": 190,
+     "h": 52,
+     "label": "Service・Deployment",
+     "sub": "対象の Pod を選ぶ",
+     "tone": "muted"
+    },
+    {
+     "id": "sel",
+     "x": 300,
+     "y": 30,
+     "w": 170,
+     "h": 52,
+     "label": "セレクター",
+     "sub": "app=web",
+     "term": "label-selector"
+    },
+    {
+     "id": "p1",
+     "x": 20,
+     "y": 160,
+     "w": 170,
+     "h": 52,
+     "label": "Pod 1",
+     "sub": "ラベル app=web",
+     "term": "label-selector"
+    },
+    {
+     "id": "p2",
+     "x": 215,
+     "y": 160,
+     "w": 170,
+     "h": 52,
+     "label": "Pod 2",
+     "sub": "ラベル app=web",
+     "term": "label-selector"
+    },
+    {
+     "id": "p3",
+     "x": 410,
+     "y": 160,
+     "w": 170,
+     "h": 52,
+     "label": "Pod 3",
+     "sub": "ラベル app=db",
+     "tone": "muted"
+    }
+   ],
+   "edges": [
+    {
+     "from": "user",
+     "to": "sel",
+     "label": "条件"
+    },
+    {
+     "from": "sel",
+     "to": "p1",
+     "label": "選ぶ"
+    },
+    {
+     "from": "sel",
+     "to": "p2"
+    },
+    {
+     "from": "sel",
+     "to": "p3",
+     "dashed": true
+    }
+   ]
+  }
+ },
+ {
+  "id": "configmap-secret",
+  "terms": [
+   "configmap",
+   "secret"
+  ],
+  "spec": {
+   "caption": "設定をイメージから切り離し、機密でない値は ConfigMap、パスワードなどは Secret に入れて、Pod に環境変数やファイルで渡します。Secret は既定で暗号化されずに etcd に置かれるので、保存時の暗号化と RBAC を合わせます。",
+   "width": 640,
+   "height": 300,
+   "nodes": [
+    {
+     "id": "image",
+     "x": 315,
+     "y": 16,
+     "w": 160,
+     "h": 52,
+     "label": "コンテナイメージ",
+     "sub": "設定を含まない",
+     "tone": "muted"
+    },
+    {
+     "id": "cm",
+     "x": 20,
+     "y": 120,
+     "w": 160,
+     "h": 52,
+     "label": "ConfigMap",
+     "sub": "機密でない設定",
+     "term": "configmap"
+    },
+    {
+     "id": "secret",
+     "x": 20,
+     "y": 226,
+     "w": 160,
+     "h": 52,
+     "label": "Secret",
+     "sub": "パスワードなど",
+     "term": "secret"
+    },
+    {
+     "id": "pod",
+     "x": 320,
+     "y": 120,
+     "w": 150,
+     "h": 52,
+     "label": "Pod",
+     "sub": "環境ごとの設定"
+    },
+    {
+     "id": "etcd",
+     "x": 470,
+     "y": 226,
+     "w": 160,
+     "h": 52,
+     "label": "etcd",
+     "sub": "既定は暗号化なし",
+     "tone": "warn"
+    }
+   ],
+   "edges": [
+    {
+     "from": "image",
+     "to": "pod",
+     "label": "同じイメージ"
+    },
+    {
+     "from": "cm",
+     "to": "pod",
+     "label": "環境変数・ファイル"
+    },
+    {
+     "from": "secret",
+     "to": "pod"
+    },
+    {
+     "from": "secret",
+     "to": "etcd",
+     "label": "base64 で保存"
+    }
+   ]
+  }
+ },
+ {
+  "id": "requests-limits",
+  "terms": [
+   "requests-limits"
+  ],
+  "spec": {
+   "caption": "requests はコンテナに確保する量で、スケジューラーはこれでノードを選びます。limits は上限で、CPU は超えないよう絞られ、メモリは超えると OOM で終了させられることがあります。",
+   "width": 600,
+   "height": 290,
+   "nodes": [
+    {
+     "id": "ctr",
+     "x": 215,
+     "y": 20,
+     "w": 170,
+     "h": 52,
+     "label": "コンテナ",
+     "sub": "CPU とメモリを使う",
+     "tone": "muted"
+    },
+    {
+     "id": "req",
+     "x": 20,
+     "y": 120,
+     "w": 180,
+     "h": 52,
+     "label": "requests",
+     "sub": "確保する量 (予約)",
+     "term": "requests-limits"
+    },
+    {
+     "id": "lim",
+     "x": 400,
+     "y": 120,
+     "w": 180,
+     "h": 52,
+     "label": "limits",
+     "sub": "使える上限",
+     "term": "requests-limits"
+    },
+    {
+     "id": "sched",
+     "x": 20,
+     "y": 226,
+     "w": 180,
+     "h": 52,
+     "label": "kube-scheduler",
+     "sub": "空きのあるノードへ",
+     "tone": "muted"
+    },
+    {
+     "id": "cpu",
+     "x": 300,
+     "y": 226,
+     "w": 140,
+     "h": 52,
+     "label": "CPU",
+     "sub": "スロットリング",
+     "tone": "muted"
+    },
+    {
+     "id": "oom",
+     "x": 460,
+     "y": 226,
+     "w": 130,
+     "h": 52,
+     "label": "メモリ",
+     "sub": "OOM で終了も",
+     "tone": "warn"
+    }
+   ],
+   "edges": [
+    {
+     "from": "ctr",
+     "to": "req"
+    },
+    {
+     "from": "ctr",
+     "to": "lim"
+    },
+    {
+     "from": "req",
+     "to": "sched",
+     "label": "材料"
+    },
+    {
+     "from": "lim",
+     "to": "cpu",
+     "label": "超えない"
+    },
+    {
+     "from": "lim",
+     "to": "oom",
+     "label": "超えると"
+    }
+   ]
+  }
+ },
+ {
+  "id": "autoscalers",
+  "terms": [
+   "metrics-server",
+   "hpa",
+   "vpa",
+   "cluster-autoscaler"
+  ],
+  "spec": {
+   "caption": "metrics-server が kubelet から集めた使用量を見て、HPA は Pod の数を、VPA は Pod の requests と limits を変えます。Cluster Autoscaler は置けない Pod があるとノードを足し、使われないノードを減らします。",
+   "width": 640,
+   "height": 290,
+   "nodes": [
+    {
+     "id": "ms",
+     "x": 200,
+     "y": 16,
+     "w": 200,
+     "h": 52,
+     "label": "metrics-server",
+     "sub": "kubelet から使用量",
+     "term": "metrics-server"
+    },
+    {
+     "id": "hpa",
+     "x": 20,
+     "y": 120,
+     "w": 180,
+     "h": 52,
+     "label": "HPA",
+     "sub": "Pod の数を変える",
+     "term": "hpa"
+    },
+    {
+     "id": "vpa",
+     "x": 230,
+     "y": 120,
+     "w": 180,
+     "h": 52,
+     "label": "VPA",
+     "sub": "Pod の大きさを変える",
+     "term": "vpa"
+    },
+    {
+     "id": "count",
+     "x": 20,
+     "y": 226,
+     "w": 180,
+     "h": 52,
+     "label": "Pod 2 → 4",
+     "sub": "水平のスケール",
+     "tone": "muted"
+    },
+    {
+     "id": "size",
+     "x": 230,
+     "y": 226,
+     "w": 180,
+     "h": 52,
+     "label": "requests を直す",
+     "sub": "垂直のスケール",
+     "tone": "muted"
+    },
+    {
+     "id": "pending",
+     "x": 460,
+     "y": 120,
+     "w": 170,
+     "h": 52,
+     "label": "Pending の Pod",
+     "sub": "置けるノードが無い",
+     "tone": "warn"
+    },
+    {
+     "id": "ca",
+     "x": 460,
+     "y": 226,
+     "w": 170,
+     "h": 52,
+     "label": "Cluster Autoscaler",
+     "sub": "ノードを足す・減らす",
+     "term": "cluster-autoscaler"
+    }
+   ],
+   "edges": [
+    {
+     "from": "ms",
+     "to": "hpa",
+     "label": "CPU・メモリ"
+    },
+    {
+     "from": "ms",
+     "to": "vpa"
+    },
+    {
+     "from": "hpa",
+     "to": "count"
+    },
+    {
+     "from": "vpa",
+     "to": "size"
+    },
+    {
+     "from": "pending",
+     "to": "ca",
+     "label": "見つける"
+    }
+   ]
+  }
+ },
+ {
+  "id": "node-placement",
+  "terms": [
+   "nodeselector",
+   "node-affinity",
+   "toleration",
+   "taint"
+  ],
+  "spec": {
+   "caption": "nodeSelector と Node affinity は Pod の側からノードのラベルを指して引き寄せます。taint はノードの側の立ち入り制限で、合う toleration を持つ Pod だけが置けます。",
+   "width": 640,
+   "height": 330,
+   "nodes": [
+    {
+     "id": "psel",
+     "x": 20,
+     "y": 16,
+     "w": 200,
+     "h": 52,
+     "label": "nodeSelector の Pod",
+     "sub": "ラベルが全部一致",
+     "term": "nodeselector"
+    },
+    {
+     "id": "paff",
+     "x": 20,
+     "y": 96,
+     "w": 200,
+     "h": 52,
+     "label": "Node affinity の Pod",
+     "sub": "必須・できればを書ける",
+     "term": "node-affinity"
+    },
+    {
+     "id": "ptol",
+     "x": 20,
+     "y": 186,
+     "w": 200,
+     "h": 52,
+     "label": "toleration の Pod",
+     "sub": "通行証を持つ",
+     "term": "toleration"
+    },
+    {
+     "id": "pnone",
+     "x": 20,
+     "y": 266,
+     "w": 200,
+     "h": 52,
+     "label": "toleration 無しの Pod",
+     "sub": "置けない",
+     "tone": "warn"
+    },
+    {
+     "id": "nssd",
+     "x": 430,
+     "y": 56,
+     "w": 190,
+     "h": 52,
+     "label": "ノード A",
+     "sub": "ラベル disktype=ssd",
+     "tone": "muted"
+    },
+    {
+     "id": "ngpu",
+     "x": 430,
+     "y": 226,
+     "w": 190,
+     "h": 52,
+     "label": "taint のノード B",
+     "sub": "gpu:NoSchedule",
+     "term": "taint"
+    }
+   ],
+   "edges": [
+    {
+     "from": "psel",
+     "to": "nssd",
+     "label": "全部一致"
+    },
+    {
+     "from": "paff",
+     "to": "nssd",
+     "label": "条件に合う"
+    },
+    {
+     "from": "ptol",
+     "to": "ngpu",
+     "label": "置いてよい"
+    },
+    {
+     "from": "pnone",
+     "to": "ngpu",
+     "label": "退けられる",
+     "dashed": true
+    }
+   ]
+  }
+ },
+ {
+  "id": "preemption-flow",
+  "terms": [
+   "preemption"
+  ],
+  "spec": {
+   "caption": "優先度の高い Pod を置けるノードが無いと、スケジューラーは優先度の低い Pod を追い出して場所を空けます。優先度は PriorityClass で決め、Pod の priorityClassName で指します。",
+   "width": 640,
+   "height": 230,
+   "nodes": [
+    {
+     "id": "pc",
+     "x": 10,
+     "y": 150,
+     "w": 170,
+     "h": 52,
+     "label": "PriorityClass",
+     "sub": "優先度の値",
+     "tone": "muted"
+    },
+    {
+     "id": "high",
+     "x": 10,
+     "y": 30,
+     "w": 170,
+     "h": 52,
+     "label": "優先度の高い Pod",
+     "sub": "置ける場所が無い"
+    },
+    {
+     "id": "sched",
+     "x": 250,
+     "y": 30,
+     "w": 150,
+     "h": 52,
+     "label": "kube-scheduler",
+     "sub": "場所を探す",
+     "tone": "muted"
+    },
+    {
+     "id": "pre",
+     "x": 250,
+     "y": 150,
+     "w": 150,
+     "h": 52,
+     "label": "プリエンプション",
+     "sub": "場所を空ける",
+     "term": "preemption"
+    },
+    {
+     "id": "node",
+     "x": 470,
+     "y": 30,
+     "w": 160,
+     "h": 52,
+     "label": "満杯のノード",
+     "tone": "muted"
+    },
+    {
+     "id": "low",
+     "x": 470,
+     "y": 150,
+     "w": 160,
+     "h": 52,
+     "label": "優先度の低い Pod",
+     "sub": "追い出される",
+     "tone": "warn"
+    }
+   ],
+   "edges": [
+    {
+     "from": "pc",
+     "to": "high",
+     "label": "値",
+     "dashed": true
+    },
+    {
+     "from": "high",
+     "to": "sched",
+     "label": "Pending"
+    },
+    {
+     "from": "sched",
+     "to": "pre"
+    },
+    {
+     "from": "pre",
+     "to": "low",
+     "label": "追い出す"
+    },
+    {
+     "from": "sched",
+     "to": "node",
+     "label": "置く"
+    }
+   ]
+  }
+ },
+ {
+  "id": "pod-backoff",
+  "terms": [
+   "imagepullbackoff",
+   "crashloopbackoff"
+  ],
+  "spec": {
+   "caption": "イメージを取れないと ImagePullBackOff で待ちながら取り直し、起動したコンテナが落ち続けると CrashLoopBackOff で再起動までの待ち時間を 10 秒から最大 300 秒まで延ばします。止まる段が違います。",
+   "width": 640,
+   "height": 230,
+   "nodes": [
+    {
+     "id": "create",
+     "x": 10,
+     "y": 30,
+     "w": 140,
+     "h": 52,
+     "label": "Pod の作成",
+     "tone": "muted"
+    },
+    {
+     "id": "pull",
+     "x": 200,
+     "y": 30,
+     "w": 150,
+     "h": 52,
+     "label": "イメージを取得",
+     "sub": "レジストリから"
+    },
+    {
+     "id": "start",
+     "x": 400,
+     "y": 30,
+     "w": 160,
+     "h": 52,
+     "label": "コンテナを起動",
+     "sub": "アプリが動く"
+    },
+    {
+     "id": "ipb",
+     "x": 200,
+     "y": 160,
+     "w": 150,
+     "h": 52,
+     "label": "ImagePullBackOff",
+     "sub": "待って取り直す",
+     "tone": "warn",
+     "term": "imagepullbackoff"
+    },
+    {
+     "id": "clb",
+     "x": 400,
+     "y": 160,
+     "w": 160,
+     "h": 52,
+     "label": "CrashLoopBackOff",
+     "sub": "10 秒→最大 300 秒",
+     "tone": "warn",
+     "term": "crashloopbackoff"
+    }
+   ],
+   "edges": [
+    {
+     "from": "create",
+     "to": "pull"
+    },
+    {
+     "from": "pull",
+     "to": "start",
+     "label": "取れた"
+    },
+    {
+     "from": "pull",
+     "to": "ipb",
+     "label": "取れない"
+    },
+    {
+     "from": "start",
+     "to": "clb",
+     "label": "落ちる"
+    },
+    {
+     "from": "clb",
+     "to": "start",
+     "label": "再起動",
+     "fromSide": "right",
+     "toSide": "right"
+    }
+   ]
+  }
+ }
+]

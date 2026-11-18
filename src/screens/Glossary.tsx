@@ -15,6 +15,8 @@ import type { Domain } from '../content/types';
 import { isFreshVisit } from '../lib/scrollMemory';
 import { searchTerms, sortTerms, termDomain, termQuestion, type GlossaryTerm } from '../lib/glossary';
 import { AskAiLinks } from '../components/AskAi';
+import Diagram from '../components/Diagram';
+import { figureOf } from '../content/glossaryFigures';
 import { findTopic } from '../content/handbook';
 import { DOMAINS } from '../lib/lessonStatus';
 import type { Progress } from '../lib/progress';
@@ -53,6 +55,7 @@ function Detail({ t, large }: { t: Entry; large?: boolean }) {
   const lessons = t.lessons.map((id) => ({ id, found: findLesson(id) })).filter((l) => l.found);
   const topics = (t.topics ?? []).map((id) => findTopic(id)?.topic).filter((x) => x !== undefined);
   const sources = [{ label: hostOf(t.source), url: t.source }, ...(t.sources ?? []).filter((x) => x.url !== t.source)];
+  const figure = figureOf(t.id);
   return (
     <div className="gloss-detail">
       <p className={large ? 'gloss-detail__desc gloss-detail__desc--lg' : 'gloss-detail__desc'}>{t.description}</p>
@@ -69,6 +72,11 @@ function Detail({ t, large }: { t: Entry; large?: boolean }) {
           )}
         </p>
       ))}
+      {figure && (
+        <div className="gloss-detail__figure" style={{ maxWidth: figure.spec.width }}>
+          <Diagram spec={figure.spec} id={`gloss-${figure.id}`} highlight={t.id} />
+        </div>
+      )}
       {topics.length > 0 && (
         <VStack gap={1.5}>
           <h3 className="gloss-detail__label">ハンドブックで読む</h3>

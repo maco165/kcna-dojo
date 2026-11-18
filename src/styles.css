@@ -2186,6 +2186,11 @@ body {
 }
 
 /* 用語集の詳しい説明: 短い説明の下に、読みやすい長さ (1 行 40 字まで) で */
+/* 用語集の図は欄の幅 (文と同じ 40em) に収める。図のデータの width も 640 以下 */
+.gloss-detail__figure {
+  max-width: 40em;
+}
+
 .gloss-detail__more {
   margin: 0;
   max-width: 40em;
