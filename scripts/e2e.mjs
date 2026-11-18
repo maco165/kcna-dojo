@@ -234,6 +234,17 @@ async function run(browser, name, width, height) {
   await page.getByRole('heading', { name: '今日の復習 0 問' }).waitFor();
   check(await page.getByText(/今日の復習はありません。次は/).isVisible(), `${tag} 終えると今日の復習は 0 で、次の予定が出る`);
 
+  // 9b1. 問題ごとの解いた記録: 前に解いた問題には回数と最後の日が、初めての問題には「はじめて」が出る
+  {
+    await page.goto(`${BASE}#/lesson/w1-l1`);
+    await page.getByRole('button', { name: '確かめる' }).waitFor();
+    check(await page.getByText(/これまで \d+ 回 \(正解 \d+・不正解 \d+\) · 最後 \d+\/\d+/).first().isVisible(), `${tag} 前に解いた問題に、解いた回数と最後の日が出る`);
+    await page.goto(`${BASE}#/lesson/w8-l4`);
+    await page.getByRole('button', { name: '確かめる' }).waitFor();
+    check(await page.getByText('はじめて').first().isVisible(), `${tag} 初めての問題には「はじめて」と出る`);
+    await page.goto(`${BASE}#/review`);
+  }
+
   // 9b2. ランダム出題: 分野と数を選んで始め、1 問答えると記録に入る
   {
     // 答えた回数の合計 (前の手順で答えた問題が選ばれても 1 つ増える)

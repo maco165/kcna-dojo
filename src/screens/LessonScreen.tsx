@@ -14,7 +14,7 @@ import FillQuestionView from '../components/FillQuestionView';
 import { ActionArea, PrimaryAction, QuestionHead } from '../components/QuestionFrame';
 import type { LabLesson, Lesson, Question, QuizLesson } from '../content/types';
 import { XP_PER_CORRECT, XP_PER_LAB } from '../lib/grade';
-import { completeLesson, currentStreak, goalXp, recordAnswer, todayXp, type Progress } from '../lib/progress';
+import { answerHistory, completeLesson, currentStreak, goalXp, recordAnswer, todayXp, type Progress } from '../lib/progress';
 import { shuffleChoices } from '../lib/shuffle';
 import { weekHref } from '../lib/route';
 import { WIDE_QUERY, useMediaQuery } from '../lib/useMediaQuery';
@@ -121,6 +121,8 @@ export function QuestionRun({
   const [attempt, setAttempt] = useState(0);
   const [startedAt, setStartedAt] = useState(() => Date.now());
   const [elapsed, setElapsed] = useState(0);
+  // 解いた記録は、始めたときのものを出す (答えるたびに数が変わると、どの回の話か分かりにくい)
+  const [before] = useState(() => progress.answers);
   // 4 択の選択肢は、開いたときと「もう一度解く」のたびに混ぜ直す (attempt が変わるたび)
   const questions = useMemo(() => source.map((question) => shuffleChoices(question)), [source, attempt]);
   const total = questions.length;
@@ -170,7 +172,7 @@ export function QuestionRun({
           { label: '時間', value: formatDuration(elapsed) },
         ]}
         progress={progress}
-        rows={questions.map((question, i) => ({ id: question.id, label: question.prompt, correct: results[i] }))}
+        rows={questions.map((question, i) => ({ id: question.id, label: question.prompt, correct: results[i], history: answerHistory(progress.answers[question.id]) }))}
         onRetry={canRetry ? restart : undefined}
       />
     );
@@ -182,9 +184,9 @@ export function QuestionRun({
       <LessonBar title={title} closeHref={closeHref} onClose={onClose} current={index + 1} total={total} unit="問" />
       <main className="lesson__main">
         {q.type === 'fill' ? (
-          <FillQuestionView key={`${attempt}-${q.id}`} question={q} domain={domainOf(q)} onChecked={onChecked} nextLabel={nextLabel} onNext={onNext} />
+          <FillQuestionView key={`${attempt}-${q.id}`} question={q} domain={domainOf(q)} onChecked={onChecked} nextLabel={nextLabel} onNext={onNext} history={answerHistory(before[q.id])} />
         ) : (
-          <ChoiceQuestionView key={`${attempt}-${q.id}`} question={q} domain={domainOf(q)} onChecked={onChecked} nextLabel={nextLabel} onNext={onNext} />
+          <ChoiceQuestionView key={`${attempt}-${q.id}`} question={q} domain={domainOf(q)} onChecked={onChecked} nextLabel={nextLabel} onNext={onNext} history={answerHistory(before[q.id])} />
         )}
       </main>
     </div>
@@ -259,7 +261,7 @@ function ResultView({
   lessonLabel: string;
   stats: { label: string; value: string }[];
   progress: Progress;
-  rows: { id: string; label: string; correct: boolean | undefined }[];
+  rows: { id: string; label: string; correct: boolean | undefined; history?: string }[];
   onRetry?: () => void;
 }) {
   const isWide = useMediaQuery(WIDE_QUERY);
@@ -304,6 +306,7 @@ function ResultView({
                 <ListItem
                   key={r.id}
                   label={r.label}
+                  description={r.history}
                   startContent={<StatusDot variant={r.correct ? 'success' : 'error'} label={r.correct ? '正解' : '不正解'} />}
                   endContent={<Text type="supporting">{r.correct ? '正解' : '復習へ'}</Text>}
                 />

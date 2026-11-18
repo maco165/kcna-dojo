@@ -28,12 +28,15 @@ export default function FillQuestionView({
   onChecked,
   nextLabel,
   onNext,
+  history,
 }: {
   question: FillQuestion;
   domain: string;
   onChecked: (correct: boolean) => void;
   nextLabel: string;
   onNext: () => void;
+  /** この問題を解いた記録の 1 行 (このレッスンを始めたときのもの) */
+  history?: string;
 }) {
   const [value, setValue] = useState('');
   const [result, setResult] = useState<boolean | null>(null);
@@ -88,7 +91,7 @@ export default function FillQuestionView({
 
   return (
     <VStack gap={5}>
-      <QuestionHead kind={KIND_LABEL[question.language]} domain={domain} prompt={question.prompt} />
+      <QuestionHead kind={KIND_LABEL[question.language]} domain={domain} prompt={question.prompt} history={history} />
 
       <div className="fill-code" data-testid="fill-code">
         <div className="fill-code__header">

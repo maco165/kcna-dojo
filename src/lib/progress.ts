@@ -10,6 +10,15 @@ export type LessonRecord = { done: boolean; best: number; at: string };
  */
 export type AnswerRecord = { right: number; wrong: number; last: string; stage?: number; nextReview?: string };
 
+/** 問題ごとの記録を 1 行の文にする (例: これまで 3 回 (正解 2・不正解 1) · 最後 11/18)。記録が無ければ「はじめて」 */
+export function answerHistory(rec: AnswerRecord | undefined): string {
+  const n = rec ? rec.right + rec.wrong : 0;
+  if (!rec || n === 0) return 'はじめて';
+  const d = new Date(rec.last);
+  const last = Number.isNaN(d.getTime()) ? '' : ` · 最後 ${d.getMonth() + 1}/${d.getDate()}`;
+  return `これまで ${n} 回 (正解 ${rec.right}・不正解 ${rec.wrong})${last}`;
+}
+
 /** 復習の間隔 (日)。間違えたら翌日、復習で続けて正解するたびに 3 日後・7 日後、その次の正解で終わる */
 export const REVIEW_INTERVALS = [1, 3, 7] as const;
 

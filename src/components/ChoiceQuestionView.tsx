@@ -14,12 +14,15 @@ export default function ChoiceQuestionView({
   onChecked,
   nextLabel,
   onNext,
+  history,
 }: {
   question: ChoiceQuestion;
   domain: string;
   onChecked: (correct: boolean) => void;
   nextLabel: string;
   onNext: () => void;
+  /** この問題を解いた記録の 1 行 (このレッスンを始めたときのもの) */
+  history?: string;
 }) {
   const [value, setValue] = useState('');
   const [result, setResult] = useState<boolean | null>(null);
@@ -37,7 +40,7 @@ export default function ChoiceQuestionView({
 
   return (
     <VStack gap={5}>
-      <QuestionHead kind={question.code ? '出力を読む' : '4 択'} domain={domain} prompt={question.prompt} />
+      <QuestionHead kind={question.code ? '出力を読む' : '4 択'} domain={domain} prompt={question.prompt} history={history} />
 
       {question.code && (
         <CodeBlock code={question.code.text} language={question.code.language} width="100%" size="sm" hasCopyButton={false} />
