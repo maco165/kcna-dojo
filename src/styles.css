@@ -2200,3 +2200,7 @@ body {
   text-decoration: underline dotted;
   text-underline-offset: 3px;
 }
+
+.gloss-detail__more a.gloss-term:hover {
+  text-decoration-style: solid;
+}

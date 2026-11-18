@@ -19,7 +19,7 @@ import { findTopic } from '../content/handbook';
 import { DOMAINS } from '../lib/lessonStatus';
 import type { Progress } from '../lib/progress';
 import { glossaryTermHref, handbookHref, lessonHref } from '../lib/route';
-import { makeTermLinker, termNames, type TermPiece } from '../lib/termLinks';
+import { linkDetail, termNames } from '../lib/termLinks';
 import { SITE_NAME } from '../lib/site';
 import { WIDE_QUERY, useMediaQuery } from '../lib/useMediaQuery';
 
@@ -48,12 +48,6 @@ function hostOf(url: string) {
 
 const NAMES = termNames(TERMS);
 
-/** 詳しい説明の段落ごとに、ほかの語を (語ごとに最初の 1 回だけ) 用語集のその語へのリンクにする。その語自身はリンクにしない */
-function detailPieces(t: Entry): TermPiece[][] {
-  const link = makeTermLinker(NAMES.filter((n) => n.id !== t.id));
-  return (t.detail ?? '').split(/\n\n+/).filter(Boolean).map((para) => link(para));
-}
-
 /** 説明・詳しい説明・出てくるレッスンとハンドブック・出典・AI に聞く (開いた語の中身。スマホと PC で共通) */
 function Detail({ t, large }: { t: Entry; large?: boolean }) {
   const lessons = t.lessons.map((id) => ({ id, found: findLesson(id) })).filter((l) => l.found);
@@ -62,7 +56,7 @@ function Detail({ t, large }: { t: Entry; large?: boolean }) {
   return (
     <div className="gloss-detail">
       <p className={large ? 'gloss-detail__desc gloss-detail__desc--lg' : 'gloss-detail__desc'}>{t.description}</p>
-      {detailPieces(t).map((pieces, i) => (
+      {linkDetail(NAMES, t).map((pieces, i) => (
         <p key={i} className="gloss-detail__more">
           {pieces.map((p, j) =>
             typeof p === 'string' ? (

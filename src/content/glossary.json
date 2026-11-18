@@ -23,7 +23,7 @@
         "オーシーアイ"
       ],
       "description": "Open Container Initiative の略で、コンテナのランタイム・イメージ・配布の 3 つの仕様を決める集まりです。2015 年に始まりました。",
-      "detail": "一言でいうと、コンテナの「形式の決まり」を業界で共通にするための集まりです。\n\n決まりが無いと、あるツールで作ったイメージが別のツールで動かない、ということが起きかねません。OCI は 2015 年 6 月に Docker や CoreOS などが始め、Linux Foundation のもとで運営されています。仕様は 3 つで、ランタイム仕様 (コンテナの動かし方)、イメージ仕様 (イメージの中身の形)、配布仕様 (イメージの配り方) です。イメージ仕様では、イメージはイメージのマニフェスト (中身の一覧)、レイヤー (ファイルの変更の差分)、設定 (起動時の引数や環境変数など) から成ります。Docker は、コンテナを起動する低いレベルのランタイムの runc を OCI に寄贈しました。\n\nOCI はイメージと実行の形式の決まり、CRI は kubelet とランタイムの会話の決まり、と分けると混ざりません。",
+      "detail": "一言でいうと、コンテナの「形式の決まり」を業界で共通にするための集まりです。\n\n決まりが無いと、あるツールで作ったイメージが別のツールで動かない、ということが起きかねません。OCI は 2015 年 6 月に Docker や CoreOS などが始め、Linux Foundation のもとで運営されています。仕様は 3 つで、ランタイム仕様 (コンテナの動かし方)、イメージ仕様 (イメージの中身の形)、配布仕様 (イメージの配り方) です。イメージ仕様では、イメージはイメージマニフェスト (中身の一覧)、レイヤー (ファイルの変更の差分)、設定 (起動時の引数や環境変数など) から成ります。Docker は、コンテナを起動する低いレベルのランタイムの runc を OCI に寄贈しました。\n\nOCI はイメージと実行の形式の決まり、CRI は kubelet とランタイムの会話の決まり、と分けると混ざりません。",
       "source": "https://opencontainers.org/about/overview/",
       "sources": [
         {
@@ -1131,7 +1131,7 @@
         "ネットワークポリシー"
       ],
       "description": "Pod が送受信できる通信を、ラベルや Namespace や IP で絞るリソースです。効かせるには、対応したネットワークプラグインが要ります。",
-      "detail": "NetworkPolicy は、Pod がどこと通信してよいかを、IP アドレスとポートの水準 (OSI の L3/L4) で決めるリソースです。\n\n何も書かないと、Pod は受信も送信もすべて許されます。podSelector で対象の Pod をラベルで選び、許す相手を Pod のラベル・Namespace・IP の範囲で書きます。たとえば role=db の Pod へは role=frontend の Pod からの 6379 番だけ、と書けます。ある Pod を選び、受信 (Ingress) を対象にするポリシーが 1 つでもできると、その Pod への受信は、どれかのポリシーで許された接続だけになります。送信 (Egress) も同じ考え方で別に決まります。NetworkPolicy を実装したネットワークプラグインが無いと、何も効きません。\n\nRBAC が API の操作を絞るのに対し、NetworkPolicy は Pod の通信を絞ります。",
+      "detail": "NetworkPolicy は、Pod がどこと通信してよいかを、IP アドレスとポートの水準 (OSI の L3/L4) で決めるリソースです。\n\n何も書かないと、Pod は受信も送信もすべて許されます。podSelector で対象の Pod をラベルで選び、許す相手を Pod のラベル・Namespace・IP の範囲で書きます。たとえば role=db の Pod へは role=frontend の Pod からの 6379 番だけ、と書けます。ある Pod を選び、受信 (ingress) を対象にするポリシーが 1 つでもできると、その Pod への受信は、どれかのポリシーで許された接続だけになります。送信 (Egress) も同じ考え方で別に決まります。NetworkPolicy を実装したネットワークプラグインが無いと、何も効きません。\n\nRBAC が API の操作を絞るのに対し、NetworkPolicy は Pod の通信を絞ります。",
       "source": "https://kubernetes.io/ja/docs/concepts/services-networking/network-policies/",
       "lessons": [
         "w3-l1",
@@ -1786,7 +1786,7 @@
         "垂直オートスケール"
       ],
       "description": "実際の使用量に合わせて、Pod の CPU とメモリの requests と limits を直す縦方向のスケールの仕組みです。HPA と違って Kubernetes の本体には入っておらず、別に入れます。Pod の数を変える HPA とは向きが違います。",
-      "detail": "VerticalPodAutoscaler (VPA) は、Pod が実際に使った量に合わせて、CPU とメモリの requests と limits を自動で直す仕組みです。\n\n多すぎる requests は資源の無駄です。部品は 3 つで、recommender は今と過去の使用量から推奨の値を出します。updater は、updateMode に従って推奨の値を当てます。Recreate では Pod を追い出して作り直させ、InPlaceOrRecreate では、できるときはその場で量を変え、できなければ追い出します。Off なら推奨を出すだけです。admission controller は、新しく作られる Pod に推奨の値を当てます。VPA は Kubernetes の本体に入っておらず、CRD (独自のリソースの定義) として別に入れます。\n\nHorizontalPodAutoscaler が Pod の数を変えるのに対し、VPA は Pod の大きさを変えます。",
+      "detail": "VerticalPodAutoscaler (VPA) は、Pod が実際に使った量に合わせて、CPU とメモリの requests と limits を自動で直す仕組みです。\n\n多すぎる requests は資源の無駄です。部品は 3 つで、recommender は今と過去の使用量から推奨の値を出します。updater は、updateMode に従って推奨の値を当てます。Recreate では Pod を追い出して作り直させ、InPlaceOrRecreate では、できるときはその場で量を変え、できなければ追い出します。Off なら推奨を出すだけです。アドミッションコントローラー は、新しく作られる Pod に推奨の値を当てます。VPA は Kubernetes の本体に入っておらず、CRD (独自のリソースの定義) として別に入れます。\n\nHorizontalPodAutoscaler が Pod の数を変えるのに対し、VPA は Pod の大きさを変えます。",
       "source": "https://kubernetes.io/docs/concepts/workloads/autoscaling/vertical-pod-autoscale/",
       "sources": [
         {
