@@ -289,7 +289,7 @@
           "text": "Terraform は、実物の資源と設定をつなぐために状態 (state) を保存します。既定では、ワークスペース (Terraform で状態を分ける単位) ごとに terraform.tfstate というローカルのファイルに置き、Terraform は操作の前に refresh をして、状態を実物に合わせます。チームで使うときは、ロックと権限のある遠隔の保存先 (remote backend) が勧められています。状態のファイルには秘密が入ることがあるので、そのまま Git に入れないようにします。"
         },
         {
-          "text": "OpenTofu は、HashiCorp が Terraform のライセンスをオープンソースから BUSL に変えたことを受けて始まった Terraform のフォークで、Linux Foundation のもとで運営されています。公式のサイトは、今の Terraform の使い方と設定をそのまま使える置き換えを目指すと書いています。命令は tofu で、tofu plan も計画を見せるだけで実物を変えません。この付録はどちらかを勧めるものではありません。"
+          "text": "OpenTofu は、HashiCorp が Terraform のライセンスをオープンソースから BUSL に変えたことを受けて始まった Terraform のフォークで、2025 年 4 月 23 日に CNCF の Sandbox のプロジェクトになりました (CNCF は Linux Foundation の一部です)。公式のサイトは、今の Terraform の使い方と設定をそのまま使える置き換えを目指すと書いています。命令は tofu で、tofu plan も計画を見せるだけで実物を変えません。この付録はどちらかを勧めるものではありません。"
         },
         {
           "text": "Kubernetes のマニフェストも宣言的です。共通点は、望ましい状態をファイルに書き、Git で版を残し、反映の前に差分を見られることです。kubectl diff は、サーバー側の dry-run (試しに通すだけで保存しない) で「適用したらどうなるか」との差を YAML で出します。差があれば終了コードは 1 です。Terraform の plan に近い役ですが、何も保存されません。",
@@ -384,6 +384,10 @@
         {
           "label": "docs.k3s.io の Cluster Datastore (SQLite が既定)",
           "url": "https://docs.k3s.io/datastore"
+        },
+        {
+          "label": "cncf.io: OpenTofu (CNCF のプロジェクト)",
+          "url": "https://www.cncf.io/projects/opentofu/"
         }
       ]
     }
