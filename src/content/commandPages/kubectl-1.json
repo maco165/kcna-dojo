@@ -35,7 +35,7 @@
       {
         "title": "kube-system の Pod を、IP と Node の列を足して出す",
         "code": "$ kubectl get pods -n kube-system -o wide",
-        "output": "NAME                                      READY   STATUS      RESTARTS      AGE   IP          NODE    NOMINATED NODE   READINESS GATES\ncoredns-5688c889c9-fxn66                  1/1     Running     1 (21d ago)   23d   10.0.0.43   node3   <none>           <none>\nhelm-install-traefik-q9z6w                0/1     Completed   0             10d   10.0.0.68   node1   <none>           <none>\nlocal-path-provisioner-67d6887d65-554hw   1/1     Running     1 (21d ago)   23d   10.0.0.44   node3   <none>           <none>\nmetrics-server-74c8c4d68b-wl2pz           1/1     Running     1 (21d ago)   23d   10.0.0.46   node3   <none>           <none>\n...\ntraefik-7489bb4c44-l6dvf                  1/1     Running     0             10d   10.0.0.69   node1   <none>           <none>",
+        "output": "NAME                                      READY   STATUS      RESTARTS      AGE   IP          NODE    NOMINATED NODE   READINESS GATES\ncoredns-5688c889c9-fxn66                  1/1     Running     1 (21d ago)   23d   10.0.0.11   node3   <none>           <none>\nhelm-install-traefik-q9z6w                0/1     Completed   0             10d   10.0.0.12   node1   <none>           <none>\nlocal-path-provisioner-67d6887d65-554hw   1/1     Running     1 (21d ago)   23d   10.0.0.13   node3   <none>           <none>\nmetrics-server-74c8c4d68b-wl2pz           1/1     Running     1 (21d ago)   23d   10.0.0.14   node3   <none>           <none>\n...\ntraefik-7489bb4c44-l6dvf                  1/1     Running     0             10d   10.0.0.15   node1   <none>           <none>",
         "note": "READY は「準備のできたコンテナの数/コンテナの数」、RESTARTS は再起動の回数と最後の再起動からの時間です。wide で IP (Pod の IP) と NODE (置かれた Node) の列が増えます。"
       },
       {
@@ -324,7 +324,7 @@
     "inside": [
       "kubeconfig を読んで行き先を決め、種類と名前 (または -f のファイル、-l のラベル) から消すものを決めます。-l のときは、先に一覧を GET して当てはまるものを集めます。",
       "1 つずつ DELETE を送ります (例: DELETE /api/v1/namespaces/{namespace}/configmaps/{name})。要求の中身 (DeleteOptions) に、--cascade の値を propagationPolicy (既定は Background) として、--grace-period があれば gracePeriodSeconds として入れます。--dry-run=server なら dryRun: [\"All\"] も入ります。",
-      "API サーバーは認証・認可 (delete が許されているか) とアドミッションを通します。ファイナライザー (metadata.finalizers) が付いていなければ、その場で etcd から消します。付いていれば deletionTimestamp だけを付け、片付けが済んでファイナライザーが外れてから消します。",
+      "API サーバーは認証・認可 (delete が許されているか) とアドミッションを通します。Background (既定) なら本体はすぐ消え、子はあとでガベージコレクターが消します。Foreground なら API サーバーが deletionTimestamp と foregroundDeletion のファイナライザーを付け、子が消えてから本体を消します。ほかのファイナライザーが付いているものと、猶予の時間つきで消える Pod は、deletionTimestamp だけが付いた状態で残り、片付けが済んでから消えます。",
       "持ち主が消えた子 (Deployment を消したときの ReplicaSet と Pod) は、Background なら kube-controller-manager のガベージコレクターが後から消します。Foreground なら子が先に消えてから本体が消え、orphan なら子は残ります。",
       "Pod は猶予の時間 (既定 30 秒) の付いた削除になります。kubelet がコンテナに止まるよう知らせ (TERM のシグナル)、止まってから Pod が消えます。Deployment などが管理している Pod なら、コントローラーが足りない分の新しい Pod を作ります。",
       "kubectl は既定 (--wait=true) で、消え終わるのを待ってから、deleted と出して戻ります。"
@@ -404,8 +404,8 @@
     "inside": [
       "kubeconfig を読んで行き先を決め、対象の Pod を GET で読みます (deployment/web のように書くと Pod を 1 つ選びます)。Pod が終わっている (Succeeded か Failed) と断り、-c が無ければ既定のコンテナを選びます。",
       "-- の後ろのコマンドを command=... の引数にした、/api/v1/namespaces/{namespace}/pods/{name}/exec への要求を作ります。-i は stdin=true、-t は tty=true になります。",
-      "v1.31 からの kubectl は、まず WebSocket (GET と Upgrade: websocket、サブプロトコル v5.channel.k8s.io) でつなぎ、アップグレードに失敗したときだけ前からの SPDY/3.1 (POST) に戻します。この動きは環境変数 KUBECTL_REMOTE_COMMAND_WEBSOCKETS で切り替えます。",
-      "API サーバーは認証と認可 (pods/exec への操作が許されているか) を通したあと、101 Switching Protocols で接続を切り替え、その Pod が動く Node の kubelet へ流れを取り次ぎます。",
+      "kubectl v1.30 からは、まず WebSocket (GET と Upgrade: websocket、サブプロトコル v5.channel.k8s.io) でつなぎ、アップグレードに失敗したときだけ前からの SPDY/3.1 (POST) に戻します。この動きは環境変数 KUBECTL_REMOTE_COMMAND_WEBSOCKETS で切り替えます。",
+      "API サーバーは認証・認可・アドミッションを通したあと、101 Switching Protocols で切り替えます。認可では pods/exec の create が要ります (WebSocket の GET は get として認可され、v1.35 からは create も確かめられます)。Node が WebSocket に対応していると申告していれば (ExtendWebSocketsToKubelet、v1.36 から既定)、WebSocket のまま kubelet へ渡します。申告が無ければ、API サーバーが SPDY に訳して kubelet へつなぎます。",
       "kubelet はコンテナランタイムに、そのコンテナの中でコマンドを動かすよう頼みます。標準入力・標準出力・標準エラー (と端末の大きさ) は、それぞれ別の流れとして、kubelet と API サーバーを通って kubectl までつながります。",
       "kubectl は手元の端末とその流れをつなぎ、コマンドが終わると戻ります。新しいコンテナも Pod も作られず、etcd には何も書かれません。中で変えたファイルは、コンテナが作り直されると消えます。"
     ],
@@ -418,7 +418,7 @@
       {
         "method": "GET",
         "path": "/api/v1/namespaces/{namespace}/pods/{name}/exec",
-        "note": "WebSocket でつなぐとき (v1.31 からの既定)"
+        "note": "WebSocket でつなぐとき (kubectl v1.30 からの既定)"
       },
       {
         "method": "POST",
@@ -520,7 +520,7 @@
         "title": "サービスアカウントになりきって聞く",
         "code": "$ kubectl auth can-i create deployments -n kube-system --as=system:serviceaccount:default:default",
         "output": "no",
-        "note": "サービスアカウントは system:serviceaccount:<名前空間>:<名前> という利用者名で表されます。default のサービスアカウントには既定で何の権限も付いていないので no です。"
+        "note": "サービスアカウントは system:serviceaccount:<名前空間>:<名前> という利用者名で表されます。default のサービスアカウントには既定では (API の発見の役割を除き) 権限が付いていないので no です。"
       }
     ],
     "verbose": {
@@ -567,7 +567,7 @@
     "id": "kubectl-top",
     "inside": [
       "kubeconfig を読んで行き先を決め、/api と /apis の一覧を読んで、metrics.k8s.io の API があるか、どの版か (v1 があれば v1、無ければ v1beta1) を確かめます。無ければ Metrics API not available で止まります。",
-      "top pod なら GET /apis/metrics.k8s.io/v1beta1/namespaces/{namespace}/pods を、top node なら .../nodes を送ります。top node は割合 (%) を出すために、Node の一覧 (/api/v1/nodes) も読んで、使える量と比べます。",
+      "top pod なら GET /apis/metrics.k8s.io/<版>/namespaces/{namespace}/pods (v1.37 からの v1 があれば v1、無ければ v1beta1) を、top node なら .../nodes を送ります。top node は割合 (%) を出すために、Node の一覧 (/api/v1/nodes) も読んで、使える量と比べます。",
       "metrics.k8s.io は API サーバーの中にある API ではなく、Metrics Server が API の集約 (aggregation layer) で足したものです。API サーバーは認証と認可のあと、要求を Metrics Server へ取り次ぎます。",
       "Metrics Server は、各 Node の kubelet (/metrics/resource) から集めた CPU とメモリの値を返します。値は etcd に保存されたものではなく、直近の値です。",
       "kubectl は、CPU をミリコア (m)、メモリを Mi にして表にします。--sort-by (cpu か memory) の並べ替えと --sum の合計は、受け取ったあとに手元で計算します。"
@@ -575,13 +575,23 @@
     "api": [
       {
         "method": "GET",
+        "path": "/apis/metrics.k8s.io/v1/namespaces/{namespace}/pods",
+        "note": "kubectl top pod (v1.37 からの v1。Metrics Server が返す)"
+      },
+      {
+        "method": "GET",
+        "path": "/apis/metrics.k8s.io/v1/nodes",
+        "note": "kubectl top node (v1.37 からの v1)"
+      },
+      {
+        "method": "GET",
         "path": "/apis/metrics.k8s.io/v1beta1/namespaces/{namespace}/pods",
-        "note": "kubectl top pod (Metrics Server が返す)"
+        "note": "kubectl top pod。v1 を出していないクラスタ (この例の v1.36 など)"
       },
       {
         "method": "GET",
         "path": "/apis/metrics.k8s.io/v1beta1/nodes",
-        "note": "kubectl top node"
+        "note": "kubectl top node。v1 を出していないクラスタ (この例の v1.36 など)"
       },
       {
         "method": "GET",
@@ -888,11 +898,11 @@
   {
     "id": "kubectl-events",
     "inside": [
-      "kubeconfig を読んで行き先を決め、GET /api/v1/namespaces/{namespace}/events を送ります (-A なら /api/v1/events)。--for pod/web なら、involvedObject.kind・involvedObject.apiVersion・involvedObject.name の 3 つの fieldSelector を付け、API サーバーの側で絞ります。",
+      "kubeconfig を読んで行き先を決め、GET /api/v1/namespaces/{namespace}/events を送ります (-A なら /api/v1/events)。--for pod/web なら、involvedObject.kind・involvedObject.apiVersion・involvedObject.name の 3 つの fieldSelector を付け、API サーバーの側で絞ります。読むのは core の v1 の Event (/api/v1) です。events.k8s.io/v1 の Event は同じイベントを新しい形で見せる API ですが、kubectl events は使いません。",
       "API サーバーは認証と認可 (events の list) を通し、保存されているイベントを返します。イベントは、kubelet・スケジューラー・コントローラーが何かをしたときに書く Event のオブジェクトで、kube-apiserver の --event-ttl (既定 1 時間) が過ぎると消えます。",
       "--types=Warning のような種類の絞り込みは、受け取ったあとに kubectl が手元で行います。",
       "kubectl は時刻の順に並べ替え、LAST SEEN・TYPE・REASON・OBJECT・MESSAGE の表にします。同じことが繰り返されたものは 1 つにまとめられ、(x23695 over 20d) のように回数と期間が付きます。",
-      "-w を付けると、一覧のあとに watch を開いたままにし、新しいイベントが届くたびに行を足して出し続けます。"
+      "-w を付けると、一覧の代わりに watch の GET を 1 本開きます。今あるイベントも最初に ADDED として届き (並べ替えはしません)、そのあとも新しいイベントが届くたびに行を足します。"
     ],
     "api": [
       {
@@ -1182,7 +1192,7 @@
       "kubeconfig を読んで行き先を決めます。deployment/mongo や service/mongo のように書くと、それに合う Pod を 1 つ選びます。Service のときは、Service のポートを選んだ Pod のポート (targetPort) に読み替えます。Service を通るのではなく、選んだ 1 つの Pod に直につながります。",
       "Pod を GET で読み、Running でなければ断ります。",
       "/api/v1/namespaces/{namespace}/pods/{name}/portforward への接続を開きます。v1.31 からは、まず WebSocket の上に SPDY を通す形でつなぎ、アップグレードに失敗したときだけ SPDY に戻します。この動きは環境変数 KUBECTL_PORT_FORWARD_WEBSOCKETS で切り替えます。",
-      "API サーバーは認証と認可 (pods の get と pods/portforward への操作) を通し、その Pod が動く Node の kubelet へ流れを取り次ぎます。kubelet が、Pod のネットワークの中のそのポートにつなぎます。",
+      "API サーバーは認証・認可 (pods の get と pods/portforward の create)・アドミッションを通します。Node が WebSocket に対応していると申告していれば (ExtendWebSocketsToKubelet、v1.36 から既定)、WebSocket のまま kubelet へ渡します。申告が無ければ、WebSocket の中の SPDY を API サーバーで取り出して kubelet へつなぎます。kubelet が、Pod のネットワークの中のそのポートにつなぎます。",
       "kubectl は手元のポート (既定では localhost。--address で変えられる) で待ち受け、来た TCP の接続を、1 本の接続の中の別々の流れとして Pod へ送ります。UDP は扱えません。",
       "Ctrl+C で止めるか、選んだ Pod が止まると終わります。Pod が作り直されても、新しい Pod には自動ではつながらないので、打ち直します。"
     ],
@@ -1228,7 +1238,7 @@
       "path": "pkg/cmd/portforward/portforward.go",
       "lines": "L144-L454",
       "excerpt": "\tdialer := spdy.NewDialerForStreaming(upgrader, &http.Client{Transport: transport}, method, url)\n\tif !cmdutil.PortForwardWebsockets.IsDisabled() {\n\t\ttunnelingDialer, err := portforward.NewSPDYOverWebsocketDialerForStreaming(url, opts.Config)\n\t\tif err != nil {\n\t\t\treturn nil, err\n\t\t}\n\t\t// First attempt tunneling (websocket) dialer, then fallback to spdy dialer.\n\t\tdialer = portforward.NewFallbackDialerForStreaming(tunnelingDialer, dialer, func(err error) bool {\n\t\t\treturn streamhttp.IsUpgradeFailure(err) || streamhttp.IsHTTPSProxyError(err)\n\t\t})\n\t}\n\t// ...\n\treq := o.RESTClient.Post().\n\t\tResource(\"pods\").\n\t\tNamespace(o.Namespace).\n\t\tName(pod.Name).\n\t\tSubResource(\"portforward\")\n\n\treturn o.PortForwarder.ForwardPorts(\"POST\", req.URL(), o)",
-      "note": "SPDY の dialer を作り、機能が切られていなければ WebSocket の上に SPDY を通す dialer を前に置いた fallback にします。つなぐ先は Pod の portforward のサブリソースです。"
+      "note": "SPDY の dialer を作り、機能が切られていなければ WebSocket の上に SPDY を通す dialer を前に置いた fallback にします。つなぐ先は Pod の portforward のサブリソースです。\"POST\" は SPDY に戻ったときだけ使われ、WebSocket の dialer は RFC 6455 のとおり GET を送ります。"
     },
     "sources": [
       {

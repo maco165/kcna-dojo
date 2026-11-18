@@ -2640,6 +2640,8 @@ html[data-loading='true'] body::before {
 
 .cmdp-inside {
   margin: 0;
+  /* 空白の無い API のパスでも、スマホの幅で折り返す */
+  overflow-wrap: anywhere;
   padding-left: 1.6em;
   display: flex;
   flex-direction: column;
@@ -2656,6 +2658,7 @@ html[data-loading='true'] body::before {
 
 .cmdp-note {
   margin: 0;
+  overflow-wrap: anywhere;
   max-width: 40em;
   font-size: 14px;
   line-height: 1.7;

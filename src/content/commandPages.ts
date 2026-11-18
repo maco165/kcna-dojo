@@ -39,6 +39,12 @@ export const COMMAND_PAGES: CommandPage[] = DATA.commands.flatMap((c) => {
 
 export const findCommandPage = (id: string) => COMMAND_PAGES.find((p) => p.id === id);
 
+/** ページの題名 (画面・書き出す HTML で共通) */
+export const commandPageTitle = (id: string) => {
+  const c = findCommandPage(id);
+  return c ? `${c.command} の中身と使い方` : 'コマンド';
+};
+
 /** 一覧の段の順 (道具) */
 export const TOOL_ORDER = ['kubectl', 'helm', 'docker', 'k3s', 'etcdctl', 'curl', 'nslookup'];
 

@@ -45,7 +45,7 @@
       "ref": "v0.37.2",
       "path": "pkg/explain/v2/explain.go",
       "lines": "L62-L81",
-      "excerpt": "paths, err := client.Paths()\n\nif err != nil {\n\treturn fmt.Errorf(\"failed to fetch list of groupVersions: %w\", err)\n}\n\nvar resourcePath string\nif len(gvr.Group) == 0 {\n\tresourcePath = fmt.Sprintf(\"api/%s\", gvr.Version)\n} else {\n\tresourcePath = fmt.Sprintf(\"apis/%s/%s\", gvr.Group, gvr.Version)\n}\n\ngv, exists := paths[resourcePath]\n\nif !exists {\n\treturn fmt.Errorf(\"couldn't find resource for \\\"%v\\\"\", gvr)\n}\n\nopenAPISchemaBytes, err := gv.Schema(runtime.ContentTypeJSON)",
+      "excerpt": "\tpaths, err := client.Paths()\n\n\tif err != nil {\n\t\treturn fmt.Errorf(\"failed to fetch list of groupVersions: %w\", err)\n\t}\n\n\tvar resourcePath string\n\tif len(gvr.Group) == 0 {\n\t\tresourcePath = fmt.Sprintf(\"api/%s\", gvr.Version)\n\t} else {\n\t\tresourcePath = fmt.Sprintf(\"apis/%s/%s\", gvr.Group, gvr.Version)\n\t}\n\n\tgv, exists := paths[resourcePath]\n\n\tif !exists {\n\t\treturn fmt.Errorf(\"couldn't find resource for \\\"%v\\\"\", gvr)\n\t}\n\n\topenAPISchemaBytes, err := gv.Schema(runtime.ContentTypeJSON)",
       "note": "GET /openapi/v3 で一覧 (paths) を取り、グループが空 (core) なら api/<版>、そうでなければ apis/<グループ>/<版> の文書を選んで、その JSON を取ります。この後、ひな形で項目の説明を組み立てます。"
     },
     "sources": [
@@ -101,7 +101,7 @@
       "ref": "v0.37.2",
       "path": "pkg/cmd/clusterinfo/clusterinfo.go",
       "lines": "L96-L115",
-      "excerpt": "b := o.Builder.\n\tWithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).\n\tNamespaceParam(o.Namespace).DefaultNamespace().\n\tLabelSelectorParam(\"kubernetes.io/cluster-service=true\").\n\tResourceTypeOrNameArgs(false, []string{\"services\"}...).\n\tLatest()\nerr := b.Do().Visit(func(r *resource.Info, err error) error {\n\tif err != nil {\n\t\treturn err\n\t}\n\tprintService(o.Out, \"Kubernetes control plane\", o.Client.Host)\n\n\tservices := r.Object.(*corev1.ServiceList).Items\n\tfor _, service := range services {\n\t\tvar link string\n\t\tif len(service.Status.LoadBalancer.Ingress) > 0 {\n\t\t\tingress := service.Status.LoadBalancer.Ingress[0]\n\t\t\tip := ingress.IP\n\t\t\tif ip == \"\" {\n\t\t\t\tip = ingress.Hostname",
+      "excerpt": "\tb := o.Builder.\n\t\tWithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).\n\t\tNamespaceParam(o.Namespace).DefaultNamespace().\n\t\tLabelSelectorParam(\"kubernetes.io/cluster-service=true\").\n\t\tResourceTypeOrNameArgs(false, []string{\"services\"}...).\n\t\tLatest()\n\terr := b.Do().Visit(func(r *resource.Info, err error) error {\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}\n\t\tprintService(o.Out, \"Kubernetes control plane\", o.Client.Host)\n\n\t\tservices := r.Object.(*corev1.ServiceList).Items\n\t\tfor _, service := range services {\n\t\t\tvar link string\n\t\t\tif len(service.Status.LoadBalancer.Ingress) > 0 {\n\t\t\t\tingress := service.Status.LoadBalancer.Ingress[0]\n\t\t\t\tip := ingress.IP\n\t\t\t\tif ip == \"\" {\n\t\t\t\t\tip = ingress.Hostname",
       "note": "ラベル kubernetes.io/cluster-service=true で Service を選び、最初に kubeconfig の住所 (o.Client.Host) を control plane として出します。Service に LoadBalancer の IP があればその http の住所を作ります。"
     },
     "sources": [
@@ -174,7 +174,7 @@
       "ref": "v0.37.2",
       "path": "pkg/cmd/clusterinfo/clusterinfo_dump.go",
       "lines": "L193-L211",
-      "excerpt": "var namespaces []string\nif o.AllNamespaces {\n\tnamespaceList, err := o.CoreClient.Namespaces().List(context.TODO(), metav1.ListOptions{})\n\tif err != nil {\n\t\treturn err\n\t}\n\tfor ix := range namespaceList.Items {\n\t\tnamespaces = append(namespaces, namespaceList.Items[ix].Name)\n\t}\n} else {\n\tif len(o.Namespaces) == 0 {\n\t\tnamespaces = []string{\n\t\t\tmetav1.NamespaceSystem,\n\t\t\to.Namespace,\n\t\t}\n\t} else {\n\t\tnamespaces = o.Namespaces\n\t}\n}",
+      "excerpt": "\tvar namespaces []string\n\tif o.AllNamespaces {\n\t\tnamespaceList, err := o.CoreClient.Namespaces().List(context.TODO(), metav1.ListOptions{})\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}\n\t\tfor ix := range namespaceList.Items {\n\t\t\tnamespaces = append(namespaces, namespaceList.Items[ix].Name)\n\t\t}\n\t} else {\n\t\tif len(o.Namespaces) == 0 {\n\t\t\tnamespaces = []string{\n\t\t\t\tmetav1.NamespaceSystem,\n\t\t\t\to.Namespace,\n\t\t\t}\n\t\t} else {\n\t\t\tnamespaces = o.Namespaces\n\t\t}\n\t}",
       "note": "書き出す名前空間を決める部分です。-A ならまず名前空間の一覧を GET し、--namespaces が無ければ kube-system と kubeconfig の今の名前空間の 2 つにします。"
     },
     "sources": [
@@ -217,9 +217,9 @@
     "examples": [
       {
         "title": "CPU の使用率 50% を目標にする (サーバーで検査だけ)",
-        "code": "$ kubectl autoscale deployment web --min=1 --max=5 --cpu=50% --dry-run=server -o yaml",
+        "code": "$ kubectl autoscale -f web-deploy.yaml --min=1 --max=5 --cpu=50% --dry-run=server -o yaml",
         "output": "apiVersion: autoscaling/v2\nkind: HorizontalPodAutoscaler\nmetadata:\n  name: web\n  namespace: default\nspec:\n  maxReplicas: 5\n  metrics:\n  - resource:\n      name: cpu\n      target:\n        averageUtilization: 50\n        type: Utilization\n    type: Resource\n  minReplicas: 1\n  scaleTargetRef:\n    apiVersion: apps/v1\n    kind: Deployment\n    name: web\n...",
-        "note": "家のクラスタで、web の Deployment のマニフェスト (-f web-deploy.yaml) に --dry-run=server を付けて打ち、保存はしていません (uid などの行は省いています)。--cpu=50% が averageUtilization: 50 の目標になっています。"
+        "note": "家のクラスタで、web の Deployment のマニフェスト web-deploy.yaml を -f で渡し、--dry-run=server を付けて打ち、保存はしていません (uid などの行は省いています)。--cpu=50% が averageUtilization: 50 の目標になっています。"
       },
       {
         "title": "公式の例",
@@ -238,7 +238,7 @@
       "ref": "v0.37.2",
       "path": "pkg/cmd/autoscale/autoscale.go",
       "lines": "L251-L270",
-      "excerpt": "// handles the creation of HorizontalPodAutoscaler objects for both autoscaling/v2 and autoscaling/v1 APIs.\n// If autoscaling/v2 API fails, try to create and handle HorizontalPodAutoscaler using autoscaling/v1 API\nvar hpaV2 runtime.Object\nhpaV2, err = o.createHorizontalPodAutoscalerV2(info.Name, mapping)\nif err != nil {\n\treturn fmt.Errorf(\"failed to create HorizontalPodAutoscaler using autoscaling/v2 API: %w\", err)\n}\nif err = o.handleHPA(hpaV2); err != nil {\n\tklog.V(1).Infof(\"Encountered an error with the autoscaling/v2 HorizontalPodAutoscaler: %v. \"+\n\t\t\"Falling back to try the autoscaling/v1 HorizontalPodAutoscaler\", err)\n\t// check if the HPA can be created using v1 API.\n\tif ok, err := o.canCreateHPAV1(); !ok {\n\t\treturn fmt.Errorf(\"failed to create autoscaling/v2 HPA and the configuration is incompatible with autoscaling/v1: %w\", err)\n\t}\n\thpaV1 := o.createHorizontalPodAutoscalerV1(info.Name, mapping)\n\tif err := o.handleHPA(hpaV1); err != nil {\n\t\treturn err\n\t}\n}\ncount++",
+      "excerpt": "\t\t// handles the creation of HorizontalPodAutoscaler objects for both autoscaling/v2 and autoscaling/v1 APIs.\n\t\t// If autoscaling/v2 API fails, try to create and handle HorizontalPodAutoscaler using autoscaling/v1 API\n\t\tvar hpaV2 runtime.Object\n\t\thpaV2, err = o.createHorizontalPodAutoscalerV2(info.Name, mapping)\n\t\tif err != nil {\n\t\t\treturn fmt.Errorf(\"failed to create HorizontalPodAutoscaler using autoscaling/v2 API: %w\", err)\n\t\t}\n\t\tif err = o.handleHPA(hpaV2); err != nil {\n\t\t\tklog.V(1).Infof(\"Encountered an error with the autoscaling/v2 HorizontalPodAutoscaler: %v. \"+\n\t\t\t\t\"Falling back to try the autoscaling/v1 HorizontalPodAutoscaler\", err)\n\t\t\t// check if the HPA can be created using v1 API.\n\t\t\tif ok, err := o.canCreateHPAV1(); !ok {\n\t\t\t\treturn fmt.Errorf(\"failed to create autoscaling/v2 HPA and the configuration is incompatible with autoscaling/v1: %w\", err)\n\t\t\t}\n\t\t\thpaV1 := o.createHorizontalPodAutoscalerV1(info.Name, mapping)\n\t\t\tif err := o.handleHPA(hpaV1); err != nil {\n\t\t\t\treturn err\n\t\t\t}\n\t\t}\n\t\tcount++",
       "note": "まず autoscaling/v2 の HPA を作って送り、失敗したら、v1 で表せる設定 (CPU の使用率だけ) のときに限り autoscaling/v1 の HPA を作って送り直します。"
     },
     "sources": [
@@ -305,7 +305,7 @@
       "ref": "v0.37.2",
       "path": "pkg/scale/scale.go",
       "lines": "L145-L164",
-      "excerpt": "type objectForReplicas struct {\n\tReplicas uint `json:\"replicas\"`\n}\n// objectForSpec is used for encoding scale patch\ntype objectForSpec struct {\n\tSpec objectForReplicas `json:\"spec\"`\n}\nspec := objectForSpec{\n\tSpec: objectForReplicas{Replicas: newSize},\n}\npatch, err := json.Marshal(&spec)\nif err != nil {\n\treturn \"\", 0, err\n}\npatchOptions := metav1.PatchOptions{}\nif dryRun {\n\tpatchOptions.DryRun = []string{metav1.DryRunAll}\n}\nupdatedScale, err := s.scaleNamespacer.Scales(namespace).Patch(context.TODO(), gvr, name, types.MergePatchType, patch, patchOptions)\nif err != nil {",
+      "excerpt": "\ttype objectForReplicas struct {\n\t\tReplicas uint `json:\"replicas\"`\n\t}\n\t// objectForSpec is used for encoding scale patch\n\ttype objectForSpec struct {\n\t\tSpec objectForReplicas `json:\"spec\"`\n\t}\n\tspec := objectForSpec{\n\t\tSpec: objectForReplicas{Replicas: newSize},\n\t}\n\tpatch, err := json.Marshal(&spec)\n\tif err != nil {\n\t\treturn \"\", 0, err\n\t}\n\tpatchOptions := metav1.PatchOptions{}\n\tif dryRun {\n\t\tpatchOptions.DryRun = []string{metav1.DryRunAll}\n\t}\n\tupdatedScale, err := s.scaleNamespacer.Scales(namespace).Patch(context.TODO(), gvr, name, types.MergePatchType, patch, patchOptions)\n\tif err != nil {",
       "note": "条件が無いときの道です。{\"spec\":{\"replicas\":N}} の JSON を作り、マージパッチとして scale のサブリソースに送ります。--dry-run=server なら DryRun: All を付けます。"
     },
     "sources": [
@@ -346,7 +346,7 @@
       {
         "method": "GET",
         "path": "/api/v1/namespaces/{namespace}/pods/{name}/attach",
-        "note": "-it のときだけ。WebSocket で kubelet までつなぐ"
+        "note": "-it のときだけ。WebSocket で API サーバーにつなぐ"
       },
       {
         "method": "DELETE",
@@ -378,7 +378,7 @@
       "ref": "v0.37.2",
       "path": "pkg/cmd/run/run.go",
       "lines": "L706-L722",
-      "excerpt": "if o.DryRunStrategy != cmdutil.DryRunClient {\n\tif err := util.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), obj, scheme.DefaultJSONEncoder()); err != nil {\n\t\treturn nil, err\n\t}\n\tclient, err := f.ClientForMapping(mapping)\n\tif err != nil {\n\t\treturn nil, err\n\t}\n\tactualObj, err = resource.\n\t\tNewHelper(client, mapping).\n\t\tDryRun(o.DryRunStrategy == cmdutil.DryRunServer).\n\t\tWithFieldManager(o.fieldManager).\n\t\tCreate(o.Namespace, false, obj)\n\tif err != nil {\n\t\treturn nil, err\n\t}\n} else {",
+      "excerpt": "\tif o.DryRunStrategy != cmdutil.DryRunClient {\n\t\tif err := util.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), obj, scheme.DefaultJSONEncoder()); err != nil {\n\t\t\treturn nil, err\n\t\t}\n\t\tclient, err := f.ClientForMapping(mapping)\n\t\tif err != nil {\n\t\t\treturn nil, err\n\t\t}\n\t\tactualObj, err = resource.\n\t\t\tNewHelper(client, mapping).\n\t\t\tDryRun(o.DryRunStrategy == cmdutil.DryRunServer).\n\t\t\tWithFieldManager(o.fieldManager).\n\t\t\tCreate(o.Namespace, false, obj)\n\t\tif err != nil {\n\t\t\treturn nil, err\n\t\t}\n\t} else {",
       "note": "組み立てた Pod を、resource.Helper の Create で送るところです。--dry-run=client ならここを通らず手元で出すだけ、server なら DryRun を付けて送ります。"
     },
     "sources": [
@@ -491,7 +491,7 @@
       "ref": "v0.37.2",
       "path": "pkg/cmd/expose/expose.go",
       "lines": "L326-L345",
-      "excerpt": "// For objects that need a pod selector, derive it from the exposed object in case a user\n// didn't explicitly specify one via --selector\nif len(o.Selector) == 0 {\n\ts, err := o.MapBasedSelectorForObject(info.Object)\n\tif err != nil {\n\t\treturn fmt.Errorf(\"couldn't retrieve selectors via --selector flag or introspection: %v\", err)\n\t}\n\to.Selector = s\n}\n\nisHeadlessService := o.ClusterIP == \"None\"\n\n// For objects that need a port, derive it from the exposed object in case a user\n// didn't explicitly specify one via --port\nif len(o.Port) == 0 {\n\tports, err := o.PortsForObject(info.Object)\n\tif err != nil {\n\t\treturn fmt.Errorf(\"couldn't find port via --port flag or introspection: %v\", err)\n\t}\n\tswitch len(ports) {",
+      "excerpt": "\t\t// For objects that need a pod selector, derive it from the exposed object in case a user\n\t\t// didn't explicitly specify one via --selector\n\t\tif len(o.Selector) == 0 {\n\t\t\ts, err := o.MapBasedSelectorForObject(info.Object)\n\t\t\tif err != nil {\n\t\t\t\treturn fmt.Errorf(\"couldn't retrieve selectors via --selector flag or introspection: %v\", err)\n\t\t\t}\n\t\t\to.Selector = s\n\t\t}\n\n\t\tisHeadlessService := o.ClusterIP == \"None\"\n\n\t\t// For objects that need a port, derive it from the exposed object in case a user\n\t\t// didn't explicitly specify one via --port\n\t\tif len(o.Port) == 0 {\n\t\t\tports, err := o.PortsForObject(info.Object)\n\t\t\tif err != nil {\n\t\t\t\treturn fmt.Errorf(\"couldn't find port via --port flag or introspection: %v\", err)\n\t\t\t}\n\t\t\tswitch len(ports) {",
       "note": "--selector が無ければ元のリソースから matchLabels を取り出し (MapBasedSelectorForObject)、--port が無ければ元のコンテナのポートを使います。ポートが複数あればすべてを Service に写します。"
     },
     "sources": [
@@ -559,7 +559,7 @@
       "ref": "v0.37.2",
       "path": "pkg/cmd/util/editor/editoptions.go",
       "lines": "L697-L716",
-      "excerpt": "\tpatchType = types.StrategicMergePatchType\n\tpatch, err = strategicpatch.CreateTwoWayMergePatch(originalJS, editedJS, versionedObject, preconditions...)\n\tif err != nil {\n\t\tklog.V(4).Infof(\"Unable to calculate diff, no merge is possible: %v\", err)\n\t\tif mergepatch.IsPreconditionFailed(err) {\n\t\t\treturn fmt.Errorf(\"%s\", \"At least one of apiVersion, kind and name was changed\")\n\t\t}\n\t\treturn err\n\t}\n}\n\nif o.OutputPatch {\n\tfmt.Fprintf(o.Out, \"Patch: %s\\n\", string(patch))\n}\n\npatched, err := resource.NewHelper(info.Client, info.Mapping).\n\tWithFieldManager(o.FieldManager).\n\tWithFieldValidation(o.ValidationDirective).\n\tWithSubresource(o.Subresource).\n\tPatch(info.Namespace, info.Name, patchType, patch, nil)",
+      "excerpt": "\t\t\tpatchType = types.StrategicMergePatchType\n\t\t\tpatch, err = strategicpatch.CreateTwoWayMergePatch(originalJS, editedJS, versionedObject, preconditions...)\n\t\t\tif err != nil {\n\t\t\t\tklog.V(4).Infof(\"Unable to calculate diff, no merge is possible: %v\", err)\n\t\t\t\tif mergepatch.IsPreconditionFailed(err) {\n\t\t\t\t\treturn fmt.Errorf(\"%s\", \"At least one of apiVersion, kind and name was changed\")\n\t\t\t\t}\n\t\t\t\treturn err\n\t\t\t}\n\t\t}\n\n\t\tif o.OutputPatch {\n\t\t\tfmt.Fprintf(o.Out, \"Patch: %s\\n\", string(patch))\n\t\t}\n\n\t\tpatched, err := resource.NewHelper(info.Client, info.Mapping).\n\t\t\tWithFieldManager(o.FieldManager).\n\t\t\tWithFieldValidation(o.ValidationDirective).\n\t\t\tWithSubresource(o.Subresource).\n\t\t\tPatch(info.Namespace, info.Name, patchType, patch, nil)",
       "note": "元 (originalJS) と編集後 (editedJS) から、差だけの strategic merge patch を作ります。apiVersion・kind・name が変わっていると止め、--output-patch ならパッチを画面に出してから送ります。"
     },
     "sources": [
@@ -583,7 +583,7 @@
       "kubeconfig を読んで行き先と資格情報を決め、対象の Node を GET します。",
       "まず cordon します。Node の spec.unschedulable を true にするパッチを PATCH で送り、スケジューラーが新しい Pod をこの Node に置かないようにします。",
       "次に、spec.nodeName がこの Node の Pod の一覧を GET し、退かせる Pod を選びます。DaemonSet の Pod は退かせても DaemonSet がすぐ戻すので、--ignore-daemonsets が無ければ止まり、付けても消しません。emptyDir を使う Pod は --delete-emptydir-data、どのコントローラーにも属さない Pod は --force が無ければ止まります。",
-      "選んだ Pod ごとに、Eviction (退去) を POST します。API サーバーはアドミッションで PodDisruptionBudget を確かめ、許せば Pod を消し、許さなければ 429 を返します。kubectl は 429 なら少し待って送り直します。",
+      "選んだ Pod ごとに、Eviction (退去) を POST します。API サーバーはアドミッションを通したあと、eviction の処理の中で PodDisruptionBudget を確かめ、許せば Pod を消し (200)、許さなければ 429 を返します (1 つの Pod に PDB が複数あれば 500)。kubectl は 429 なら 5 秒待って送り直します。",
       "消された Pod は、kubelet が猶予の時間の中で止めます。Deployment などの Pod なら、コントローラーが代わりを作り、スケジューラーが別の Node に置きます。",
       "kubectl は Pod が消えるまで待ち、node/<名前> drained と出して終わります。保守が終わったら kubectl uncordon で spec.unschedulable を戻します。"
     ],
@@ -625,7 +625,7 @@
     ],
     "verbose": {
       "code": "$ kubectl drain node1 --ignore-daemonsets --dry-run=server -v=6",
-      "output": "I1118 18:10:02.675956 2069930 round_trippers.go:632] \"Response\" verb=\"GET\" url=\"https://<API サーバー>/api/v1/nodes/node1\" status=\"200 OK\" milliseconds=20\nI1118 18:10:02.689173 2069930 round_trippers.go:632] \"Response\" verb=\"PATCH\" url=\"https://<API サーバー>/api/v1/nodes/node1?dryRun=All\" status=\"403 Forbidden\" milliseconds=5\nerror: unable to cordon node \"node1\": nodes \"node1\" is forbidden: User \"<利用者>\" cannot patch resource \"nodes\" in API group \"\" at the cluster scope\nI1118 18:10:02.704395 2069930 round_trippers.go:632] \"Response\" verb=\"GET\" url=\"https://<API サーバー>/api/v1/pods?fieldSelector=spec.nodeName%3Dnode1&limit=500\" status=\"200 OK\" milliseconds=12\nI1118 18:10:02.724044 2069930 round_trippers.go:632] \"Response\" verb=\"GET\" url=\"https://<API サーバー>/apis/apps/v1/namespaces/kube-system/daemonsets/svclb-web-xxxxx\" status=\"200 OK\" milliseconds=7\n...",
+      "output": "I1118 18:10:02.675956 2069930 round_trippers.go:632] \"Response\" verb=\"GET\" url=\"https://<API サーバー>/api/v1/nodes/node1\" status=\"200 OK\" milliseconds=20\nI1118 18:10:02.689173 2069930 round_trippers.go:632] \"Response\" verb=\"PATCH\" url=\"https://<API サーバー>/api/v1/nodes/node1?dryRun=All\" status=\"403 Forbidden\" milliseconds=5\nerror: unable to cordon node \"node1\": nodes \"node1\" is forbidden: User \"kcna-user\" cannot patch resource \"nodes\" in API group \"\" at the cluster scope\nI1118 18:10:02.704395 2069930 round_trippers.go:632] \"Response\" verb=\"GET\" url=\"https://<API サーバー>/api/v1/pods?fieldSelector=spec.nodeName%3Dnode1&limit=500\" status=\"200 OK\" milliseconds=12\nI1118 18:10:02.724044 2069930 round_trippers.go:632] \"Response\" verb=\"GET\" url=\"https://<API サーバー>/apis/apps/v1/namespaces/kube-system/daemonsets/svclb-web-xxxxx\" status=\"200 OK\" milliseconds=7\n...",
       "note": "家のクラスタで --dry-run=server を付けて打ち、Node も Pod も変わっていないことを確かめました (名前は伏せています)。cordon の PATCH は Node を書く権限が無く 403 になりました。続けて Node の Pod の一覧と、Pod の持ち主の DaemonSet を GET して、退かせてよいかを調べています。"
     },
     "impl": {
@@ -656,6 +656,10 @@
       {
         "label": "kubectl の実装 (pkg/cmd/drain/drain.go)",
         "url": "https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/cmd/drain/drain.go#L325-L364"
+      },
+      {
+        "label": "kube-apiserver の実装 (pkg/registry/core/pod/storage/eviction.go)",
+        "url": "https://github.com/kubernetes/kubernetes/blob/v1.37.2/pkg/registry/core/pod/storage/eviction.go#L150-L275"
       }
     ]
   },
@@ -779,7 +783,8 @@
       "kubeconfig を読んで行き先と資格情報を決め、Pod を GET します。rs/nginx のように Pod 以外を指定すると、その持ち物の Pod を 1 つ選びます。終わった Pod (Succeeded・Failed) にはつなげません。",
       "つなぐコンテナを決めます。-c が無ければ注釈 kubectl.kubernetes.io/default-container のコンテナ、それも無ければ最初のコンテナです。コンテナが tty: true で起動していなければ、-t は使えず外されます。",
       "API サーバーの pods/<名前>/attach に、どの入出力をつなぐか (container・stdin・stdout・tty) を付けて要求します。kubectl v1.30 からは WebSocket が既定で、つなげないときだけ SPDY に戻ります (KUBECTL_REMOTE_COMMAND_WEBSOCKETS=false で WebSocket を切れる)。",
-      "API サーバーは認証と、pods/attach への認可を確かめてから、Pod が動く Node の kubelet に要求を中継します。kubelet はコンテナランタイムに頼み、今動いているメインのプロセスの入出力をつなぎます。exec と違って新しいプロセスは動かしません。",
+      "API サーバーは認証・認可・アドミッションを通します。認可では pods/attach の create が要ります (WebSocket の GET は get として認可され、v1.35 からは create も確かめられます)。通れば 101 Switching Protocols で WebSocket に切り替えます。",
+      "Node が WebSocket に対応していると申告していれば (ExtendWebSocketsToKubelet、v1.36 から既定)、API サーバーは WebSocket のまま kubelet へ渡し、申告が無ければ SPDY に訳して kubelet へつなぎます。kubelet はコンテナランタイムに頼み、今動いているメインのプロセスの入出力をつなぎます。exec と違って新しいプロセスは動かしません。",
       "-i で送った入力は、そのプロセスの stdin に届きます (コンテナの stdin: true が要る)。打った内容はコンテナのログにも残ります。",
       "-i -t でつないだときは、ctrl-p, ctrl-q (v1.36 で足された --detach-keys の既定) で、プロセスを止めずに切り離せます。抜けた後に、もう一度つなぐためのコマンドが表示されます。"
     ],
@@ -805,7 +810,7 @@
       {
         "title": "入力も渡して端末としてつなぐ (公式の例)",
         "code": "$ kubectl attach mypod -c ruby-container -i -t",
-        "output": "If you don't see a command prompt, try pressing enter.\n...\nSession ended, resume using 'kubectl attach mypod -c ruby-container -n default -i -t' command",
+        "output": "All commands and output from this session will be recorded in container logs, including credentials and sensitive information passed through the command prompt.\nIf you don't see a command prompt, try pressing enter.\n...\nSession ended, resume using 'kubectl attach mypod -c ruby-container -n default -i -t' command",
         "note": "最後の行は、-i -t で抜けたときに実装が出す文言で、同じプロセスにつなぎ直すコマンドを教えてくれます (名前空間は例)。"
       }
     ],
@@ -838,6 +843,14 @@
       {
         "label": "kubectl の実装 (pkg/cmd/attach/attach.go)",
         "url": "https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/cmd/attach/attach.go#L260-L337"
+      },
+      {
+        "label": "Feature Gates (ExtendWebSocketsToKubelet・AuthorizePodWebsocketUpgradeCreatePermission)",
+        "url": "https://kubernetes.io/docs/reference/command-line-tools-reference/feature-gates/"
+      },
+      {
+        "label": "kube-apiserver の実装 (pkg/registry/core/pod/rest/subresources.go)",
+        "url": "https://github.com/kubernetes/kubernetes/blob/v1.37.2/pkg/registry/core/pod/rest/subresources.go#L115-L157"
       }
     ]
   },
@@ -949,7 +962,7 @@
       "ref": "v0.37.2",
       "path": "pkg/polymorphichelpers/rollout_status.go",
       "lines": "L75-L91",
-      "excerpt": "if deployment.Generation <= deployment.Status.ObservedGeneration {\n\tcond := deploymentutil.GetDeploymentCondition(deployment.Status, appsv1.DeploymentProgressing)\n\tif cond != nil && cond.Reason == deploymentutil.TimedOutReason {\n\t\treturn \"\", false, fmt.Errorf(\"deployment %q exceeded its progress deadline\", deployment.Name)\n\t}\n\tif deployment.Spec.Replicas != nil && deployment.Status.UpdatedReplicas < *deployment.Spec.Replicas {\n\t\treturn fmt.Sprintf(\"Waiting for deployment %q rollout to finish: %d out of %d new replicas have been updated...\\n\", deployment.Name, deployment.Status.UpdatedReplicas, *deployment.Spec.Replicas), false, nil\n\t}\n\tif deployment.Status.Replicas > deployment.Status.UpdatedReplicas {\n\t\treturn fmt.Sprintf(\"Waiting for deployment %q rollout to finish: %d old replicas are pending termination...\\n\", deployment.Name, deployment.Status.Replicas-deployment.Status.UpdatedReplicas), false, nil\n\t}\n\tif deployment.Status.AvailableReplicas < deployment.Status.UpdatedReplicas {\n\t\treturn fmt.Sprintf(\"Waiting for deployment %q rollout to finish: %d of %d updated replicas are available...\\n\", deployment.Name, deployment.Status.AvailableReplicas, deployment.Status.UpdatedReplicas), false, nil\n\t}\n\treturn fmt.Sprintf(\"deployment %q successfully rolled out\\n\", deployment.Name), true, nil\n}\nreturn fmt.Sprintf(\"Waiting for deployment spec update to be observed...\\n\"), false, nil",
+      "excerpt": "\tif deployment.Generation <= deployment.Status.ObservedGeneration {\n\t\tcond := deploymentutil.GetDeploymentCondition(deployment.Status, appsv1.DeploymentProgressing)\n\t\tif cond != nil && cond.Reason == deploymentutil.TimedOutReason {\n\t\t\treturn \"\", false, fmt.Errorf(\"deployment %q exceeded its progress deadline\", deployment.Name)\n\t\t}\n\t\tif deployment.Spec.Replicas != nil && deployment.Status.UpdatedReplicas < *deployment.Spec.Replicas {\n\t\t\treturn fmt.Sprintf(\"Waiting for deployment %q rollout to finish: %d out of %d new replicas have been updated...\\n\", deployment.Name, deployment.Status.UpdatedReplicas, *deployment.Spec.Replicas), false, nil\n\t\t}\n\t\tif deployment.Status.Replicas > deployment.Status.UpdatedReplicas {\n\t\t\treturn fmt.Sprintf(\"Waiting for deployment %q rollout to finish: %d old replicas are pending termination...\\n\", deployment.Name, deployment.Status.Replicas-deployment.Status.UpdatedReplicas), false, nil\n\t\t}\n\t\tif deployment.Status.AvailableReplicas < deployment.Status.UpdatedReplicas {\n\t\t\treturn fmt.Sprintf(\"Waiting for deployment %q rollout to finish: %d of %d updated replicas are available...\\n\", deployment.Name, deployment.Status.AvailableReplicas, deployment.Status.UpdatedReplicas), false, nil\n\t\t}\n\t\treturn fmt.Sprintf(\"deployment %q successfully rolled out\\n\", deployment.Name), true, nil\n\t}\n\treturn fmt.Sprintf(\"Waiting for deployment spec update to be observed...\\n\"), false, nil",
       "note": "Deployment の status から、終わったかを決める部分です。期限切れならエラー、新しい Pod が足りない・古い Pod が残る・使える Pod が足りないの順に確かめ、全部そろえば successfully rolled out です。"
     },
     "sources": [
@@ -1089,7 +1102,7 @@
       "ref": "v0.37.2",
       "path": "pkg/polymorphichelpers/objectrestarter.go",
       "lines": "L44-L52",
-      "excerpt": "case *appsv1.Deployment:\n\tif obj.Spec.Paused {\n\t\treturn nil, errors.New(\"can't restart paused deployment (run rollout resume first)\")\n\t}\n\tif obj.Spec.Template.ObjectMeta.Annotations == nil {\n\t\tobj.Spec.Template.ObjectMeta.Annotations = make(map[string]string)\n\t}\n\tobj.Spec.Template.ObjectMeta.Annotations[\"kubectl.kubernetes.io/restartedAt\"] = time.Now().Format(time.RFC3339)\n\treturn runtime.Encode(scheme.Codecs.LegacyCodec(appsv1.SchemeGroupVersion), obj)",
+      "excerpt": "\tcase *appsv1.Deployment:\n\t\tif obj.Spec.Paused {\n\t\t\treturn nil, errors.New(\"can't restart paused deployment (run rollout resume first)\")\n\t\t}\n\t\tif obj.Spec.Template.ObjectMeta.Annotations == nil {\n\t\t\tobj.Spec.Template.ObjectMeta.Annotations = make(map[string]string)\n\t\t}\n\t\tobj.Spec.Template.ObjectMeta.Annotations[\"kubectl.kubernetes.io/restartedAt\"] = time.Now().Format(time.RFC3339)\n\t\treturn runtime.Encode(scheme.Codecs.LegacyCodec(appsv1.SchemeGroupVersion), obj)",
       "note": "apps/v1 の Deployment のときの処理です。一時停止中なら断り、Pod テンプレートの注釈 kubectl.kubernetes.io/restartedAt に今の時刻 (RFC3339) を書きます。この変更との差がパッチになります。"
     },
     "sources": [

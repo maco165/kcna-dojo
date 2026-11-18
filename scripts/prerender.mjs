@@ -133,7 +133,7 @@ export async function buildPages(load) {
   }
 
   // コマンド: 一覧と、コマンドごとのページ (中で何が起きるか・API の要求・実行の例・実装の抜粋まで、画面と同じ中身)
-  const { COMMAND_PAGES, implUrl } = await load('/src/content/commandPages.ts');
+  const { COMMAND_PAGES, implUrl, commandPageTitle } = await load('/src/content/commandPages.ts');
   pages.push({
     path: 'commands/',
     title: 'コマンド',
@@ -144,7 +144,7 @@ export async function buildPages(load) {
     const flags = [...(c.flags ?? []), ...c.globalFlags];
     pages.push({
       path: `commands/${c.id}/`,
-      title: `${c.command} の中身と使い方`,
+      title: commandPageTitle(c.id),
       description: clip(`${c.summary} ${c.detail ?? ''}`),
       body: [
         `<p>${link('commands/', 'コマンド')}</p>`,
@@ -162,7 +162,7 @@ export async function buildPages(load) {
         c.verbose ? `<h3>-v で見える要求</h3><pre><code>${esc(`${c.verbose.code}\n${c.verbose.output}`)}</code></pre>` : '',
         c.impl ? `<h2>実装を読む</h2><p><a href="${esc(implUrl(c.impl))}">${esc(`${c.impl.repo} ${c.impl.ref} の ${c.impl.path}`)}</a></p><pre><code>${esc(c.impl.excerpt)}</code></pre>` : '',
         '<h2>出典</h2>',
-        `<ul>${[{ label: `${c.command} の公式リファレンス`, url: c.source }, ...c.sources].map((x) => `<li><a href="${esc(x.url)}">${esc(x.label)}</a></li>`).join('')}</ul>`,
+        `<ul>${[{ label: `${c.command} の公式リファレンス`, url: c.source }, ...c.sources.filter((x) => x.url !== c.source)].map((x) => `<li><a href="${esc(x.url)}">${esc(x.label)}</a></li>`).join('')}</ul>`,
       ]
         .filter(Boolean)
         .join('\n'),

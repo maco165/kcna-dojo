@@ -91,7 +91,11 @@ export function useRoute(): Route {
       const at = shown;
       if (needsHeavyTitle(next)) void import('./pageMeta').then((m) => shown === at && (document.title = m.fullTitle(next)));
       // 比較表の表は、比較表のデータだけを読んで題名を決める (pageMeta はハンドブックのデータも読むので使わない)
-      else if (next.name === 'compare' && next.tableId) {
+      else if (next.name === 'commands' && next.commandId) {
+        // コマンドのページは、コマンドのデータだけを読んで題名を決める
+        const id = next.commandId;
+        void import('../content/commandPages').then((m) => shown === at && (document.title = withSite(m.commandPageTitle(id))));
+      } else if (next.name === 'compare' && next.tableId) {
         const id = next.tableId;
         void import('../content/compare').then((m) => shown === at && (document.title = withSite(m.findTable(id)?.title ?? '似た語の比較表')));
       }

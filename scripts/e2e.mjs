@@ -11,7 +11,7 @@
 //   8. どの画面も横にはみ出さない
 //   9. リポジトリへのリンク、このサイトについての画面、サイト名の横の印
 import { spawn } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { gzipSync } from 'node:zlib';
 
@@ -73,7 +73,7 @@ function checkFirstLoad() {
   const kb = Math.round(gz / 1024);
   check(kb <= 380, `最初に読む JS は gzip で 380KB まで (${kb}KB、${files.length} ファイル)`);
   // 名前だけでなく中身でも見る (静的に取り込まれて本体に混ざっても気づけるように)。それぞれのデータにしか無い文字で調べる
-  const marks = { ハンドブックのデータ: 'k3s-vs-kubernetes', 用語集のデータ: 'container-image', 説明のページ: '2026-03-22 の版', 模擬試験用の問題: 'のイメージを更新した直後に', 比較表のデータ: 'volumeClaimTemplates:  # Pod ごとに', コマンドの説明: 'リソースの一覧や状態を表で表示します' };
+  const marks = { ハンドブックのデータ: 'k3s-vs-kubernetes', 用語集のデータ: 'container-image', 説明のページ: '2026-03-22 の版', 模擬試験用の問題: 'のイメージを更新した直後に', 比較表のデータ: 'volumeClaimTemplates:  # Pod ごとに', コマンドの説明: 'リソースの一覧や状態を表で表示します', コマンドのページのデータ: 'Initial install underway', コマンドのページの中身: 'のような種類の名前を、API のグループ・版・資源に引き当てます' };
   const text = files.map((f) => readFileSync(new URL(`../dist/assets/${f}`, import.meta.url), 'utf8')).join('\n');
   const found = Object.entries(marks).filter(([, m]) => text.includes(m)).map(([k]) => k);
   check(found.length === 0, `ハンドブック・用語集・説明のページ・模擬試験用の問題・コマンドの説明・比較表・コマンドのページは最初に読まない ${found.join(',')}`);
@@ -747,6 +747,18 @@ async function run(browser, name, width, height) {
     check((await page.locator('.cmdp-api tbody tr').count()) >= 1 && (await page.locator('a[href^="https://github.com/kubernetes/kubectl/blob/"]').count()) >= 1, `${tag} コマンドのページに API の要求と実装へのリンクがある`);
     check((await page.title()).startsWith('kubectl get の中身と使い方'), `${tag} コマンドのページの題名 (${await page.title()})`);
     await noHorizontalOverflow(page, width, `${tag} コマンドのページ`);
+    // スマホでは全部のページの横のはみ出しを見る (長い API のパスなど、ページごとに中身が違うため)
+    if (width < 768) {
+      const ids = readdirSync(new URL('../src/content/commandPages/', import.meta.url)).flatMap((f) => JSON.parse(readFileSync(new URL(`../src/content/commandPages/${f}`, import.meta.url), 'utf8')).map((p) => p.id));
+      const wide = [];
+      for (const id of ids) {
+        await page.goto(`${BASE}commands/${id}/`);
+        await page.locator('.cmdp-inside').waitFor();
+        const sw = await page.evaluate(() => document.documentElement.scrollWidth);
+        if (sw > width) wide.push(`${id}:${sw}`);
+      }
+      check(wide.length === 0, `${tag} コマンドのページ ${ids.length} ページとも横にはみ出さない ${wide.join(' ')}`);
+    }
     await page.goto(`${BASE}lesson/w1-l3/`);
     await page.getByRole('textbox', { name: '空欄' }).fill('get');
     await page.getByRole('textbox', { name: '空欄' }).press('Enter');

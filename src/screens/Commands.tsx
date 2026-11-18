@@ -1,5 +1,6 @@
 // コマンドのページ (/commands/ と /commands/<id>/)。問題に出てくるコマンドごとに、何をするか・書き方・オプション・
 // 中で何が起きるか・API の要求・実行の例・-v で見える要求・実装の抜粋・出てくる問題・公式リファレンスを出す
+import { useMemo } from 'react';
 import { AppShell } from '@astryxdesign/core/AppShell';
 import { CodeBlock } from '@astryxdesign/core/CodeBlock';
 import { Link } from '@astryxdesign/core/Link';
@@ -65,7 +66,8 @@ function Index() {
 }
 
 function Page({ p }: { p: CommandPage }) {
-  const lessons = lessonsOf(p.id);
+  // 全問題を数えるので、ページが変わったときだけ数え直す
+  const lessons = useMemo(() => lessonsOf(p.id), [p.id]);
   const flags = [...(p.flags ?? []), ...p.globalFlags];
   return (
     <article className="hb cmdp" aria-labelledby="cmdp-title">

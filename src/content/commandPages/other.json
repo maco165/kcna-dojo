@@ -132,7 +132,7 @@
         "title": "値のファイルを替えて上げ、効いたかを見る (Using Helm の例)",
         "code": "$ helm upgrade -f panda.yaml happy-panda bitnami/wordpress\n$ helm get values happy-panda",
         "output": "mariadb:\n  auth:\n    username: user1",
-        "note": "panda.yaml に書いた mariadb.auth.username が、リリースに渡した値として記録されたことが分かります。出力は helm.sh の文書の例です。"
+        "note": "panda.yaml に書いた mariadb.auth.username が、リリースに渡した値として記録されたことが分かります。出力は helm.sh の文書の例です。 今の版 (v4) の helm get values は、出力の先頭に USER-SUPPLIED VALUES: の行を出します。"
       },
       {
         "title": "上げるたびにリビジョンが増える (helm history の文書の例)",
@@ -284,7 +284,7 @@
         "title": "履歴を見る (helm history の文書の例)",
         "code": "$ helm history angry-bird",
         "output": "REVISION    UPDATED                     STATUS          CHART             APP VERSION     DESCRIPTION\n1           Mon Oct 3 10:15:13 2016     superseded      alpine-0.1.0      1.0             Initial install\n2           Mon Oct 3 10:15:13 2016     superseded      alpine-0.1.0      1.0             Upgraded successfully\n3           Mon Oct 3 10:15:13 2016     superseded      alpine-0.1.0      1.0             Rolled back to 2\n4           Mon Oct 3 10:15:13 2016     deployed        alpine-0.1.0      1.0             Upgraded successfully",
-        "note": "STATUS が deployed の行が今のリリースです。rollback で戻す先の番号はこの REVISION の列から選びます。"
+        "note": "STATUS が deployed の行が今のリリースです。rollback で戻す先の番号はこの REVISION の列から選びます。 出力は helm.sh の文書の例です。今の版 (v4) の実装では DESCRIPTION は Install complete・Upgrade complete・Rollback to 2 の形になります。"
       }
     ],
     "impl": {
@@ -595,7 +595,7 @@
   {
     "id": "docker-build",
     "inside": [
-      "docker の CLI は build を自分では処理せず、CLI のプラグインの Buildx (docker buildx build) に渡します。既定のビルダーは Docker のドライバーで、Docker Engine に組み込まれた BuildKit を使います (DOCKER_BUILDKIT=0 のときだけ古いビルダーに戻り、非推奨の警告が出ます)。",
+      "既定のビルダーは Docker のドライバーで、Docker Engine に組み込まれた BuildKit を使います。DOCKER_BUILDKIT=0 のときと、Buildx のプラグインが無いときは古いビルダーに戻り、非推奨の警告が出ます (Windows のデーモンでは古いビルダーが既定です)。",
       "Buildx は、Dockerfile・ビルドの引数・出力の指定 (-t の名前など)・キャッシュの指定を、ビルドの要求として BuildKit に送ります。",
       "BuildKit の Dockerfile のフロントエンドが Dockerfile を読み、LLB という中間の形の依存のグラフに変えます。使われない段は飛ばし、依存の無い段は並べて実行できます。",
       "コンテキスト (最後に渡す . などのフォルダ) は丸ごと送られるのではなく、BuildKit が COPY や ADD に要るファイルだけを Buildx に求めます。.dockerignore に書いたものは送られません。出力の「load build context」「transferring context」がこの受け渡しです。",
@@ -733,7 +733,7 @@
         "title": "動いているコンテナ (kubernetes.io の crictl の文書の例)",
         "code": "$ sudo k3s crictl ps",
         "output": "CONTAINER ID        IMAGE                                                                                                             CREATED             STATE               NAME                       ATTEMPT\n1f73f2d81bf98       busybox@sha256:141c253bc4c3fd0a201d32dc1f493bcf3fff003b6df416dea4f41046e0f37d47                                   6 minutes ago       Running             sh                         1\n87d3992f84f74       nginx@sha256:d0a8828cccb73397acb0073bf34f4d7d8aa315263f1e7806bf8c55d8ac139d5f                                     7 minutes ago       Running             nginx                      0\n1941fb4da154f       k8s-gcrio.azureedge.net/hyperkube-amd64@sha256:00d814b1f7763f4ab5be80c58e98140dfc69df107f253d7fdd714b30a714260a   17 hours ago        Running             kube-proxy                 0",
-        "note": "文書の例は crictl ps の出力で、k3s crictl でも同じ形です。今の版 (v1.36) では右に POD ID・POD・NAMESPACE の列も出ます。"
+        "note": "文書の例は古い版の crictl ps の出力です。今の版 (v1.36) では、先頭の列名が CONTAINER になり、IMAGE の列はイメージの ID の頭 13 字になり、右に POD ID・POD・NAMESPACE の列も出ます。k3s crictl でも同じ形です。"
       },
       {
         "title": "止まったものも含める (kubernetes.io の crictl の文書の例)",
