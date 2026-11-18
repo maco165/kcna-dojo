@@ -464,6 +464,27 @@ async function run(browser, name, width, height) {
   check(figureMissing.length === 0, `${tag} ハンドブックの 14 トピックすべてに図がある ${figureMissing.join(',')}`);
   check(allIds.length === 14 && widest.w <= width, `${tag} ハンドブックの 14 トピックが横にはみ出さない (いちばん広い ${widest.id} ${widest.w} <= ${width})`);
 
+  // 15b. ハンドブックの本文の用語: 強調され、押すと用語集のその語が開く
+  {
+    await page.goto(`${BASE}#/handbook/core-concepts`);
+    await page.getByRole('heading', { name: '全体の流れ' }).waitFor();
+    const terms = page.locator('a.hb-term');
+    check((await terms.count()) >= 10, `${tag} ハンドブックの本文の用語集の語がリンクになる (${await terms.count()} 語)`);
+    const weight = await terms.first().evaluate((el) => getComputedStyle(el).fontWeight);
+    check(Number(weight) >= 600, `${tag} 用語のリンクは太字で強調される (${weight})`);
+    const etcd = page.locator('a.hb-term', { hasText: /^etcd$/ });
+    await etcd.first().click();
+    await page.waitForURL(/#\/glossary\/etcd$/);
+    if (width >= 768) {
+      await page.locator('#gloss-pane-term').waitFor();
+      check((await page.locator('#gloss-pane-term').innerText()).trim() === 'etcd', `${tag} 用語集でその語 (etcd) の説明が開く`);
+    } else {
+      const head = page.locator('#gloss-row-etcd button[aria-expanded]');
+      await head.waitFor();
+      check((await head.getAttribute('aria-expanded')) === 'true' && (await head.isVisible()), `${tag} 用語集でその語 (etcd) が開いて見える`);
+    }
+  }
+
   // 16. 戻る操作: 目次を下まで送ってトピックを開き、戻ると元の位置。新しく開いたページは先頭
   {
     const scrollTop = () => page.evaluate(() => (document.querySelector('.astryx-layout-content') ?? document.scrollingElement).scrollTop);

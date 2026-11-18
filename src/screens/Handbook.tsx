@@ -13,15 +13,39 @@ import { APPENDIX, HANDBOOK, findTopic, type HandbookStep } from '../content/han
 import { HANDBOOK_FIGURES } from '../content/handbookFigures';
 import { EXAM_WEIGHTS } from '../lib/exam';
 import type { Progress } from '../lib/progress';
-import { guideHref, handbookHref, lessonHref } from '../lib/route';
+import { glossaryTermHref, guideHref, handbookHref, lessonHref } from '../lib/route';
+import glossary from '../content/glossary.json';
+import type { GlossaryTerm } from '../lib/glossary';
+import { makeTermLinker, termNames, type TermPiece } from '../lib/termLinks';
 import { SITE_NAME } from '../lib/site';
 import { WIDE_QUERY, useMediaQuery } from '../lib/useMediaQuery';
 
+const TERM_NAMES = termNames((glossary as { terms: GlossaryTerm[] }).terms);
+
+/** 本文。用語集にある語 (ページの中で最初の 1 回) を強調し、用語集のその語へのリンクにする */
+function Prose({ pieces }: { pieces: TermPiece[] }) {
+  return (
+    <>
+      {pieces.map((p, i) =>
+        typeof p === 'string' ? (
+          p
+        ) : (
+          <a key={i} className="hb-term" href={glossaryTermHref(p.id)}>
+            {p.text}
+          </a>
+        ),
+      )}
+    </>
+  );
+}
+
 /** 1 段: 説明、コマンドかマニフェスト、出力の例 */
-function Step({ step }: { step: HandbookStep }) {
+function Step({ step, text }: { step: HandbookStep; text: TermPiece[] }) {
   return (
     <div className="hb-step">
-      <p className="hb-step__text">{step.text}</p>
+      <p className="hb-step__text">
+        <Prose pieces={text} />
+      </p>
       {step.code && <StepVisual code={step.code.text} language={step.code.language} result={step.result} />}
       {step.code && <CodeBlock code={step.code.text} language={step.code.language} width="100%" size="sm" hasCopyButton />}
       {step.output && (
@@ -96,6 +120,9 @@ function Topic({ id }: { id: string }) {
   }
   const { topic: t, prev, next } = found;
   const lessons = t.lessons.map((l) => findLesson(l)).filter((x) => x !== undefined);
+  // 本文の順に、語ごとに最初の 1 回だけリンクにする (描く前にまとめて決めるので、何度描いても同じ)
+  const link = makeTermLinker(TERM_NAMES);
+  const prose = { summary: link(t.summary), flow: t.flow.map((s) => link(s.text)), tries: t.try.map((x) => x.steps.map((s) => link(s.text))) };
   return (
     <article className="hb" aria-labelledby="hb-title">
       <nav aria-label="パンくず" className="hb-crumbs">
@@ -114,7 +141,9 @@ function Topic({ id }: { id: string }) {
         <h1 id="hb-title" className="week-title">
           {t.title}
         </h1>
-        <p className="hb-lead">{t.summary}</p>
+        <p className="hb-lead">
+          <Prose pieces={prose.summary} />
+        </p>
       </div>
       {HANDBOOK_FIGURES[t.id] && <Diagram spec={HANDBOOK_FIGURES[t.id]} id={t.id} />}
 
@@ -126,7 +155,7 @@ function Topic({ id }: { id: string }) {
         <ol className="hb-flow">
           {t.flow.map((s, i) => (
             <li key={i}>
-              <Step step={s} />
+              <Step step={s} text={prose.flow[i]} />
             </li>
           ))}
         </ol>
@@ -143,7 +172,7 @@ function Topic({ id }: { id: string }) {
             <ol className="hb-flow">
               {x.steps.map((s, j) => (
                 <li key={j}>
-                  <Step step={s} />
+                  <Step step={s} text={prose.tries[i][j]} />
                 </li>
               ))}
             </ol>
