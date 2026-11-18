@@ -63,6 +63,9 @@ describe('validateHandbook', () => {
     expect(check((t) => (t.extra = 1))[0]).toMatch(/extra/);
     expect(check((t) => (t.id = 'Core_Concepts'))[0]).toMatch(/kebab-case/);
     expect(check((t) => (t.try = []))[0]).toMatch(/1 つ以上/);
+    expect(check((t) => ((t.flow as Record<string, unknown>[])[1] = { text: 'b', code: { language: 'bash', text: 'kubectl get pods' }, result: { text: 'x', tone: 'maybe' } }))[0]).toMatch(/tone/);
+    expect(check((t) => ((t.flow as Record<string, unknown>[])[0] = { text: 'a', result: { text: 'x', tone: 'ok' } }))[0]).toMatch(/コードのある手順/);
+    expect(check((t) => ((t.flow as Record<string, unknown>[])[1] = { text: 'b', code: { language: 'bash', text: 'kubectl get pods' }, result: { text: 'あ'.repeat(41), tone: 'ok' } }))[0]).toMatch(/40 字/);
     expect(check((t) => ((t.flow as Record<string, unknown>[])[2] = { text: 'c', outptu: 'x' }))[0]).toMatch(/outptu/);
     expect(check((t) => (t.lessons = ['w1-l1', 'w1-l1']))[0]).toMatch(/重なって/);
     expect(check((t) => (t.sources = [{ label: 'a', url: 'https://k/' }, { label: 'b', url: 'https://k/' }]))[0]).toMatch(/同じ URL/);

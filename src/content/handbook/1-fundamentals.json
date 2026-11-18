@@ -84,7 +84,11 @@
                 "language": "bash",
                 "text": "kubectl delete pod -l app=web -n try-kcna\nkubectl get pods -n try-kcna -l app=web"
               },
-              "output": "pod \"web-6b8f7c5d9-2kq9x\" deleted from try-kcna namespace\npod \"web-6b8f7c5d9-7tz4m\" deleted from try-kcna namespace\nNAME                  READY   STATUS    RESTARTS   AGE\nweb-6b8f7c5d9-h5w2r   1/1     Running   0          6s\nweb-6b8f7c5d9-p9c3l   1/1     Running   0          6s"
+              "output": "pod \"web-6b8f7c5d9-2kq9x\" deleted from try-kcna namespace\npod \"web-6b8f7c5d9-7tz4m\" deleted from try-kcna namespace\nNAME                  READY   STATUS    RESTARTS   AGE\nweb-6b8f7c5d9-h5w2r   1/1     Running   0          6s\nweb-6b8f7c5d9-p9c3l   1/1     Running   0          6s",
+              "result": {
+                "text": "Deployment が替わりの Pod を作り、2 つに戻る",
+                "tone": "ok"
+              }
             },
             {
               "text": "後片付けとして、名前空間ごと消します。中に作ったものもまとめて消えます。",
@@ -629,7 +633,11 @@
                 "language": "bash",
                 "text": "kubectl get pod big -n try-kcna -o wide"
               },
-              "output": "NAME   READY   STATUS    RESTARTS   AGE   IP       NODE     NOMINATED NODE   READINESS GATES\nbig    0/1     Pending   0          15s   <none>   <none>   <none>           <none>"
+              "output": "NAME   READY   STATUS    RESTARTS   AGE   IP       NODE     NOMINATED NODE   READINESS GATES\nbig    0/1     Pending   0          15s   <none>   <none>   <none>           <none>",
+              "result": {
+                "text": "どのノードにも置けず、Pending のまま",
+                "tone": "warn"
+              }
             },
             {
               "text": "Events の FailedScheduling に Insufficient cpu が出ていることを読みます (フィルタリングで全部のノードが外れました)。",
@@ -690,7 +698,11 @@
                 "language": "bash",
                 "text": "kubectl label nodes \"$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}')\" disktype=ssd\nkubectl get pod on-ssd -n try-kcna -o wide"
               },
-              "output": "node/k3s-1 labeled\nNAME     READY   STATUS    RESTARTS   AGE   IP           NODE    NOMINATED NODE   READINESS GATES\non-ssd   1/1     Running   0          40s   10.42.0.21   k3s-1   <none>           <none>"
+              "output": "node/k3s-1 labeled\nNAME     READY   STATUS    RESTARTS   AGE   IP           NODE    NOMINATED NODE   READINESS GATES\non-ssd   1/1     Running   0          40s   10.42.0.21   k3s-1   <none>           <none>",
+              "result": {
+                "text": "ラベルの合うノードに置かれ、Running になる",
+                "tone": "ok"
+              }
             },
             {
               "text": "ノードに付けたラベルを外します (キーの後ろに - を付けます)。動いている Pod はそのまま動き続けます。",
@@ -735,7 +747,11 @@
                 "language": "bash",
                 "text": "kubectl apply -f - <<'EOF'\napiVersion: v1\nkind: Pod\nmetadata:\n  name: prefer-ssd\n  namespace: try-kcna\nspec:\n  affinity:\n    nodeAffinity:\n      preferredDuringSchedulingIgnoredDuringExecution:\n        - weight: 1\n          preference:\n            matchExpressions:\n              - key: disktype\n                operator: In\n                values:\n                  - ssd\n  containers:\n    - name: nginx\n      image: nginx:1.27-alpine\nEOF\nkubectl get pod prefer-ssd -n try-kcna -o wide"
               },
-              "output": "pod/prefer-ssd created\nNAME         READY   STATUS    RESTARTS   AGE   IP           NODE    NOMINATED NODE   READINESS GATES\nprefer-ssd   1/1     Running   0          8s    10.42.0.22   k3s-1   <none>           <none>"
+              "output": "pod/prefer-ssd created\nNAME         READY   STATUS    RESTARTS   AGE   IP           NODE    NOMINATED NODE   READINESS GATES\nprefer-ssd   1/1     Running   0          8s    10.42.0.22   k3s-1   <none>           <none>",
+              "result": {
+                "text": "合うノードが無くても、ほかのノードに置かれて Running",
+                "tone": "ok"
+              }
             },
             {
               "text": "同じ条件を required (必須) にすると、合うノードが無いので Pending のままになります。違いを見比べます。",
@@ -743,7 +759,11 @@
                 "language": "bash",
                 "text": "kubectl apply -f - <<'EOF'\napiVersion: v1\nkind: Pod\nmetadata:\n  name: require-ssd\n  namespace: try-kcna\nspec:\n  affinity:\n    nodeAffinity:\n      requiredDuringSchedulingIgnoredDuringExecution:\n        nodeSelectorTerms:\n          - matchExpressions:\n              - key: disktype\n                operator: In\n                values:\n                  - ssd\n  containers:\n    - name: nginx\n      image: nginx:1.27-alpine\nEOF\nkubectl get pods -n try-kcna"
               },
-              "output": "pod/require-ssd created\nNAME          READY   STATUS    RESTARTS   AGE\nprefer-ssd    1/1     Running   0          1m\nrequire-ssd   0/1     Pending   0          5s"
+              "output": "pod/require-ssd created\nNAME          READY   STATUS    RESTARTS   AGE\nprefer-ssd    1/1     Running   0          1m\nrequire-ssd   0/1     Pending   0          5s",
+              "result": {
+                "text": "required では合うノードが無く、Pending のまま",
+                "tone": "warn"
+              }
             },
             {
               "text": "後片付けとして、名前空間ごと消します。中に作ったものもまとめて消えます。",

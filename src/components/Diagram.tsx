@@ -69,9 +69,9 @@ export default function Diagram({ spec, id }: { spec: DiagramSpec; id: string })
   const edges = spec.edges.map((e) => ({ ...e, ...edgeEnds(spec, e) }));
   return (
     <figure className="dg">
-      <div className="dg__scroll" tabIndex={0} role="group" aria-label="図 (横に送れます)">
+      <div className="dg__scroll">
         {/* 説明は figcaption が受け持つので、図そのものは読み上げない (同じ文が並ばないように) */}
-        <svg viewBox={`0 0 ${spec.width} ${spec.height}`} aria-hidden="true" focusable="false" className="dg__svg" style={{ minWidth: spec.width }}>
+        <svg viewBox={`0 0 ${spec.width} ${spec.height}`} aria-hidden="true" focusable="false" className="dg__svg">
           <defs>
             <marker id={marker} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
               <path d="M0 0 L10 5 L0 10 z" className="dg__head" />
@@ -112,9 +112,21 @@ export default function Diagram({ spec, id }: { spec: DiagramSpec; id: string })
           )}
         </svg>
       </div>
-      <p className="dg__hint" aria-hidden="true">
-        横に送ると図の続きが見られます
-      </p>
+      {/* スマホでは図を幅に収めて全体を見せ、小さくなる文字は、つながりの一覧で補う */}
+      <ul className="dg__links" aria-label="図のつながり">
+        {spec.edges.map((e, i) => {
+          const from = spec.nodes.find((n) => n.id === e.from)!;
+          const to = spec.nodes.find((n) => n.id === e.to)!;
+          return (
+            <li key={i}>
+              <span className="dg__links-node">{from.label}</span>
+              <span aria-hidden="true"> → </span>
+              <span className="dg__links-node">{to.label}</span>
+              {e.label && <span className="dg__links-label">{e.label}</span>}
+            </li>
+          );
+        })}
+      </ul>
       <figcaption className="dg__caption">{spec.caption}</figcaption>
     </figure>
   );

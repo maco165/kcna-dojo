@@ -85,7 +85,11 @@
                 "language": "bash",
                 "text": "kubectl set image deployment/web nginx=nginx:1.28 -n try-kcna\nkubectl rollout status deployment/web -n try-kcna\nkubectl get replicasets -n try-kcna"
               },
-              "output": "NAME             DESIRED   CURRENT   READY   AGE\nweb-5d8b9c7f6d   0         0         0       2m\nweb-6c4f8d9b7a   3         3         3       30s"
+              "output": "NAME             DESIRED   CURRENT   READY   AGE\nweb-5d8b9c7f6d   0         0         0       2m\nweb-6c4f8d9b7a   3         3         3       30s",
+              "result": {
+                "text": "ReplicaSet が 2 つになり、古い側の数が 0 に減る",
+                "tone": "ok"
+              }
             },
             {
               "text": "履歴を見て、1 つ前に戻します。戻したあとはイメージが nginx:1.27 になっていることを確かめます。",
@@ -173,7 +177,11 @@
                 "language": "bash",
                 "text": "helm upgrade hello ./hello -n try-kcna --set replicaCount=2\nhelm rollback hello 1 -n try-kcna\nhelm history hello -n try-kcna"
               },
-              "output": "REVISION  UPDATED                   STATUS      CHART        APP VERSION  DESCRIPTION\n1         Mon Jan 11 10:27:17 2027  superseded  hello-0.1.0  1.16.0       Install complete\n2         Mon Jan 11 10:28:40 2027  superseded  hello-0.1.0  1.16.0       Upgrade complete\n3         Mon Jan 11 10:29:05 2027  deployed    hello-0.1.0  1.16.0       Rollback to 1"
+              "output": "REVISION  UPDATED                   STATUS      CHART        APP VERSION  DESCRIPTION\n1         Mon Jan 11 10:27:17 2027  superseded  hello-0.1.0  1.16.0       Install complete\n2         Mon Jan 11 10:28:40 2027  superseded  hello-0.1.0  1.16.0       Upgrade complete\n3         Mon Jan 11 10:29:05 2027  deployed    hello-0.1.0  1.16.0       Rollback to 1",
+              "result": {
+                "text": "rollback も新しいリビジョンになり、履歴は 3 まで",
+                "tone": "ok"
+              }
             },
             {
               "text": "リリースを外してから、名前空間を片付けます。",
@@ -385,7 +393,11 @@
                 "language": "bash",
                 "text": "kubectl set image deployment/bad nginx=nginx:1.27 -n try-kcna\nkubectl rollout status deployment/bad -n try-kcna"
               },
-              "output": "deployment.apps/bad image updated\ndeployment \"bad\" successfully rolled out"
+              "output": "deployment.apps/bad image updated\ndeployment \"bad\" successfully rolled out",
+              "result": {
+                "text": "新しい Pod が Running になる",
+                "tone": "ok"
+              }
             },
             {
               "text": "終わったら、試すために作った名前空間ごと片付けます。中のリソースもまとめて消えます。",
@@ -420,9 +432,13 @@
               "text": "1 分ほど待って状態を見ると、RESTARTS が増え、STATUS が CrashLoopBackOff になります。",
               "code": {
                 "language": "bash",
-                "text": "kubectl get pod crash -n try-kcna"
+                "text": "sleep 60\nkubectl get pod crash -n try-kcna"
               },
-              "output": "NAME    READY   STATUS             RESTARTS      AGE\ncrash   0/1     CrashLoopBackOff   3 (20s ago)   70s"
+              "output": "NAME    READY   STATUS             RESTARTS      AGE\ncrash   0/1     CrashLoopBackOff   3 (20s ago)   70s",
+              "result": {
+                "text": "RESTARTS が増え、CrashLoopBackOff になる",
+                "tone": "warn"
+              }
             },
             {
               "text": "落ちる前のコンテナのログと、終わったときの理由と終了コードを読みます。",
@@ -467,7 +483,11 @@
                 "language": "bash",
                 "text": "kubectl get pod big -n try-kcna\nkubectl describe pod big -n try-kcna | grep -A3 Events"
               },
-              "output": "NAME   READY   STATUS    RESTARTS   AGE\nbig    0/1     Pending   0          15s\nEvents:\n  Type     Reason            Age   From               Message\n  ----     ------            ----  ----               -------\n  Warning  FailedScheduling  15s   default-scheduler  0/1 nodes are available: 1 Insufficient memory. ..."
+              "output": "NAME   READY   STATUS    RESTARTS   AGE\nbig    0/1     Pending   0          15s\nEvents:\n  Type     Reason            Age   From               Message\n  ----     ------            ----  ----               -------\n  Warning  FailedScheduling  15s   default-scheduler  0/1 nodes are available: 1 Insufficient memory. ...",
+              "result": {
+                "text": "Pending のまま。イベントにスケジューラーの理由が出る",
+                "tone": "warn"
+              }
             },
             {
               "text": "終わったら、試すために作った名前空間ごと片付けます。中のリソースもまとめて消えます。",

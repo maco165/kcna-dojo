@@ -434,6 +434,8 @@ async function run(browser, name, width, height) {
   await page.getByRole('heading', { name: '全体の流れ' }).waitFor();
   check(page.url().includes('#/handbook/debugging'), `${tag} 目次からトピックへ飛べる`);
   check((await page.locator('.hb-try').count()) >= 2 && (await page.locator('.hb-try[open]').count()) === 1, `${tag} 試す手順があり、最初の 1 つだけ開いている`);
+  check((await page.locator('.sv__result').count()) >= 1, `${tag} 手順の絵に、起きる結果が添えられる`);
+  check((await page.locator('.sv__row').count()) >= 10 && (await page.locator('.sv__row[aria-label^="作る"]').count()) >= 1, `${tag} 手順に、コマンドで起きることの絵が付く`);
   await page.locator('.gloss-chip').first().click();
   await page.waitForURL(/#\/lesson\//);
   check(true, `${tag} ハンドブックから練習のレッスンへ飛べる`);
@@ -446,14 +448,18 @@ async function run(browser, name, width, height) {
   const allIds = await page.locator('.hb-topic').evaluateAll((els) => els.map((a) => a.getAttribute('href').split('/').pop()));
   let widest = { id: '', w: 0 };
   const figureMissing = [];
+  const figureScroll = [];
   for (const id of allIds) {
     await page.goto(`${BASE}#/handbook/${id}`);
     await page.getByRole('heading', { name: '全体の流れ' }).waitFor();
     await page.evaluate(() => document.querySelectorAll('details').forEach((d) => (d.open = true)));
     const w = await page.evaluate(() => document.documentElement.scrollWidth);
     if ((await page.locator('figure.dg figcaption').count()) !== 1) figureMissing.push(id);
+    const figOverflow = await page.locator('.dg__scroll').evaluate((el) => el.scrollWidth - el.clientWidth);
+    if (figOverflow > 1) figureScroll.push(`${id}:${figOverflow}`);
     if (w > widest.w) widest = { id, w };
   }
+  check(figureScroll.length === 0, `${tag} 図が横にスクロールせず幅に収まる ${figureScroll.join(',')}`);
   check(figureMissing.length === 0, `${tag} ハンドブックの 13 トピックすべてに図がある ${figureMissing.join(',')}`);
   check(allIds.length === 13 && widest.w <= width, `${tag} ハンドブックの 13 トピックが横にはみ出さない (いちばん広い ${widest.id} ${widest.w} <= ${width})`);
 

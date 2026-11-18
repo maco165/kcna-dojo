@@ -1,6 +1,9 @@
 // ハンドブックのデータの検査。違反を文で返す (空なら OK)
 const TOPIC_KEYS = new Set(['id', 'competency', 'title', 'summary', 'flow', 'try', 'lessons', 'sources']);
-const STEP_KEYS = new Set(['text', 'code', 'output']);
+const STEP_KEYS = new Set(['text', 'code', 'output', 'result']);
+const RESULT_KEYS = new Set(['text', 'tone']);
+/** 結果の文の長さの上限 (絵の 1 行に収める) */
+export const RESULT_MAX = 40;
 const CODE_KEYS = new Set(['language', 'text']);
 const TRY_KEYS = new Set(['goal', 'steps']);
 const FILE_KEYS = new Set(['domain', 'topics']);
@@ -23,6 +26,14 @@ function checkSteps(steps: unknown, where: string, errors: string[], min: number
     if (!isObj(s) || !isText(s.text)) return void errors.push(`${w}: text がありません`);
     unknownKeys(s, STEP_KEYS, w, errors);
     if (isObj(s.code)) unknownKeys(s.code, CODE_KEYS, `${w}.code`, errors);
+    if (s.result !== undefined) {
+      if (!isObj(s.result) || !isText(s.result.text) || !['ok', 'warn'].includes(s.result.tone as string)) errors.push(`${w}: result は text と tone (ok か warn) を持ちます`);
+      else {
+        unknownKeys(s.result, RESULT_KEYS, `${w}.result`, errors);
+        if ((s.result.text as string).length > RESULT_MAX) errors.push(`${w}: result は ${RESULT_MAX} 字までにします`);
+        if (!s.code) errors.push(`${w}: result はコードのある手順にだけ付けます`);
+      }
+    }
     if (s.code !== undefined && !(isObj(s.code) && LANGS.has(s.code.language as string) && isText(s.code.text))) errors.push(`${w}: code は language (bash か yaml) と text を持ちます`);
     if (s.output !== undefined && !isText(s.output)) errors.push(`${w}: output は文字列にします`);
   });
