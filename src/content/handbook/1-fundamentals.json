@@ -1070,6 +1070,10 @@
         {
           "label": "docs.k3s.io: Import Images",
           "url": "https://docs.k3s.io/add-ons/import-images"
+        },
+        {
+          "label": "Docker: Storage drivers (読み取り専用の層と書き込みの層)",
+          "url": "https://docs.docker.com/engine/storage/drivers/"
         }
       ]
     }

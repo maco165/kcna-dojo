@@ -451,7 +451,7 @@ async function run(browser, name, width, height) {
     await page.getByRole('heading', { name: '全体の流れ' }).waitFor();
     await page.evaluate(() => document.querySelectorAll('details').forEach((d) => (d.open = true)));
     const w = await page.evaluate(() => document.documentElement.scrollWidth);
-    if ((await page.locator('figure.dg svg[role="img"]').count()) !== 1) figureMissing.push(id);
+    if ((await page.locator('figure.dg figcaption').count()) !== 1) figureMissing.push(id);
     if (w > widest.w) widest = { id, w };
   }
   check(figureMissing.length === 0, `${tag} ハンドブックの 13 トピックすべてに図がある ${figureMissing.join(',')}`);

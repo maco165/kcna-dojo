@@ -11,7 +11,9 @@ export type DiagramNode = {
   tone?: 'accent' | 'warn' | 'muted';
 };
 export type DiagramGroup = { x: number; y: number; w: number; h: number; label: string };
-export type DiagramEdge = { from: string; to: string; label?: string; dashed?: boolean };
+export type Side = 'top' | 'bottom' | 'left' | 'right';
+/** fromSide / toSide を付けると、その辺の真ん中から出入りする (付けなければ中心どうしを結ぶ線と縁の交点) */
+export type DiagramEdge = { from: string; to: string; label?: string; dashed?: boolean; fromSide?: Side; toSide?: Side };
 export type DiagramSpec = {
   /** 読み上げと図の下の説明に使う 1〜2 文 */
   caption: string;
@@ -23,6 +25,31 @@ export type DiagramSpec = {
 };
 
 type Pt = { x: number; y: number };
+
+function sidePoint(n: DiagramNode, side: Side, pad: number): Pt {
+  if (side === 'top') return { x: n.x + n.w / 2, y: n.y - pad };
+  if (side === 'bottom') return { x: n.x + n.w / 2, y: n.y + n.h + pad };
+  if (side === 'left') return { x: n.x - pad, y: n.y + n.h / 2 };
+  return { x: n.x + n.w + pad, y: n.y + n.h / 2 };
+}
+
+/** 矢印の両端 (テストでも使う) */
+export function edgeEnds(spec: DiagramSpec, e: DiagramEdge): { p: Pt; q: Pt } {
+  const a = spec.nodes.find((n) => n.id === e.from)!;
+  const b = spec.nodes.find((n) => n.id === e.to)!;
+  const ca = { x: a.x + a.w / 2, y: a.y + a.h / 2 };
+  const cb = { x: b.x + b.w / 2, y: b.y + b.h / 2 };
+  const p = e.fromSide ? sidePoint(a, e.fromSide, 2) : edgePoint(a, e.toSide ? sidePoint(b, e.toSide, 0) : cb, 2);
+  const q = e.toSide ? sidePoint(b, e.toSide, 6) : edgePoint(b, e.fromSide ? sidePoint(a, e.fromSide, 0) : ca, 6);
+  return { p, q };
+}
+
+/** 矢印の文字の置き場所。横向きの線は線の上、縦向きの線は線の右 */
+export function labelPlace(p: Pt, q: Pt): { x: number; y: number; anchor: 'middle' | 'start' } {
+  const mx = (p.x + q.x) / 2;
+  const my = (p.y + q.y) / 2;
+  return Math.abs(q.x - p.x) >= Math.abs(q.y - p.y) ? { x: mx, y: my - 6, anchor: 'middle' } : { x: mx + 8, y: my + 4, anchor: 'start' };
+}
 
 /** 箱の中心から相手の中心へ向かう線が、箱の縁と交わる点 */
 function edgePoint(n: DiagramNode, toward: Pt, pad = 4): Pt {
@@ -38,19 +65,13 @@ function edgePoint(n: DiagramNode, toward: Pt, pad = 4): Pt {
 }
 
 export default function Diagram({ spec, id }: { spec: DiagramSpec; id: string }) {
-  const byId = new Map(spec.nodes.map((n) => [n.id, n]));
   const marker = `arrow-${id}`;
-  const edges = spec.edges.map((e) => {
-    const a = byId.get(e.from)!;
-    const b = byId.get(e.to)!;
-    const ca = { x: a.x + a.w / 2, y: a.y + a.h / 2 };
-    const cb = { x: b.x + b.w / 2, y: b.y + b.h / 2 };
-    return { ...e, p: edgePoint(a, cb, 2), q: edgePoint(b, ca, 6) };
-  });
+  const edges = spec.edges.map((e) => ({ ...e, ...edgeEnds(spec, e) }));
   return (
     <figure className="dg">
-      <div className="dg__scroll">
-        <svg viewBox={`0 0 ${spec.width} ${spec.height}`} role="img" aria-label={spec.caption} className="dg__svg" style={{ minWidth: Math.min(spec.width, 560) }}>
+      <div className="dg__scroll" tabIndex={0} role="group" aria-label="図 (横に送れます)">
+        {/* 説明は figcaption が受け持つので、図そのものは読み上げない (同じ文が並ばないように) */}
+        <svg viewBox={`0 0 ${spec.width} ${spec.height}`} aria-hidden="true" focusable="false" className="dg__svg" style={{ minWidth: spec.width }}>
           <defs>
             <marker id={marker} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
               <path d="M0 0 L10 5 L0 10 z" className="dg__head" />
@@ -84,13 +105,16 @@ export default function Diagram({ spec, id }: { spec: DiagramSpec; id: string })
           {edges.map(
             (e, i) =>
               e.label && (
-                <text key={i} x={(e.p.x + e.q.x) / 2} y={(e.p.y + e.q.y) / 2 - 6} textAnchor="middle" className="dg__edge-label">
+                <text key={i} {...(({ x, y }) => ({ x, y }))(labelPlace(e.p, e.q))} textAnchor={labelPlace(e.p, e.q).anchor} className="dg__edge-label">
                   {e.label}
                 </text>
               ),
           )}
         </svg>
       </div>
+      <p className="dg__hint" aria-hidden="true">
+        横に送ると図の続きが見られます
+      </p>
       <figcaption className="dg__caption">{spec.caption}</figcaption>
     </figure>
   );
@@ -101,14 +125,12 @@ export default function Diagram({ spec, id }: { spec: DiagramSpec; id: string })
  * 図を直せばサムネイルも同じように変わる
  */
 export function DiagramThumb({ spec }: { spec: DiagramSpec }) {
-  const byId = new Map(spec.nodes.map((n) => [n.id, n]));
   return (
     <svg viewBox={`0 0 ${spec.width} ${spec.height}`} className="dg-thumb" aria-hidden="true" focusable="false" preserveAspectRatio="xMidYMid meet">
       {spec.groups?.map((g) => <rect key={g.label} x={g.x} y={g.y} width={g.w} height={g.h} rx="14" className="dg-thumb__group" />)}
       {spec.edges.map((e, i) => {
-        const a = byId.get(e.from)!;
-        const b = byId.get(e.to)!;
-        return <line key={i} x1={a.x + a.w / 2} y1={a.y + a.h / 2} x2={b.x + b.w / 2} y2={b.y + b.h / 2} className={e.dashed ? 'dg-thumb__edge dg-thumb__edge--dashed' : 'dg-thumb__edge'} />;
+        const { p, q } = edgeEnds(spec, e);
+        return <line key={i} x1={p.x} y1={p.y} x2={q.x} y2={q.y} className={e.dashed ? 'dg-thumb__edge dg-thumb__edge--dashed' : 'dg-thumb__edge'} />;
       })}
       {spec.nodes.map((n) => (
         <rect key={n.id} x={n.x} y={n.y} width={n.w} height={n.h} rx="10" className={`dg-thumb__node${n.tone ? ` dg-thumb__node--${n.tone}` : ''}`} />
