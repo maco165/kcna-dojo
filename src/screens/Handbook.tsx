@@ -4,6 +4,7 @@ import { Link } from '@astryxdesign/core/Link';
 import { Text } from '@astryxdesign/core/Text';
 import AppSideNav from '../components/AppSideNav';
 import Diagram, { DiagramThumb } from '../components/Diagram';
+import StepVisual from '../components/StepVisual';
 import BottomTabs from '../components/BottomTabs';
 import RepoLink from '../components/RepoLink';
 import SiteLogo from '../components/SiteLogo';
@@ -21,6 +22,7 @@ function Step({ step }: { step: HandbookStep }) {
   return (
     <div className="hb-step">
       <p className="hb-step__text">{step.text}</p>
+      {step.code && <StepVisual code={step.code.text} language={step.code.language} />}
       {step.code && <CodeBlock code={step.code.text} language={step.code.language} width="100%" size="sm" hasCopyButton />}
       {step.output && (
         <figure className="hb-output">

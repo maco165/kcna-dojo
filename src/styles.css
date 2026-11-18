@@ -1934,3 +1934,150 @@ body {
 .dg-thumb__edge--dashed {
   stroke-dasharray: 10 8;
 }
+
+/* 手順の絵 (components/StepVisual.tsx): kubectl → 操作 → 場所の中の対象 */
+.sv {
+  list-style: none;
+  margin: 0;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-radius: var(--radius-container);
+  border: 1px solid var(--color-border);
+  background: var(--color-background-card);
+}
+
+.sv__row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+}
+
+.sv__tool {
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--color-background-inverted);
+  /* 反転した地 (ライトは濃い・ダークは白) に、いつも逆の色の字 */
+  color: var(--color-background-body);
+  font-family: var(--font-family-code, 'SF Mono', Monaco, Consolas, monospace);
+  font-size: 12px;
+}
+
+.sv__arrow {
+  color: var(--color-icon-secondary);
+  font-size: 14px;
+}
+
+.sv__arrow--back {
+  color: var(--color-icon-accent);
+}
+
+.sv__verb {
+  padding: 2px 10px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+
+.sv__verb--create,
+.sv__verb--apply {
+  background: var(--color-success-muted);
+  border-color: var(--color-border-green);
+  color: var(--color-text-green);
+}
+
+.sv__verb--read,
+.sv__verb--logs,
+.sv__verb--wait {
+  background: var(--color-accent-muted);
+  border-color: var(--color-border-blue);
+  color: var(--color-text-blue);
+}
+
+.sv__verb--enter {
+  background: var(--color-background-purple);
+  border-color: var(--color-border-purple);
+  color: var(--color-text-purple);
+}
+
+.sv__verb--change {
+  background: var(--color-warning-muted);
+  border-color: var(--color-border-yellow);
+  color: var(--color-text-yellow);
+}
+
+.sv__verb--delete {
+  background: var(--color-error-muted);
+  border-color: var(--color-border-red);
+  color: var(--color-text-red);
+}
+
+.sv__where {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  padding: 4px 8px;
+  border-radius: 10px;
+  border: 1.5px dashed var(--color-border-gray);
+  min-width: 0;
+}
+
+.sv__where--local {
+  border-style: dotted;
+}
+
+.sv__where-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.sv__obj {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  border: 1.5px solid var(--color-border-gray);
+  background: var(--color-background-card);
+  overflow-wrap: anywhere;
+}
+
+.sv__obj--create,
+.sv__obj--apply {
+  border-color: var(--color-border-green);
+}
+
+.sv__obj--delete {
+  border-style: dashed;
+  border-color: var(--color-border-red);
+  text-decoration: line-through;
+  text-decoration-color: var(--color-border-red);
+}
+
+.sv__obj--read,
+.sv__obj--logs,
+.sv__obj--wait,
+.sv__obj--enter {
+  border-color: var(--color-border-blue);
+}
+
+.sv__kind {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.sv__name {
+  font-family: var(--font-family-code, 'SF Mono', Monaco, Consolas, monospace);
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.sv__more {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
