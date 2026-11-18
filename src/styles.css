@@ -2192,3 +2192,11 @@ body {
   line-height: 1.8;
   color: var(--color-text-primary);
 }
+
+/* 用語集の詳しい説明の中の、ほかの語へのリンク (ハンドブックの用語と同じ見た目) */
+.gloss-detail__more a.gloss-term {
+  font-weight: 600;
+  color: var(--color-text-blue);
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
