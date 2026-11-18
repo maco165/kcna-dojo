@@ -34,8 +34,9 @@ export function termNames(terms: GlossaryTerm[]): { name: string; id: string }[]
  * 1 ページの中で、それぞれの語の最初の 1 回だけをリンクにする関数を作る (同じ語が何度もリンクになると読みにくい)。
  * 描く順に呼ぶ
  */
-export function makeTermLinker(names: { name: string; id: string }[]) {
-  const seen = new Set<string>();
+export function makeTermLinker(names: { name: string; id: string }[], skip: string[] = []) {
+  // skip の語 (用語集でいま開いている語など) は最初から「済み」にして、名前を読み飛ばす (名前の中の短い語にも当てない)
+  const seen = new Set<string>(skip);
   return (text: string): TermPiece[] => {
     const out: TermPiece[] = [];
     let rest = text;
@@ -48,7 +49,8 @@ export function makeTermLinker(names: { name: string; id: string }[]) {
         const after = rest.charAt(name.length);
         if (ASCII.test(name.charAt(0)) && WORD_CHAR.test(before)) continue;
         if (ASCII.test(name.charAt(name.length - 1)) && WORD_CHAR.test(after)) continue;
-        if (KATAKANA.test(name.charAt(0)) && KATAKANA.test(before)) continue;
+        // カタカナの語は、前がカタカナか漢字なら複合語の一部 (データベース・等価ベース) なので当てない
+        if (KATAKANA.test(name.charAt(0)) && KANA_OR_KANJI.test(before)) continue;
         if (KANJI.test(name.charAt(0)) && KANA_OR_KANJI.test(before)) continue;
         if (KATAKANA.test(name.charAt(name.length - 1)) && KATAKANA.test(after)) continue;
         if (seen.has(id)) {
@@ -69,4 +71,10 @@ export function makeTermLinker(names: { name: string; id: string }[]) {
     if (plain) out.push(plain);
     return out;
   };
+}
+
+/** 用語集の語の詳しい説明を段落に分け、ほかの語をリンクにする。その語自身 (名前・別名・名前の一部) はリンクにしない */
+export function linkDetail(names: { name: string; id: string }[], term: { id: string; detail?: string }): TermPiece[][] {
+  const link = makeTermLinker(names, [term.id]);
+  return (term.detail ?? '').split(/\n\n+/).filter(Boolean).map((para) => link(para));
 }
