@@ -7,11 +7,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && vite build && node scripts/prerender.mjs",
     "preview": "vite preview",
     "test": "vitest run",
     "check:content": "node scripts/check-content.mjs",
-    "e2e": "vite build && node scripts/e2e.mjs",
+    "e2e": "vite build && node scripts/prerender.mjs && node scripts/e2e.mjs",
     "astryx": "node node_modules/@astryxdesign/cli/clients/cli/bin/astryx.mjs",
     "readme:images": "vite build && node scripts/readme-images.mjs"
   },

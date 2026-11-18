@@ -1,11 +1,17 @@
 import { useEffect, useState } from 'react';
 import { onRouteChanged, savePosition, startScrollMemory } from './scrollMemory';
 
-// GitHub Pages ではサーバーで経路を振り分けられないので、URL の # の後ろで画面を決める。
+// 経路は # の無い URL (/kcna-dojo/handbook/core-concepts/ など) で、History API で切り替える。
+// 検索エンジンは # の後ろを別のページとして扱わないため。ページごとの index.html は作るときに scripts/prerender.mjs が書き出す。
+// 前の形の #/... の URL は、開いたときに同じページの新しい URL へ置き換える。
 export type Route = { name: 'home'; week: number } | { name: 'lesson'; lessonId: string } | { name: 'about' } | { name: 'settings' } | { name: 'review' } | { name: 'progress' } | { name: 'exam' } | { name: 'glossary'; termId?: string } | { name: 'guide' } | { name: 'handbook'; topicId?: string };
 
-export function parseRoute(hash: string): Route {
-  const path = hash.replace(/^#/, '');
+/** サイトの置き場所 (vite の base。/kcna-dojo/) */
+export const BASE = import.meta.env.BASE_URL;
+
+/** URL の道 (pathname) か、前の形の #/... から画面を決める */
+export function parseRoute(where: string): Route {
+  const path = (where.startsWith('#') ? where.slice(1) : where.startsWith(BASE) ? `/${where.slice(BASE.length)}` : where).replace(/\/+$/, '') || '/';
   const lesson = path.match(/^\/lesson\/([\w-]+)$/);
   if (lesson) return { name: 'lesson', lessonId: lesson[1] };
   if (path === '/about') return { name: 'about' };
@@ -17,8 +23,8 @@ export function parseRoute(hash: string): Route {
   const term = path.match(/^\/glossary\/([\w-]+)$/);
   if (term) return { name: 'glossary', termId: term[1] };
   if (path === '/guide') return { name: 'guide' };
-  if (/^\/handbook\/?$/.test(path)) return { name: 'handbook' };
-  const handbook = path.match(/^\/handbook\/([^/]+)\/?$/);
+  if (path === '/handbook') return { name: 'handbook' };
+  const handbook = path.match(/^\/handbook\/([^/]+)$/);
   // 知らない id でもハンドブックの画面に回し、「見つかりませんでした」と目次へのリンクを出す
   if (handbook) return { name: 'handbook', topicId: handbook[1].toLowerCase() };
   const week = path.match(/^\/week\/(\d+)$/);
@@ -26,30 +32,79 @@ export function parseRoute(hash: string): Route {
   return { name: 'home', week: 1 };
 }
 
-export const lessonHref = (lessonId: string) => `#/lesson/${lessonId}`;
-export const aboutHref = '#/about';
-export const settingsHref = '#/settings';
-export const reviewHref = '#/review';
-export const progressHref = '#/progress';
-export const examHref = '#/exam';
-export const glossaryHref = '#/glossary';
-export const glossaryTermHref = (termId: string) => `#/glossary/${termId}`;
-export const guideHref = '#/guide';
-export const handbookHref = (topicId?: string) => (topicId ? `#/handbook/${topicId}` : '#/handbook');
-export const weekHref = (week: number) => `#/week/${week}`;
+/** 前の形の #/... を、同じページの新しい URL にする (#/ で始まらなければ null) */
+export function legacyHashToPath(hash: string): string | null {
+  if (!hash.startsWith('#/')) return null;
+  const p = hash.slice(2).replace(/\/+$/, '');
+  return p ? `${BASE}${p}/` : BASE;
+}
+
+const href = (p: string) => `${BASE}${p}/`;
+export const lessonHref = (lessonId: string) => href(`lesson/${lessonId}`);
+export const aboutHref = href('about');
+export const settingsHref = href('settings');
+export const reviewHref = href('review');
+export const progressHref = href('progress');
+export const examHref = href('exam');
+export const glossaryHref = href('glossary');
+export const glossaryTermHref = (termId: string) => href(`glossary/${termId}`);
+export const guideHref = href('guide');
+export const handbookHref = (topicId?: string) => href(topicId ? `handbook/${topicId}` : 'handbook');
+export const weekHref = (week: number) => href(`week/${week}`);
+
+/** サイトの中へのリンクなら、ページを読み直さずに切り替える (新しいタブ・修飾キー・外のサイト・同じページの中の印は除く) */
+function internalTarget(e: MouseEvent): string | null {
+  if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return null;
+  const a = (e.target as Element | null)?.closest?.('a');
+  if (!a || !a.href || (a.target && a.target !== '_self') || a.hasAttribute('download')) return null;
+  const u = new URL(a.href, window.location.href);
+  if (u.origin !== window.location.origin || !u.pathname.startsWith(BASE)) return null;
+  if (u.pathname === window.location.pathname && u.hash) return null;
+  return u.pathname + u.search + u.hash;
+}
 
 export function useRoute(): Route {
-  const [route, setRoute] = useState(() => parseRoute(window.location.hash));
+  const [route, setRoute] = useState(() => {
+    const legacy = legacyHashToPath(window.location.hash);
+    if (legacy) history.replaceState(history.state, '', legacy);
+    return parseRoute(window.location.pathname);
+  });
   useEffect(() => {
     startScrollMemory();
-    const onChange = () => {
-      // 前のページの画面がまだあるうちに、その位置を覚える
-      savePosition();
-      setRoute(parseRoute(window.location.hash));
+    let shown = window.location.pathname;
+    const show = () => {
+      shown = window.location.pathname;
+      setRoute(parseRoute(shown));
       onRouteChanged();
     };
-    window.addEventListener('hashchange', onChange);
-    return () => window.removeEventListener('hashchange', onChange);
+    const onPop = () => {
+      // 前の形の #/... のリンクを押したとき (ページの中に残っていても) も新しい URL にする
+      const legacy = legacyHashToPath(window.location.hash);
+      if (legacy) history.replaceState(null, '', legacy);
+      // 同じページの中の印 (#...) への移動は、画面を切り替えない
+      if (window.location.pathname === shown) return;
+      // 前のページの画面がまだあるうちに、その位置を覚える (覚える先は前のページの鍵)
+      savePosition();
+      show();
+    };
+    const onClick = (e: MouseEvent) => {
+      const to = internalTarget(e);
+      if (!to) return;
+      e.preventDefault();
+      if (to === window.location.pathname + window.location.search + window.location.hash) return;
+      // 前のページの画面がまだあるうちに、その位置を覚える
+      savePosition();
+      history.pushState(null, '', to);
+      show();
+    };
+    window.addEventListener('popstate', onPop);
+    window.addEventListener('hashchange', onPop);
+    document.addEventListener('click', onClick);
+    return () => {
+      window.removeEventListener('popstate', onPop);
+      window.removeEventListener('hashchange', onPop);
+      document.removeEventListener('click', onClick);
+    };
   }, []);
   return route;
 }

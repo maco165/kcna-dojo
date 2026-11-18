@@ -64,8 +64,9 @@ describe('本文の用語を用語集へのリンクにする', () => {
       expect(n, t.id).toBeGreaterThan(0);
     }
   });
-  it('#/glossary/<id> で用語集のその語を開く経路になる', () => {
+  it('/glossary/<id>/ で用語集のその語を開く経路になる (前の形の #/ も読める)', () => {
+    expect(parseRoute('/kcna-dojo/glossary/pod/')).toEqual({ name: 'glossary', termId: 'pod' });
+    expect(parseRoute('/kcna-dojo/glossary/')).toEqual({ name: 'glossary' });
     expect(parseRoute('#/glossary/pod')).toEqual({ name: 'glossary', termId: 'pod' });
-    expect(parseRoute('#/glossary')).toEqual({ name: 'glossary' });
   });
 });
