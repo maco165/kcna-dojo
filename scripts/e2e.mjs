@@ -73,10 +73,10 @@ function checkFirstLoad() {
   const kb = Math.round(gz / 1024);
   check(kb <= 380, `最初に読む JS は gzip で 380KB まで (${kb}KB、${files.length} ファイル)`);
   // 名前だけでなく中身でも見る (静的に取り込まれて本体に混ざっても気づけるように)。それぞれのデータにしか無い文字で調べる
-  const marks = { ハンドブックのデータ: 'k3s-vs-kubernetes', 用語集のデータ: 'container-image', 説明のページ: '2026-03-22 の版' };
+  const marks = { ハンドブックのデータ: 'k3s-vs-kubernetes', 用語集のデータ: 'container-image', 説明のページ: '2026-03-22 の版', 模擬試験用の問題: 'のイメージを更新した直後に' };
   const text = files.map((f) => readFileSync(new URL(`../dist/assets/${f}`, import.meta.url), 'utf8')).join('\n');
   const found = Object.entries(marks).filter(([, m]) => text.includes(m)).map(([k]) => k);
-  check(found.length === 0, `ハンドブック・用語集・説明のページは最初に読まない ${found.join(',')}`);
+  check(found.length === 0, `ハンドブック・用語集・説明のページ・模擬試験用の問題は最初に読まない ${found.join(',')}`);
 }
 
 async function run(browser, name, width, height) {
@@ -333,10 +333,35 @@ async function run(browser, name, width, height) {
   await noHorizontalOverflow(page, width, `${tag} 設定`);
 
   // 11. 模擬試験: 60 問・90 分。1 問だけ答えて採点し、結果と記録と復習を見る
+  // 模擬試験で間違えた初見の問題 (x-) も、復習の画面に「模擬試験の問題」として出る
+  await page.evaluate(() => {
+    const p = JSON.parse(localStorage.getItem('kcna.v1') ?? '{"v":1}');
+    const d = new Date();
+    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    p.answers = { ...(p.answers ?? {}), 'x-fd1-001': { right: 0, wrong: 1, last: '', stage: 0, nextReview: today } };
+    localStorage.setItem('kcna.v1', JSON.stringify(p));
+  });
+  await page.goto(`${BASE}review/`);
+  await page.reload();
+  await page.getByRole('heading', { name: /今日の復習 \d+ 問/ }).waitFor();
+  check(await page.getByText('模擬試験の問題', { exact: true }).first().isVisible(), `${tag} 模擬試験の初見の問題も復習の一覧に出る`);
+  await page.evaluate(() => {
+    const p = JSON.parse(localStorage.getItem('kcna.v1'));
+    delete p.answers['x-fd1-001'];
+    localStorage.setItem('kcna.v1', JSON.stringify(p));
+  });
   await page.goto(`${BASE}exam/`);
   await page.getByRole('heading', { name: '模擬試験' }).waitFor();
   const answersBefore = await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('kcna.v1') ?? '{}').answers ?? {}).length);
-  check((await page.getByRole('radio', { name: /^(第 [1-3] 回|ランダム)/ }).count()) === 4, `${tag} 模擬試験は第 1〜3 回とランダムから選べる`);
+  check((await page.getByRole('radio', { name: /^(第 [1-5] 回|ランダム)/ }).count()) === 6, `${tag} 模擬試験は第 1〜5 回とランダムから選べる`);
+  check(await page.getByText(/第 4・5 回はレッスンに無い初見の問題/).isVisible(), `${tag} 第 4・5 回は初見の問題と書く`);
+  // 第 4 回 (初見の問題だけの回) も 60 問で始まる
+  await page.getByRole('radio', { name: /^第 4 回/ }).check();
+  await page.getByRole('button', { name: '第 4 回を始める' }).click();
+  check(await page.getByText(/模擬試験 · 1 \/ 60 問/).isVisible(), `${tag} 第 4 回は初見の問題で 60 問始まる`);
+  await page.goto(`${BASE}exam/`);
+  await page.getByRole('heading', { name: '模擬試験' }).waitFor();
+  await page.getByRole('radio', { name: /^第 1 回/ }).check();
   await page.getByRole('button', { name: '第 1 回を始める' }).click();
   check(await page.getByText(/模擬試験 · 1 \/ 60 問/).isVisible(), `${tag} 模擬試験は 60 問`);
   check(await page.getByText(/残り (90:00|89:5\d)/).isVisible(), `${tag} 残り時間が 90 分から始まる`);

@@ -1,0 +1,1059 @@
+{
+  "week": 0,
+  "lessons": [
+    {
+      "id": "x-co",
+      "kind": "quiz",
+      "title": "模擬試験用 Orchestration",
+      "summary": "模擬試験用",
+      "domain": "Container Orchestration",
+      "questions": [
+        {
+          "id": "x-co-001",
+          "type": "choice",
+          "prompt": "1 つの Pod に、アプリのコンテナ (8080 番で待ち受け) と、ログを集めるサイドカーのコンテナがある。サイドカーからアプリの 8080 番に繋ぐとき、いちばん簡単な宛先はどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "Service を 1 つ作り、その名前の 8080 番に繋ぐ",
+              "why": "繋がりはしますが、同じ Pod の中なら Service を通す必要はありません。"
+            },
+            {
+              "id": "b",
+              "text": "localhost:8080 に繋ぐ",
+              "why": "同じ Pod のコンテナはネットワークの名前空間を共有するので、localhost で届きます。"
+            },
+            {
+              "id": "c",
+              "text": "ノードの IP の 8080 番に繋ぐ",
+              "why": "ノードの IP の 8080 番では、Pod のコンテナのポートに届くとは限りません。hostPort などの設定が別に要ります。"
+            },
+            {
+              "id": "d",
+              "text": "アプリのコンテナの名前を DNS で引いて繋ぐ",
+              "why": "コンテナの名前はクラスタの DNS に登録されません。DNS で引けるのは Service などです。"
+            }
+          ],
+          "answer": "b",
+          "explanation": "Kubernetes では IP は Pod ごとに振られ、Pod の中のコンテナはネットワークの名前空間を共有します。そのため、同じ Pod のコンテナどうしは localhost とポート番号で通信できます。",
+          "source": "https://kubernetes.io/docs/concepts/services-networking/"
+        },
+        {
+          "id": "x-co-002",
+          "type": "fill",
+          "prompt": "ログイン状態を Pod のメモリに持つ古いアプリを動かしている。同じクライアントの IP からの通信を、いつも同じ Pod に送りたい。空欄に入る値は?",
+          "language": "yaml",
+          "code": "apiVersion: v1\nkind: Service\nmetadata:\n  name: legacy-web\nspec:\n  selector:\n    app: legacy-web\n  sessionAffinity: {{blank}}\n  ports:\n    - port: 80\n      targetPort: 8080",
+          "answers": [
+            "ClientIP"
+          ],
+          "candidates": [
+            "Sticky",
+            "None",
+            "ClientIP",
+            "Local"
+          ],
+          "explanation": "sessionAffinity を ClientIP にすると、同じクライアントの IP からの接続が同じ Pod に送られます。既定の None では、接続ごとに振り分け先が変わることがあります。",
+          "wrongNotes": {
+            "None": "None は既定の値で、クライアントごとに Pod を固定しません。",
+            "Local": "Local は externalTrafficPolicy などに書く値で、sessionAffinity の値ではありません。",
+            "Sticky": "Sticky という値はありません。sessionAffinity に書けるのは None と ClientIP です。"
+          },
+          "source": "https://kubernetes.io/docs/reference/networking/virtual-ips/"
+        },
+        {
+          "id": "x-co-003",
+          "type": "choice",
+          "prompt": "type: LoadBalancer の Service の後ろのアプリで、アクセスしてきたクライアントの元の IP をログに残したい。ところが、ログにはノードの IP しか出ない。Service の設定で試すものはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "type を ClusterIP に変えて、ノードを通さない",
+              "why": "ClusterIP はクラスタの中からしか届かないので、外のクライアントが繋げなくなります。"
+            },
+            {
+              "id": "b",
+              "text": "sessionAffinity を ClientIP にする",
+              "why": "sessionAffinity は振り分け先を固定するだけで、送信元の IP の書き換えは止めません。"
+            },
+            {
+              "id": "c",
+              "text": "externalTrafficPolicy を Local にする",
+              "why": "Local にすると、通信を受けたノードの上の Pod にだけ送るので、送信元の IP が保たれます。"
+            },
+            {
+              "id": "d",
+              "text": "targetPort を port と同じ番号にする",
+              "why": "ポートの番号を揃えても、送信元の IP の扱いは変わりません。"
+            }
+          ],
+          "answer": "c",
+          "explanation": "externalTrafficPolicy が既定の Cluster だと、別のノードの Pod へ転送するときに送信元の IP が書き換えられます。Local にすると、受けたノードの上の Pod にだけ送るので、クライアントの元の IP が保たれます。その代わり、Pod の数がノードごとに偏ると負荷も偏ることがあります。",
+          "source": "https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/"
+        },
+        {
+          "id": "x-co-004",
+          "type": "choice",
+          "prompt": "次の出力から分かることとして正しいのはどれ?",
+          "code": {
+            "language": "plaintext",
+            "text": "$ kubectl get service web\nNAME   TYPE       CLUSTER-IP     EXTERNAL-IP   PORT(S)        AGE\nweb    NodePort   10.43.120.15   <none>        80:31234/TCP   3m"
+          },
+          "choices": [
+            {
+              "id": "a",
+              "text": "クラスタの外からは、どのノードの IP でも 31234 番に繋げば web に届く",
+              "why": "NodePort の Service は、すべてのノードで同じ番号 (ここでは 31234) を開きます。"
+            },
+            {
+              "id": "b",
+              "text": "クラスタの外からは、10.43.120.15 の 80 番に繋げば web に届く",
+              "why": "10.43.120.15 は ClusterIP で、ふつうはクラスタの中からしか届きません。"
+            },
+            {
+              "id": "c",
+              "text": "EXTERNAL-IP が <none> なので、この Service はまだ使えない",
+              "why": "NodePort では外向けの IP を持たないので <none> がふつうです。ノードの IP で繋ぎます。"
+            },
+            {
+              "id": "d",
+              "text": "Pod のコンテナは 31234 番で待ち受けていなければならない",
+              "why": "31234 はノードで受ける番号です。Pod へは targetPort の番号で送られます。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "PORT(S) の 80:31234 は、Service の 80 番と、各ノードが外から受ける 31234 番の組です。NodePort の Service は ClusterIP も持つので、クラスタの中からは 10.43.120.15:80 でも届きます。",
+          "source": "https://kubernetes.io/docs/concepts/services-networking/service/"
+        },
+        {
+          "id": "x-co-005",
+          "type": "choice",
+          "prompt": "Namespace shop で、すべての Pod の外向きの通信を拒否する NetworkPolicy を入れた。そのあと、Pod から Service の名前で繋ぐと名前解決に失敗するようになった。どう直すのがよい?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "Service を消して、同じ名前でもう一度作り直す",
+              "why": "Service を作り直しても、外向きの通信は止まったままなので名前は引けません。"
+            },
+            {
+              "id": "b",
+              "text": "DNS の Pod の 53 番への外向きの通信を許すポリシーを足す",
+              "why": "名前解決はクラスタの DNS の Pod への外向きの通信なので、それを許せば直ります。"
+            },
+            {
+              "id": "c",
+              "text": "policyTypes から Ingress を外して、内向きの制限をやめる",
+              "why": "止まっているのは外向き (Egress) の通信です。内向きの扱いを変えても名前解決は直りません。"
+            },
+            {
+              "id": "d",
+              "text": "Service の名前をやめ、Pod の IP を直接書いて繋ぐように変える",
+              "why": "名前解決は避けられても、外向きの通信が拒否されているので繋がりません。"
+            }
+          ],
+          "answer": "b",
+          "explanation": "外向きを全部拒否すると、Pod からクラスタの DNS (CoreDNS) への問い合わせも止まります。NetworkPolicy は許すものを足していく仕組みなので、DNS の Pod への 53 番の通信を許すポリシーを足します。Service の後ろの Pod へ繋ぐ通信も外向きなので、繋ぐ先への許可も別に要ります。",
+          "source": "https://kubernetes.io/docs/concepts/services-networking/network-policies/"
+        },
+        {
+          "id": "x-co-006",
+          "type": "choice",
+          "prompt": "Ingress で shop.example.test を HTTPS で受けたい。証明書と秘密鍵はどこに置き、どう指定する?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "ConfigMap に入れ、Ingress の annotations に ConfigMap の名前を書く",
+              "why": "秘密鍵を ConfigMap に入れるのは不適切で、Ingress の TLS もそう指定しません。"
+            },
+            {
+              "id": "b",
+              "text": "後ろの Pod のコンテナのイメージに入れ、Ingress には何も書かない",
+              "why": "それは Pod が自分で TLS を終える方法で、Ingress で HTTPS を受ける指定ではありません。"
+            },
+            {
+              "id": "c",
+              "text": "kubernetes.io/tls 型の Secret に入れ、spec.tls で指す",
+              "why": "Ingress の TLS は、tls.crt と tls.key を持つ Secret を spec.tls で指して設定します。"
+            },
+            {
+              "id": "d",
+              "text": "Service の spec.ports に、証明書と秘密鍵のファイル名を書く",
+              "why": "Service には証明書を指定する欄がありません。"
+            }
+          ],
+          "answer": "c",
+          "explanation": "Ingress の spec.tls に、ホスト名と、証明書 (tls.crt) と秘密鍵 (tls.key) を持つ kubernetes.io/tls 型の Secret の名前を書きます。TLS は Ingress のところで終わり、後ろの Service へはふつう HTTP で送られます。",
+          "source": "https://kubernetes.io/docs/concepts/services-networking/ingress/"
+        },
+        {
+          "id": "x-co-007",
+          "type": "choice",
+          "prompt": "Gateway API で、新しい版 web-v2 に通信の 1 割だけを流して様子を見たい (カナリア)。HTTPRoute でどうする?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "Gateway を 2 つ作り、片方にだけ web-v2 を結びつける",
+              "why": "Gateway を分けても、通信の割合は決まりません。割合は HTTPRoute で決めます。"
+            },
+            {
+              "id": "b",
+              "text": "HTTPRoute の matches に path を書き、/v2 を web-v2 に向ける",
+              "why": "パスで分けると /v2 に来た通信だけが web-v2 に行き、全体の 1 割を流すことにはなりません。"
+            },
+            {
+              "id": "c",
+              "text": "GatewayClass を web-v2 のために新しく作る",
+              "why": "GatewayClass はコントローラーの種類を決めるもので、通信の割合とは関係ありません。"
+            },
+            {
+              "id": "d",
+              "text": "backendRefs に 2 つを並べ、weight を 90 と 10 にする",
+              "why": "backendRefs の weight は、後ろの Service への通信の割合を決めます。"
+            }
+          ],
+          "answer": "d",
+          "explanation": "HTTPRoute の backendRefs に複数の Service を並べ、weight を付けると、その比で通信が分かれます。weight は比なので、90 と 10 なら 9 割と 1 割になり、書かなければ 1 として扱われます。",
+          "source": "https://gateway-api.sigs.k8s.io/guides/user-guides/traffic-splitting/"
+        },
+        {
+          "id": "x-co-008",
+          "type": "choice",
+          "prompt": "Namespace shop の Pod の中で /etc/resolv.conf を見た。分かることとして正しいのはどれ?",
+          "code": {
+            "language": "plaintext",
+            "text": "$ kubectl exec -n shop web-6d4f8c7b9-k2x7p -- cat /etc/resolv.conf\nsearch shop.svc.cluster.local svc.cluster.local cluster.local\nnameserver 10.43.0.10\noptions ndots:5"
+          },
+          "choices": [
+            {
+              "id": "a",
+              "text": "この Pod は名前を、ノードの /etc/hosts だけで引いていて、DNS は使っていない",
+              "why": "nameserver に 10.43.0.10 が書かれているので、DNS のサーバーに問い合わせています。"
+            },
+            {
+              "id": "b",
+              "text": "名前は 10.43.0.10 の DNS に問い合わせ、shop の Service は短い名前で引ける",
+              "why": "nameserver はクラスタの DNS の Service の IP で、search の先頭が自分の Namespace です。"
+            },
+            {
+              "id": "c",
+              "text": "この Pod は Namespace shop の Service しか名前で引けず、他の Namespace は引けない",
+              "why": "search は短い名前を補うだけです。web.other のように Namespace を付ければ他も引けます。"
+            },
+            {
+              "id": "d",
+              "text": "10.43.0.10 はこの Pod 自身の IP で、名前は自分で解決している",
+              "why": "10.43.0.10 はクラスタの DNS (kube-dns の Service) の IP で、Pod の IP ではありません。"
+            }
+          ],
+          "answer": "b",
+          "explanation": "kubelet は Pod の resolv.conf に、クラスタの DNS の Service の IP と、Namespace に合わせた search を書きます。そのため同じ Namespace の Service は短い名前で、他の Namespace の Service は <名前>.<Namespace> で引けます。",
+          "source": "https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/"
+        },
+        {
+          "id": "x-co-009",
+          "type": "choice",
+          "prompt": "Pod のコンテナのポートに name: http を付け、Service の targetPort に http と書いた。こうしておくと何がよい?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "コンテナの待ち受けの番号を変えても、Service を書き直さずに済む",
+              "why": "Service は名前でポートを指すので、番号は Pod の定義の側だけで変えられます。"
+            },
+            {
+              "id": "b",
+              "text": "通信が自動で HTTPS に暗号化されるようになる",
+              "why": "ポートの名前は目印にすぎず、暗号化の設定ではありません。"
+            },
+            {
+              "id": "c",
+              "text": "Service がクラスタの外からも届くようになる",
+              "why": "外から届くかは Service の type で決まり、ポートの名前とは関係ありません。"
+            },
+            {
+              "id": "d",
+              "text": "Pod を作り直しても、IP が変わらなくなる",
+              "why": "Pod の IP は作り直すと変わります。ポートの名前では止められません。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "targetPort には番号の代わりに、Pod のポートの名前を書けます。Service は名前で Pod のポートを探すので、番号を変えたり、版によって番号が違う Pod が混ざったりしても、Service はそのまま使えます。",
+          "source": "https://kubernetes.io/docs/concepts/services-networking/service/"
+        },
+        {
+          "id": "x-co-010",
+          "type": "choice",
+          "prompt": "監視の ServiceAccount に、Namespace app の Pod の一覧とログの読み取りだけを許したい。Role の rules の resources に書くものとして正しい組み合わせはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "\"pods\" だけ (ログは pods に含まれる)",
+              "why": "ログは pods とは別のサブリソース pods/log です。pods だけではログを読めません。"
+            },
+            {
+              "id": "b",
+              "text": "\"pods\" と \"events\"",
+              "why": "events はイベントの資源で、コンテナのログではありません。"
+            },
+            {
+              "id": "c",
+              "text": "\"logs\" だけ",
+              "why": "logs という資源はありません。ログは Pod のサブリソースです。"
+            },
+            {
+              "id": "d",
+              "text": "\"pods\" と \"pods/log\"",
+              "why": "一覧は pods、ログはサブリソース pods/log で、どちらも get などの verbs で許します。"
+            }
+          ],
+          "answer": "d",
+          "explanation": "RBAC では、Pod のログのようなサブリソースを「資源/サブリソース」の形で別に書きます。pods に list と get、pods/log に get を許せば、一覧とログの読み取りだけができます。",
+          "source": "https://kubernetes.io/docs/reference/access-authn-authz/rbac/"
+        },
+        {
+          "id": "x-co-011",
+          "type": "choice",
+          "prompt": "開発者に Namespace dev の資源をほぼ全部扱わせたいが、Secret だけは読ませたくない。RBAC で考えるときに正しいのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "広い権限の Role を与え、Secret を「拒否する」ルールを足せばよい",
+              "why": "RBAC には拒否のルールがありません。許すルールだけを足していく仕組みです。"
+            },
+            {
+              "id": "b",
+              "text": "Secret を含めず、許したい資源だけを並べた Role を作る",
+              "why": "権限は足し算なので、与えたくないものは最初から含めないようにします。"
+            },
+            {
+              "id": "c",
+              "text": "Secret に annotations を付ければ、その Secret だけ読めなくなる",
+              "why": "annotations で RBAC の判断は変わりません。"
+            },
+            {
+              "id": "d",
+              "text": "RoleBinding を 2 つ作れば、後から作った方の権限が優先される",
+              "why": "複数の RoleBinding の権限は合わさる (和になる) だけで、後のものが上書きしません。"
+            }
+          ],
+          "answer": "b",
+          "explanation": "RBAC のルールは許可だけで、拒否のルールはありません。複数の Role を結びつけると権限は合わさります。読ませたくない資源があるときは、それを含まない Role を作って与えます。ただし Pod や Deployment を作れる人は、Secret を Pod にマウントして中身を読めます。Secret を本当に守るなら、Pod を作る権限も絞ります。",
+          "source": "https://kubernetes.io/docs/reference/access-authn-authz/rbac/"
+        },
+        {
+          "id": "x-co-012",
+          "type": "fill",
+          "prompt": "この Pod のアプリは Kubernetes の API を使わない。ServiceAccount のトークンを Pod にマウントさせないようにしたい。空欄に入るフィールドは?",
+          "language": "yaml",
+          "code": "apiVersion: v1\nkind: Pod\nmetadata:\n  name: static-web\nspec:\n  {{blank}}: false\n  containers:\n    - name: web\n      image: nginx:1.27",
+          "answers": [
+            "automountServiceAccountToken"
+          ],
+          "candidates": [
+            "serviceAccountName",
+            "readOnlyRootFilesystem",
+            "allowPrivilegeEscalation",
+            "automountServiceAccountToken"
+          ],
+          "explanation": "automountServiceAccountToken を false にすると、ServiceAccount のトークンが Pod に自動でマウントされません。API を使わない Pod にトークンを持たせなければ、コンテナを乗っ取られても API を使われにくくなります。",
+          "wrongNotes": {
+            "serviceAccountName": "serviceAccountName は使う ServiceAccount の名前を書く欄で、false は書けません。",
+            "readOnlyRootFilesystem": "readOnlyRootFilesystem はコンテナの securityContext の欄で、トークンのマウントとは関係ありません。",
+            "allowPrivilegeEscalation": "allowPrivilegeEscalation は特権の昇格を止める欄で、コンテナの securityContext に書きます。"
+          },
+          "source": "https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/"
+        },
+        {
+          "id": "x-co-013",
+          "type": "choice",
+          "prompt": "コンテナを乗っ取られても、イメージの中のファイルを書き換えられないようにしたい。ログなどの書き込みは emptyDir に向ける。securityContext で設定するものはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "privileged: true",
+              "why": "privileged はノードに近い強い権限を与える設定で、守りとは逆です。"
+            },
+            {
+              "id": "b",
+              "text": "runAsUser: 0 (root で動かす)",
+              "why": "ユーザー ID 0 は root で、書き換えをむしろしやすくします。"
+            },
+            {
+              "id": "c",
+              "text": "readOnlyRootFilesystem: true",
+              "why": "コンテナのルートのファイルシステムを読み取り専用にし、書き換えを防ぎます。"
+            },
+            {
+              "id": "d",
+              "text": "hostNetwork: true (ノードのネットワーク)",
+              "why": "hostNetwork はノードのネットワークを使う設定で、ファイルの書き換えとは関係ありません。"
+            }
+          ],
+          "answer": "c",
+          "explanation": "readOnlyRootFilesystem: true にすると、コンテナのルートのファイルシステムが読み取り専用になります。書き込みが要る場所だけを emptyDir などのボリュームとしてマウントすれば、アプリは動かしたまま改ざんを防げます。",
+          "source": "https://kubernetes.io/docs/tasks/configure-pod-container/security-context/"
+        },
+        {
+          "id": "x-co-014",
+          "type": "choice",
+          "prompt": "root でないユーザーで動くコンテナに、80 番 (1024 より小さい番号) で待ち受けさせたい。ほかの強い権限は持たせたくない。securityContext の capabilities をどうする?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "drop で ALL を落とし、add で NET_BIND_SERVICE を足す",
+              "why": "すべてを落としてから、小さい番号のポートを開く権限だけを足すので、最小の権限になります。"
+            },
+            {
+              "id": "b",
+              "text": "add で SYS_ADMIN を足し、ほかは既定のままにしておく",
+              "why": "SYS_ADMIN は非常に広い権限で、ポートを開くためだけに与えるものではありません。"
+            },
+            {
+              "id": "c",
+              "text": "capabilities は何も書かず、privileged: true にする",
+              "why": "privileged はすべての権限を与えるので、「ほかの強い権限は持たせない」に反します。"
+            },
+            {
+              "id": "d",
+              "text": "drop で NET_BIND_SERVICE を落とし、ほかは既定のままにする",
+              "why": "NET_BIND_SERVICE は小さい番号のポートを開くための権限で、落とすのは目的と逆です。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "Linux の capabilities は root の権限を細かく分けたものです。いったん ALL を落とし、要る NET_BIND_SERVICE だけを足すと、与える権限を最小にできます。Pod Security Standards の Restricted も、足してよいのは NET_BIND_SERVICE だけとしています。",
+          "source": "https://kubernetes.io/docs/concepts/security/pod-security-standards/"
+        },
+        {
+          "id": "x-co-015",
+          "type": "choice",
+          "prompt": "Namespace legacy の既存のアプリが Restricted を満たすかを調べたい。Pod は拒否せず、利用者の画面に警告も出さず、違反を監査ログにだけ記録したい。Namespace に付けるラベルはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "pod-security.kubernetes.io/enforce: restricted",
+              "why": "enforce は違反した Pod を拒否するので、既存のアプリが止まるおそれがあります。"
+            },
+            {
+              "id": "b",
+              "text": "pod-security.kubernetes.io/warn: restricted",
+              "why": "warn は違反を利用者への警告として出します。画面に出したくないという条件に合いません。"
+            },
+            {
+              "id": "c",
+              "text": "pod-security.kubernetes.io/audit: restricted",
+              "why": "audit は違反を監査ログの注記として残し、Pod は許します。"
+            },
+            {
+              "id": "d",
+              "text": "pod-security.kubernetes.io/enforce: privileged",
+              "why": "privileged は制限なしの段階で、Restricted を満たすかは記録されません。"
+            }
+          ],
+          "answer": "c",
+          "explanation": "Pod Security Admission には enforce (拒否する)、audit (監査ログに記録する)、warn (利用者に警告する) の 3 つのモードがあります。audit モードなら Pod は作られ、違反は監査ログの注記として残ります。",
+          "source": "https://kubernetes.io/docs/concepts/security/pod-security-admission/"
+        },
+        {
+          "id": "x-co-016",
+          "type": "choice",
+          "prompt": "etcd のバックアップのファイルが外に漏れても、中の Secret の値を読まれないようにしたい。どうする?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "Secret の data を base64 でもう一度変換して入れる",
+              "why": "base64 は誰でも戻せる変換で、暗号化ではありません。"
+            },
+            {
+              "id": "b",
+              "text": "API サーバーで Secret の保存時の暗号化を有効にする",
+              "why": "保存時の暗号化を有効にすると、etcd に書かれる Secret が暗号化されます。"
+            },
+            {
+              "id": "c",
+              "text": "Secret を使う Pod の数を減らし、Secret を読む機会を少なくする",
+              "why": "Pod の数を減らしても、etcd に保存されている値の形は変わりません。"
+            },
+            {
+              "id": "d",
+              "text": "Secret の代わりに ConfigMap に入れ、Secret の一覧に出さない",
+              "why": "ConfigMap も etcd に保存され、Secret より扱いが緩くなるだけです。"
+            }
+          ],
+          "answer": "b",
+          "explanation": "既定では、Secret は etcd に暗号化されずに保存されます。API サーバーに EncryptionConfiguration を渡して保存時の暗号化 (encryption at rest) を有効にすると、etcd に書かれる値が暗号化され、バックアップが漏れてもそのままでは読めません。",
+          "source": "https://kubernetes.io/docs/tasks/administer-cluster/encrypt-data/"
+        },
+        {
+          "id": "x-co-017",
+          "type": "choice",
+          "prompt": "ユーザー jane で kubectl を使ったときの出力です。分かることとして正しいのはどれ?",
+          "code": {
+            "language": "plaintext",
+            "text": "$ kubectl get pods -n prod\nError from server (Forbidden): pods is forbidden: User \"jane\" cannot list resource \"pods\" in API group \"\" in the namespace \"prod\""
+          },
+          "choices": [
+            {
+              "id": "a",
+              "text": "jane の証明書やトークンが誤っていて、利用者がだれかを確かめられなかった",
+              "why": "認証に失敗したときは Unauthorized になります。ここでは User \"jane\" と分かっています。"
+            },
+            {
+              "id": "b",
+              "text": "Namespace prod がまだ作られていないので、Pod を探せなかった",
+              "why": "Forbidden は権限が無いことを示します。Namespace が無いことは分かりません。"
+            },
+            {
+              "id": "c",
+              "text": "アドミッションコントロールが、要求の中身を受け入れずに拒否した",
+              "why": "一覧 (list) は読むだけの要求で、アドミッションは読む要求を調べません。「cannot list resource」は認可で拒否されたときの文言です。"
+            },
+            {
+              "id": "d",
+              "text": "認証は通ったが、認可で prod の Pod の一覧を拒否された",
+              "why": "User \"jane\" と名前が出ており、Forbidden は認可で拒否されたことを示します。"
+            }
+          ],
+          "answer": "d",
+          "explanation": "API サーバーへの要求は、認証 (だれか)、認可 (してよいか)、アドミッションコントロール (中身を受け入れるか) の順に調べられます。Forbidden で利用者の名前が出ているので、認証は通り、認可で拒否されています。Forbidden はアドミッションの拒否でも出るので、読むだけの list の要求であることと、cannot list の文言で認可と分かります。",
+          "source": "https://kubernetes.io/docs/concepts/security/controlling-access/"
+        },
+        {
+          "id": "x-co-018",
+          "type": "choice",
+          "prompt": "securityContext に runAsNonRoot: true を書いた Pod が起動しない。出力から分かることとして正しいのはどれ?",
+          "code": {
+            "language": "plaintext",
+            "text": "$ kubectl get pod api\nNAME   READY   STATUS                       RESTARTS   AGE\napi    0/1     CreateContainerConfigError   0          30s\n$ kubectl describe pod api\n...\n  Warning  Failed  10s (x3 over 30s)  kubelet  Error: container has runAsNonRoot and image will run as root (pod: \"api_default(...)\", container: api)"
+          },
+          "choices": [
+            {
+              "id": "a",
+              "text": "イメージを取得できなかったので、イメージの名前とタグを直す必要がある",
+              "why": "イメージは取れています。取れないときは ImagePullBackOff などになります。"
+            },
+            {
+              "id": "b",
+              "text": "イメージが root で動くので、kubelet が起動を止めた",
+              "why": "runAsNonRoot は、root で動こうとするコンテナの起動を kubelet に止めさせる設定です。"
+            },
+            {
+              "id": "c",
+              "text": "ノードのメモリが足りず、コンテナを作るための領域を確保できなかった",
+              "why": "メモリの不足ならスケジュールの段階で Pending になるか、OOMKilled になります。"
+            },
+            {
+              "id": "d",
+              "text": "アプリが起動してすぐ落ちていて、kubelet が再起動を繰り返している",
+              "why": "RESTARTS は 0 で、コンテナはまだ一度も起動していません。"
+            }
+          ],
+          "answer": "b",
+          "explanation": "runAsNonRoot: true にすると、kubelet はコンテナが root (ユーザー ID 0) で動かないかを起動の前に確かめ、root なら起動しません。runAsUser で root 以外の ID を指定するか、イメージの USER を直します。",
+          "source": "https://kubernetes.io/docs/reference/kubernetes-api/core/pod-v1/"
+        },
+        {
+          "id": "x-co-019",
+          "type": "choice",
+          "prompt": "Pod が何度も再起動している。describe の出力から考えて、いちばん適切な対処はどれ?",
+          "code": {
+            "language": "plaintext",
+            "text": "$ kubectl describe pod report\n...\n    State:          Running\n    Last State:     Terminated\n      Reason:       OOMKilled\n      Exit Code:    137\n    Restart Count:  4\n    Limits:\n      memory:  128Mi"
+          },
+          "choices": [
+            {
+              "id": "a",
+              "text": "イメージのタグを新しいものに変えて、Deployment を更新し直す",
+              "why": "イメージは取れて起動もしています。落ちる理由はメモリの上限です。"
+            },
+            {
+              "id": "b",
+              "text": "Service を作り直して、通信の振り分け先を新しくする",
+              "why": "Service は通信の入り口で、コンテナが落ちる理由とは関係ありません。"
+            },
+            {
+              "id": "c",
+              "text": "memory の limits を実際の使用量に合わせて上げる",
+              "why": "OOMKilled は memory の limits を超えて強制終了されたことを示します。"
+            },
+            {
+              "id": "d",
+              "text": "CPU の requests を下げて、ノードに置きやすくする",
+              "why": "CPU の設定を変えても、メモリの上限を超えて落ちることは防げません。"
+            }
+          ],
+          "answer": "c",
+          "explanation": "Reason が OOMKilled、終了コードが 137 なのは、コンテナが memory の limits (ここでは 128Mi) を超えて強制終了されたしるしです。アプリの使用量を減らすか、limits を実際の使用量に合わせて上げます。",
+          "source": "https://kubernetes.io/docs/tasks/configure-pod-container/assign-memory-resource/"
+        },
+        {
+          "id": "x-co-020",
+          "type": "choice",
+          "prompt": "Deployment web の Pod は動いているのに、Service web の振り分け先が空になっている。次の出力から分かる理由はどれ?",
+          "code": {
+            "language": "plaintext",
+            "text": "$ kubectl get pods -l app=web\nNAME                   READY   STATUS    RESTARTS   AGE\nweb-5f7d9c8b6-2kq9x    0/1     Running   0          5m\n$ kubectl describe pod web-5f7d9c8b6-2kq9x\n...\n  Warning  Unhealthy  8s (x30 over 5m)  kubelet  Readiness probe failed: HTTP probe failed with statuscode: 404"
+          },
+          "choices": [
+            {
+              "id": "a",
+              "text": "readiness probe の失敗で、振り分け先から外れている",
+              "why": "READY が 0/1 で、readiness probe は 404 で失敗しています。準備できていない Pod には通信が送られません。"
+            },
+            {
+              "id": "b",
+              "text": "liveness probe が失敗していて、コンテナが再起動を繰り返している",
+              "why": "失敗しているのは Readiness probe で、RESTARTS も 0 です。"
+            },
+            {
+              "id": "c",
+              "text": "イメージが取れていないので、コンテナがまだ一度も起動していない",
+              "why": "STATUS は Running で、コンテナは起動しています。"
+            },
+            {
+              "id": "d",
+              "text": "Pod を置くノードがまだ決まらず、スケジュールを待っている",
+              "why": "置き場所が決まっていなければ Pending になります。この Pod は Running です。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "readiness probe が失敗している Pod は準備できていない (READY 0/1) とされ、Service の振り分け先から外されます。ここでは probe の確かめる先が 404 を返しているので、probe の path やアプリの応答を確かめます。",
+          "source": "https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/"
+        },
+        {
+          "type": "choice",
+          "prompt": "ノード node-2 の上の Pod が、いくつも Failed になって消えていった。node-2 を describe した出力から分かることとして正しいのはどれ?",
+          "code": {
+            "language": "plaintext",
+            "text": "$ kubectl describe node node-2\n...\nConditions:\n  Type             Status  Reason                       Message\n  ----             ------  ------                       -------\n  MemoryPressure   True    KubeletHasInsufficientMemory kubelet has insufficient memory available\n  DiskPressure     False   KubeletHasNoDiskPressure     kubelet has no disk pressure\n  PIDPressure      False   KubeletHasSufficientPID      kubelet has sufficient PID available\n  Ready            True    KubeletReady                 kubelet is posting ready status"
+          },
+          "choices": [
+            {
+              "id": "a",
+              "text": "node-2 のメモリの空きが足りず、kubelet が Pod を追い出している",
+              "why": "MemoryPressure が True なのは、空きメモリが追い出しのしきい値に達したしるしです。kubelet は Pod を Failed にして止めます。"
+            },
+            {
+              "id": "b",
+              "text": "node-2 は Ready が True なので、Pod が消えたのはノードと関係ない",
+              "why": "Ready が True でも、MemoryPressure が True なら kubelet は資源を取り戻すために Pod を追い出します。"
+            },
+            {
+              "id": "c",
+              "text": "PodDisruptionBudget を作っておけば、この追い出しは止められる",
+              "why": "ノードの資源の不足による追い出しでは、kubelet は PodDisruptionBudget を守りません。"
+            },
+            {
+              "id": "d",
+              "text": "ディスクがいっぱいなので、古いイメージを消せば直る",
+              "why": "DiskPressure は False です。足りないのはディスクではなくメモリです。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "kubelet はノードの空きメモリなどを見ていて、しきい値 (Linux の既定は memory.available<100Mi) に達すると MemoryPressure を True にし、Pod を選んで Failed にして止めます (ノードの圧迫による追い出し)。Deployment などの Pod は作り直されますが、メモリを使いすぎている Pod の limits やノードの容量を見直す必要があります。",
+          "source": "https://kubernetes.io/docs/concepts/scheduling-eviction/node-pressure-eviction/",
+          "id": "x-co-021"
+        },
+        {
+          "id": "x-co-022",
+          "type": "choice",
+          "prompt": "次の出力から分かることとして正しいのはどれ?",
+          "code": {
+            "language": "plaintext",
+            "text": "$ kubectl get nodes\nNAME     STATUS     ROLES                  AGE   VERSION\nnode-1   Ready      control-plane          30d   v1.34.1+k3s1\nnode-2   NotReady   <none>                 30d   v1.34.1+k3s1"
+          },
+          "choices": [
+            {
+              "id": "a",
+              "text": "node-2 は新しく足したばかりで、Pod を置く準備をしている途中",
+              "why": "AGE は 30 日で、新しく足したノードではありません。"
+            },
+            {
+              "id": "b",
+              "text": "コントロールプレーンが止まっているので、kubectl はもう使えない",
+              "why": "kubectl get nodes が答えているので、API サーバーは動いています。"
+            },
+            {
+              "id": "c",
+              "text": "node-2 は健康でないと報告されているか、kubelet からの報告が途絶えている",
+              "why": "NotReady は、Ready の状態が False (kubelet が健康でないと報告) か Unknown (報告がしばらく届かない) のときに出ます。"
+            },
+            {
+              "id": "d",
+              "text": "node-2 の上の Pod は、すぐにすべて node-1 に移っている",
+              "why": "Pod が追い出されるのは、NotReady がしばらく続いた後です。すぐに移るわけではありません。"
+            }
+          ],
+          "answer": "c",
+          "explanation": "ノードの STATUS は Ready の状態で決まります。kubelet が健康でないと報告している (False) か、kubelet からの報告がしばらく届かない (Unknown) と NotReady になります。どちらかは describe node の Conditions で確かめ、kubelet のログやネットワークを調べます。",
+          "source": "https://kubernetes.io/docs/reference/node/node-status/"
+        },
+        {
+          "type": "fill",
+          "prompt": "SSH を使わずに、ノード node-2 のファイル (ログなど) を調べたい。node-2 の上に調べるための Pod を作る。空欄に入るのは?",
+          "language": "bash",
+          "code": "kubectl debug {{blank}} -it --image=ubuntu",
+          "answers": [
+            "node/node-2"
+          ],
+          "candidates": [
+            "pod/node-2",
+            "node-2",
+            "node/node-2",
+            "nodes"
+          ],
+          "output": "Creating debugging pod node-debugger-node-2-pdx84 with container debugger on node node-2.\nIf you don't see a command prompt, try pressing enter.\nroot@node-2:/#",
+          "explanation": "kubectl debug node/<ノード名> は、そのノードの上に調べるための Pod を作り、ノードのルートのファイルシステムを /host にマウントします。/host/var/log の下などを読めます。終わったら、作られた node-debugger-... の Pod を消します。",
+          "wrongNotes": {
+            "pod/node-2": "pod/ を付けると Pod を指します。node-2 という名前の Pod はありません。",
+            "node-2": "種類を付けないと Pod の名前として扱われます。ノードを指すには node/ を付けます。",
+            "nodes": "これはノードの一覧の資源の名前で、どのノードかを指していません。"
+          },
+          "source": "https://kubernetes.io/docs/tasks/debug/debug-cluster/kubectl-node-debug/",
+          "id": "x-co-023"
+        },
+        {
+          "type": "choice",
+          "prompt": "Service web に繋がらないのは、node-2 の上の Pod からだけだった。次の出力から考えて、次に疑うものはどれ?",
+          "code": {
+            "language": "plaintext",
+            "text": "$ kubectl get endpointslices -l kubernetes.io/service-name=web\nNAME        ADDRESSTYPE   PORTS   ENDPOINTS              AGE\nweb-7xk2p   IPv4          8080    10.42.0.15,10.42.1.22  3d\n\n# node-2 の上の Pod から\n$ wget -qO- -T 3 10.42.0.15:8080      # Pod の IP に直接\nhello\n$ wget -qO- -T 3 10.43.88.20:80       # Service の ClusterIP\nwget: download timed out\n\n# node-1 の上の Pod から\n$ wget -qO- -T 3 10.43.88.20:80\nhello"
+          },
+          "choices": [
+            {
+              "id": "a",
+              "text": "Service のセレクターと、Pod のラベルが合っていない",
+              "why": "EndpointSlice に Pod の IP が入っているので、セレクターは Pod を選べています。"
+            },
+            {
+              "id": "b",
+              "text": "後ろの Pod のアプリが、応答を返していない",
+              "why": "Pod の IP に直接繋ぐと hello が返るので、アプリは応答しています。"
+            },
+            {
+              "id": "c",
+              "text": "クラスタの DNS が止まり、名前を引けていない",
+              "why": "ここでは名前ではなく ClusterIP に直接繋いでいるので、DNS は関係ありません。"
+            },
+            {
+              "id": "d",
+              "text": "node-2 の kube-proxy が規則を作れていない",
+              "why": "Pod の IP には届くのに ClusterIP だけが node-2 で失敗するので、node-2 の Service の転送を疑います。"
+            }
+          ],
+          "answer": "d",
+          "explanation": "Service があり、EndpointSlice に Pod が入り、Pod も応答しているのに ClusterIP だけが届かないときは、Service の転送の仕組みを疑います。kube-proxy は各ノードで動き、ClusterIP あての通信を Pod へ送る規則 (iptables など) を作ります。node-2 だけで起きているので、node-2 の kube-proxy が動いているかと、そのログを確かめます。",
+          "source": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-service/",
+          "id": "x-co-024"
+        },
+        {
+          "type": "choice",
+          "prompt": "どの Pod からも Service の名前が引けなくなった。切り分けのために次を実行した。いちばん適切な次の一手はどれ?",
+          "code": {
+            "language": "plaintext",
+            "text": "$ kubectl exec -it dnsutils -- nslookup kubernetes.default\nServer:    10.43.0.10\nAddress 1: 10.43.0.10\n\nnslookup: can't resolve 'kubernetes.default'\n\n$ kubectl get pods -n kube-system -l k8s-app=kube-dns\nNAME                       READY   STATUS             RESTARTS      AGE\ncoredns-6799fbcd5-x7kq2    0/1     CrashLoopBackOff   8 (30s ago)   20m"
+          },
+          "choices": [
+            {
+              "id": "a",
+              "text": "アプリの Service をすべて消して、同じ名前で作り直す",
+              "why": "アプリの Service に問題は見えていません。名前を答える CoreDNS が落ちています。"
+            },
+            {
+              "id": "b",
+              "text": "CoreDNS の Pod のログを見て、落ちる理由を調べる",
+              "why": "名前を答える CoreDNS の Pod が CrashLoopBackOff なので、そのログから原因を探します。"
+            },
+            {
+              "id": "c",
+              "text": "dnsutils の Pod の /etc/resolv.conf を消して作り直す",
+              "why": "Server に 10.43.0.10 が出ており、問い合わせ先は正しく届いています。答える側が落ちています。"
+            },
+            {
+              "id": "d",
+              "text": "kubernetes.default という Service を新しく作る",
+              "why": "kubernetes.default は API サーバーの Service で、はじめからあります。引けないのは DNS の側の問題です。"
+            }
+          ],
+          "answer": "b",
+          "explanation": "kubernetes.default はどのクラスタにもある Service なので、これが引けないならクラスタの DNS を疑います。DNS を担う CoreDNS の Pod (ラベル k8s-app=kube-dns) が CrashLoopBackOff なので、kubectl logs -n kube-system でそのログを読み、設定の誤りなどの原因を調べます。",
+          "source": "https://kubernetes.io/docs/tasks/administer-cluster/dns-debugging-resolution/",
+          "id": "x-co-025"
+        },
+        {
+          "type": "choice",
+          "prompt": "クラスタの調子が悪い。詳しい人に見てもらうため、クラスタの状態と kube-system の Pod のログをまとめてディレクトリに書き出して渡したい。どのコマンドを使う?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "kubectl get all --all-namespaces -o yaml > state.yaml",
+              "why": "資源の一覧は出ますが、Pod のログやイベントの詳しい情報までは含みません。"
+            },
+            {
+              "id": "b",
+              "text": "kubectl logs -n kube-system --all-containers",
+              "why": "Pod を 1 つ指さないと動かず、クラスタの状態も書き出しません。"
+            },
+            {
+              "id": "c",
+              "text": "kubectl describe nodes --output-directory=out",
+              "why": "describe に --output-directory という指定はなく、ノードの情報しか出しません。"
+            },
+            {
+              "id": "d",
+              "text": "kubectl cluster-info dump --output-directory=out",
+              "why": "クラスタの状態と Pod のログを、Namespace と Pod ごとのファイルに書き出します。"
+            }
+          ],
+          "answer": "d",
+          "explanation": "kubectl cluster-info dump は、調べるのに使うクラスタの情報と Pod のログをまとめて出します。既定では画面に出し、--output-directory を付けるとディレクトリにファイルとして書き出します。対象は既定で今の Namespace と kube-system で、--all-namespaces で全部にできます。",
+          "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_cluster-info/kubectl_cluster-info_dump/",
+          "id": "x-co-026"
+        },
+        {
+          "id": "x-co-027",
+          "type": "choice",
+          "prompt": "Pod の中で、2 つのコンテナが一時的なファイルを受け渡したい。ファイルは Pod が消えたら要らない。コンテナが再起動しても残っていてほしい。どのボリュームを使う?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "hostPath",
+              "why": "hostPath はノードのファイルを直接使うので、Pod が消えても残り、ノードを危険にさらすこともあります。"
+            },
+            {
+              "id": "b",
+              "text": "PersistentVolumeClaim",
+              "why": "PVC は Pod より長く残すためのストレージで、一時的な受け渡しには大げさです。"
+            },
+            {
+              "id": "c",
+              "text": "emptyDir",
+              "why": "emptyDir は Pod と同じ寿命で、コンテナが再起動しても中身は残ります。"
+            },
+            {
+              "id": "d",
+              "text": "ConfigMap",
+              "why": "ConfigMap は設定を渡すためのもので、コンテナからは書き込めません。"
+            }
+          ],
+          "answer": "c",
+          "explanation": "emptyDir は、Pod がノードに置かれたときに空で作られ、Pod が消えると一緒に消えます。コンテナがクラッシュして再起動しても中身は残り、同じ Pod のコンテナどうしで共有できます。",
+          "source": "https://kubernetes.io/docs/reference/storage/volume-types/#emptydir"
+        },
+        {
+          "id": "x-co-028",
+          "type": "choice",
+          "prompt": "これから StorageClass で動的に作る PV について、PVC を誤って消しても、ストレージの中のデータは消えないようにしたい。StorageClass をどう設定する?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "reclaimPolicy を Retain にする",
+              "why": "Retain なら、PVC を消しても PV と中のデータは残ります。"
+            },
+            {
+              "id": "b",
+              "text": "reclaimPolicy を書かずにおく",
+              "why": "書かないと Delete になり、PVC を消すと PV と中のデータも消えます。"
+            },
+            {
+              "id": "c",
+              "text": "volumeBindingMode を Immediate にする",
+              "why": "volumeBindingMode は PV を用意する時機の設定で、消したときの扱いは決めません。"
+            },
+            {
+              "id": "d",
+              "text": "accessModes を ReadOnlyMany にする",
+              "why": "アクセスモードは読み書きのしかたで、PVC を消したときの扱いは変わりません。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "動的に作られる PV は、StorageClass の reclaimPolicy を引き継ぎます。書かなければ Delete で、PVC を消すとストレージも消えます。Retain にすると PV とデータが残り、管理者が後で扱いを決められます。StorageClass の設定は、これから作られる PV にだけ効きます。すでにある PV は、PV の persistentVolumeReclaimPolicy を Retain に書き換えます。",
+          "source": "https://kubernetes.io/docs/concepts/storage/storage-classes/"
+        },
+        {
+          "id": "x-co-029",
+          "type": "choice",
+          "prompt": "StatefulSet db (レプリカ 3) の Pod db-1 を消した。作り直された db-1 はどの PVC につながる?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "新しく作られる PVC data-db-3",
+              "why": "StatefulSet は消された Pod と同じ名前の Pod を作り直し、前と同じ PVC を使います。新しい PVC は作りません。"
+            },
+            {
+              "id": "b",
+              "text": "空いている PVC data-db-0",
+              "why": "data-db-0 は Pod db-0 の PVC です。Pod と PVC は名前の番号で 1 対 1 に結びついています。"
+            },
+            {
+              "id": "c",
+              "text": "前と同じ PVC data-db-1",
+              "why": "作り直された db-1 は、前の db-1 と同じ PVC data-db-1 をマウントします。"
+            },
+            {
+              "id": "d",
+              "text": "PVC にはつながらず、空のボリュームで起動する",
+              "why": "volumeClaimTemplates で作られた PVC は Pod を消しても残り、作り直した Pod がまたつながります。"
+            }
+          ],
+          "answer": "c",
+          "explanation": "StatefulSet の Pod は db-0、db-1 のように決まった名前を持ち、volumeClaimTemplates から作られた PVC (data-db-1 など) と名前で結びついています。Pod を消しても PVC は残り、作り直された同じ名前の Pod は前と同じ PVC につながるので、データを引き継げます。",
+          "source": "https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/",
+          "code": {
+            "language": "plaintext",
+            "text": "$ kubectl get pvc\nNAME        STATUS   VOLUME         CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE\ndata-db-0   Bound    pvc-3f1a9c2e   10Gi       RWO            local-path     <unset>                 7d\ndata-db-1   Bound    pvc-8b27d4f1   10Gi       RWO            local-path     <unset>                 7d\ndata-db-2   Bound    pvc-c94e0a57   10Gi       RWO            local-path     <unset>                 7d"
+          }
+        },
+        {
+          "id": "x-co-030",
+          "type": "choice",
+          "prompt": "アプリの設定ファイルを ConfigMap で渡している。Pod を作り直さずに、ConfigMap を変えたら設定ファイルも新しくなってほしい。どの渡し方にする?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "ConfigMap の値を env で環境変数として渡す",
+              "why": "環境変数はコンテナの起動のときに決まり、ConfigMap を変えても変わりません。"
+            },
+            {
+              "id": "b",
+              "text": "ConfigMap をボリュームとしてディレクトリにマウントする",
+              "why": "ボリュームとしてマウントした ConfigMap は、変えるとしばらくして中のファイルも新しくなります。"
+            },
+            {
+              "id": "c",
+              "text": "ConfigMap を subPath で 1 つのファイルとしてマウントする",
+              "why": "subPath でマウントしたファイルには、ConfigMap の変更が届きません。"
+            },
+            {
+              "id": "d",
+              "text": "設定ファイルをイメージに入れて作り直す",
+              "why": "イメージを作り直すと、Pod も作り直すことになります。"
+            }
+          ],
+          "answer": "b",
+          "explanation": "ボリュームとしてマウントした ConfigMap は、kubelet が定期的に確かめ、変更をしばらくしてファイルに反映します。環境変数や subPath で渡したものには反映されないので、Pod の作り直しが要ります。アプリが新しいファイルを読み直すかは、アプリの作りによります。",
+          "source": "https://kubernetes.io/docs/concepts/configuration/configmap/"
+        },
+        {
+          "id": "x-co-031",
+          "type": "fill",
+          "prompt": "PVC の容量を、Pod を止めずに 10Gi から 20Gi に増やせるようにしたい。StorageClass の空欄に入るフィールドは?",
+          "language": "yaml",
+          "code": "apiVersion: storage.k8s.io/v1\nkind: StorageClass\nmetadata:\n  name: expandable\nprovisioner: example.com/csi-driver\n{{blank}}: true",
+          "answers": [
+            "allowVolumeExpansion"
+          ],
+          "candidates": [
+            "resizable",
+            "volumeBindingMode",
+            "allowVolumeExpansion",
+            "reclaimPolicy"
+          ],
+          "explanation": "StorageClass の allowVolumeExpansion が true なら、PVC の spec.resources.requests.storage を大きく書き換えて容量を増やせます。使う CSI のドライバーが拡張に対応していれば、Pod を動かしたまま増やせます。小さくすることはできません。",
+          "wrongNotes": {
+            "reclaimPolicy": "reclaimPolicy は PVC を消したときの扱い (Delete か Retain) を決める欄で、true は書けません。",
+            "volumeBindingMode": "volumeBindingMode は PV を用意する時機を決める欄で、Immediate か WaitForFirstConsumer を書きます。",
+            "resizable": "resizable という欄はありません。"
+          },
+          "source": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/"
+        },
+        {
+          "id": "x-co-032",
+          "type": "choice",
+          "prompt": "PVC を書くときに storageClassName を書かなかった。次の出力のクラスタでは、何が起きる?",
+          "code": {
+            "language": "plaintext",
+            "text": "$ kubectl get storageclass\nNAME                   PROVISIONER             RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE\nlocal-path (default)   rancher.io/local-path   Delete          WaitForFirstConsumer   false                  30d\nnfs                    nfs.csi.k8s.io          Retain          Immediate              true                   10d"
+          },
+          "choices": [
+            {
+              "id": "a",
+              "text": "StorageClass が決まらないので、PVC の作成が拒否される",
+              "why": "既定の StorageClass があるので、拒否されずにそれが使われます。"
+            },
+            {
+              "id": "b",
+              "text": "後から作られた nfs が使われる",
+              "why": "新しさでは選ばれません。使われるのは既定の印が付いたものです。"
+            },
+            {
+              "id": "c",
+              "text": "既定の印の付いた local-path が使われる",
+              "why": "(default) と出ている StorageClass が、書かなかった PVC に使われます。"
+            },
+            {
+              "id": "d",
+              "text": "local-path と nfs の両方に半分ずつ作られる",
+              "why": "1 つの PVC は 1 つの StorageClass から作られます。"
+            }
+          ],
+          "answer": "c",
+          "explanation": "storageClassName を書かない PVC には、既定の StorageClass が使われます。既定かどうかは、注釈 storageclass.kubernetes.io/is-default-class: \"true\" で決まり、kubectl get storageclass では名前の後ろに (default) と出ます。",
+          "source": "https://kubernetes.io/docs/concepts/storage/storage-classes/"
+        },
+        {
+          "id": "x-co-033",
+          "type": "choice",
+          "prompt": "reclaimPolicy が Retain の PV を使っていた PVC data を消した。そのあとの kubectl get pv から言えることはどれ?",
+          "code": {
+            "language": "plaintext",
+            "text": "$ kubectl get pv\nNAME     CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS     CLAIM          STORAGECLASS   AGE\npv-nfs   20Gi       RWX            Retain           Released   default/data   nfs            12d"
+          },
+          "choices": [
+            {
+              "id": "a",
+              "text": "中のデータは消えていて、新しい PVC にすぐ結びつけられる",
+              "why": "Retain なのでデータは残っており、Released の PV は新しい PVC にそのままでは結びつきません。"
+            },
+            {
+              "id": "b",
+              "text": "PV はもう消されていて、一覧には名残りが出ているだけ",
+              "why": "Retain の PV は消されません。一覧に残っているのは実物です。"
+            },
+            {
+              "id": "c",
+              "text": "同じ名前の PVC data を作り直せば、自動で元の状態に戻る",
+              "why": "Released の PV は前の結びつき (claimRef) を持ったままで、自動では結びつき直しません。"
+            },
+            {
+              "id": "d",
+              "text": "データは残るが、そのままでは別の PVC に使われない",
+              "why": "Released は、PVC は消えたが PV とデータは残り、まだ再利用の準備ができていない状態です。"
+            }
+          ],
+          "answer": "d",
+          "explanation": "reclaimPolicy が Retain の PV は、PVC が消されると Released になり、中のデータは残ります。前の PVC への結びつきの情報が残っているので、そのままでは別の PVC には使われません。管理者がデータを確かめてから、PV を作り直すなどして再利用します。",
+          "source": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/"
+        },
+        {
+          "id": "x-co-034",
+          "type": "choice",
+          "prompt": "CSI のドライバーで動かしているデータベースの PVC について、アップグレードの前に、その時点のストレージの状態を残したい。Kubernetes の API で使うものはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "VolumeSnapshot",
+              "why": "VolumeSnapshot は、CSI のドライバーに PVC のその時点の写しを作らせる資源です。"
+            },
+            {
+              "id": "b",
+              "text": "PersistentVolume をもう 1 つ手で作る",
+              "why": "空の PV を作るだけで、今のデータは写されません。"
+            },
+            {
+              "id": "c",
+              "text": "ConfigMap に PVC の中身を入れる",
+              "why": "ConfigMap は小さな設定のためのもので、ストレージの写しには使えません。"
+            },
+            {
+              "id": "d",
+              "text": "StorageClass の名前を変える",
+              "why": "StorageClass の名前を変えても、データの写しは作られません。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "VolumeSnapshot は、ボリュームのスナップショット (その時点の写し) を要求する資源で、CSI のドライバーが実際のスナップショットを作ります。スナップショットからは新しい PVC を作って元に戻せます。使えるのは、スナップショットの機能を持つ CSI のドライバーだけです。",
+          "source": "https://kubernetes.io/docs/concepts/storage/volume-snapshots/"
+        }
+      ]
+    }
+  ]
+}

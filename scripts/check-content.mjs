@@ -3,7 +3,7 @@
 // 使い方: node scripts/check-content.mjs [ファイル ...]   (省略すると src/content/week*.json の全部)
 // 通れば "OK <ファイル>" を出して終了コード 0。1 つでも違えば "NG <ファイル> <id>: <理由>" を出して終了コード 1。
 import { readFileSync, readdirSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { basename, dirname, join, relative } from 'node:path';
 
 const ROOT = new URL('..', import.meta.url).pathname;
 const CONTENT_DIR = join(ROOT, 'src/content');
@@ -24,7 +24,9 @@ const files = args.length
   : readdirSync(CONTENT_DIR)
       .filter((f) => /^week\d+\.json$/.test(f))
       .sort()
-      .map((f) => join(CONTENT_DIR, f));
+      .map((f) => join(CONTENT_DIR, f))
+      // 模擬試験用の問題 (レッスンに無い初見の問題)。週を持たないので week は 0
+      .concat(readdirSync(join(CONTENT_DIR, 'exam')).filter((f) => f.endsWith('.json')).sort().map((f) => join(CONTENT_DIR, 'exam', f)));
 
 const seenIds = new Map(); // id -> file
 let failed = false;
@@ -64,7 +66,15 @@ for (const file of files) {
     continue;
   }
 
-  if (!Number.isInteger(data.week) || data.week < 1) ng('-', 'week は 1 以上の整数にします');
+  // 模擬試験用のファイル (exam/ の下) は週を持たないので week 0。レッスンと問題の id は x- で始め、4 択か穴埋めのレッスンだけを持つ
+  const examFile = basename(dirname(file)) === 'exam';
+  if (examFile) {
+    if (data.week !== 0) ng('-', '模擬試験用のファイル (exam/ の下) は week を 0 にします');
+    for (const l of data.lessons ?? []) {
+      if (!String(l?.id).startsWith('x-') || l?.kind !== 'quiz') ng(l?.id ?? '-', '模擬試験用のファイル (exam/ の下) のレッスンは、id が x- で始まる quiz にします');
+      for (const q of l?.questions ?? []) if (!String(q?.id).startsWith('x-')) ng(q?.id ?? '-', '模擬試験用の問題の id は x- で始めます');
+    }
+  } else if (!Number.isInteger(data.week) || data.week < 1) ng('-', 'week は 1 以上の整数にします');
   if (!Array.isArray(data.lessons) || data.lessons.length === 0) ng('-', 'lessons がありません');
 
   for (const [li, lesson] of (data.lessons ?? []).entries()) {

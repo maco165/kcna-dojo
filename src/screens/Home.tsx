@@ -30,7 +30,7 @@ import { downloadProgress } from '../lib/download';
 import { SITE_NAME } from '../lib/site';
 import { currentStreak, dayKey, daysBetween, examDate, goalXp, todayXp, type Progress } from '../lib/progress';
 import { aboutHref, examHref, glossaryHref, guideHref, handbookHref, lessonHref, reviewHref, weekHref } from '../lib/route';
-import { dueQuestions } from '../content';
+import { dueQuestions, dueReviewCount } from '../content';
 import { WIDE_QUERY, useMediaQuery } from '../lib/useMediaQuery';
 
 function formatDate(day: string): string {
@@ -237,7 +237,7 @@ function PhoneHome({ s, progress }: { s: Summary; progress: Progress }) {
         </div>
       </main>
 
-      <BottomTabs current="learn" reviewCount={dueQuestions(progress, new Date()).length} />
+      <BottomTabs current="learn" reviewCount={dueReviewCount(progress, new Date())} />
     </div>
   );
 }
@@ -281,6 +281,8 @@ function DesktopHome({ s, progress }: { s: Summary; progress: Progress }) {
   const { meta, lessons, statuses } = s;
   const accuracy = domainAccuracy(progress);
   const due = dueQuestions(progress, new Date());
+  // 模擬試験用の問題はこの画面では読まないので、数は id から数える
+  const dueCount = dueReviewCount(progress, new Date());
   const rows: Row[] = lessons.map((l, i) => ({ id: l.id, lesson: l, status: statuses[i] }));
 
   const columns: TableColumn<Row>[] = [
@@ -408,14 +410,12 @@ function DesktopHome({ s, progress }: { s: Summary; progress: Progress }) {
             <Card padding={4}>
               <VStack gap={2}>
                 <HStack justify="between" vAlign="center">
-                  <h2 className="h-sm">今日の復習 {due.length} 問</h2>
-                  <Button size="sm" variant={due.length > 0 ? 'primary' : 'secondary'} label={due.length > 0 ? '始める' : '見る'} href={reviewHref} />
+                  <h2 className="h-sm">今日の復習 {dueCount} 問</h2>
+                  <Button size="sm" variant={dueCount > 0 ? 'primary' : 'secondary'} label={dueCount > 0 ? '始める' : '見る'} href={reviewHref} />
                 </HStack>
                 <Text type="supporting">
-                  {due.length > 0
-                    ? due
-                        .slice(0, 3)
-                        .map((r) => r.lesson.title)
+                  {dueCount > 0
+                    ? [...due.slice(0, 3).map((r) => r.lesson.title), ...(due.length < dueCount ? ['模擬試験の問題'] : [])]
                         .filter((t, i, a) => a.indexOf(t) === i)
                         .join(' / ')
                     : '間違えた問題を 1・3・7 日後に出します'}
