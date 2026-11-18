@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertDialog } from '@astryxdesign/core/AlertDialog';
 import { AppShell } from '@astryxdesign/core/AppShell';
 import { Banner } from '@astryxdesign/core/Banner';
@@ -47,6 +47,9 @@ import { normalizeAnswer } from '../lib/grade';
 import type { Progress } from '../lib/progress';
 import { SITE_NAME } from '../lib/site';
 import { WIDE_QUERY, useMediaQuery } from '../lib/useMediaQuery';
+
+// 弱い分野の読み直す先 (ハンドブックのデータ) は、結果を出すときに読む
+const WeakDomains = lazy(() => import('../components/WeakDomains'));
 
 type Props = { progress: Progress; updateProgress: (fn: (p: Progress) => Progress) => void };
 
@@ -322,6 +325,9 @@ function Result({ items, answers, result, onRestart }: { items: BankItem[]; answ
               />
             );
           })}
+          <Suspense fallback={null}>
+            <WeakDomains domains={(Object.keys(result.byDomain) as Domain[]).filter((d) => result.byDomain[d].total > 0 && result.byDomain[d].right / result.byDomain[d].total < PASS_MARK)} />
+          </Suspense>
         </VStack>
       </Card>
       {wrong.length > 0 && (

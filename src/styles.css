@@ -2417,3 +2417,30 @@ html[data-loading='true'] body::before {
 .cmd-note__source {
   font-size: 13px;
 }
+
+/* 答えたあとの「読み直す」。ハンドブックと用語集への札を、ラベルと並べる */
+.read-more {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.read-more__title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.read-more__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+}
+
+.read-more__label {
+  flex: none;
+  min-width: 6em;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}

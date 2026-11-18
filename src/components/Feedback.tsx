@@ -7,6 +7,8 @@ import type { Question } from '../content/types';
 
 // コマンドの説明のデータは、答えたあとに読む (最初に読む JS に入れない)
 const CommandNotes = lazy(() => import('./CommandNotes'));
+// 読み直す先 (ハンドブックと用語集) も、そのデータと一緒に答えたあとに読む
+const ReadMore = lazy(() => import('./ReadMore'));
 
 /** 正解・不正解の知らせと解説。不正解のときは、選んだものがなぜ違うかを先に出す */
 export default function Feedback({
@@ -47,6 +49,7 @@ export default function Feedback({
       {question && (
         <Suspense fallback={null}>
           <CommandNotes question={question} />
+          <ReadMore question={question} />
         </Suspense>
       )}
     </>
