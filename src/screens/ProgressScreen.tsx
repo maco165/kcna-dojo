@@ -125,7 +125,7 @@ function Body({ progress }: { progress: Progress }) {
         </HStack>
       </Card>
 
-      <List hasDividers edge="flush" header={<h2 className="h-sm">週ごとの進み具合</h2>}>
+      <List hasDividers header={<h2 className="h-sm">週ごとの進み具合</h2>}>
         {WEEKS.map((w) => {
           const lessons = w.content?.lessons ?? [];
           const done = lessons.filter((l) => progress.lessons[l.id]?.done).length;

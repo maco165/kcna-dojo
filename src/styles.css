@@ -382,11 +382,22 @@ body {
   padding: var(--spacing-8);
 }
 
-/* 見出しの下の説明と本文の段落は、欄が広くても読みやすい長さ (幅 640px) で折り返す */
+/*
+ * 欄は広げても、文章の 1 行は日本語で 40 字まで (WCAG 1.4.8 の CJK の値。字の大きさに合わせて em で決める)。
+ * 図と、名前と値が並ぶ一覧も、広げすぎると読みにくいので 760px まで
+ */
 .about .week-title ~ *,
+.about .astryx-card .astryx-text,
 .hb-lead,
-.hb-step__text {
-  max-width: 40rem;
+.hb-step__text,
+.hb .dg__caption,
+.hb-section > .hb-muted {
+  max-width: 40em;
+}
+
+.hb .dg,
+.about .astryx-card .astryx-list {
+  max-width: 760px;
 }
 
 .topbar__brand {
