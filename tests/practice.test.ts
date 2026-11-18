@@ -30,6 +30,10 @@ describe('ランダム出題', () => {
     // 違う乱数なら違う組になる
     expect(got).not.toEqual(pickPractice(all, 10, 'all', seeded(4)).map((q) => q.question.id));
   });
+  it('偏りの無い混ぜ方 (乱数が常に最大なら、どこも入れ替えず元の並びのまま)', () => {
+    const pool = all.slice(0, 8);
+    expect(pickPractice(pool, 8, 'all', () => 0.999).map((q) => q.question.id)).toEqual(pool.map((q) => q.question.id));
+  });
   it('元の配列を変えず、少なければあるだけ返す', () => {
     const pool = all.slice(0, 5);
     const before = pool.map((q) => q.question.id);

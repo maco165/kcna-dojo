@@ -236,10 +236,11 @@ async function run(browser, name, width, height) {
 
   // 9b2. ランダム出題: 分野と数を選んで始め、1 問答えると記録に入る
   {
-    const countAnswers = () => page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('kcna.v1') ?? '{}').answers ?? {}).length);
+    // 答えた回数の合計 (前の手順で答えた問題が選ばれても 1 つ増える)
+    const countAnswers = () => page.evaluate(() => Object.values(JSON.parse(localStorage.getItem('kcna.v1') ?? '{}').answers ?? {}).reduce((n, a) => n + a.right + a.wrong, 0));
     await page.getByRole('heading', { name: 'ランダム出題' }).waitFor();
     await page.getByRole('radio', { name: /^Cloud Native Architecture \(\d+ 問\)/ }).check();
-    await page.getByRole('radio', { name: '20 問' }).click().catch(() => page.getByRole('button', { name: '20 問' }).click());
+    await page.getByRole('radio', { name: '20 問', exact: true }).click();
     await page.getByRole('button', { name: '20 問を始める' }).click();
     await page.getByRole('button', { name: '確かめる' }).waitFor();
     check(await page.getByText('ランダム出題').first().isVisible(), `${tag} ランダム出題が始まる`);
@@ -249,7 +250,7 @@ async function run(browser, name, width, height) {
     else await page.getByRole('radio').first().check();
     await page.getByRole('button', { name: '確かめる' }).click();
     await page.getByRole('button', { name: /次へ|結果を見る/ }).waitFor();
-    check((await countAnswers()) >= before, `${tag} ランダム出題で答えると記録に入る (${before} → ${await countAnswers()})`);
+    check((await countAnswers()) === before + 1, `${tag} ランダム出題で答えると記録に入る (${before} → ${await countAnswers()})`);
     await page.goto(`${BASE}#/week/1`);
   }
 

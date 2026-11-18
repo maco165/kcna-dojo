@@ -5,7 +5,7 @@ import { Card } from '@astryxdesign/core/Card';
 import { List, ListItem } from '@astryxdesign/core/List';
 import { RadioList, RadioListItem } from '@astryxdesign/core/RadioList';
 import { SegmentedControl, SegmentedControlItem } from '@astryxdesign/core/SegmentedControl';
-import { VStack } from '@astryxdesign/core/Stack';
+import { HStack, VStack } from '@astryxdesign/core/Stack';
 import { Text } from '@astryxdesign/core/Text';
 import AppSideNav from '../components/AppSideNav';
 import BottomTabs from '../components/BottomTabs';
@@ -29,16 +29,20 @@ function formatDay(day: string): string {
 }
 
 /** 全週の問題から、分野と数を選んでランダムに出す */
-function RandomCard({ onStart }: { onStart: (domain: PracticeDomain, size: number) => void }) {
-  const [domain, setDomain] = useState<PracticeDomain>('all');
-  const [size, setSize] = useState<string>(String(PRACTICE_SIZES[0]));
+type RandomChoice = { domain: PracticeDomain; size: string };
+
+/** 分野と数は Review が持つ (解き終えて戻っても、同じ条件で続けられるように) */
+function RandomCard({ choice, onChange, onStart }: { choice: RandomChoice; onChange: (c: RandomChoice) => void; onStart: () => void }) {
+  const { domain, size } = choice;
+  const setDomain = (d: PracticeDomain) => onChange({ ...choice, domain: d });
+  const setSize = (n: string) => onChange({ ...choice, size: n });
   const all = allQuestions();
   const available = domain === 'all' ? all.length : all.filter((q) => q.domain === domain).length;
   return (
     <Card padding={4}>
       <VStack gap={3}>
         <h2 className="h-sm">ランダム出題</h2>
-        <Text type="supporting">第 1〜8 週の問題から、週の順に関係なく選んで出します。1 問ずつ答えと解説が出て、間違えた問題は復習に入ります。</Text>
+        <Text type="supporting">第 1〜8 週の問題から、週の順に関係なく選んで出します。1 問ずつ答えと解説が出て、間違えた問題は復習に入ります。今日の復習の問題に当たったときは、ここでの答えがその日の復習として記録されます。</Text>
         <RadioList label="分野" value={domain} onChange={(v) => setDomain(v as PracticeDomain)}>
           <RadioListItem value="all" label={`すべての分野 (${all.length} 問)`} />
           {DOMAINS.map((d) => (
@@ -50,15 +54,15 @@ function RandomCard({ onStart }: { onStart: (domain: PracticeDomain, size: numbe
             <SegmentedControlItem key={n} value={String(n)} label={`${n} 問`} />
           ))}
         </SegmentedControl>
-        <div>
-          <Button variant="primary" label={`${Math.min(Number(size), available)} 問を始める`} onClick={() => onStart(domain, Number(size))} />
-        </div>
+        <HStack>
+          <Button variant="primary" label={`${Math.min(Number(size), available)} 問を始める`} onClick={onStart} />
+        </HStack>
       </VStack>
     </Card>
   );
 }
 
-function Overview({ progress, onStart, onRandom }: { progress: Progress; onStart: () => void; onRandom: (domain: PracticeDomain, size: number) => void }) {
+function Overview({ progress, onStart, random }: { progress: Progress; onStart: () => void; random: { choice: RandomChoice; onChange: (c: RandomChoice) => void; onStart: () => void } }) {
   const now = new Date();
   const due = dueQuestions(progress, now);
   const upcoming = upcomingReview(progress, now, isKnownQuestion);
@@ -88,7 +92,7 @@ function Overview({ progress, onStart, onRandom }: { progress: Progress; onStart
         </VStack>
       </Card>
 
-      <RandomCard onStart={onRandom} />
+      <RandomCard {...random} />
 
       {due.length > 0 && (
         <List hasDividers header={<h2 className="h-sm">今日の問題</h2>}>
@@ -105,6 +109,7 @@ export default function Review({ progress, updateProgress }: Props) {
   const isWide = useMediaQuery(WIDE_QUERY);
   const [running, setRunning] = useState<QuestionRef[] | null>(null);
   const [mode, setMode] = useState<'review' | 'random'>('review');
+  const [choice, setChoice] = useState<RandomChoice>({ domain: 'all', size: String(PRACTICE_SIZES[0]) });
   const questions = useMemo(() => running?.map((r) => r.question) ?? [], [running]);
 
   if (running && running.length > 0) {
@@ -135,9 +140,13 @@ export default function Review({ progress, updateProgress }: Props) {
         setMode('review');
         setRunning(dueQuestions(progress, new Date()));
       }}
-      onRandom={(domain, size) => {
-        setMode('random');
-        setRunning(pickPractice(allQuestions(), size, domain));
+      random={{
+        choice,
+        onChange: setChoice,
+        onStart: () => {
+          setMode('random');
+          setRunning(pickPractice(allQuestions(), Number(choice.size), choice.domain));
+        },
       }}
     />
   );
