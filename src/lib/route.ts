@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { fullTitle } from './pageMeta';
 import { onRouteChanged, savePosition, startScrollMemory } from './scrollMemory';
 
 // 経路は # の無い URL (/kcna-dojo/handbook/core-concepts/ など) で、History API で切り替える。
@@ -78,8 +77,8 @@ export function useRoute(): Route {
       shown = window.location.pathname;
       const next = parseRoute(shown);
       setRoute(next);
-      // 書き出した HTML の題名はページごとなので、サイトの中で移ったときも合わせる
-      document.title = fullTitle(next);
+      // 書き出した HTML の題名はページごとなので、サイトの中で移ったときも合わせる (題名の部品はデータを持つので後から読む)
+      void import('./pageMeta').then((m) => (document.title = m.fullTitle(next)));
       onRouteChanged();
     };
     const onPop = () => {

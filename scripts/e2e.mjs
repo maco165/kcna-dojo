@@ -13,6 +13,7 @@
 import { spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { gzipSync } from 'node:zlib';
 
 const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
@@ -60,6 +61,20 @@ const choiceLabel = (q, choiceId) => {
   const text = q.choices.find((c) => c.id === choiceId).text;
   return new RegExp(`^[A-D]\\. ${escapeRe(text)}$`);
 };
+
+/**
+ * 軽さの見張り: トップの HTML が最初に読む JS (script と modulepreload) の gzip の合計を測る。
+ * ハンドブックと用語集のデータは開いたときに読むので、最初には入らないこと
+ */
+function checkFirstLoad() {
+  const html = readFileSync(new URL('../dist/index.html', import.meta.url), 'utf8');
+  const files = [...new Set([...html.matchAll(/\/kcna-dojo\/assets\/([^"]+\.js)/g)].map((m) => m[1]))];
+  const gz = files.reduce((n, f) => n + gzipSync(readFileSync(new URL(`../dist/assets/${f}`, import.meta.url))).length, 0);
+  const kb = Math.round(gz / 1024);
+  check(kb <= 380, `最初に読む JS は gzip で 380KB まで (${kb}KB、${files.length} ファイル)`);
+  const heavy = files.filter((f) => /^(handbook|Handbook|Glossary|Guide)-/.test(f));
+  check(heavy.length === 0, `ハンドブック・用語集・説明のページは最初に読まない ${heavy.join(',')}`);
+}
 
 async function run(browser, name, width, height) {
   const context = await browser.newContext({ viewport: { width, height } });
@@ -508,6 +523,8 @@ async function run(browser, name, width, height) {
   check(true, `${tag} 説明のページの学習要領の表からハンドブックへ飛べる`);
   // 26 トピックすべてを、試す手順を全部開いた形で、横にはみ出さないか測る
   await page.goto(`${BASE}handbook/`);
+  // 画面の部品は開いたときに読むので、目次のカードが出るまで待つ
+  await page.locator('.hb-topic').first().waitFor();
   const allIds = await page.locator('.hb-topic').evaluateAll((els) => els.map((a) => a.getAttribute('href').split('/').filter(Boolean).pop()));
   let widest = { id: '', w: 0 };
   const figureMissing = [];
@@ -678,6 +695,7 @@ let browser;
 try {
   await waitForServer();
   browser = await chromium.launch();
+  checkFirstLoad();
   await run(browser, 'phone', 390, 844);
   await run(browser, 'pc', 1280, 860);
 } catch (e) {
