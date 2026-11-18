@@ -319,7 +319,7 @@
               "output": "namespace/try-kcna created"
             },
             {
-              "text": "今のコンテキストの既定の名前空間を try-kcna にし、効いていることを確かめます。kubeconfig のファイルを書き換えるので、/etc/rancher/k3s/k3s.yaml を直接使っているときは、そのファイルの書き込み権限が要ります (無いと失敗します)。",
+              "text": "今のコンテキストの既定の名前空間を try-kcna にし、効いていることを確かめます。kubeconfig のファイルを書き換えるので、/etc/rancher/k3s/k3s.yaml を直接使っているときは、そのファイルの書き込み権限が要ります (無いと失敗します)。付録の「ハンドブックを試すための k3s の入れ方」のとおり ~/.kube/config に写して使っていれば書き換えられます。",
               "code": {
                 "language": "bash",
                 "text": "kubectl config set-context --current --namespace=try-kcna\nkubectl config view --minify -o jsonpath='{..namespace}{\"\\n\"}'\nkubectl get pods"

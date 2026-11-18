@@ -72,6 +72,8 @@ describe('ノードの上のコマンド (付録)', () => {
     expect(one('curl -sfL https://get.k3s.io | K3S_URL=https://myserver:6443 K3S_TOKEN=mynodetoken sh -')).toEqual(['参加させる: agent のノード (クラスタ)']);
     expect(one('kubectl get storageclass || sudo k3s kubectl get storageclass')).toEqual(['見る: StorageClass (クラスタ)']);
     expect(one('kubectl get pods && kubectl get nodes')).toHaveLength(2);
+    expect(one('/usr/local/bin/k3s-uninstall.sh')).toEqual(['消す: k3s server (ノード)']);
+    expect(one('/usr/local/bin/k3s-agent-uninstall.sh')).toEqual(['消す: k3s agent (ノード)']);
   });
 });
 
