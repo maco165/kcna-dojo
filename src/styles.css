@@ -1556,8 +1556,27 @@ body {
   color: var(--color-text-secondary);
 }
 
+.hb-crumbs ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.hb-crumbs li + li::before {
+  content: '/';
+  margin-right: 4px;
+}
+
 .hb a {
   color: var(--color-text-accent);
+}
+
+.hb a.gloss-chip {
+  /* 薄い青の地のチップは濃い青の字 (4.5:1 以上) のまま */
+  color: var(--color-text-blue);
 }
 
 .hb-domain {
@@ -1671,6 +1690,14 @@ body {
 .hb-step__text {
   margin: 0;
   line-height: 1.7;
+  /* requiredDuringSchedulingIgnoredDuringExecution のような長い識別子でも横にはみ出さない */
+  overflow-wrap: anywhere;
+}
+
+.hb-lead,
+.hb-try > summary,
+.hb-topic__summary {
+  overflow-wrap: anywhere;
 }
 
 .hb-output {

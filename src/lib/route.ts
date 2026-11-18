@@ -14,9 +14,10 @@ export function parseRoute(hash: string): Route {
   if (path === '/exam') return { name: 'exam' };
   if (path === '/glossary') return { name: 'glossary' };
   if (path === '/guide') return { name: 'guide' };
-  if (path === '/handbook') return { name: 'handbook' };
-  const handbook = path.match(/^\/handbook\/([a-z0-9-]+)$/);
-  if (handbook) return { name: 'handbook', topicId: handbook[1] };
+  if (/^\/handbook\/?$/.test(path)) return { name: 'handbook' };
+  const handbook = path.match(/^\/handbook\/([^/]+)\/?$/);
+  // 知らない id でもハンドブックの画面に回し、「見つかりませんでした」と目次へのリンクを出す
+  if (handbook) return { name: 'handbook', topicId: handbook[1].toLowerCase() };
   const week = path.match(/^\/week\/(\d+)$/);
   if (week) return { name: 'home', week: Number(week[1]) };
   return { name: 'home', week: 1 };

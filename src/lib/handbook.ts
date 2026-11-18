@@ -1,5 +1,13 @@
 // ハンドブックのデータの検査。違反を文で返す (空なら OK)
 const TOPIC_KEYS = new Set(['id', 'competency', 'title', 'summary', 'flow', 'try', 'lessons', 'sources']);
+const STEP_KEYS = new Set(['text', 'code', 'output']);
+const CODE_KEYS = new Set(['language', 'text']);
+const TRY_KEYS = new Set(['goal', 'steps']);
+const FILE_KEYS = new Set(['domain', 'topics']);
+
+function unknownKeys(obj: Record<string, unknown>, allowed: Set<string>, where: string, errors: string[]) {
+  for (const k of Object.keys(obj)) if (!allowed.has(k)) errors.push(`${where}: ${k} という欄は使いません`);
+}
 const LANGS = new Set(['bash', 'yaml']);
 
 const isText = (v: unknown): v is string => typeof v === 'string' && v.trim() !== '';
@@ -13,6 +21,8 @@ function checkSteps(steps: unknown, where: string, errors: string[], min: number
   steps.forEach((s, i) => {
     const w = `${where}[${i}]`;
     if (!isObj(s) || !isText(s.text)) return void errors.push(`${w}: text がありません`);
+    unknownKeys(s, STEP_KEYS, w, errors);
+    if (isObj(s.code)) unknownKeys(s.code, CODE_KEYS, `${w}.code`, errors);
     if (s.code !== undefined && !(isObj(s.code) && LANGS.has(s.code.language as string) && isText(s.code.text))) errors.push(`${w}: code は language (bash か yaml) と text を持ちます`);
     if (s.output !== undefined && !isText(s.output)) errors.push(`${w}: output は文字列にします`);
   });
@@ -27,11 +37,15 @@ export function validateHandbook(data: unknown[], domains: Map<string, string[]>
   const errors: string[] = [];
   const ids = new Set<string>();
   const covered = new Set<string>();
+  const seenDomains = new Set<string>();
   for (const [fi, file] of data.entries()) {
     if (!isObj(file) || !domains.has(file.domain as string) || !Array.isArray(file.topics)) {
       errors.push(`ファイル ${fi}: domain (4 分野のどれか) と topics の配列が要ります`);
       continue;
     }
+    unknownKeys(file, FILE_KEYS, `ファイル ${fi}`, errors);
+    if (seenDomains.has(file.domain as string)) errors.push(`ファイル ${fi}: ${file.domain} のファイルが 2 つあります`);
+    seenDomains.add(file.domain as string);
     const competencies = domains.get(file.domain as string)!;
     for (const t of file.topics as unknown[]) {
       if (!isObj(t)) {
@@ -48,16 +62,22 @@ export function validateHandbook(data: unknown[], domains: Map<string, string[]>
       else covered.add(t.competency as string);
       if (!isText(t.title) || !isText(t.summary)) errors.push(`${id}: title と summary が要ります`);
       checkSteps(t.flow, `${id}.flow`, errors, 3);
-      if (!Array.isArray(t.try)) errors.push(`${id}: try の配列が要ります`);
+      if (!Array.isArray(t.try) || t.try.length === 0) errors.push(`${id}: try (試す手順) が 1 つ以上要ります`);
       else
         t.try.forEach((x, i) => {
           if (!isObj(x) || !isText(x.goal)) return void errors.push(`${id}.try[${i}]: goal がありません`);
+          unknownKeys(x, TRY_KEYS, `${id}.try[${i}]`, errors);
           checkSteps(x.steps, `${id}.try[${i}].steps`, errors, 1);
         });
       if (!Array.isArray(t.lessons)) errors.push(`${id}: lessons の配列が要ります`);
-      else for (const l of t.lessons) if (!lessonIds.has(l as string)) errors.push(`${id}: lessons の ${String(l)} というレッスンはありません`);
+      else {
+        for (const l of t.lessons) if (!lessonIds.has(l as string)) errors.push(`${id}: lessons の ${String(l)} というレッスンはありません`);
+        if (new Set(t.lessons).size !== t.lessons.length) errors.push(`${id}: lessons に同じレッスンが重なっています`);
+      }
       if (!Array.isArray(t.sources) || t.sources.length === 0) errors.push(`${id}: sources が要ります`);
-      else
+      else {
+        const urls = t.sources.map((s) => (isObj(s) ? s.url : undefined));
+        if (new Set(urls).size !== urls.length) errors.push(`${id}: sources に同じ URL が重なっています`);
         for (const s of t.sources) {
           try {
             if (!isObj(s) || !isText(s.label) || new URL(s.url as string).protocol !== 'https:') errors.push(`${id}: sources は label と https の url を持ちます`);
@@ -65,7 +85,12 @@ export function validateHandbook(data: unknown[], domains: Map<string, string[]>
             errors.push(`${id}: sources の url が読めません`);
           }
         }
+        }
     }
+  }
+  for (const [domain, competencies] of domains) {
+    if (!seenDomains.has(domain)) errors.push(`${domain} のファイルがありません`);
+    for (const c of competencies) if (seenDomains.has(domain) && !covered.has(c)) errors.push(`細目 ${c} のトピックがありません`);
   }
   return errors;
 }

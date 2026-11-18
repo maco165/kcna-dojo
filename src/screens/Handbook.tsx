@@ -23,7 +23,7 @@ function Step({ step }: { step: HandbookStep }) {
       {step.output && (
         <figure className="hb-output">
           <figcaption>出力の例 (名前・時刻などは環境で変わります)</figcaption>
-          <pre>{step.output}</pre>
+          <pre tabIndex={0}>{step.output}</pre>
         </figure>
       )}
     </div>
@@ -90,7 +90,13 @@ function Topic({ id }: { id: string }) {
   return (
     <article className="hb" aria-labelledby="hb-title">
       <nav aria-label="パンくず" className="hb-crumbs">
-        <a href={handbookHref()}>ハンドブック</a> / <span>{t.domain}</span>
+        <ol>
+          <li>
+            <a href={handbookHref()}>ハンドブック</a>
+          </li>
+          <li>{t.domain}</li>
+          <li aria-current="page">{t.title}</li>
+        </ol>
       </nav>
       <div className="hb-head">
         <span className="hb-topic__en" lang="en">

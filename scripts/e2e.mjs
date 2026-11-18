@@ -440,7 +440,18 @@ async function run(browser, name, width, height) {
   await page.getByRole('link', { name: 'Kubernetes Core Concepts' }).click();
   await page.waitForURL(/#\/handbook\/core-concepts/);
   check(true, `${tag} 説明のページの学習要領の表からハンドブックへ飛べる`);
-  await noHorizontalOverflow(page, width, `${tag} ハンドブックのトピック`);
+  // 13 トピックすべてを、試す手順を全部開いた形で、横にはみ出さないか測る
+  await page.goto(`${BASE}#/handbook`);
+  const allIds = await page.locator('.hb-topic').evaluateAll((els) => els.map((a) => a.getAttribute('href').split('/').pop()));
+  let widest = { id: '', w: 0 };
+  for (const id of allIds) {
+    await page.goto(`${BASE}#/handbook/${id}`);
+    await page.getByRole('heading', { name: '全体の流れ' }).waitFor();
+    await page.evaluate(() => document.querySelectorAll('details').forEach((d) => (d.open = true)));
+    const w = await page.evaluate(() => document.documentElement.scrollWidth);
+    if (w > widest.w) widest = { id, w };
+  }
+  check(allIds.length === 13 && widest.w <= width, `${tag} ハンドブックの 13 トピックが横にはみ出さない (いちばん広い ${widest.id} ${widest.w} <= ${width})`);
 
   check(errors.length === 0, `${tag} ページのエラーが無い ${errors.length ? errors.join(' / ') : ''}`);
   await context.close();

@@ -46,10 +46,12 @@ describe('validateHandbook', () => {
       },
     ],
   };
+  // ok は 1 分野 1 細目だけなので、それ以外の細目の欠けは数えない小さな分野表で検査する
+  const one = new Map([['Kubernetes Fundamentals', ['Kubernetes Core Concepts']]]);
   const check = (mut: (t: Record<string, unknown>) => void) => {
     const d = structuredClone(ok);
     mut(d.topics[0] as unknown as Record<string, unknown>);
-    return validateHandbook([d], domains, new Set(['w1-l1']));
+    return validateHandbook([d], one, new Set(['w1-l1']));
   };
   it('正しい形は通る', () => expect(check(() => {})).toEqual([]));
   it('壊れた形を見つける', () => {
@@ -60,5 +62,18 @@ describe('validateHandbook', () => {
     expect(check((t) => (t.sources = [{ label: 'k', url: 'http://x' }]))[0]).toMatch(/https/);
     expect(check((t) => (t.extra = 1))[0]).toMatch(/extra/);
     expect(check((t) => (t.id = 'Core_Concepts'))[0]).toMatch(/kebab-case/);
+    expect(check((t) => (t.try = []))[0]).toMatch(/1 つ以上/);
+    expect(check((t) => ((t.flow as Record<string, unknown>[])[2] = { text: 'c', outptu: 'x' }))[0]).toMatch(/outptu/);
+    expect(check((t) => (t.lessons = ['w1-l1', 'w1-l1']))[0]).toMatch(/重なって/);
+    expect(check((t) => (t.sources = [{ label: 'a', url: 'https://k/' }, { label: 'b', url: 'https://k/' }]))[0]).toMatch(/同じ URL/);
+  });
+  it('細目の欠けと、同じ分野のファイルの重なりを見つける', () => {
+    const full = validateHandbook(HANDBOOK, domains, lessonIds);
+    expect(full).toEqual([]);
+    const missingTopic = structuredClone(HANDBOOK);
+    missingTopic[0].topics.pop();
+    expect(validateHandbook(missingTopic, domains, lessonIds).join()).toMatch(/トピックがありません/);
+    expect(validateHandbook(HANDBOOK.slice(1), domains, lessonIds).join()).toMatch(/ファイルがありません/);
+    expect(validateHandbook([...HANDBOOK, { domain: HANDBOOK[0].domain, topics: [] }], domains, lessonIds).join()).toMatch(/2 つあります/);
   });
 });
