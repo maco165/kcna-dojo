@@ -3,7 +3,7 @@ import glossary from '../src/content/glossary.json';
 import { HANDBOOK_TOPICS } from '../src/content/handbook';
 import type { GlossaryTerm } from '../src/lib/glossary';
 import { parseRoute } from '../src/lib/route';
-import { makeTermLinker, termNames } from '../src/lib/termLinks';
+import { linkDetail, makeTermLinker, termNames } from '../src/lib/termLinks';
 
 const TERMS = (glossary as { terms: GlossaryTerm[] }).terms;
 const names = termNames(TERMS);
@@ -68,5 +68,22 @@ describe('本文の用語を用語集へのリンクにする', () => {
     expect(parseRoute('/kcna-dojo/glossary/pod/')).toEqual({ name: 'glossary', termId: 'pod' });
     expect(parseRoute('/kcna-dojo/glossary/')).toEqual({ name: 'glossary' });
     expect(parseRoute('#/glossary/pod')).toEqual({ name: 'glossary', termId: 'pod' });
+  });
+  it('カタカナの語は、漢字に続く複合語の一部にも当てない (等価ベースのベース)', () => {
+    expect(links('等価ベースのセレクター').map((p) => p.text)).not.toContain('ベース');
+  });
+  it('用語集の詳しい説明では、その語自身 (名前・別名・名前の一部) をリンクにしない', () => {
+    const argo = TERMS.find((t) => t.id === 'argo-cd')!;
+    const flat = linkDetail(names, argo).flat();
+    expect(flat.some((p) => typeof p !== 'string' && p.id === 'argo-cd')).toBe(false);
+    // 「Argo CD」の中の CD はリンクにしない (ほかの所の CD は CD の語を指してよい)
+    flat.forEach((p, i) => {
+      if (typeof p !== 'string' && p.text === 'CD') expect(String(flat[i - 1] ?? '').endsWith('Argo ')).toBe(false);
+    });
+    const pss = TERMS.find((t) => t.id === 'pod-security-standards')!;
+    const ids = linkDetail(names, pss).flat().filter((p) => typeof p !== 'string').map((p) => p.id);
+    expect(ids).not.toContain('pod-security-standards');
+    // 87 語のどれでも、自分へのリンクは出ない
+    for (const t of TERMS) expect(linkDetail(names, t).flat().some((p) => typeof p !== 'string' && p.id === t.id), t.id).toBe(false);
   });
 });

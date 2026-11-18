@@ -32,7 +32,7 @@ export default function App() {
       ) : route.name === 'guide' ? (
         <Guide progress={progress} />
       ) : route.name === 'glossary' ? (
-        <Glossary progress={progress} termId={route.termId} />
+        <Glossary key={route.termId ?? 'index'} progress={progress} termId={route.termId} />
       ) : route.name === 'progress' ? (
         <ProgressScreen progress={progress} />
       ) : route.name === 'review' ? (
