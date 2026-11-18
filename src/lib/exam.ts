@@ -157,3 +157,6 @@ export function recordExam(p: Progress, items: BankItem[], answers: ExamAnswer[]
   next = completeReview(next, correct * XP_PER_CORRECT, now);
   return addExamRecord(next, { at: now.toISOString(), correct, total: items.length, ...(set ? { set } : {}) });
 }
+
+/** 合格の目安に届かなかった分野 (出題の無い分野は除く)。模擬試験の結果で、読み直すトピックを出す */
+export const weakDomains = (r: ExamResult): Domain[] => (Object.keys(r.byDomain) as Domain[]).filter((d) => r.byDomain[d].total > 0 && r.byDomain[d].right / r.byDomain[d].total < PASS_MARK);

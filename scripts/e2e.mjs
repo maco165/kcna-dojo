@@ -73,10 +73,10 @@ function checkFirstLoad() {
   const kb = Math.round(gz / 1024);
   check(kb <= 380, `最初に読む JS は gzip で 380KB まで (${kb}KB、${files.length} ファイル)`);
   // 名前だけでなく中身でも見る (静的に取り込まれて本体に混ざっても気づけるように)。それぞれのデータにしか無い文字で調べる
-  const marks = { ハンドブックのデータ: 'k3s-vs-kubernetes', 用語集のデータ: 'container-image', 説明のページ: '2026-03-22 の版', 模擬試験用の問題: 'のイメージを更新した直後に' };
+  const marks = { ハンドブックのデータ: 'k3s-vs-kubernetes', 用語集のデータ: 'container-image', 説明のページ: '2026-03-22 の版', 模擬試験用の問題: 'のイメージを更新した直後に', 比較表のデータ: 'volumeClaimTemplates:  # Pod ごとに', コマンドの説明: 'リソースの一覧や状態を表で表示します' };
   const text = files.map((f) => readFileSync(new URL(`../dist/assets/${f}`, import.meta.url), 'utf8')).join('\n');
   const found = Object.entries(marks).filter(([, m]) => text.includes(m)).map(([k]) => k);
-  check(found.length === 0, `ハンドブック・用語集・説明のページ・模擬試験用の問題は最初に読まない ${found.join(',')}`);
+  check(found.length === 0, `ハンドブック・用語集・説明のページ・模擬試験用の問題・コマンドの説明・比較表は最初に読まない ${found.join(',')}`);
   // 書き出したハンドブックの目次も、画面と同じ 2 部 (h2) と段 (h3) の組みにする
   const hbHtml = readFileSync(new URL('../dist/handbook/index.html', import.meta.url), 'utf8');
   const hbHeads = [...hbHtml.matchAll(/<h([23])>([^<]*)<\/h\1>/g)].map((m) => `${m[1]}:${m[2]}`);
@@ -109,6 +109,7 @@ async function run(browser, name, width, height) {
     const wrong = q.choices.find((c) => c.id !== q.answer).id;
     const pick = i === 0 ? wrong : q.answer;
     await page.getByRole('radio', { name: choiceLabel(q, pick) }).check();
+    if (i === 0) check((await page.getByRole('navigation', { name: '読み直す' }).count()) === 0, `${tag} 答える前には読み直す先を出さない`);
     await page.getByRole('button', { name: '確かめる' }).click();
     if (i === 0) {
       check(await page.getByText('不正解 · 正しくは').isVisible(), `${tag} 不正解のとき知らせが出る`);
@@ -117,6 +118,12 @@ async function run(browser, name, width, height) {
       const answerLetter = answerLabel.trim().slice(0, 1);
       check(/^[A-D]$/.test(answerLetter) && (await page.getByText(`不正解 · 正しくは ${answerLetter}`).isVisible()), `${tag} 「正しくは ${answerLetter}」が画面の並びと合う`);
       check(await page.getByText(q.explanation).isVisible(), `${tag} 不正解のとき解説が出る`);
+      // 答えたあとに、読み直す先 (ハンドブック・用語集) が出る。答える前には出さない
+      const readMore = page.getByRole('navigation', { name: '読み直す' });
+      await readMore.waitFor({ timeout: 5000 }).catch(() => {});
+      const hbLinks = await readMore.locator('a[href*="/handbook/"]').count();
+      const glLinks = await readMore.locator('a[href*="/glossary/"]').count();
+      check(hbLinks + glLinks >= 1, `${tag} 答えたあとに読み直す先が出る (ハンドブック ${hbLinks}・用語集 ${glLinks})`);
       await noHorizontalOverflow(page, width, `${tag} 4 択の解説`);
     } else {
       check(await page.getByText('正解', { exact: true }).isVisible(), `${tag} ${q.id} 正解の知らせ`);
@@ -163,8 +170,19 @@ async function run(browser, name, width, height) {
   check(await page.getByText(`${l3.title} · 2 / ${l3.questions.length} 問`).isVisible(), `${tag} 答えたあと Enter で次へ進む`);
   await page.goto(`${BASE}lesson/w1-l3/`);
   await page.reload();
+  // 説明の部品は問題を開いたときに先に読むので、読み込みが落ち着いてから数える (答える前には出さない)
+  await page.waitForLoadState('networkidle');
+  await page.waitForTimeout(500);
+  check((await page.locator('.cmd-notes').count()) === 0, `${tag} 答える前には出てきたコマンドを出さない`);
   await page.getByRole('textbox', { name: '空欄' }).fill('get');
   await page.getByRole('textbox', { name: '空欄' }).press('Enter');
+  // 答えたあと、出てきたコマンド (kubectl get) の説明・使ったオプション・公式リファレンスが出る
+  const notes = page.locator('.cmd-notes');
+  await notes.waitFor({ timeout: 5000 }).catch(() => {});
+  check((await notes.locator('.cmd-note__name').allInnerTexts()).includes('kubectl get'), `${tag} 答えたあとに出てきたコマンドの説明が出る`);
+  check((await notes.locator('.cmd-note__flags dt').allInnerTexts()).some((t) => t.startsWith('-n')) && (await notes.locator('.cmd-note__flags dt').allInnerTexts()).some((t) => t.startsWith('-o')), `${tag} 問題で使ったオプション (-n・-o) の説明が出る`);
+  check((await notes.locator('a[href^="https://kubernetes.io/docs/reference/kubectl/generated/kubectl_get/"]').count()) === 1, `${tag} 公式リファレンスへのリンクがある`);
+  await noHorizontalOverflow(page, width, `${tag} 出てきたコマンド`);
 
   // 4b. 候補を押して不正解なら、なぜ違うかが出る (2 問目は describe が正解なので get を押す)
   await page.getByRole('button', { name: '次へ' }).click();
@@ -382,6 +400,10 @@ async function run(browser, name, width, height) {
   check(afterExam?.exams?.length === 1 && afterExam.exams[0].total === 60 && afterExam.exams[0].set === 1, `${tag} 模擬試験の結果が回の番号つきで記録に残る`);
   const answersAdded = Object.keys(afterExam?.answers ?? {}).length - answersBefore;
   check(answersAdded <= 1, `${tag} 答えなしの問題は記録しない (増えた記録 ${answersAdded})`);
+  // ほぼ答えずに採点したので、4 分野とも目安に届かず、分野ごとに読み直すトピックが出る
+  const weak = page.getByRole('navigation', { name: '弱い分野を読み直す' });
+  await weak.waitFor({ timeout: 5000 }).catch(() => {});
+  check((await weak.locator('a[href*="/handbook/"]').count()) >= 4, `${tag} 模擬試験の結果に、弱い分野の読み直すトピックが出る`);
   await noHorizontalOverflow(page, width, `${tag} 模擬試験の結果`);
   await page.getByRole('button', { name: '模擬試験の最初へ戻る' }).click();
   check(await page.getByText(/前回 \d+ \/ 60/).first().isVisible(), `${tag} 第 1 回の前回の結果が回の選択に出る`);
@@ -687,6 +709,33 @@ async function run(browser, name, width, height) {
     }
   }
 
+  // 15c. 似た語の比較表: 一覧から表を開き、列の語から用語集へ、用語集から表へ行き来できる
+  {
+    await page.goto(`${BASE}compare/`);
+    await page.locator('.cmp-card').first().waitFor();
+    check((await page.locator('.cmp-card').count()) >= 10, `${tag} 比較表の一覧に表が並ぶ (${await page.locator('.cmp-card').count()})`);
+    await page.locator('.cmp-card', { hasText: 'StatefulSet' }).first().click();
+    await page.locator('.cmp-table').waitFor();
+    const cols = await page.locator('.cmp-table thead th').count();
+    const rowCells = await page.locator('.cmp-table tbody tr').first().locator('td').count();
+    check(cols - 1 === rowCells && rowCells >= 2, `${tag} 比較表は列と行のセルの数がそろう (${rowCells} 列)`);
+    check((await page.locator('.cmp-pitfalls li').count()) >= 1 && (await page.locator('.cmp-section pre, .cmp-section code').count()) >= 1, `${tag} 比較表に取り違えやすい点とコードがある`);
+    await noHorizontalOverflow(page, width, `${tag} 比較表`);
+    // サイトの中で表へ移ると、題名が表の題名になり、ハンドブックのデータは読まない
+    const loaded = [];
+    const onReq = (r) => loaded.push(r.url());
+    page.on('request', onReq);
+    await page.goto(`${BASE}compare/`);
+    await page.locator('.cmp-card').nth(1).click();
+    await page.locator('.cmp-table').waitFor();
+    await page.waitForTimeout(500);
+    page.off('request', onReq);
+    check((await page.title()).includes('の違い') && !loaded.some((u) => /\/handbook-[^/]*\.js$/.test(u)), `${tag} 比較表へ移ると題名が表の題名になり、ハンドブックのデータは読まない (${await page.title()})`);
+    await page.goto(`${BASE}glossary/deployment/`);
+    await page.getByRole('heading', { name: '似た語と比べる' }).first().waitFor({ timeout: 5000 }).catch(() => {});
+    check((await page.locator('a.gloss-chip[href*="/compare/"]').count()) >= 1, `${tag} 用語集の語から、その語の比較表へ飛べる`);
+  }
+
   // 16. 戻る操作: 目次を下まで送ってトピックを開き、戻ると元の位置。新しく開いたページは先頭
   {
     const scrollTop = () => page.evaluate(() => (document.querySelector('.astryx-layout-content') ?? document.scrollingElement).scrollTop);
@@ -732,6 +781,9 @@ async function run(browser, name, width, height) {
     check(personal.includes('<meta name="robots" content="noindex"'), `${tag} 個人の記録の画面は検索に載せない (noindex)`);
     const map = await (await fetch(`${BASE}sitemap.xml`)).text();
     check(map.includes('/kcna-dojo/handbook/core-concepts/</loc>') && map.includes('/kcna-dojo/glossary/</loc>') && !map.includes('/progress/'), `${tag} sitemap にハンドブックと用語集があり、個人の画面は無い`);
+    // 比較表: 書き出した HTML に表まで入り、sitemap に載る
+    const cmpHtml = await (await fetch(`${BASE}compare/workloads/`)).text();
+    check(cmpHtml.includes('<table>') && cmpHtml.includes('<h2>取り違えやすい点</h2>') && map.includes('/kcna-dojo/compare/workloads/</loc>'), `${tag} 比較表のページは書き出した HTML に表まであり、sitemap に載る`);
     await page.goto(`${BASE}handbook/storage/`);
     await page.getByRole('heading', { name: '全体の流れ' }).waitFor();
     check(new URL(page.url()).pathname === '/kcna-dojo/handbook/storage/' && !page.url().includes('#'), `${tag} 前の形の #/... の URL は、同じページの新しい URL になる (${page.url()})`);

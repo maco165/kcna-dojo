@@ -18,9 +18,10 @@ import { AskAiLinks } from '../components/AskAi';
 import Diagram from '../components/Diagram';
 import { figureOf } from '../content/glossaryFigures';
 import { findTopic } from '../content/handbook';
+import { tablesOfTerm } from '../content/compare';
 import { DOMAINS } from '../lib/lessonStatus';
 import type { Progress } from '../lib/progress';
-import { glossaryTermHref, handbookHref, lessonHref } from '../lib/route';
+import { compareHref, glossaryTermHref, handbookHref, lessonHref } from '../lib/route';
 import { linkDetail, termNames } from '../lib/termLinks';
 import { SITE_NAME } from '../lib/site';
 import { WIDE_QUERY, useMediaQuery } from '../lib/useMediaQuery';
@@ -77,6 +78,20 @@ function Detail({ t, large }: { t: Entry; large?: boolean }) {
         <div className="gloss-detail__figure" style={{ maxWidth: figure.spec.width }}>
           <Diagram spec={figure.spec} id={`gloss-${figure.id}`} highlight={t.id} />
         </div>
+      )}
+      {tablesOfTerm(t.id).length > 0 && (
+        <VStack gap={1.5}>
+          <h3 className="gloss-detail__label">似た語と比べる</h3>
+          <ul className="gloss-chips">
+            {tablesOfTerm(t.id).map((c) => (
+              <li key={c.id}>
+                <a className="gloss-chip" href={compareHref(c.id)}>
+                  {c.title}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </VStack>
       )}
       {topics.length > 0 && (
         <VStack gap={1.5}>

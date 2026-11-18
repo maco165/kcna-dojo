@@ -5,7 +5,7 @@ import { onRouteChanged, savePosition, startScrollMemory } from './scrollMemory'
 // 経路は # の無い URL (/kcna-dojo/handbook/core-concepts/ など) で、History API で切り替える。
 // 検索エンジンは # の後ろを別のページとして扱わないため。ページごとの index.html は作るときに scripts/prerender.mjs が書き出す。
 // 前の形の #/... の URL は、開いたときに同じページの新しい URL へ置き換える。
-export type Route = { name: 'home'; week: number } | { name: 'lesson'; lessonId: string } | { name: 'about' } | { name: 'settings' } | { name: 'review' } | { name: 'progress' } | { name: 'exam' } | { name: 'glossary'; termId?: string } | { name: 'guide' } | { name: 'handbook'; topicId?: string };
+export type Route = { name: 'home'; week: number } | { name: 'lesson'; lessonId: string } | { name: 'about' } | { name: 'settings' } | { name: 'review' } | { name: 'progress' } | { name: 'exam' } | { name: 'glossary'; termId?: string } | { name: 'guide' } | { name: 'handbook'; topicId?: string } | { name: 'compare'; tableId?: string };
 
 /** サイトの置き場所 (vite の base。/kcna-dojo/) */
 export const BASE = import.meta.env.BASE_URL;
@@ -24,6 +24,9 @@ export function parseRoute(where: string): Route {
   const term = path.match(/^\/glossary\/([\w-]+)$/);
   if (term) return { name: 'glossary', termId: term[1] };
   if (path === '/guide') return { name: 'guide' };
+  if (path === '/compare') return { name: 'compare' };
+  const compare = path.match(/^\/compare\/([^/]+)$/);
+  if (compare) return { name: 'compare', tableId: compare[1].toLowerCase() };
   if (path === '/handbook') return { name: 'handbook' };
   const handbook = path.match(/^\/handbook\/([^/]+)$/);
   // 知らない id でもハンドブックの画面に回し、「見つかりませんでした」と目次へのリンクを出す
@@ -51,6 +54,7 @@ export const glossaryHref = href('glossary');
 export const glossaryTermHref = (termId: string) => href(`glossary/${termId}`);
 export const guideHref = href('guide');
 export const handbookHref = (topicId?: string) => href(topicId ? `handbook/${topicId}` : 'handbook');
+export const compareHref = (tableId?: string) => href(tableId ? `compare/${tableId}` : 'compare');
 /** 第 1 週はトップと同じ画面なので、トップの URL を正にする (同じ画面の URL を 2 つにしない) */
 export const weekHref = (week: number) => (week === 1 ? BASE : href(`week/${week}`));
 
@@ -82,6 +86,11 @@ export function useRoute(): Route {
       // ハンドブックのトピックと用語集の語だけは、題名に重いデータが要るので後から読む (読み終えたときに、まだ同じページにいるときだけ書く)
       const at = shown;
       if (needsHeavyTitle(next)) void import('./pageMeta').then((m) => shown === at && (document.title = m.fullTitle(next)));
+      // 比較表の表は、比較表のデータだけを読んで題名を決める (pageMeta はハンドブックのデータも読むので使わない)
+      else if (next.name === 'compare' && next.tableId) {
+        const id = next.tableId;
+        void import('../content/compare').then((m) => shown === at && (document.title = withSite(m.findTable(id)?.title ?? '似た語の比較表')));
+      }
       else document.title = withSite(lightTitle(next));
       onRouteChanged();
     };

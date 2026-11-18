@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { Button } from '@astryxdesign/core/Button';
 import { CodeBlock } from '@astryxdesign/core/CodeBlock';
 import { HStack, VStack } from '@astryxdesign/core/Stack';
@@ -9,6 +9,10 @@ import { gradeFill, normalizeAnswer } from '../lib/grade';
 import AskAi from './AskAi';
 import Feedback from './Feedback';
 import { ActionArea, PrimaryAction, QuestionHead } from './QuestionFrame';
+import { preloadNotes } from '../lib/preloadNotes';
+
+// 読み直す先 (ハンドブックと用語集) は、そのデータと一緒に答えたあとに読む
+const ReadMore = lazy(() => import('./ReadMore'));
 
 const LANGUAGE_LABEL: Record<FillQuestion['language'], string> = {
   bash: 'bash',
@@ -38,6 +42,8 @@ export default function FillQuestionView({
   /** この問題を解いた記録の 1 行 (このレッスンを始めたときのもの) */
   history?: string;
 }) {
+  // 答えたあとに出すコマンドの説明を、問題を開いたときに先に読む (答えてから読むと「次へ」が下へずれる)
+  useEffect(preloadNotes, []);
   const [value, setValue] = useState('');
   const [result, setResult] = useState<boolean | null>(null);
   const checked = result !== null;
@@ -155,11 +161,13 @@ export default function FillQuestionView({
               explanation={question.explanation}
               note={result ? undefined : question.wrongNotes?.[typed]}
               source={question.source}
+              question={question}
+              extra={result && question.output ? <CodeBlock code={question.output} title="実行結果の例 (列の一部)" width="100%" size="sm" hasCopyButton={false} /> : undefined}
             />
-            {result && question.output && (
-              <CodeBlock code={question.output} title="実行結果の例 (列の一部)" width="100%" size="sm" hasCopyButton={false} />
-            )}
             <PrimaryAction label={nextLabel} onClick={onNext} kbdHint="Enter で次へ" />
+            <Suspense fallback={null}>
+              <ReadMore question={question} domain={domain} />
+            </Suspense>
             <AskAi question={question} answered={{ picked: typed, correct: result }} />
           </>
         )}

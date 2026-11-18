@@ -8,6 +8,7 @@ const LOADERS = {
   handbook: () => import('../screens/Handbook'),
   guide: () => import('../screens/Guide'),
   glossary: () => import('../screens/Glossary'),
+  compare: () => import('../screens/Compare'),
   progress: () => import('../screens/ProgressScreen'),
   review: () => import('../screens/Review'),
   settings: () => import('../screens/Settings'),
