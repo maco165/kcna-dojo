@@ -9,7 +9,7 @@ import AppSideNav from '../components/AppSideNav';
 import BottomTabs from '../components/BottomTabs';
 import RepoLink from '../components/RepoLink';
 import SiteLogo from '../components/SiteLogo';
-import { dueQuestions, findLesson } from '../content';
+import { dueReviewCount, findLesson } from '../content';
 import glossary from '../content/glossary.json';
 import type { Domain } from '../content/types';
 import { isFreshVisit } from '../lib/scrollMemory';
@@ -323,7 +323,7 @@ export default function Glossary({ progress, termId }: { progress: Progress; ter
       <main className="page__section">
         <Body isWide={false} termId={termId} />
       </main>
-      <BottomTabs current="glossary" reviewCount={dueQuestions(progress, new Date()).length} />
+      <BottomTabs current="glossary" reviewCount={dueReviewCount(progress, new Date())} />
     </div>
   );
 }

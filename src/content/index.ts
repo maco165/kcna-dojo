@@ -31,12 +31,21 @@ export function allQuestions(): (QuestionRef & { domain: Lesson['domain'] })[] {
   );
 }
 
-/** 今日の復習の問題。問題データから消えた id は飛ばす (件数のバッジもこれで数える) */
-export function dueQuestions(p: Progress, now: Date): QuestionRef[] {
+/**
+ * 今日の復習の問題。問題データから消えた id は飛ばす。
+ * 模擬試験用の問題 (x- で始まる) は、それを読んだ画面 (復習) が find を渡したときだけ引ける
+ */
+export function dueQuestions(p: Progress, now: Date, find: (id: string) => QuestionRef | undefined = findQuestion): QuestionRef[] {
   return dueReviewIds(p, now)
-    .map((id) => findQuestion(id))
+    .map((id) => find(id))
     .filter((r): r is QuestionRef => r !== undefined);
 }
+
+/** 模擬試験用の問題の id か (データを読まずに見分ける) */
+export const isExamQuestionId = (id: string) => id.startsWith('x-');
+
+/** 今日の復習の数 (タブのバッジ)。模擬試験用の問題も、データを読まずに数える */
+export const dueReviewCount = (p: Progress, now: Date) => dueReviewIds(p, now).filter((id) => isExamQuestionId(id) || findQuestion(id) !== undefined).length;
 
 export const isKnownQuestion = (id: string): boolean => findQuestion(id) !== undefined;
 

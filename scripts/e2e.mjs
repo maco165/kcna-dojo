@@ -73,7 +73,7 @@ function checkFirstLoad() {
   const kb = Math.round(gz / 1024);
   check(kb <= 380, `最初に読む JS は gzip で 380KB まで (${kb}KB、${files.length} ファイル)`);
   // 名前だけでなく中身でも見る (静的に取り込まれて本体に混ざっても気づけるように)。それぞれのデータにしか無い文字で調べる
-  const marks = { ハンドブックのデータ: 'k3s-vs-kubernetes', 用語集のデータ: 'container-image', 説明のページ: '2026-03-22 の版' };
+  const marks = { ハンドブックのデータ: 'k3s-vs-kubernetes', 用語集のデータ: 'container-image', 説明のページ: '2026-03-22 の版', 模擬試験用の問題: 'x-fd1-001' };
   const text = files.map((f) => readFileSync(new URL(`../dist/assets/${f}`, import.meta.url), 'utf8')).join('\n');
   const found = Object.entries(marks).filter(([, m]) => text.includes(m)).map(([k]) => k);
   check(found.length === 0, `ハンドブック・用語集・説明のページは最初に読まない ${found.join(',')}`);
@@ -336,7 +336,8 @@ async function run(browser, name, width, height) {
   await page.goto(`${BASE}exam/`);
   await page.getByRole('heading', { name: '模擬試験' }).waitFor();
   const answersBefore = await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('kcna.v1') ?? '{}').answers ?? {}).length);
-  check((await page.getByRole('radio', { name: /^(第 [1-3] 回|ランダム)/ }).count()) === 4, `${tag} 模擬試験は第 1〜3 回とランダムから選べる`);
+  check((await page.getByRole('radio', { name: /^(第 [1-5] 回|ランダム)/ }).count()) === 6, `${tag} 模擬試験は第 1〜5 回とランダムから選べる`);
+  check(await page.getByText(/第 4・5 回はレッスンに無い初見の問題/).isVisible(), `${tag} 第 4・5 回は初見の問題と書く`);
   await page.getByRole('button', { name: '第 1 回を始める' }).click();
   check(await page.getByText(/模擬試験 · 1 \/ 60 問/).isVisible(), `${tag} 模擬試験は 60 問`);
   check(await page.getByText(/残り (90:00|89:5\d)/).isVisible(), `${tag} 残り時間が 90 分から始まる`);

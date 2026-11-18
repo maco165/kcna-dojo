@@ -13,7 +13,7 @@ import AppSideNav from '../components/AppSideNav';
 import BottomTabs from '../components/BottomTabs';
 import RepoLink from '../components/RepoLink';
 import SiteLogo from '../components/SiteLogo';
-import { dueQuestions } from '../content';
+import { dueReviewCount } from '../content';
 import { downloadProgress } from '../lib/download';
 import {
   COLOR_MODES,
@@ -216,7 +216,7 @@ export default function Settings(props: Props) {
       <main className="page__section">
         <Body {...props} />
       </main>
-      <BottomTabs current="config" reviewCount={dueQuestions(props.progress, new Date()).length} />
+      <BottomTabs current="config" reviewCount={dueReviewCount(props.progress, new Date())} />
     </div>
   );
 }

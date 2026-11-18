@@ -34,6 +34,21 @@ describe('check-content', { timeout: 30_000 }, () => {
     expect(r.out).toContain('OK');
   });
 
+  it('模擬試験用のファイル (week 0) は、x- で始まる quiz だけを許す', () => {
+    const ok = mutate('exam-ok', (d) => {
+      d.week = 0;
+      d.lessons = d.lessons.filter((l: any) => l.kind === 'quiz').slice(0, 1).map((l: any) => ({ ...l, id: 'x-t', questions: l.questions.map((q: any, i: number) => ({ ...q, id: `x-t-${i}` })) }));
+    });
+    expect(run(ok).code).toBe(0);
+    const ng = mutate('exam-ng', (d) => {
+      d.week = 0;
+    });
+    const r = run(ng);
+    expect(r.code).toBe(1);
+    expect(r.out).toContain('x- で始まる quiz');
+    expect(run(mutate('week-neg', (d) => (d.week = -1))).code).toBe(1);
+  });
+
   it('必須の欄を消すと NG (ファイル名と id を出す)', () => {
     for (const key of ['id', 'type', 'prompt', 'explanation', 'source']) {
       const file = mutate(`no-${key}`, (d) => {

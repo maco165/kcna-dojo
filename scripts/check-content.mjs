@@ -24,7 +24,9 @@ const files = args.length
   : readdirSync(CONTENT_DIR)
       .filter((f) => /^week\d+\.json$/.test(f))
       .sort()
-      .map((f) => join(CONTENT_DIR, f));
+      .map((f) => join(CONTENT_DIR, f))
+      // 模擬試験用の問題 (レッスンに無い初見の問題)。週を持たないので week は 0
+      .concat(readdirSync(join(CONTENT_DIR, 'exam')).filter((f) => f.endsWith('.json')).sort().map((f) => join(CONTENT_DIR, 'exam', f)));
 
 const seenIds = new Map(); // id -> file
 let failed = false;
@@ -64,7 +66,10 @@ for (const file of files) {
     continue;
   }
 
-  if (!Number.isInteger(data.week) || data.week < 1) ng('-', 'week は 1 以上の整数にします');
+  // 模擬試験用のファイル (week 0) は、レッスンの id が x- で始まる 4 択か穴埋めのレッスンだけを持つ
+  const examFile = data.week === 0;
+  if (!Number.isInteger(data.week) || data.week < 0) ng('-', 'week は 1 以上の整数にします (模擬試験用のファイルは 0)');
+  if (examFile) for (const l of data.lessons ?? []) if (!String(l?.id).startsWith('x-') || l?.kind !== 'quiz') ng(l?.id ?? '-', '模擬試験用のファイル (week 0) のレッスンは、id が x- で始まる quiz にします');
   if (!Array.isArray(data.lessons) || data.lessons.length === 0) ng('-', 'lessons がありません');
 
   for (const [li, lesson] of (data.lessons ?? []).entries()) {

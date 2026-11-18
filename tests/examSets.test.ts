@@ -1,16 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { questionBank } from '../src/content';
+import { EXAM_ONLY } from '../src/content/examBank';
 import examSets from '../src/content/examSets.json';
 import { defaultChoice, examSetItems, lastExamOf, recordExam, startExam, validateExamSets, type ExamSet } from '../src/lib/exam';
 import { MAX_EXAM_RECORDS, addExamRecord } from '../src/lib/progress';
 import { emptyProgress, parseProgressText } from '../src/lib/progress';
 
 const SETS = (examSets as { sets: ExamSet[] }).sets;
-const bank = questionBank();
+const bank = [...questionBank(), ...EXAM_ONLY];
 
 describe('模擬試験の決まった回', () => {
-  it('3 回あり、どれも 60 問で配点どおり、実在する問題で、回どうしで重ならない', () => {
-    expect(SETS).toHaveLength(3);
+  it('5 回あり、どれも 60 問で配点どおり、実在する問題で、回どうしで重ならない', () => {
+    expect(SETS).toHaveLength(5);
     expect(validateExamSets(SETS, bank)).toEqual([]);
   });
   it('検査は、重なり・数・配点・知らない問題・番号の飛びを見つける', () => {
@@ -23,9 +24,13 @@ describe('模擬試験の決まった回', () => {
     expect(validateExamSets([{ ...a, questions: a.questions.map((id) => (id === fd ? arch.question.id : id)) }], bank).join()).toMatch(/配点どおりなら/);
     expect(validateExamSets([{ ...a, id: 2 }], bank).join()).toMatch(/1 から順に/);
   });
-  it('どの回にも第 1〜8 週の問題が入る (前半の週に偏らない)', () => {
+  it('第 1〜3 回はどれも第 1〜8 週の問題から (前半の週に偏らない)', () => {
     const weekOf = (id: string) => Number(id.match(/^w(\d+)-/)?.[1]);
-    for (const s of SETS) expect(new Set(s.questions.map(weekOf)).size, `第 ${s.id} 回`).toBe(8);
+    for (const s of SETS.slice(0, 3)) expect(new Set(s.questions.map(weekOf)).size, `第 ${s.id} 回`).toBe(8);
+  });
+  it('第 4・5 回は模擬試験用の初見の問題だけで、初見の問題を全部使う', () => {
+    for (const s of SETS.slice(3)) expect(s.questions.every((id) => id.startsWith('x-')), `第 ${s.id} 回`).toBe(true);
+    expect(SETS.slice(3).flatMap((s) => s.questions).sort()).toEqual(EXAM_ONLY.map((r) => r.question.id).sort());
   });
   it('決まった回は毎回同じ問題で、順番は混ぜる', () => {
     const one = examSetItems(bank, SETS[0], () => 0.3).map((b) => b.question.id);
@@ -67,6 +72,6 @@ describe('模擬試験の決まった回', () => {
     const at = '2026-11-18T00:00:00.000Z';
     expect(defaultChoice([], SETS)).toBe(1);
     expect(defaultChoice([{ at, correct: 1, total: 60, set: 1 }], SETS)).toBe(2);
-    expect(defaultChoice([1, 2, 3].map((set) => ({ at, correct: 1, total: 60, set })), SETS)).toBe('random');
+    expect(defaultChoice([1, 2, 3, 4, 5].map((set) => ({ at, correct: 1, total: 60, set })), SETS)).toBe('random');
   });
 });

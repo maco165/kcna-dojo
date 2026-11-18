@@ -19,7 +19,7 @@ import BottomTabs from '../components/BottomTabs';
 import Feedback from '../components/Feedback';
 import RepoLink from '../components/RepoLink';
 import SiteLogo from '../components/SiteLogo';
-import { dueQuestions, questionBank } from '../content';
+import { dueReviewCount, questionBank } from '../content';
 import type { Domain, Question } from '../content/types';
 import {
   EXAM_MINUTES,
@@ -42,6 +42,7 @@ import {
   type ExamResult,
 } from '../lib/exam';
 import examSets from '../content/examSets.json';
+import { EXAM_ONLY } from '../content/examBank';
 import { normalizeAnswer } from '../lib/grade';
 import type { Progress } from '../lib/progress';
 import { SITE_NAME } from '../lib/site';
@@ -72,12 +73,16 @@ function Frame({ progress, children }: { progress: Progress; children: React.Rea
         <RepoLink />
       </header>
       <main className="page__section">{children}</main>
-      <BottomTabs current="exam" reviewCount={dueQuestions(progress, new Date()).length} />
+      <BottomTabs current="exam" reviewCount={dueReviewCount(progress, new Date())} />
     </div>
   );
 }
 
 const EXAM_SETS = (examSets as { sets: ExamSet[] }).sets;
+/** 決まった回が引く束: レッスンの問題と、模擬試験用の初見の問題 (ランダムはレッスンの問題だけから選ぶ) */
+const setBank = () => [...questionBank(), ...EXAM_ONLY];
+/** 初見の問題だけでできた回 */
+const FRESH_SETS = EXAM_SETS.filter((s) => s.questions.every((id) => id.startsWith('x-'))).map((s) => s.id);
 const choiceName = (c: ExamChoice) => (c === 'random' ? 'ランダム' : `第 ${c} 回`);
 
 /** 選んだ回は ExamScreen が持つ (解き終えて戻っても、選んでいた回のまま) */
@@ -93,7 +98,7 @@ function Intro({ progress, choice: picked, onChoice, onStart }: { progress: Prog
         <Text type="supporting">{SITE_NAME}</Text>
         <h1 className="week-title">模擬試験</h1>
         <Text type="supporting">
-          第 1〜8 週の問題 ({bankSize} 問) から、本番と同じ 4 分野の配点の割合で {EXAM_QUESTIONS} 問を出します。問題が決まっていて互いに重ならない第 1〜{EXAM_SETS.length} 回と、毎回選び直すランダムがあります。時間は {EXAM_MINUTES} 分で、途中では答えを見せず、最後にまとめて採点します。
+          本番と同じ 4 分野の配点の割合で {EXAM_QUESTIONS} 問を出します。問題が決まっていて互いに重ならない第 1〜{EXAM_SETS.length} 回と、毎回選び直すランダムがあります。第 1〜{EXAM_SETS.length - FRESH_SETS.length} 回とランダムは第 1〜8 週の問題 ({bankSize} 問) から、第 {FRESH_SETS.join('・')} 回はレッスンに無い初見の問題から出します。時間は {EXAM_MINUTES} 分で、途中では答えを見せず、最後にまとめて採点します。
         </Text>
       </VStack>
       <Card padding={4}>
@@ -375,7 +380,7 @@ export default function ExamScreen({ progress, updateProgress }: Props) {
 
   const [choice, setChoice] = useState<ExamChoice>(() => defaultChoice(progress.exams, EXAM_SETS));
   const start = (c: ExamChoice) => {
-    const next = startExam(c, EXAM_SETS, questionBank());
+    const next = startExam(c, EXAM_SETS, c === 'random' ? questionBank() : setBank());
     setSet(next.set);
     setItems(next.items);
     setAnswers([]);
