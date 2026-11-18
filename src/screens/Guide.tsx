@@ -30,7 +30,8 @@ import { EXAM_WEIGHTS } from '../lib/exam';
 import { gradeFill } from '../lib/grade';
 import { NEW_ISSUE_URL } from '../lib/links';
 import type { Progress } from '../lib/progress';
-import { aboutHref, glossaryHref, lessonHref, weekHref } from '../lib/route';
+import { aboutHref, glossaryHref, handbookHref, lessonHref, weekHref } from '../lib/route';
+import { topicByCompetency } from '../content/handbook';
 import { SITE_NAME } from '../lib/site';
 import { WIDE_QUERY, useMediaQuery } from '../lib/useMediaQuery';
 
@@ -351,7 +352,9 @@ function Body() {
                   <tbody>
                     {c.competencies.map((x) => (
                       <tr key={x.en}>
-                        <td lang="en">{x.en}</td>
+                        <td lang="en">
+                          {topicByCompetency(x.en) ? <a href={handbookHref(topicByCompetency(x.en)!.id)}>{x.en}</a> : x.en}
+                        </td>
                         <td>{x.ja}</td>
                         <td>
                           {x.weeks.map((w, i) => (

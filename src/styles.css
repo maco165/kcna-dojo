@@ -1521,3 +1521,254 @@ body {
     opacity: 0;
   }
 }
+
+/* ハンドブック (#/handbook) */
+.hb {
+  max-width: 820px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.desk > .hb {
+  padding: var(--spacing-8);
+}
+
+.hb-head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hb-lead {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.hb-muted {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+
+.hb-crumbs {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.hb-crumbs ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.hb-crumbs li + li::before {
+  content: '/';
+  margin-right: 4px;
+}
+
+.hb a {
+  color: var(--color-text-accent);
+}
+
+.hb a.gloss-chip {
+  /* 薄い青の地のチップは濃い青の字 (4.5:1 以上) のまま */
+  color: var(--color-text-blue);
+}
+
+.hb-domain {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hb-domain__head {
+  margin: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.hb-topics,
+.hb-flow,
+.hb-sources {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.hb-topics {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
+  gap: 10px;
+}
+
+.hb .hb-topic {
+  height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  border-radius: var(--radius-container);
+  border: 1px solid var(--color-border);
+  background: var(--color-background-card);
+  color: var(--color-text-primary);
+  text-decoration: none;
+}
+
+.hb .hb-topic:hover {
+  border-color: var(--color-accent);
+}
+
+.hb-topic__en {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.hb-topic__title {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.hb-topic__summary {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.hb-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.hb-h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.hb-flow {
+  counter-reset: hb;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.hb-flow > li {
+  counter-increment: hb;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  column-gap: 10px;
+}
+
+.hb-flow > li::before {
+  content: counter(hb, decimal-leading-zero);
+  font-family: var(--font-family-code, 'SF Mono', Monaco, Consolas, monospace);
+  font-weight: 700;
+  color: var(--color-text-accent);
+  padding-top: 2px;
+}
+
+.hb-step {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.hb-step__text {
+  margin: 0;
+  line-height: 1.7;
+  /* requiredDuringSchedulingIgnoredDuringExecution のような長い識別子でも横にはみ出さない */
+  overflow-wrap: anywhere;
+}
+
+.hb-lead,
+.hb-try > summary,
+.hb-topic__summary {
+  overflow-wrap: anywhere;
+}
+
+.hb-output {
+  margin: 0;
+  border-radius: 8px;
+  border: 1px dashed var(--color-border-emphasized);
+  overflow: hidden;
+}
+
+.hb-output figcaption {
+  padding: 4px 10px;
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  border-bottom: 1px dashed var(--color-border-emphasized);
+}
+
+.hb-output pre {
+  margin: 0;
+  padding: 8px 10px;
+  overflow-x: auto;
+  font-family: var(--font-family-code, 'SF Mono', Monaco, Consolas, monospace);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+}
+
+.hb-try {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-container);
+  background: var(--color-background-card);
+  padding: 0 14px;
+}
+
+.hb-try > summary {
+  cursor: pointer;
+  padding: 12px 0;
+  font-weight: 600;
+}
+
+.hb-try[open] > summary {
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: 12px;
+}
+
+.hb-try > .hb-flow {
+  padding-bottom: 14px;
+}
+
+.hb-sources {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.hb-pager {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border);
+}
+
+.hb-pager a {
+  display: flex;
+  flex-direction: column;
+  max-width: 48%;
+  text-decoration: none;
+}
+
+.hb-pager__next {
+  text-align: right;
+  margin-left: auto;
+}

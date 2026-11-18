@@ -1,0 +1,1077 @@
+{
+  "domain": "Kubernetes Fundamentals",
+  "topics": [
+    {
+      "id": "core-concepts",
+      "competency": "Kubernetes Core Concepts",
+      "title": "Kubernetes の中心の考え方",
+      "summary": "Kubernetes のクラスタは、全体の状態を管理するコントロールプレーンと、コンテナを動かすワーカーノードでできています。人はオブジェクトの spec に望ましい状態を書き、コントローラーが現在の状態 (status) をそれに近づけ続けます。",
+      "flow": [
+        {
+          "text": "クラスタは、コントロールプレーン (クラスタ全体の状態を管理する部品の集まり) と、1 つ以上のワーカーノード (コンテナを実際に動かす機械) で構成されます。まず、クラスタにあるノードを一覧します。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl get nodes -o wide"
+          },
+          "output": "NAME    STATUS   ROLES                  AGE   VERSION        INTERNAL-IP    EXTERNAL-IP   OS-IMAGE             KERNEL-VERSION     CONTAINER-RUNTIME\nk3s-1   Ready    control-plane,master   12d   v1.33.5+k3s1   192.168.1.10   <none>        Ubuntu 24.04.1 LTS   6.8.0-48-generic   containerd://2.1.4-k3s1"
+        },
+        {
+          "text": "コントロールプレーンの主な部品は 4 つです。kube-apiserver は Kubernetes の HTTP API を公開する中心のサーバー、etcd は API サーバーのすべてのデータを保存するキーバリューストア (キーと値の組で保存するデータベース)、kube-scheduler はまだノードが決まっていない Pod をノードに割り当てる部品、kube-controller-manager はコントローラーを動かして API の動作を実装する部品です。kubectl が話しかける API サーバーの住所は cluster-info で分かります。なお、k3s をサーバー 1 台で入れたときは、etcd の代わりに組み込みの SQLite が既定の保存先です (etcd・MySQL・Postgres も選べます)。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl cluster-info"
+          },
+          "output": "Kubernetes control plane is running at https://127.0.0.1:6443\nCoreDNS is running at https://127.0.0.1:6443/api/v1/namespaces/kube-system/services/kube-dns:dns/proxy\nMetrics-server is running at https://127.0.0.1:6443/api/v1/namespaces/kube-system/services/https:metrics-server:https/proxy"
+        },
+        {
+          "text": "各ノードでは、kubelet (Pod のコンテナが動いていることを保証するエージェント)、kube-proxy (ノードのネットワークのルールを保ち Service を実装する部品。入れないこともできます)、コンテナランタイム (コンテナを実際に動かすソフトウェア) が動きます。k3s はコントロールプレーンの部品を 1 つのバイナリの 1 つのプロセスにまとめて動かすので、kube-system に kube-apiserver の Pod は出てきません。出てくるのは CoreDNS や Traefik などの同梱の部品です。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl get pods -n kube-system"
+          },
+          "output": "NAME                                      READY   STATUS      RESTARTS   AGE\ncoredns-ccb96694c-7xk2p                   1/1     Running     0          12d\nlocal-path-provisioner-5cf85fd84d-qm4rb   1/1     Running     0          12d\nmetrics-server-5985cbc9d7-h2l8s           1/1     Running     0          12d\nhelm-install-traefik-crd-8kz5w            0/1     Completed   0          12d\nsvclb-traefik-3f1a2b4c-9wq7d              2/2     Running     0          12d\ntraefik-5d45fc8cc9-rx6tn                  1/1     Running     0          12d"
+        },
+        {
+          "text": "クラスタの中のもの (Pod や Deployment など) は Kubernetes オブジェクトと呼ばれ、ほとんどが spec と status の 2 つの欄を持ちます。spec には人が望ましい状態を書き、status には Kubernetes のシステムとその部品が現在の状態を書きます。YAML のマニフェスト (オブジェクトを書いたファイル) では apiVersion・kind・metadata・spec に値を入れます。次は「nginx の Pod を 2 つ動かしてほしい」という Deployment です。",
+          "code": {
+            "language": "yaml",
+            "text": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web\n  namespace: try-kcna\nspec:\n  replicas: 2\n  selector:\n    matchLabels:\n      app: web\n  template:\n    metadata:\n      labels:\n        app: web\n    spec:\n      containers:\n        - name: nginx\n          image: nginx:1.27-alpine"
+          }
+        },
+        {
+          "text": "コントローラーは、クラスタの状態を見張り、現在の状態を望ましい状態に近づける、終わりの無い制御ループです (設定温度に近づけるサーモスタットにたとえられます)。Deployment を反映すると、Deployment が ReplicaSet を作り、ReplicaSet が Pod を作って数を保ちます。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl apply -f web.yaml\nkubectl get deployment,replicaset,pod -n try-kcna"
+          },
+          "output": "deployment.apps/web created\nNAME                  READY   UP-TO-DATE   AVAILABLE   AGE\ndeployment.apps/web   2/2     2            2           20s\n\nNAME                             DESIRED   CURRENT   READY   AGE\nreplicaset.apps/web-7c9d8b6f5d   2         2         2       20s\n\nNAME                       READY   STATUS    RESTARTS   AGE\npod/web-7c9d8b6f5d-4hx2k   1/1     Running   0          20s\npod/web-7c9d8b6f5d-q8m7n   1/1     Running   0          20s"
+        },
+        {
+          "text": "Pod は Kubernetes で作って管理できる、デプロイできる最小の単位です。1 つ以上のコンテナのまとまりで、中のコンテナは IP アドレスとポートを共有し、localhost で互いに通信できます。Pod は一時的で使い捨ての存在として設計されているので、Pod を直接作ることはめったになく、Deployment などに作らせます。"
+        },
+        {
+          "text": "Namespace (名前空間) は、1 つのクラスタの中のリソースを分ける仕組みです。起動したときから default・kube-system・kube-public・kube-node-lease の 4 つがあります。ラベルはオブジェクトに付けるキーと値の組で、ラベルセレクターで対象をまとめて選べます。選ぶのに使わない情報はアノテーションに書きます。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl get namespaces\nkubectl get pods -n try-kcna -l app=web --show-labels"
+          },
+          "output": "NAME              STATUS   AGE\ndefault           Active   12d\nkube-node-lease   Active   12d\nkube-public       Active   12d\nkube-system       Active   12d\ntry-kcna          Active   1m\nNAME                   READY   STATUS    RESTARTS   AGE   LABELS\nweb-7c9d8b6f5d-4hx2k   1/1     Running   0          1m    app=web,pod-template-hash=7c9d8b6f5d\nweb-7c9d8b6f5d-q8m7n   1/1     Running   0          1m    app=web,pod-template-hash=7c9d8b6f5d"
+        }
+      ],
+      "try": [
+        {
+          "goal": "コントローラーが Pod の数を元に戻すことを確かめたいなら",
+          "steps": [
+            {
+              "text": "試すための名前空間 try-kcna を作ります。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl create namespace try-kcna"
+              },
+              "output": "namespace/try-kcna created"
+            },
+            {
+              "text": "nginx の Pod を 2 つ動かす Deployment web を作り、揃うまで待ちます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl create deployment web --image=nginx:1.27-alpine --replicas=2 -n try-kcna\nkubectl rollout status deployment/web -n try-kcna"
+              },
+              "output": "deployment.apps/web created\ndeployment \"web\" successfully rolled out"
+            },
+            {
+              "text": "Pod を手で消します。少し待ってからもう一度一覧すると、新しい名前の Pod が作られて 2 つに戻っています。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl delete pod -l app=web -n try-kcna\nkubectl get pods -n try-kcna -l app=web"
+              },
+              "output": "pod \"web-6b8f7c5d9-2kq9x\" deleted from try-kcna namespace\npod \"web-6b8f7c5d9-7tz4m\" deleted from try-kcna namespace\nNAME                  READY   STATUS    RESTARTS   AGE\nweb-6b8f7c5d9-h5w2r   1/1     Running   0          6s\nweb-6b8f7c5d9-p9c3l   1/1     Running   0          6s"
+            },
+            {
+              "text": "後片付けとして、名前空間ごと消します。中に作ったものもまとめて消えます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl delete namespace try-kcna"
+              },
+              "output": "namespace \"try-kcna\" deleted"
+            }
+          ]
+        },
+        {
+          "goal": "spec (望ましい状態) と status (現在の状態) の違いを見たいなら",
+          "steps": [
+            {
+              "text": "試すための名前空間 try-kcna を作ります。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl create namespace try-kcna"
+              },
+              "output": "namespace/try-kcna created"
+            },
+            {
+              "text": "Deployment を作り、spec の replicas と status の readyReplicas を並べて出します。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl create deployment web --image=nginx:1.27-alpine --replicas=2 -n try-kcna\nkubectl rollout status deployment/web -n try-kcna\nkubectl get deployment web -n try-kcna -o jsonpath='{.spec.replicas} {.status.readyReplicas}{\"\\n\"}'"
+              },
+              "output": "2 2"
+            },
+            {
+              "text": "spec の replicas を 3 に変えます。直後は status が追いついておらず、少し待つと 3 に揃います。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl scale deployment web --replicas=3 -n try-kcna\nkubectl get deployment web -n try-kcna -o jsonpath='{.spec.replicas} {.status.readyReplicas}{\"\\n\"}'"
+              },
+              "output": "deployment.apps/web scaled\n3 2"
+            },
+            {
+              "text": "status の欄に何があるかは、クラスタが持つ API の説明から調べられます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl explain deployment.status"
+              }
+            },
+            {
+              "text": "後片付けとして、名前空間ごと消します。中に作ったものもまとめて消えます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl delete namespace try-kcna"
+              },
+              "output": "namespace \"try-kcna\" deleted"
+            }
+          ]
+        },
+        {
+          "goal": "どのリソースが Namespace に属するかを確かめたいなら",
+          "steps": [
+            {
+              "text": "試すための名前空間 try-kcna を作ります。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl create namespace try-kcna"
+              },
+              "output": "namespace/try-kcna created"
+            },
+            {
+              "text": "Namespace に属さないリソースを一覧します。Node や PersistentVolume、Namespace そのものが並びます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl api-resources --namespaced=false"
+              },
+              "output": "NAME                SHORTNAMES   APIVERSION   NAMESPACED   KIND\nnamespaces          ns           v1           false        Namespace\nnodes               no           v1           false        Node\npersistentvolumes   pv           v1           false        PersistentVolume\n..."
+            },
+            {
+              "text": "Namespace に属するリソースは、-n で選んだ名前空間の中だけが出ます。作ったばかりの try-kcna には Pod がありません。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl get pods -n try-kcna"
+              },
+              "output": "No resources found in try-kcna namespace."
+            },
+            {
+              "text": "後片付けとして、名前空間ごと消します。中に作ったものもまとめて消えます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl delete namespace try-kcna"
+              },
+              "output": "namespace \"try-kcna\" deleted"
+            }
+          ]
+        }
+      ],
+      "lessons": [
+        "w2-l1",
+        "w2-l2",
+        "w2-l3",
+        "w2-l4",
+        "w3-l1",
+        "w3-l2",
+        "w3-l4"
+      ],
+      "sources": [
+        {
+          "label": "kubernetes.io: Kubernetesのコンポーネント",
+          "url": "https://kubernetes.io/ja/docs/concepts/overview/components/"
+        },
+        {
+          "label": "kubernetes.io: Kubernetesオブジェクトを理解する",
+          "url": "https://kubernetes.io/ja/docs/concepts/overview/working-with-objects/kubernetes-objects/"
+        },
+        {
+          "label": "kubernetes.io: コントローラー",
+          "url": "https://kubernetes.io/ja/docs/concepts/architecture/controller/"
+        },
+        {
+          "label": "kubernetes.io: Pod",
+          "url": "https://kubernetes.io/ja/docs/concepts/workloads/pods/"
+        },
+        {
+          "label": "kubernetes.io: Deployment",
+          "url": "https://kubernetes.io/ja/docs/concepts/workloads/controllers/deployment/"
+        },
+        {
+          "label": "kubernetes.io: Namespace",
+          "url": "https://kubernetes.io/ja/docs/concepts/overview/working-with-objects/namespaces/"
+        },
+        {
+          "label": "kubernetes.io: ラベルとセレクター",
+          "url": "https://kubernetes.io/ja/docs/concepts/overview/working-with-objects/labels/"
+        },
+        {
+          "label": "kubernetes.io: kubectlチートシート",
+          "url": "https://kubernetes.io/ja/docs/reference/kubectl/cheatsheet/"
+        },
+        {
+          "label": "docs.k3s.io: K3s (概要)",
+          "url": "https://docs.k3s.io/"
+        },
+        {
+          "label": "docs.k3s.io: Architecture",
+          "url": "https://docs.k3s.io/architecture"
+        },
+        {
+          "label": "docs.k3s.io: Packaged Components",
+          "url": "https://docs.k3s.io/installation/packaged-components"
+        }
+      ]
+    },
+    {
+      "id": "administration",
+      "competency": "Administration",
+      "title": "クラスタの管理: kubectl・kubeconfig・資源の上限",
+      "summary": "クラスタの管理は、kubectl で API サーバーに頼むことが基本です。kubeconfig のコンテキストで接続先と既定の名前空間を選び、マニフェストを宣言的に反映し、コンテナの requests と limits、名前空間ごとの上限 (ResourceQuota)、Pod の数の自動の増減 (HPA) を設定します。",
+      "flow": [
+        {
+          "text": "kubectl は kubeconfig というファイルで、つなぐクラスタとユーザーの認証を決めます。既定では $HOME/.kube/config を読み、環境変数 KUBECONFIG か --kubeconfig フラグで別のファイルを指せます。k3s は管理者用の kubeconfig を /etc/rancher/k3s/k3s.yaml に書き、k3s に付いてくる kubectl はそれを使います。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl config get-contexts\nkubectl config current-context"
+          },
+          "output": "CURRENT   NAME      CLUSTER   AUTHINFO   NAMESPACE\n*         default   default   default\ndefault"
+        },
+        {
+          "text": "コンテキスト (context) は、cluster・user・namespace の 3 つに名前を付けた組です。kubectl は current-context の組を使って通信するので、use-context で切り替えると、接続先と既定の名前空間が一度に変わります。今のコンテキストの既定の名前空間だけを変えるには set-context --current を使います。試したら default に戻します。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl config use-context default\nkubectl config set-context --current --namespace=try-kcna\n# 試したら default に戻す\nkubectl config set-context --current --namespace=default"
+          },
+          "output": "Switched to context \"default\".\nContext \"default\" modified.\nContext \"default\" modified."
+        },
+        {
+          "text": "オブジェクトの管理の仕方には、命令型コマンド (kubectl create deployment のように引数で指示する)、命令型オブジェクト設定 (kubectl create -f のようにファイルと操作を指定する)、宣言型オブジェクト設定 (kubectl apply -f で、作るか更新するかを kubectl に任せる) の 3 つがあります。1 つのオブジェクトは 1 つのやり方で管理します。混ぜると振る舞いが決まりません。ここでは別の名前にして、同じオブジェクトに両方を使わないようにしています。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl create deployment web-cmd --image=nginx:1.27-alpine -n try-kcna   # 命令型コマンド (web-cmd は命令型だけで扱う)\nkubectl apply -f web.yaml                                                  # 宣言型オブジェクト設定"
+          }
+        },
+        {
+          "text": "宣言型では、反映する前に kubectl diff で、今のクラスタと apply したあとの違いを確かめます。違いがあると diff は終了コード 1 で終わります。ファイルから消したオブジェクトは、--prune を付けない限り apply では消えません。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl diff -f web.yaml\nkubectl apply -f web.yaml"
+          },
+          "output": "-  replicas: 2\n+  replicas: 3\ndeployment.apps/web configured"
+        },
+        {
+          "text": "どこに何を書けばよいかは、kubectl explain でクラスタの API の説明から調べられます。API サーバーが扱えるリソースの種類は kubectl api-resources で一覧できます。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl explain pod.spec.containers.resources\nkubectl api-resources --namespaced=true"
+          }
+        },
+        {
+          "text": "コンテナには requests (確保してほしい量) と limits (使ってよい上限) を書けます。スケジューラーは requests を見て Pod を置くノードを選び、kubelet は limits を守らせます。CPU は 1 個を 1000m (ミリ CPU) で数え、0.1 は 100m と同じです。CPU の limits はスロットリング (使える時間を絞ること) で守らせ、メモリの limits を超えるとカーネルの OOM (メモリ不足) でプロセスが終了させられることがあります。",
+          "code": {
+            "language": "yaml",
+            "text": "    spec:\n      containers:\n        - name: nginx\n          image: nginx:1.27-alpine\n          resources:\n            requests:\n              cpu: 100m\n              memory: 64Mi\n            limits:\n              cpu: 500m\n              memory: 128Mi"
+          }
+        },
+        {
+          "text": "ResourceQuota は、名前空間ごとに使ってよい資源の合計やオブジェクトの数を決める、管理者のための道具です。上限を超える作成や更新は HTTP の 403 FORBIDDEN で断られます。cpu や memory の上限を決めた名前空間では、Pod に requests か limits を書かないと作成を断られることがあります。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl create quota team-quota --hard=pods=5,requests.cpu=1,requests.memory=1Gi -n try-kcna\nkubectl describe quota team-quota -n try-kcna"
+          },
+          "output": "resourcequota/team-quota created\nName:            team-quota\nNamespace:       try-kcna\nResource         Used  Hard\n--------         ----  ----\npods             0     5\nrequests.cpu     0     1\nrequests.memory  0     1Gi"
+        },
+        {
+          "text": "HorizontalPodAutoscaler (HPA) は、メトリクスを見て Deployment などの Pod の数を増減させます。CPU の使用率を目標にするときは、各 Pod のコンテナの requests に対する割合で計算するので、requests を書いておきます。使用量のメトリクスは、ふつう metrics-server が提供します (k3s は同梱しています)。 --cpu は kubectl 1.34 からのフラグです。1.33 以前 (k3s v1.33 に付いてくる kubectl など) では --cpu-percent=50 と書きます。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl autoscale deployment web --min=1 --max=3 --cpu=50% -n try-kcna\nkubectl get hpa -n try-kcna"
+          },
+          "output": "horizontalpodautoscaler.autoscaling/web autoscaled\nNAME   REFERENCE        TARGETS       MINPODS   MAXPODS   REPLICAS   AGE\nweb    Deployment/web   cpu: 0%/50%   1         3         1          90s"
+        }
+      ],
+      "try": [
+        {
+          "goal": "既定の名前空間を切り替えて、-n を省きたいなら",
+          "steps": [
+            {
+              "text": "試すための名前空間 try-kcna を作ります。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl create namespace try-kcna"
+              },
+              "output": "namespace/try-kcna created"
+            },
+            {
+              "text": "今のコンテキストの既定の名前空間を try-kcna にし、効いていることを確かめます。kubeconfig のファイルを書き換えるので、/etc/rancher/k3s/k3s.yaml を直接使っているときは、そのファイルの書き込み権限が要ります (無いと失敗します)。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl config set-context --current --namespace=try-kcna\nkubectl config view --minify -o jsonpath='{..namespace}{\"\\n\"}'\nkubectl get pods"
+              },
+              "output": "Context \"default\" modified.\ntry-kcna\nNo resources found in try-kcna namespace."
+            },
+            {
+              "text": "既定の名前空間を default に戻します。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl config set-context --current --namespace=default"
+              },
+              "output": "Context \"default\" modified."
+            },
+            {
+              "text": "後片付けとして、名前空間ごと消します。中に作ったものもまとめて消えます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl delete namespace try-kcna"
+              },
+              "output": "namespace \"try-kcna\" deleted"
+            }
+          ]
+        },
+        {
+          "goal": "宣言型で、違いを確かめてから反映したいなら",
+          "steps": [
+            {
+              "text": "試すための名前空間 try-kcna を作ります。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl create namespace try-kcna"
+              },
+              "output": "namespace/try-kcna created"
+            },
+            {
+              "text": "Deployment のマニフェストを書いて反映します。",
+              "code": {
+                "language": "bash",
+                "text": "cat > web.yaml <<'EOF'\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web\n  namespace: try-kcna\nspec:\n  replicas: 2\n  selector:\n    matchLabels:\n      app: web\n  template:\n    metadata:\n      labels:\n        app: web\n    spec:\n      containers:\n        - name: nginx\n          image: nginx:1.27-alpine\nEOF\nkubectl apply -f web.yaml"
+              },
+              "output": "deployment.apps/web created"
+            },
+            {
+              "text": "ファイルの replicas を 3 に直し、反映する前に違いを見ます。",
+              "code": {
+                "language": "bash",
+                "text": "sed -i 's/replicas: 2/replicas: 3/' web.yaml\nkubectl diff -f web.yaml"
+              },
+              "output": "-  replicas: 2\n+  replicas: 3"
+            },
+            {
+              "text": "反映すると、変わったところだけが更新されます。もう一度 diff を打つと、違いが無いので何も出ません。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl apply -f web.yaml\nkubectl diff -f web.yaml"
+              },
+              "output": "deployment.apps/web configured"
+            },
+            {
+              "text": "後片付けとして、名前空間とファイルを消します。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl delete namespace try-kcna\nrm web.yaml"
+              },
+              "output": "namespace \"try-kcna\" deleted"
+            }
+          ]
+        },
+        {
+          "goal": "ResourceQuota が作成を止める様子を見たいなら",
+          "steps": [
+            {
+              "text": "試すための名前空間 try-kcna を作ります。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl create namespace try-kcna"
+              },
+              "output": "namespace/try-kcna created"
+            },
+            {
+              "text": "Pod を 2 つまでにする ResourceQuota を作ります。ResourceQuota を作る権限が要ります (無いと Forbidden で失敗します。k3s の管理者用の kubeconfig なら作れます)。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl create quota pod-limit --hard=pods=2 -n try-kcna"
+              },
+              "output": "resourcequota/pod-limit created"
+            },
+            {
+              "text": "Pod を 3 つ求める Deployment を作ります。Pod は 2 つしかできません。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl create deployment web --image=nginx:1.27-alpine --replicas=3 -n try-kcna\nkubectl get pods -n try-kcna"
+              },
+              "output": "deployment.apps/web created\nNAME                  READY   STATUS    RESTARTS   AGE\nweb-6b8f7c5d9-2kq9x   1/1     Running   0          10s\nweb-6b8f7c5d9-7tz4m   1/1     Running   0          10s"
+            },
+            {
+              "text": "上限に達していることと、ReplicaSet が Pod を作れなかった理由 (exceeded quota) をイベントで読みます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl describe quota pod-limit -n try-kcna\nkubectl events -n try-kcna --types=Warning"
+              },
+              "output": "Name:       pod-limit\nNamespace:  try-kcna\nResource    Used  Hard\n--------    ----  ----\npods        2     2\nLAST SEEN   TYPE      REASON         OBJECT                      MESSAGE\n5s          Warning   FailedCreate   ReplicaSet/web-6b8f7c5d9   Error creating: pods \"web-6b8f7c5d9-x7p2q\" is forbidden: exceeded quota: pod-limit, requested: pods=1, used: pods=2, limited: pods=2"
+            },
+            {
+              "text": "後片付けとして、名前空間ごと消します。中に作ったものもまとめて消えます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl delete namespace try-kcna"
+              },
+              "output": "namespace \"try-kcna\" deleted"
+            }
+          ]
+        },
+        {
+          "goal": "HPA を付けて、目標と今の使用率を見たいなら",
+          "steps": [
+            {
+              "text": "試すための名前空間 try-kcna を作ります。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl create namespace try-kcna"
+              },
+              "output": "namespace/try-kcna created"
+            },
+            {
+              "text": "Deployment を作り、CPU の requests を付けます。HPA の使用率は requests に対する割合なので要ります。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl create deployment web --image=nginx:1.27-alpine -n try-kcna\nkubectl set resources deployment web --requests=cpu=100m -n try-kcna"
+              },
+              "output": "deployment.apps/web created\ndeployment.apps/web resource requirements updated"
+            },
+            {
+              "text": "CPU の使用率 50% を目標に、1〜3 個で増減させる HPA を付けます。--cpu は kubectl 1.34 からのフラグです。1.33 以前 (k3s v1.33 に付いてくる kubectl など) では --cpu-percent=50 と書きます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl autoscale deployment web --min=1 --max=3 --cpu=50% -n try-kcna"
+              },
+              "output": "horizontalpodautoscaler.autoscaling/web autoscaled"
+            },
+            {
+              "text": "1〜2 分待って、TARGETS に今の使用率と目標が出ることを確かめます。<unknown> のままなら、メトリクスが取れていません (metrics-server が動いているかを確かめます)。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl get hpa web -n try-kcna"
+              },
+              "output": "NAME   REFERENCE        TARGETS       MINPODS   MAXPODS   REPLICAS   AGE\nweb    Deployment/web   cpu: 0%/50%   1         3         1          2m"
+            },
+            {
+              "text": "後片付けとして、名前空間ごと消します。中に作ったものもまとめて消えます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl delete namespace try-kcna"
+              },
+              "output": "namespace \"try-kcna\" deleted"
+            }
+          ]
+        }
+      ],
+      "lessons": [
+        "w4-l1",
+        "w4-l2",
+        "w2-l3",
+        "w8-l3"
+      ],
+      "sources": [
+        {
+          "label": "kubernetes.io: kubeconfigファイルを使用してクラスターアクセスを組織する",
+          "url": "https://kubernetes.io/ja/docs/concepts/configuration/organize-cluster-access-kubeconfig/"
+        },
+        {
+          "label": "kubernetes.io: 複数のクラスターへのアクセスを設定する",
+          "url": "https://kubernetes.io/ja/docs/tasks/access-application-cluster/configure-access-multiple-clusters/"
+        },
+        {
+          "label": "kubernetes.io: kubectlチートシート",
+          "url": "https://kubernetes.io/ja/docs/reference/kubectl/cheatsheet/"
+        },
+        {
+          "label": "kubernetes.io: kubectl config set-context",
+          "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_config/kubectl_config_set-context/"
+        },
+        {
+          "label": "kubernetes.io: Kubernetesオブジェクト管理",
+          "url": "https://kubernetes.io/ja/docs/concepts/overview/working-with-objects/object-management/"
+        },
+        {
+          "label": "kubernetes.io: Declarative Management of Kubernetes Objects Using Configuration Files",
+          "url": "https://kubernetes.io/docs/tasks/manage-kubernetes-objects/declarative-config/"
+        },
+        {
+          "label": "kubernetes.io: kubectl diff",
+          "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_diff/"
+        },
+        {
+          "label": "kubernetes.io: コンテナのリソース管理",
+          "url": "https://kubernetes.io/ja/docs/concepts/configuration/manage-resources-containers/"
+        },
+        {
+          "label": "kubernetes.io: Resource Management for Pods and Containers",
+          "url": "https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/"
+        },
+        {
+          "label": "kubernetes.io: リソースクォータ",
+          "url": "https://kubernetes.io/ja/docs/concepts/policy/resource-quotas/"
+        },
+        {
+          "label": "kubernetes.io: Resource Quotas",
+          "url": "https://kubernetes.io/docs/concepts/policy/resource-quotas/"
+        },
+        {
+          "label": "kubernetes.io: Horizontal Pod Autoscaling",
+          "url": "https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/"
+        },
+        {
+          "label": "kubernetes.io: kubectl autoscale",
+          "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_autoscale/"
+        },
+        {
+          "label": "docs.k3s.io: Cluster Access",
+          "url": "https://docs.k3s.io/cluster-access"
+        },
+        {
+          "label": "docs.k3s.io: Packaged Components",
+          "url": "https://docs.k3s.io/installation/packaged-components"
+        }
+      ]
+    },
+    {
+      "id": "scheduling",
+      "competency": "Scheduling",
+      "title": "スケジューリング: Pod を置くノードの決まり方",
+      "summary": "kube-scheduler は、ノードがまだ決まっていない Pod を見つけ、フィルタリングで置けるノードに絞り、スコアリングで点を付けて最も高いノードに割り当てます。requests・nodeSelector・Node affinity・taint と toleration で、置き場所の条件を変えられます。",
+      "flow": [
+        {
+          "text": "kube-scheduler は、まだノードに割り当てられていない Pod を見つけ、それぞれの Pod に合うノードを選びます。どのノードに置かれたかは -o wide の NODE の列で分かります。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl get pods -n try-kcna -o wide"
+          },
+          "output": "NAME                   READY   STATUS    RESTARTS   AGE   IP           NODE    NOMINATED NODE   READINESS GATES\nweb-7c9d8b6f5d-4hx2k   1/1     Running   0          30s   10.42.0.15   k3s-1   <none>           <none>"
+        },
+        {
+          "text": "選び方は 2 段です。まずフィルタリングで、Pod を置けるノードに絞ります。たとえば、Pod の requests (確保してほしい資源の量) を満たす空きがあるかを調べます。候補が 1 つも残らなければ、その Pod はスケジュールできず Pending のまま待ちます。理由は describe の Events の FailedScheduling に出ます。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl describe pod big -n try-kcna"
+          },
+          "output": "Events:\n  Type     Reason            Age   From               Message\n  ----     ------            ----  ----               -------\n  Warning  FailedScheduling  10s   default-scheduler  0/1 nodes are available: 1 Insufficient cpu. preemption: 0/1 nodes are available: 1 No preemption victims found for incoming pod."
+        },
+        {
+          "text": "次にスコアリングで、フィルタリングで残った各ノードに点を付けて順位を決め、最も高いノードに Pod を割り当てます。同じ点のノードが複数あれば、その中からランダムに 1 つ選びます。"
+        },
+        {
+          "text": "ノードにもラベルが付いていて、kubernetes.io/hostname や kubernetes.io/os のように kubelet が付ける標準のラベルもあります。nodeSelector に書いたラベルをすべて持つノードにだけ、Pod は置かれます。ノードにラベルを付けるのは kubectl label です。",
+          "code": {
+            "language": "yaml",
+            "text": "apiVersion: v1\nkind: Pod\nmetadata:\n  name: on-ssd\n  namespace: try-kcna\nspec:\n  nodeSelector:\n    disktype: ssd\n  containers:\n    - name: nginx\n      image: nginx:1.27-alpine"
+          }
+        },
+        {
+          "text": "Node affinity は nodeSelector より細かく書けます。requiredDuringSchedulingIgnoredDuringExecution は満たさない限り置かず、preferredDuringSchedulingIgnoredDuringExecution は合うノードを探しますが、無くても他のノードに置きます (weight に 1〜100 で好みの強さを付けます)。IgnoredDuringExecution は、置いたあとにノードのラベルが変わっても Pod は動き続けるという意味です。",
+          "code": {
+            "language": "yaml",
+            "text": "spec:\n  affinity:\n    nodeAffinity:\n      requiredDuringSchedulingIgnoredDuringExecution:\n        nodeSelectorTerms:\n          - matchExpressions:\n              - key: kubernetes.io/os\n                operator: In\n                values:\n                  - linux\n      preferredDuringSchedulingIgnoredDuringExecution:\n        - weight: 1\n          preference:\n            matchExpressions:\n              - key: disktype\n                operator: In\n                values:\n                  - ssd"
+          }
+        },
+        {
+          "text": "taint はノードに付けて合わない Pod を退ける印で、toleration は Pod に付けて「その taint があっても構わない」と示す設定です。effect (効果) は 3 つあり、NoSchedule は合う toleration の無い Pod を置かず、PreferNoSchedule はできるだけ置かないようにし、NoExecute は置かないことに加えて動いている Pod も追い出します。toleration は合う taint のノードへの配置を認めるだけで、そこへ必ず置かれるとは限りません。",
+          "code": {
+            "language": "yaml",
+            "text": "spec:\n  tolerations:\n    - key: dedicated\n      operator: Equal\n      value: gpu\n      effect: NoSchedule"
+          }
+        },
+        {
+          "text": "operator を省くと Equal になり、value まで同じときだけ合致します。Exists はキーと効果が合えば値を問わず合致し、value は書きません。ノードの taint は describe で見られます。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl describe node | grep -i taints"
+          },
+          "output": "Taints:             <none>"
+        },
+        {
+          "text": "Pod の spec の nodeName に値が入っていると、スケジューラーはその Pod を扱わず、指定したノードの kubelet が Pod を受け持ちます。スケジューラーを通さない高度な使い方のためのもので、ふつうは nodeSelector や Node affinity を使います。"
+        }
+      ],
+      "try": [
+        {
+          "goal": "Pending の理由 (FailedScheduling) を読みたいなら",
+          "steps": [
+            {
+              "text": "試すための名前空間 try-kcna を作ります。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl create namespace try-kcna"
+              },
+              "output": "namespace/try-kcna created"
+            },
+            {
+              "text": "どのノードにも収まらない大きな CPU の requests (100 個分) を持つ Pod を作ります。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl apply -f - <<'EOF'\napiVersion: v1\nkind: Pod\nmetadata:\n  name: big\n  namespace: try-kcna\nspec:\n  containers:\n    - name: nginx\n      image: nginx:1.27-alpine\n      resources:\n        requests:\n          cpu: \"100\"\nEOF"
+              },
+              "output": "pod/big created"
+            },
+            {
+              "text": "STATUS が Pending のままで、NODE が <none> (どこにも置かれていない) ことを確かめます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl get pod big -n try-kcna -o wide"
+              },
+              "output": "NAME   READY   STATUS    RESTARTS   AGE   IP       NODE     NOMINATED NODE   READINESS GATES\nbig    0/1     Pending   0          15s   <none>   <none>   <none>           <none>"
+            },
+            {
+              "text": "Events の FailedScheduling に Insufficient cpu が出ていることを読みます (フィルタリングで全部のノードが外れました)。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl describe pod big -n try-kcna"
+              },
+              "output": "  Warning  FailedScheduling  20s  default-scheduler  0/1 nodes are available: 1 Insufficient cpu. ..."
+            },
+            {
+              "text": "後片付けとして、名前空間ごと消します。中に作ったものもまとめて消えます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl delete namespace try-kcna"
+              },
+              "output": "namespace \"try-kcna\" deleted"
+            }
+          ]
+        },
+        {
+          "goal": "nodeSelector でノードを選ばせたいなら",
+          "steps": [
+            {
+              "text": "試すための名前空間 try-kcna を作ります。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl create namespace try-kcna"
+              },
+              "output": "namespace/try-kcna created"
+            },
+            {
+              "text": "ノードに disktype のラベルがまだ無いことを確かめます。DISKTYPE の列に値があるときは、この試しをしないでください (外す手順で元のラベルまで消えます)。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl get nodes -L disktype"
+              },
+              "output": "NAME    STATUS   ROLES                  AGE   VERSION        DISKTYPE\nk3s-1   Ready    control-plane,master   12d   v1.33.5+k3s1   "
+            },
+            {
+              "text": "ラベル disktype=ssd のノードにだけ置く Pod を作ります。(前の手順で確かめたとおり) どのノードにもそのラベルが無いので Pending になります。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl apply -f - <<'EOF'\napiVersion: v1\nkind: Pod\nmetadata:\n  name: on-ssd\n  namespace: try-kcna\nspec:\n  nodeSelector:\n    disktype: ssd\n  containers:\n    - name: nginx\n      image: nginx:1.27-alpine\nEOF\nkubectl get pod on-ssd -n try-kcna"
+              },
+              "output": "pod/on-ssd created\nNAME     READY   STATUS    RESTARTS   AGE\non-ssd   0/1     Pending   0          5s"
+            },
+            {
+              "text": "理由を読むと、ノードがセレクターに合わなかったことが分かります。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl describe pod on-ssd -n try-kcna | tail -n 3"
+              },
+              "output": "  Warning  FailedScheduling  10s  default-scheduler  0/1 nodes are available: 1 node(s) didn't match Pod's node affinity/selector. ..."
+            },
+            {
+              "text": "ノードにラベル disktype=ssd を付けると、Pod が置かれて Running になります。ノードを変える権限が要ります (無いと Forbidden で失敗します)。ノードのラベルはクラスタ全体で共有される設定なので、最後の手順で必ず外します。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl label nodes \"$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}')\" disktype=ssd\nkubectl get pod on-ssd -n try-kcna -o wide"
+              },
+              "output": "node/k3s-1 labeled\nNAME     READY   STATUS    RESTARTS   AGE   IP           NODE    NOMINATED NODE   READINESS GATES\non-ssd   1/1     Running   0          40s   10.42.0.21   k3s-1   <none>           <none>"
+            },
+            {
+              "text": "ノードに付けたラベルを外します (キーの後ろに - を付けます)。動いている Pod はそのまま動き続けます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl label nodes \"$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}')\" disktype-"
+              },
+              "output": "node/k3s-1 unlabeled"
+            },
+            {
+              "text": "後片付けとして、名前空間ごと消します。中に作ったものもまとめて消えます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl delete namespace try-kcna"
+              },
+              "output": "namespace \"try-kcna\" deleted"
+            }
+          ]
+        },
+        {
+          "goal": "「できれば」の Node affinity は、合うノードが無くても置かれることを確かめたいなら",
+          "steps": [
+            {
+              "text": "試すための名前空間 try-kcna を作ります。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl create namespace try-kcna"
+              },
+              "output": "namespace/try-kcna created"
+            },
+            {
+              "text": "ノードに disktype のラベルがまだ無いことを確かめます。DISKTYPE の列に値があるときは、この試しをしないでください (外す手順で元のラベルまで消えます)。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl get nodes -L disktype"
+              },
+              "output": "NAME    STATUS   ROLES                  AGE   VERSION        DISKTYPE\nk3s-1   Ready    control-plane,master   12d   v1.33.5+k3s1   "
+            },
+            {
+              "text": "どのノードにも無いラベル disktype=ssd を「できれば」の条件にした Pod を作ります。合うノードが無くても、他のノードに置かれて Running になります。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl apply -f - <<'EOF'\napiVersion: v1\nkind: Pod\nmetadata:\n  name: prefer-ssd\n  namespace: try-kcna\nspec:\n  affinity:\n    nodeAffinity:\n      preferredDuringSchedulingIgnoredDuringExecution:\n        - weight: 1\n          preference:\n            matchExpressions:\n              - key: disktype\n                operator: In\n                values:\n                  - ssd\n  containers:\n    - name: nginx\n      image: nginx:1.27-alpine\nEOF\nkubectl get pod prefer-ssd -n try-kcna -o wide"
+              },
+              "output": "pod/prefer-ssd created\nNAME         READY   STATUS    RESTARTS   AGE   IP           NODE    NOMINATED NODE   READINESS GATES\nprefer-ssd   1/1     Running   0          8s    10.42.0.22   k3s-1   <none>           <none>"
+            },
+            {
+              "text": "同じ条件を required (必須) にすると、合うノードが無いので Pending のままになります。違いを見比べます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl apply -f - <<'EOF'\napiVersion: v1\nkind: Pod\nmetadata:\n  name: require-ssd\n  namespace: try-kcna\nspec:\n  affinity:\n    nodeAffinity:\n      requiredDuringSchedulingIgnoredDuringExecution:\n        nodeSelectorTerms:\n          - matchExpressions:\n              - key: disktype\n                operator: In\n                values:\n                  - ssd\n  containers:\n    - name: nginx\n      image: nginx:1.27-alpine\nEOF\nkubectl get pods -n try-kcna"
+              },
+              "output": "pod/require-ssd created\nNAME          READY   STATUS    RESTARTS   AGE\nprefer-ssd    1/1     Running   0          1m\nrequire-ssd   0/1     Pending   0          5s"
+            },
+            {
+              "text": "後片付けとして、名前空間ごと消します。中に作ったものもまとめて消えます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl delete namespace try-kcna"
+              },
+              "output": "namespace \"try-kcna\" deleted"
+            }
+          ]
+        }
+      ],
+      "lessons": [
+        "w4-l2",
+        "w4-l3",
+        "w4-l4"
+      ],
+      "sources": [
+        {
+          "label": "kubernetes.io: Kubernetesのスケジューラー",
+          "url": "https://kubernetes.io/ja/docs/concepts/scheduling-eviction/kube-scheduler/"
+        },
+        {
+          "label": "kubernetes.io: ノード上へのPodのスケジューリング",
+          "url": "https://kubernetes.io/ja/docs/concepts/scheduling-eviction/assign-pod-node/"
+        },
+        {
+          "label": "kubernetes.io: Taintとtoleration",
+          "url": "https://kubernetes.io/ja/docs/concepts/scheduling-eviction/taint-and-toleration/"
+        },
+        {
+          "label": "kubernetes.io: コンテナのリソース管理",
+          "url": "https://kubernetes.io/ja/docs/concepts/configuration/manage-resources-containers/"
+        },
+        {
+          "label": "kubernetes.io: Well-Known Labels, Annotations and Taints",
+          "url": "https://kubernetes.io/docs/reference/labels-annotations-taints/"
+        },
+        {
+          "label": "kubernetes.io: Kubernetesのコンポーネント",
+          "url": "https://kubernetes.io/ja/docs/concepts/overview/components/"
+        }
+      ]
+    },
+    {
+      "id": "containerization",
+      "competency": "Containerization",
+      "title": "コンテナ化: イメージ・ランタイム・CRI",
+      "summary": "コンテナは、アプリと動かすのに要るものをイメージにまとめ、ホストの OS を共有しながら分けて動かす仕組みです。Kubernetes では kubelet が CRI という接続口でコンテナランタイム (k3s では同梱の containerd) に頼んでコンテナを動かし、イメージの形と動かし方は OCI の仕様で標準化されています。",
+      "flow": [
+        {
+          "text": "仮想マシン (VM) は、仮想のハードウェアの上で OS を含めた全部を動かす、完全な 1 台の機械です。コンテナは VM と似ていますが、アプリどうしで OS を共有する、緩めの分離です。そのため軽く、どのクラウドや OS でも同じように動かしやすくなります。"
+        },
+        {
+          "text": "コンテナイメージは、すぐに動かせるソフトウェアの包みで、コード・ランタイム・ライブラリ・設定の既定値など、アプリを動かすのに要るものをすべて含みます。コンテナは不変 (immutable) に作られていて、動いているコンテナのコードは変えられません。変えるときは新しいイメージを作り、コンテナを作り直します。"
+        },
+        {
+          "text": "イメージは Dockerfile から作ります。Dockerfile の命令は、それぞれ最終的なイメージの層 (レイヤー) になり、層は前の層の上に積み重なります。ある層が変わると、その層と後ろの層はすべて作り直されます。キャッシュが効くのは、変わった層より前の層です。",
+          "code": {
+            "language": "bash",
+            "text": "cat > index.html <<'EOF'\n<h1>hello from try-kcna</h1>\nEOF\ncat > Dockerfile <<'EOF'\nFROM nginx:1.27-alpine\nCOPY index.html /usr/share/nginx/html/index.html\nEOF\ndocker build -t hello:0.1 ."
+          },
+          "output": "[+] Building 3.2s (7/7) FINISHED\n => [1/2] FROM docker.io/library/nginx:1.27-alpine\n => [2/2] COPY index.html /usr/share/nginx/html/index.html\n => naming to docker.io/library/hello:0.1"
+        },
+        {
+          "text": "イメージは レジストリ/名前:タグ の形で指します。タグを省くと latest として扱われ、レジストリを省くと Docker の公開レジストリになります (nginx は docker.io/library/nginx と同じです)。latest は中身が変わりうるので本番では避け、v1.42.0 のような意味のあるタグか、ダイジェスト (sha256:... の一意の識別子) を書きます。",
+          "code": {
+            "language": "yaml",
+            "text": "containers:\n  - name: web\n    image: nginx:1.27-alpine          # タグで指す\n  - name: pinned\n    image: nginx@sha256:<ダイジェスト>  # ダイジェストで指す (中身が変わらない)"
+          }
+        },
+        {
+          "text": "imagePullPolicy (イメージを取りに行く決まり) は 3 つあります。IfNotPresent はノードに無いときだけ取り、Always は起動のたびにレジストリに問い合わせ、Never は取りに行きません。省いたときは、ダイジェストで指したなら IfNotPresent、タグが latest か、タグもダイジェストも無いなら Always、それ以外のタグなら IfNotPresent が入ります。"
+        },
+        {
+          "text": "OCI (Open Container Initiative) は、コンテナの形式とランタイムの業界標準を作る団体で、ランタイムの仕様 (runtime-spec)・イメージの仕様 (image-spec)・配布の仕様 (distribution-spec) の 3 つを定めています。"
+        },
+        {
+          "text": "CRI (Container Runtime Interface) は、kubelet とコンテナランタイムがやりとりする主な gRPC のプロトコルで、kubelet はランタイムに接続するクライアントになります。CRI に対応した containerd や CRI-O などを使えます。v1.24 より前の Kubernetes には、Docker Engine と直接つなぐ dockershim という部品が入っていましたが、今は Kubernetes の一部ではありません。各ノードのランタイムは -o wide の CONTAINER-RUNTIME の列で分かります。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl get nodes -o wide"
+          },
+          "output": "NAME    STATUS   ROLES                  AGE   VERSION        INTERNAL-IP    EXTERNAL-IP   OS-IMAGE             KERNEL-VERSION     CONTAINER-RUNTIME\nk3s-1   Ready    control-plane,master   12d   v1.33.5+k3s1   192.168.1.10   <none>        Ubuntu 24.04.1 LTS   6.8.0-48-generic   containerd://2.1.4-k3s1"
+        },
+        {
+          "text": "k3s は containerd を同梱して CRI のランタイムとして使います。ノードの上では、CRI でランタイムを見る道具 crictl を k3s crictl として、containerd を直接扱う道具 ctr を k3s ctr として使えます。どちらもノードに入って root の権限で打ちます。",
+          "code": {
+            "language": "bash",
+            "text": "sudo k3s crictl ps\nsudo k3s crictl images"
+          },
+          "output": "CONTAINER      IMAGE          CREATED       STATE     NAME      ATTEMPT   POD ID         POD                       NAMESPACE\n3f9c1e2a7b4d   4b9fb5f8a2c1   2 hours ago   Running   coredns   0         9a8b7c6d5e4f   coredns-ccb96694c-7xk2p   kube-system\nIMAGE                          TAG           IMAGE ID        SIZE\ndocker.io/library/nginx        1.27-alpine   1ff6c18fbef2    20.5MB"
+        }
+      ],
+      "try": [
+        {
+          "goal": "Pod のコンテナがノードのランタイムで動いていることを確かめたいなら",
+          "steps": [
+            {
+              "text": "試すための名前空間 try-kcna を作ります。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl create namespace try-kcna"
+              },
+              "output": "namespace/try-kcna created"
+            },
+            {
+              "text": "Pod を 1 つ作ります。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl run web --image=nginx:1.27-alpine -n try-kcna\nkubectl wait --for=condition=Ready pod/web -n try-kcna --timeout=120s"
+              },
+              "output": "pod/web created\npod/web condition met"
+            },
+            {
+              "text": "ノードのランタイムの名前と版を出します。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl get nodes -o jsonpath='{.items[*].status.nodeInfo.containerRuntimeVersion}{\"\\n\"}'"
+              },
+              "output": "containerd://2.0.5-k3s2"
+            },
+            {
+              "text": "ノードに入り、CRI の道具で同じ Pod を見ます。kubectl run はラベル run=web を付けるので、それで絞ります。NAMESPACE の列が try-kcna になっています。root の権限が要ります (ノードに入れないときは、この手順はできません)。",
+              "code": {
+                "language": "bash",
+                "text": "sudo k3s crictl pods --label run=web"
+              },
+              "output": "POD ID          CREATED          STATE   NAME   NAMESPACE   ATTEMPT   RUNTIME\n5c4b3a2d1e0f9   30 seconds ago   Ready   web    try-kcna    0         (default)"
+            },
+            {
+              "text": "後片付けとして、名前空間ごと消します。中に作ったものもまとめて消えます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl delete namespace try-kcna"
+              },
+              "output": "namespace \"try-kcna\" deleted"
+            }
+          ]
+        },
+        {
+          "goal": "タグとダイジェストの違いを確かめたいなら",
+          "steps": [
+            {
+              "text": "試すための名前空間 try-kcna を作ります。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl create namespace try-kcna"
+              },
+              "output": "namespace/try-kcna created"
+            },
+            {
+              "text": "タグで指した Pod を作り、実際に動いているイメージのダイジェストを読みます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl run web --image=nginx:1.27-alpine -n try-kcna\nkubectl wait --for=condition=Ready pod/web -n try-kcna --timeout=120s\nkubectl get pod web -n try-kcna -o jsonpath='{.status.containerStatuses[0].imageID}{\"\\n\"}'"
+              },
+              "output": "pod/web created\npod/web condition met\ndocker.io/library/nginx@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10"
+            },
+            {
+              "text": "タグを書いた Pod の imagePullPolicy は IfNotPresent になっていることを確かめます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl get pod web -n try-kcna -o jsonpath='{.spec.containers[0].imagePullPolicy}{\"\\n\"}'"
+              },
+              "output": "IfNotPresent"
+            },
+            {
+              "text": "読んだダイジェストで指した Pod を作ります。タグがあとで別の中身を指すようになっても、この Pod は同じ中身で動きます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl run pinned --image=\"$(kubectl get pod web -n try-kcna -o jsonpath='{.status.containerStatuses[0].imageID}')\" -n try-kcna\nkubectl get pod pinned -n try-kcna -o jsonpath='{.spec.containers[0].image}{\"\\n\"}'"
+              },
+              "output": "pod/pinned created\ndocker.io/library/nginx@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10"
+            },
+            {
+              "text": "後片付けとして、名前空間ごと消します。中に作ったものもまとめて消えます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl delete namespace try-kcna"
+              },
+              "output": "namespace \"try-kcna\" deleted"
+            }
+          ]
+        },
+        {
+          "goal": "imagePullPolicy: Never の振る舞いを確かめたいなら",
+          "steps": [
+            {
+              "text": "試すための名前空間 try-kcna を作ります。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl create namespace try-kcna"
+              },
+              "output": "namespace/try-kcna created"
+            },
+            {
+              "text": "ノードに無いイメージを、取りに行かない決まりで動かします。kubelet は取りに行かないので、コンテナは起動できません。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl run never --image=nginx:1.26.3-alpine --image-pull-policy=Never -n try-kcna\nkubectl get pod never -n try-kcna"
+              },
+              "output": "pod/never created\nNAME    READY   STATUS              RESTARTS   AGE\nnever   0/1     ErrImageNeverPull   0          10s"
+            },
+            {
+              "text": "理由をイベントで読みます。そのノードに前から nginx:1.26.3-alpine があるときは、そのまま Running になります。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl events --for pod/never -n try-kcna"
+              },
+              "output": "LAST SEEN   TYPE      REASON              OBJECT      MESSAGE\n5s          Warning   ErrImageNeverPull   Pod/never   Container image \"nginx:1.26.3-alpine\" is not present with pull policy of Never"
+            },
+            {
+              "text": "後片付けとして、名前空間ごと消します。中に作ったものもまとめて消えます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl delete namespace try-kcna"
+              },
+              "output": "namespace \"try-kcna\" deleted"
+            }
+          ]
+        },
+        {
+          "goal": "自分で作ったイメージを k3s で動かしたいなら (ノードに Docker が要ります)",
+          "steps": [
+            {
+              "text": "試すための名前空間 try-kcna を作ります。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl create namespace try-kcna"
+              },
+              "output": "namespace/try-kcna created"
+            },
+            {
+              "text": "k3s のノードで、index.html と Dockerfile を作り、イメージを作ります。",
+              "code": {
+                "language": "bash",
+                "text": "cat > index.html <<'EOF'\n<h1>hello from try-kcna</h1>\nEOF\ncat > Dockerfile <<'EOF'\nFROM nginx:1.27-alpine\nCOPY index.html /usr/share/nginx/html/index.html\nEOF\ndocker build -t hello:0.1 ."
+              },
+              "output": "=> naming to docker.io/library/hello:0.1"
+            },
+            {
+              "text": "Docker と k3s の containerd はイメージの置き場所が別なので、書き出して取り込みます。root の権限が要ります。イメージはこのノードにだけ入ります。",
+              "code": {
+                "language": "bash",
+                "text": "docker save hello:0.1 | sudo k3s ctr images import -\nsudo k3s crictl images | grep hello"
+              },
+              "output": "docker.io/library/hello   0.1   5e8f2a1b3c4d   20.6MB"
+            },
+            {
+              "text": "レジストリへ取りに行かせず (Never)、取り込んだイメージで Pod を動かします。1 ノードのクラスタなので、取り込んだノードに置かれます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl run hello --image=hello:0.1 --image-pull-policy=Never -n try-kcna\nkubectl get pod hello -n try-kcna -o wide"
+              },
+              "output": "pod/hello created\nNAME    READY   STATUS    RESTARTS   AGE   IP           NODE    NOMINATED NODE   READINESS GATES\nhello   1/1     Running   0          5s    10.42.0.30   k3s-1   <none>           <none>"
+            },
+            {
+              "text": "後片付けとして、名前空間、取り込んだイメージ (containerd と Docker の両方)、作業のファイルを消します。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl delete namespace try-kcna\nsudo k3s crictl rmi docker.io/library/hello:0.1\ndocker rmi hello:0.1\nrm index.html Dockerfile"
+              },
+              "output": "namespace \"try-kcna\" deleted"
+            }
+          ]
+        }
+      ],
+      "lessons": [
+        "w1-l1",
+        "w1-l2",
+        "w1-l3",
+        "w1-l4"
+      ],
+      "sources": [
+        {
+          "label": "kubernetes.io: Kubernetesとは何か",
+          "url": "https://kubernetes.io/ja/docs/concepts/overview/"
+        },
+        {
+          "label": "kubernetes.io: コンテナ",
+          "url": "https://kubernetes.io/ja/docs/concepts/containers/"
+        },
+        {
+          "label": "kubernetes.io: イメージ",
+          "url": "https://kubernetes.io/ja/docs/concepts/containers/images/"
+        },
+        {
+          "label": "kubernetes.io: Container Runtime Interface (CRI)",
+          "url": "https://kubernetes.io/docs/concepts/containers/cri/"
+        },
+        {
+          "label": "kubernetes.io: コンテナランタイム",
+          "url": "https://kubernetes.io/ja/docs/setup/production-environment/container-runtimes/"
+        },
+        {
+          "label": "kubernetes.io: Container Runtimes",
+          "url": "https://kubernetes.io/docs/setup/production-environment/container-runtimes/"
+        },
+        {
+          "label": "opencontainers.org: Open Container Initiative",
+          "url": "https://opencontainers.org/"
+        },
+        {
+          "label": "docs.docker.com: Docker build cache",
+          "url": "https://docs.docker.com/build/cache/"
+        },
+        {
+          "label": "docs.docker.com: Dockerfile reference",
+          "url": "https://docs.docker.com/reference/dockerfile/"
+        },
+        {
+          "label": "docs.k3s.io: K3s (概要)",
+          "url": "https://docs.k3s.io/"
+        },
+        {
+          "label": "docs.k3s.io: CLI Tools",
+          "url": "https://docs.k3s.io/cli"
+        },
+        {
+          "label": "kubernetes.io: crictlによるKubernetesノードのデバッグ",
+          "url": "https://kubernetes.io/ja/docs/tasks/debug/debug-cluster/crictl/"
+        },
+        {
+          "label": "docs.k3s.io: Import Images",
+          "url": "https://docs.k3s.io/add-ons/import-images"
+        }
+      ]
+    }
+  ]
+}

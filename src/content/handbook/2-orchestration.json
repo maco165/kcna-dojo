@@ -1,0 +1,973 @@
+{
+  "domain": "Container Orchestration",
+  "topics": [
+    {
+      "id": "networking",
+      "competency": "Networking",
+      "title": "ネットワーク: Pod・Service・DNS・入口・NetworkPolicy",
+      "summary": "Kubernetes では Pod ごとにクラスタ全体で一意の IP が付き、Pod どうしは NAT (アドレス変換) なしで直接通信できます。Pod は作り直されると IP が変わるので、Service が変わらない名前と IP を与え、DNS でその名前を引けるようにします。外からの入口には NodePort・LoadBalancer・Ingress・Gateway API があり、NetworkPolicy で Pod に届く通信を絞れます。",
+      "flow": [
+        {
+          "text": "Kubernetes のネットワークモデルでは、クラスタの中の各 Pod がクラスタ全体で一意の IP アドレスを持ちます。同じ Pod の中のコンテナはネットワーク名前空間を共有するので、localhost で通信できます。Pod どうしは、同じノードでも別のノードでも、プロキシや NAT を使わずに直接通信できます。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl get pods -o wide"
+          },
+          "output": "NAME                   READY   STATUS    RESTARTS   AGE   IP           NODE\nweb-6d4cf56db6-7xk2p   1/1     Running   0          1m    10.42.0.15   node1\nweb-6d4cf56db6-q9m4r   1/1     Running   0          1m    10.42.0.16   node1"
+        },
+        {
+          "text": "このモデルを実際に組むのは、各ノードのコンテナランタイムが使う CNI (Container Network Interface) プラグインです。CNI はコンテナのネットワークの接続を受け持つプラグインの仕様で、さまざまな製品があります。k3s は Flannel という CNI プラグインを使い、--flannel-backend=none で外して別の CNI プラグインに替えることもできます。"
+        },
+        {
+          "text": "Pod は一時的なもので、作り直されると別の IP になります。Service は、selector (ラベルの条件) に合う Pod の集まりに、変わらない名前と仮想の IP を与えます。port は Service が受けるポート、targetPort は転送先の Pod のポートで、targetPort を書かなければ port と同じ値になります。type を書かないと、クラスタの中からだけ届く ClusterIP になります。",
+          "code": {
+            "language": "yaml",
+            "text": "apiVersion: v1\nkind: Service\nmetadata:\n  name: web\nspec:\n  selector:\n    app: web\n  ports:\n    - protocol: TCP\n      port: 80\n      targetPort: 8080"
+          }
+        },
+        {
+          "text": "Service の selector に合う Pod の IP は、コントロールプレーンが EndpointSlice という資源に書き出します。EndpointSlice には kubernetes.io/service-name のラベルで元の Service の名前が付くので、ラベルで引けます。各ノードの kube-proxy などのサービスプロキシが Service と EndpointSlice を見て、Service の IP あての通信を Pod へ届けます。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl get endpointslices -l kubernetes.io/service-name=web"
+          },
+          "output": "NAME        ADDRESSTYPE   PORTS   ENDPOINTS               AGE\nweb-8k2zq   IPv4          8080    10.42.0.15,10.42.0.16   2m"
+        },
+        {
+          "text": "Service の名前は DNS で引けます。形は <Service 名>.<名前空間>.svc.<クラスタのドメイン> です。kubelet が各 Pod の /etc/resolv.conf に自分の名前空間を含む search (検索ドメイン) を書くので、同じ名前空間の Service は短い名前だけでも引けます。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl exec deploy/web -- cat /etc/resolv.conf"
+          },
+          "output": "search default.svc.cluster.local svc.cluster.local cluster.local\nnameserver 10.43.0.10\noptions ndots:5"
+        },
+        {
+          "text": "クラスタの外に出す方法はいくつかあります。NodePort は、すべてのノードの同じポート (既定の範囲は 30000-32767) で Service を受けます。LoadBalancer は、外部のロードバランサーを用意する仕組みと組み合わせて使います。k3s は ServiceLB という、ノードのポートを使うロードバランサーを同梱しています。",
+          "code": {
+            "language": "yaml",
+            "text": "apiVersion: v1\nkind: Service\nmetadata:\n  name: web-nodeport\nspec:\n  type: NodePort\n  selector:\n    app: web\n  ports:\n    - port: 80\n      targetPort: 8080"
+          }
+        },
+        {
+          "text": "Ingress は、HTTP と HTTPS の通信をホスト名やパスで複数の Service に振り分ける決まりを書く資源です。Ingress を作るだけでは何も起きず、それを読んで振り分ける Ingress コントローラーが要ります。k3s は Traefik を既定で入れています。Gateway API は、入口の種類 (GatewayClass)・入口そのもの (Gateway)・振り分け (HTTPRoute など) に資源を分けた、より新しい仕組みです。Ingress を作るときに指す IngressClass の名前は kubectl get ingressclass で確かめます (名前は環境で変わります)。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl create ingress web --class=traefik --rule=\"web.example.test/*=web:80\""
+          },
+          "output": "ingress.networking.k8s.io/web created"
+        },
+        {
+          "text": "既定では Pod は分離されておらず、どこからの通信も受け取ります。NetworkPolicy で Pod を選ぶと、その Pod にはポリシーで許した通信だけが届くようになります。NetworkPolicy はネットワークプラグインが実装するもので、対応していないプラグインでは作っても効果がありません。k3s はネットワークポリシーのコントローラーを同梱しています。",
+          "code": {
+            "language": "yaml",
+            "text": "apiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: default-deny-ingress\nspec:\n  podSelector: {}\n  policyTypes:\n    - Ingress"
+          }
+        }
+      ],
+      "try": [
+        {
+          "goal": "Service を名前で引いて Pod に届くかを確かめたいなら",
+          "steps": [
+            {
+              "text": "試す用の名前空間 try-kcna を作ります。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl create namespace try-kcna"
+              },
+              "output": "namespace/try-kcna created"
+            },
+            {
+              "text": "nginx を 2 つ動かし、80 番で受ける ClusterIP の Service を作ります。kubectl create deployment は Pod に app=web のラベルを付け、kubectl expose はそのセレクターを引き継ぎます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl create deployment web --image=nginx:1.27-alpine --replicas=2 -n try-kcna\nkubectl expose deployment web --port=80 -n try-kcna\nkubectl rollout status deployment/web -n try-kcna"
+              },
+              "output": "deployment \"web\" successfully rolled out"
+            },
+            {
+              "text": "使い捨ての Pod から、Service の名前を DNS で引きます。ClusterIP が返ります。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl run tmp --rm -it --restart=Never --image=busybox:1.36 -n try-kcna -- nslookup web.try-kcna.svc.cluster.local"
+              },
+              "output": "Server:\t\t10.43.0.10\nAddress:\t10.43.0.10:53\n\nName:\tweb.try-kcna.svc.cluster.local\nAddress: 10.43.112.45"
+            },
+            {
+              "text": "同じ名前空間からは短い名前 web だけで届くことを、nginx の歓迎ページで確かめます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl run tmp --rm -it --restart=Never --image=busybox:1.36 -n try-kcna -- wget -qO- -T 3 http://web"
+              },
+              "output": "<!DOCTYPE html>\n<html>\n<head>\n<title>Welcome to nginx!</title>\n..."
+            },
+            {
+              "text": "後片付けです。名前空間ごと消すと、中に作ったものもまとめて消えます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl delete namespace try-kcna"
+              },
+              "output": "namespace \"try-kcna\" deleted"
+            }
+          ]
+        },
+        {
+          "goal": "Pod の数が変わると EndpointSlice が追いかけることを確かめたいなら",
+          "steps": [
+            {
+              "text": "試す用の名前空間 try-kcna を作ります。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl create namespace try-kcna"
+              },
+              "output": "namespace/try-kcna created"
+            },
+            {
+              "text": "Deployment と Service を作り、EndpointSlice に Pod の IP が 2 つ入っていることを見ます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl create deployment web --image=nginx:1.27-alpine --replicas=2 -n try-kcna\nkubectl expose deployment web --port=80 -n try-kcna\nkubectl rollout status deployment/web -n try-kcna\nkubectl get endpointslices -n try-kcna -l kubernetes.io/service-name=web"
+              },
+              "output": "NAME        ADDRESSTYPE   PORTS   ENDPOINTS               AGE\nweb-x7q2d   IPv4          80      10.42.0.21,10.42.0.22   10s"
+            },
+            {
+              "text": "Pod を 3 つに増やし、EndpointSlice の ENDPOINTS も 3 つになることと、Pod の IP と同じであることを確かめます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl scale deployment web --replicas=3 -n try-kcna\nkubectl rollout status deployment/web -n try-kcna\nkubectl get endpointslices -n try-kcna -l kubernetes.io/service-name=web\nkubectl get pods -n try-kcna -l app=web -o wide"
+              },
+              "output": "NAME        ADDRESSTYPE   PORTS   ENDPOINTS                          AGE\nweb-x7q2d   IPv4          80      10.42.0.21,10.42.0.22,10.42.0.23   40s"
+            },
+            {
+              "text": "後片付けです。名前空間ごと消すと、中に作ったものもまとめて消えます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl delete namespace try-kcna"
+              },
+              "output": "namespace \"try-kcna\" deleted"
+            }
+          ]
+        },
+        {
+          "goal": "NetworkPolicy で Pod に届く通信を絞れることを確かめたいなら",
+          "steps": [
+            {
+              "text": "試す用の名前空間 try-kcna を作ります。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl create namespace try-kcna"
+              },
+              "output": "namespace/try-kcna created"
+            },
+            {
+              "text": "Deployment と Service を作り、まだポリシーが無いので使い捨ての Pod から届くことを確かめます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl create deployment web --image=nginx:1.27-alpine -n try-kcna\nkubectl expose deployment web --port=80 -n try-kcna\nkubectl rollout status deployment/web -n try-kcna\nkubectl run tmp --rm -it --restart=Never --image=busybox:1.36 -n try-kcna -- wget -qO- -T 3 http://web"
+              },
+              "output": "<title>Welcome to nginx!</title> を含む HTML が返ります"
+            },
+            {
+              "text": "この名前空間のすべての Pod について、内向きの通信を拒否するポリシーを作ります。もう一度同じ wget を走らせると、繋がらずにエラーか時間切れになります。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl apply -n try-kcna -f - <<'EOF'\napiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: default-deny-ingress\nspec:\n  podSelector: {}\n  policyTypes:\n    - Ingress\nEOF\nkubectl run tmp --rm -it --restart=Never --image=busybox:1.36 -n try-kcna -- wget -qO- -T 3 http://web"
+              }
+            },
+            {
+              "text": "ラベル access=true の Pod からだけ web の Pod へ入れるポリシーを足します。ポリシーは足し合わせで効くので、拒否のポリシーを残したまま、許したものだけが通ります。ラベルを付けた Pod からは届き、付けない Pod からは、手順 2 と同じ wget のコマンドで、今も届かないことを確かめます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl apply -n try-kcna -f - <<'EOF'\napiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: web-allow-access\nspec:\n  podSelector:\n    matchLabels:\n      app: web\n  policyTypes:\n    - Ingress\n  ingress:\n    - from:\n        - podSelector:\n            matchLabels:\n              access: \"true\"\nEOF\nkubectl run tmp --rm -it --restart=Never --image=busybox:1.36 --labels=access=true -n try-kcna -- wget -qO- -T 3 http://web"
+              },
+              "output": "<title>Welcome to nginx!</title> を含む HTML が返ります"
+            },
+            {
+              "text": "後片付けです。名前空間ごと消すと、中に作ったものもまとめて消えます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl delete namespace try-kcna"
+              },
+              "output": "namespace \"try-kcna\" deleted"
+            }
+          ]
+        }
+      ],
+      "lessons": [
+        "w5-l1",
+        "w5-l2",
+        "w5-l3",
+        "w5-l4"
+      ],
+      "sources": [
+        {
+          "label": "kubernetes.io の Service、負荷分散とネットワーク (ネットワークモデル)",
+          "url": "https://kubernetes.io/ja/docs/concepts/services-networking/"
+        },
+        {
+          "label": "kubernetes.io のクラスターのネットワーク",
+          "url": "https://kubernetes.io/ja/docs/concepts/cluster-administration/networking/"
+        },
+        {
+          "label": "kubernetes.io の Service",
+          "url": "https://kubernetes.io/ja/docs/concepts/services-networking/service/"
+        },
+        {
+          "label": "kubernetes.io の EndpointSlice",
+          "url": "https://kubernetes.io/ja/docs/concepts/services-networking/endpoint-slices/"
+        },
+        {
+          "label": "kubernetes.io の Service と Pod に対する DNS",
+          "url": "https://kubernetes.io/ja/docs/concepts/services-networking/dns-pod-service/"
+        },
+        {
+          "label": "kubernetes.io の Ingress",
+          "url": "https://kubernetes.io/ja/docs/concepts/services-networking/ingress/"
+        },
+        {
+          "label": "kubernetes.io の Gateway API",
+          "url": "https://kubernetes.io/ja/docs/concepts/services-networking/gateway/"
+        },
+        {
+          "label": "kubernetes.io のネットワークポリシー",
+          "url": "https://kubernetes.io/ja/docs/concepts/services-networking/network-policies/"
+        },
+        {
+          "label": "kubectl expose のリファレンス",
+          "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_expose/"
+        },
+        {
+          "label": "kubectl create ingress のリファレンス",
+          "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_create/kubectl_create_ingress/"
+        },
+        {
+          "label": "kube-proxy のリファレンス",
+          "url": "https://kubernetes.io/docs/reference/command-line-tools-reference/kube-proxy/"
+        },
+        {
+          "label": "k3s の Networking Services (CoreDNS・Traefik・NetworkPolicy・ServiceLB)",
+          "url": "https://docs.k3s.io/networking/networking-services"
+        },
+        {
+          "label": "k3s の Basic Network Options (Flannel)",
+          "url": "https://docs.k3s.io/networking/basic-network-options"
+        }
+      ]
+    },
+    {
+      "id": "security",
+      "competency": "Security",
+      "title": "セキュリティ: 認証・RBAC・Secret・Pod のセキュリティ",
+      "summary": "API サーバーへのリクエストは、認証 (だれか)・認可 (してよいか)・(作る・変えるリクエストでは) アドミッションコントロール (中身を変える・拒否する) の順に通ります。認可の代表は RBAC で、Role と ClusterRole に権限を書き、RoleBinding と ClusterRoleBinding でだれに与えるかを決めます。Pod の側では securityContext で動かすユーザーや特権を絞り、Pod Security Admission で名前空間ごとに Pod Security Standards を守らせます。",
+      "flow": [
+        {
+          "text": "kubectl などから API サーバーに届いたリクエストは、まず認証でだれからのものかを確かめ、次に認可でその操作が許されているかを確かめます。認可で拒否されると、リクエストは HTTP の 403 で拒否されます。オブジェクトを作る・変える・消すリクエストは、そのあとアドミッションコントロールを通り、中身を見て変更されたり拒否されたりします (読むだけのリクエストには働きません)。"
+        },
+        {
+          "text": "RBAC (ロールベースのアクセス制御) では、Role か ClusterRole に権限のルールを書きます。権限は足していく方式で、「拒否」のルールはありません。Role は必ずどれか 1 つの名前空間に属し、ClusterRole は名前空間に属さないリソースです。",
+          "code": {
+            "language": "yaml",
+            "text": "apiVersion: rbac.authorization.k8s.io/v1\nkind: Role\nmetadata:\n  namespace: default\n  name: pod-reader\nrules:\n- apiGroups: [\"\"]\n  resources: [\"pods\"]\n  verbs: [\"get\", \"watch\", \"list\"]"
+          }
+        },
+        {
+          "text": "権限をだれに与えるかは RoleBinding と ClusterRoleBinding で決めます。subjects にはユーザー・グループ・ServiceAccount を書きます。RoleBinding は ClusterRole を指すこともでき、その場合は ClusterRole の権限を RoleBinding の名前空間の中だけで与えます。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl create rolebinding viewer-view --clusterrole=view --serviceaccount=default:viewer -n default"
+          },
+          "output": "rolebinding.rbac.authorization.k8s.io/viewer-view created"
+        },
+        {
+          "text": "ServiceAccount は Pod の中のプロセスが API サーバーに認証するときの身元です。どの名前空間にも default という名前の ServiceAccount があり、Pod に ServiceAccount を指定しなければそれが割り当てられます。kubectl auth can-i で操作が許されているかを確かめられ、--as で別の利用者になりすまして確かめられます (なりすましの権限が要ります)。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl auth can-i list pods -n default --as=system:serviceaccount:default:viewer"
+          },
+          "output": "yes"
+        },
+        {
+          "text": "Secret はパスワードやトークンのような機密の値を持つ資源です。data の値は base64 でエンコードした文字列ですが、base64 は暗号化ではありません。既定では Secret は etcd に暗号化されずに保存され、API にアクセスできる人はだれでも取得できるので、RBAC で読める人を絞ります。k3s の 1 ノードの既定では保存先は etcd ではなく SQLite で、--secrets-encryption を付けて起動すると保存時に暗号化されます。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl create secret generic db-pass --from-literal=password=example-only"
+          },
+          "output": "secret/db-pass created"
+        },
+        {
+          "text": "securityContext は Pod やコンテナの特権とアクセスの設定です。runAsUser で動かすユーザー ID を決め、allowPrivilegeEscalation: false でプロセスが親より強い権限を得られないようにします。",
+          "code": {
+            "language": "yaml",
+            "text": "apiVersion: v1\nkind: Pod\nmetadata:\n  name: security-context-demo\nspec:\n  securityContext:\n    runAsUser: 1000\n    runAsGroup: 3000\n  containers:\n  - name: app\n    image: busybox:1.36\n    command: [\"sh\", \"-c\", \"sleep 1h\"]\n    securityContext:\n      allowPrivilegeEscalation: false"
+          }
+        },
+        {
+          "text": "Pod Security Standards は Privileged (制限なし)・Baseline (既知の特権昇格を防ぐ)・Restricted (いちばん厳しい) の 3 段階です。Pod Security Admission は名前空間のラベルで働き、モードは enforce (違反した Pod を拒否)・audit (監査ログに記録)・warn (警告を出す) の 3 つです。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl label --overwrite ns example \\\n  pod-security.kubernetes.io/enforce=baseline \\\n  pod-security.kubernetes.io/warn=restricted"
+          },
+          "output": "namespace/example labeled"
+        }
+      ],
+      "try": [
+        {
+          "goal": "ServiceAccount に与えた権限の範囲を確かめたいなら",
+          "steps": [
+            {
+              "text": "試す用の名前空間 try-kcna を作ります。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl create namespace try-kcna"
+              },
+              "output": "namespace/try-kcna created"
+            },
+            {
+              "text": "読むだけの ServiceAccount viewer を作り、組み込みの ClusterRole view を RoleBinding で try-kcna の中だけに与えます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl create serviceaccount viewer -n try-kcna\nkubectl create rolebinding viewer-view --clusterrole=view --serviceaccount=try-kcna:viewer -n try-kcna"
+              },
+              "output": "serviceaccount/viewer created\nrolebinding.rbac.authorization.k8s.io/viewer-view created"
+            },
+            {
+              "text": "viewer になりすまして確かめます。try-kcna の Pod の一覧は yes、削除は no、default の Pod の一覧は no です。view は Secret を読む権限を含まないので、Secret の一覧も no になります。--as を使うにはなりすましの権限が要るので、k3s の管理者の kubeconfig で行います。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl auth can-i list pods -n try-kcna --as=system:serviceaccount:try-kcna:viewer\nkubectl auth can-i delete pods -n try-kcna --as=system:serviceaccount:try-kcna:viewer\nkubectl auth can-i list pods -n default --as=system:serviceaccount:try-kcna:viewer\nkubectl auth can-i list secrets -n try-kcna --as=system:serviceaccount:try-kcna:viewer"
+              },
+              "output": "yes\nno\nno\nno"
+            },
+            {
+              "text": "後片付けです。名前空間ごと消すと、中に作ったものもまとめて消えます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl delete namespace try-kcna"
+              },
+              "output": "namespace \"try-kcna\" deleted"
+            }
+          ]
+        },
+        {
+          "goal": "Secret の値が暗号化ではなく base64 なだけだと確かめたいなら",
+          "steps": [
+            {
+              "text": "試す用の名前空間 try-kcna を作ります。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl create namespace try-kcna"
+              },
+              "output": "namespace/try-kcna created"
+            },
+            {
+              "text": "見本の値で Secret を作り、保存された値を取り出して base64 を戻します。Secret を読める人には元の値がそのまま見えることが分かります。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl create secret generic db-pass --from-literal=password=example-only -n try-kcna\nkubectl get secret db-pass -n try-kcna -o jsonpath='{.data.password}'; echo\nkubectl get secret db-pass -n try-kcna -o jsonpath='{.data.password}' | base64 -d; echo"
+              },
+              "output": "secret/db-pass created\nZXhhbXBsZS1vbmx5\nexample-only"
+            },
+            {
+              "text": "後片付けです。名前空間ごと消すと、中に作ったものもまとめて消えます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl delete namespace try-kcna"
+              },
+              "output": "namespace \"try-kcna\" deleted"
+            }
+          ]
+        },
+        {
+          "goal": "Pod Security Admission が Restricted に合わない Pod を拒否することを確かめたいなら",
+          "steps": [
+            {
+              "text": "試す用の名前空間 try-kcna を作ります。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl create namespace try-kcna"
+              },
+              "output": "namespace/try-kcna created"
+            },
+            {
+              "text": "try-kcna に enforce=restricted のラベルを付けます。名前空間のラベルを変える権限が要ります。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl label --overwrite ns try-kcna pod-security.kubernetes.io/enforce=restricted"
+              },
+              "output": "namespace/try-kcna labeled"
+            },
+            {
+              "text": "securityContext を何も書かない Pod を作ろうとすると、Restricted に違反するので拒否され、Pod は作られません。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl run nginx --image=nginx:1.27-alpine -n try-kcna"
+              },
+              "output": "Error from server (Forbidden): pods \"nginx\" is forbidden: violates PodSecurity \"restricted:latest\": allowPrivilegeEscalation != false (...), unrestricted capabilities (...), runAsNonRoot != true (...), seccompProfile (...)"
+            },
+            {
+              "text": "Restricted が求める設定 (root 以外で動かす・特権昇格を許さない・ケイパビリティを全部外す・seccomp を RuntimeDefault にする) を書いた Pod は作られます。中で id を動かし、runAsUser と runAsGroup で決めた ID で動いていることを確かめます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl apply -n try-kcna -f - <<'EOF'\napiVersion: v1\nkind: Pod\nmetadata:\n  name: restricted-ok\nspec:\n  securityContext:\n    runAsNonRoot: true\n    runAsUser: 1000\n    runAsGroup: 3000\n    seccompProfile:\n      type: RuntimeDefault\n  containers:\n  - name: app\n    image: busybox:1.36\n    command: [\"sh\", \"-c\", \"sleep 1h\"]\n    securityContext:\n      allowPrivilegeEscalation: false\n      capabilities:\n        drop: [\"ALL\"]\nEOF\nkubectl wait --for=condition=Ready pod/restricted-ok -n try-kcna --timeout=60s\nkubectl exec restricted-ok -n try-kcna -- id"
+              },
+              "output": "pod/restricted-ok created\npod/restricted-ok condition met\nuid=1000 gid=3000 groups=3000"
+            },
+            {
+              "text": "後片付けです。名前空間ごと消すと、中に作ったものもまとめて消えます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl delete namespace try-kcna"
+              },
+              "output": "namespace \"try-kcna\" deleted"
+            }
+          ]
+        }
+      ],
+      "lessons": [
+        "w6-l1",
+        "w6-l2"
+      ],
+      "sources": [
+        {
+          "label": "kubernetes.io の Kubernetes API へのアクセスコントロール",
+          "url": "https://kubernetes.io/ja/docs/concepts/security/controlling-access/"
+        },
+        {
+          "label": "kubernetes.io の RBAC 認可を使用する",
+          "url": "https://kubernetes.io/ja/docs/reference/access-authn-authz/rbac/"
+        },
+        {
+          "label": "kubernetes.io の Authorization (kubectl auth can-i)",
+          "url": "https://kubernetes.io/docs/reference/access-authn-authz/authorization/"
+        },
+        {
+          "label": "kubectl create rolebinding のリファレンス",
+          "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_create/kubectl_create_rolebinding/"
+        },
+        {
+          "label": "kubernetes.io の Pod にサービスアカウントを設定する",
+          "url": "https://kubernetes.io/ja/docs/tasks/configure-pod-container/configure-service-account/"
+        },
+        {
+          "label": "kubernetes.io の Secret",
+          "url": "https://kubernetes.io/ja/docs/concepts/configuration/secret/"
+        },
+        {
+          "label": "kubectl create secret generic のリファレンス",
+          "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_create/kubectl_create_secret_generic/"
+        },
+        {
+          "label": "kubernetes.io の Pod とコンテナにセキュリティコンテキストを設定する",
+          "url": "https://kubernetes.io/ja/docs/tasks/configure-pod-container/security-context/"
+        },
+        {
+          "label": "kubernetes.io の Pod セキュリティの標準",
+          "url": "https://kubernetes.io/ja/docs/concepts/security/pod-security-standards/"
+        },
+        {
+          "label": "kubernetes.io の Pod Security Standards (英語版、Restricted の項目)",
+          "url": "https://kubernetes.io/docs/concepts/security/pod-security-standards/"
+        },
+        {
+          "label": "kubernetes.io の Pod のセキュリティアドミッション",
+          "url": "https://kubernetes.io/ja/docs/concepts/security/pod-security-admission/"
+        },
+        {
+          "label": "kubernetes.io の名前空間レベルでの Pod セキュリティの標準の適用",
+          "url": "https://kubernetes.io/ja/docs/tutorials/security/ns-level-pss/"
+        },
+        {
+          "label": "K3s: Datastore",
+          "url": "https://docs.k3s.io/datastore"
+        },
+        {
+          "label": "K3s: Secrets Encryption",
+          "url": "https://docs.k3s.io/security/secrets-encryption"
+        }
+      ]
+    },
+    {
+      "id": "troubleshooting",
+      "competency": "Troubleshooting",
+      "title": "障害対応: 状態・イベント・ログの順に読む",
+      "summary": "動かないときは、kubectl get で状態を見て、kubectl describe と kubectl events でイベントを読み、kubectl logs でコンテナの出力を読む順に絞り込みます。Pending はノードに置けていない、ImagePullBackOff はイメージを取れない、CrashLoopBackOff はコンテナが起動しては終わる状態です。Service に繋がらないときは、EndpointSlice に Pod が入っているか (selector とラベルが合っているか) を見ます。",
+      "flow": [
+        {
+          "text": "まず kubectl get pods で STATUS と RESTARTS を見ます。Pod のフェーズは Pending・Running・Succeeded・Failed・Unknown のどれかです。コンテナが Waiting (待ち) の状態のときは、CrashLoopBackOff や ImagePullBackOff のようにその理由が出ます。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl get pods"
+          },
+          "output": "NAME                   READY   STATUS             RESTARTS      AGE\nweb-7c9d8f6b5d-k2x8p   0/1     CrashLoopBackOff   5 (40s ago)   4m\nbig                    0/1     Pending            0             2m\nbroken-5f7b9c-xp2lq    0/1     ImagePullBackOff   0             1m"
+        },
+        {
+          "text": "次に kubectl describe pod で、コンテナの State と Last State、末尾の Events を読みます。Pending のまま止まっているのは、ノードにスケジュールできないということで、多くはリソースが足りないことが原因です。Events にスケジューラーの理由が出ます。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl describe pod big"
+          },
+          "output": "Events:\n  Type     Reason            Age   From               Message\n  ----     ------            ----  ----               -------\n  Warning  FailedScheduling  12s   default-scheduler  0/1 nodes are available: 1 Insufficient memory. ..."
+        },
+        {
+          "text": "ImagePullBackOff は、イメージを取得できずコンテナを始められない状態です。イメージ名の誤りや、プライベートレジストリに imagePullSecret なしで取りに行ったことなどが原因です。Events のメッセージを読み、イメージの名前かタグを直します。Deployment なら kubectl set image で差し替えます。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl set image deployment/broken nginx=nginx:1.27-alpine"
+          },
+          "output": "deployment.apps/broken image updated"
+        },
+        {
+          "text": "CrashLoopBackOff は、コンテナが終了するたびに kubelet が間隔を延ばしながら (指数バックオフ) 再起動している状態です。再起動のあとのコンテナには落ちた理由が残っていないことがあるので、--previous (短く -p) で一つ前のコンテナのログを読み、describe の Last State の Reason と Exit Code を見ます。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl logs web-7c9d8f6b5d-k2x8p --previous"
+          },
+          "output": "Error: config file /etc/app/config.yaml not found"
+        },
+        {
+          "text": "kubectl events は名前空間の最近のイベントを並べ、--for で 1 つのリソースに関係するものだけに絞れます。--watch で新しいイベントを出し続けます。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl events --for pod/big"
+          },
+          "output": "LAST SEEN   TYPE      REASON             OBJECT    MESSAGE\n30s         Warning   FailedScheduling   Pod/big   0/1 nodes are available: 1 Insufficient memory. ..."
+        },
+        {
+          "text": "動いているコンテナの中は kubectl exec で調べます。イメージにシェルやデバッグの道具が無いときは、kubectl debug で一時的なデバッグ用のコンテナ (エフェメラルコンテナ) を Pod に足せます。--target は、そのコンテナのプロセスを見られるようにする指定で、コンテナランタイムが対応している必要があります。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl debug -it <動いている Pod 名> --image=busybox:1.36 --target=<調べたいコンテナ名>"
+          }
+        },
+        {
+          "text": "Service に繋がらないときは、Service に振り分け先の Pod があるかを見ます。ENDPOINTS が <unset> (振り分け先が 0 個) なら、Service の spec.selector が Pod の metadata.labels と合っているかを確かめます。タイプミスがよくある間違いです。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl get endpointslices -l kubernetes.io/service-name=web\nkubectl get pods --show-labels"
+          },
+          "output": "NAME        ADDRESSTYPE   PORTS     ENDPOINTS   AGE\nweb-5xk8d   IPv4          <unset>   <unset>     2m"
+        }
+      ],
+      "try": [
+        {
+          "goal": "ImagePullBackOff の理由を読んで直す流れを確かめたいなら",
+          "steps": [
+            {
+              "text": "試す用の名前空間 try-kcna を作ります。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl create namespace try-kcna"
+              },
+              "output": "namespace/try-kcna created"
+            },
+            {
+              "text": "存在しないタグのイメージで Deployment を作ります。30 秒ほど待って、STATUS が ErrImagePull か ImagePullBackOff になっていることを見ます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl create deployment broken --image=nginx:no-such-tag -n try-kcna\nsleep 30\nkubectl get pods -n try-kcna -l app=broken"
+              },
+              "output": "NAME                      READY   STATUS             RESTARTS   AGE\nbroken-6b8d9f5c7d-r4t2x   0/1     ImagePullBackOff   0          32s"
+            },
+            {
+              "text": "Events で取れない理由 (not found など) を読みます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl describe pods -n try-kcna -l app=broken | tail -n 8"
+              },
+              "output": "  Warning  Failed     10s (x2 over 30s)  kubelet  Failed to pull image \"nginx:no-such-tag\": ... not found\n  Normal   BackOff    5s (x2 over 29s)   kubelet  Back-off pulling image \"nginx:no-such-tag\""
+            },
+            {
+              "text": "正しいイメージに差し替え、Pod が入れ替わって動くことを確かめます。コンテナ名は kubectl create deployment がイメージ名から付けた nginx です。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl set image deployment/broken nginx=nginx:1.27-alpine -n try-kcna\nkubectl rollout status deployment/broken -n try-kcna"
+              },
+              "output": "deployment \"broken\" successfully rolled out"
+            },
+            {
+              "text": "後片付けです。名前空間ごと消すと、中に作ったものもまとめて消えます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl delete namespace try-kcna"
+              },
+              "output": "namespace \"try-kcna\" deleted"
+            }
+          ]
+        },
+        {
+          "goal": "CrashLoopBackOff で落ちる前のログを読みたいなら",
+          "steps": [
+            {
+              "text": "試す用の名前空間 try-kcna を作ります。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl create namespace try-kcna"
+              },
+              "output": "namespace/try-kcna created"
+            },
+            {
+              "text": "メッセージを出してすぐに終了コード 1 で終わるコンテナを動かします。kubectl run の Pod は終わるたびに再起動されるので、終わるたびに間隔を延ばしながら再起動されるので、数十秒で CrashLoopBackOff になります。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl run crash --image=busybox:1.36 -n try-kcna -- sh -c 'echo starting; echo config not found; exit 1'\nsleep 60\nkubectl get pod crash -n try-kcna"
+              },
+              "output": "NAME    READY   STATUS             RESTARTS      AGE\ncrash   0/1     CrashLoopBackOff   2 (30s ago)   62s"
+            },
+            {
+              "text": "一つ前のコンテナのログと、describe の Last State を読みます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl logs crash -n try-kcna --previous\nkubectl describe pod crash -n try-kcna | grep -A 2 'Last State'"
+              },
+              "output": "starting\nconfig not found\n    Last State:     Terminated\n      Reason:       Error\n      Exit Code:    1"
+            },
+            {
+              "text": "後片付けです。名前空間ごと消すと、中に作ったものもまとめて消えます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl delete namespace try-kcna"
+              },
+              "output": "namespace \"try-kcna\" deleted"
+            }
+          ]
+        },
+        {
+          "goal": "Pending の理由をイベントで読みたいなら",
+          "steps": [
+            {
+              "text": "試す用の名前空間 try-kcna を作ります。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl create namespace try-kcna"
+              },
+              "output": "namespace/try-kcna created"
+            },
+            {
+              "text": "ノードに無いほどのメモリ (1000Gi) を要求する Pod を作ります。どのノードにも置けないので Pending のままになります。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl apply -n try-kcna -f - <<'EOF'\napiVersion: v1\nkind: Pod\nmetadata:\n  name: big\nspec:\n  containers:\n  - name: app\n    image: nginx:1.27-alpine\n    resources:\n      requests:\n        memory: 1000Gi\nEOF\nkubectl get pod big -n try-kcna"
+              },
+              "output": "NAME   READY   STATUS    RESTARTS   AGE\nbig    0/1     Pending   0          5s"
+            },
+            {
+              "text": "この Pod に関係するイベントだけを並べ、スケジューラーの理由を読みます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl events --for pod/big -n try-kcna"
+              },
+              "output": "LAST SEEN   TYPE      REASON             OBJECT    MESSAGE\n10s         Warning   FailedScheduling   Pod/big   0/1 nodes are available: 1 Insufficient memory. ..."
+            },
+            {
+              "text": "後片付けです。名前空間ごと消すと、中に作ったものもまとめて消えます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl delete namespace try-kcna"
+              },
+              "output": "namespace \"try-kcna\" deleted"
+            }
+          ]
+        },
+        {
+          "goal": "Service の selector の誤りで繋がらないときの見つけ方を確かめたいなら",
+          "steps": [
+            {
+              "text": "試す用の名前空間 try-kcna を作ります。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl create namespace try-kcna"
+              },
+              "output": "namespace/try-kcna created"
+            },
+            {
+              "text": "app=web の Pod を動かし、selector をわざと app: wbe と打ち間違えた Service を作ります。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl create deployment web --image=nginx:1.27-alpine -n try-kcna\nkubectl apply -n try-kcna -f - <<'EOF'\napiVersion: v1\nkind: Service\nmetadata:\n  name: web\nspec:\n  selector:\n    app: wbe\n  ports:\n    - port: 80\nEOF"
+              }
+            },
+            {
+              "text": "EndpointSlice に Pod の IP が入っていないこと (ENDPOINTS が <unset>) と、Pod のラベルが app=web であることを見比べます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl get endpointslices -n try-kcna -l kubernetes.io/service-name=web\nkubectl get pods -n try-kcna --show-labels"
+              },
+              "output": "NAME        ADDRESSTYPE   PORTS     ENDPOINTS   AGE\nweb-q8w2c   IPv4          <unset>   <unset>     20s\nNAME                   READY   STATUS    RESTARTS   AGE   LABELS\nweb-5d7c8b9f6c-h3k9m   1/1     Running   0          25s   app=web,pod-template-hash=5d7c8b9f6c"
+            },
+            {
+              "text": "selector を app: web に直すと、EndpointSlice に Pod の IP が入ります。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl patch service web -n try-kcna -p '{\"spec\":{\"selector\":{\"app\":\"web\"}}}'\nkubectl get endpointslices -n try-kcna -l kubernetes.io/service-name=web"
+              },
+              "output": "service/web patched\nNAME        ADDRESSTYPE   PORTS   ENDPOINTS    AGE\nweb-q8w2c   IPv4          80      10.42.0.31   50s"
+            },
+            {
+              "text": "後片付けです。名前空間ごと消すと、中に作ったものもまとめて消えます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl delete namespace try-kcna"
+              },
+              "output": "namespace \"try-kcna\" deleted"
+            }
+          ]
+        }
+      ],
+      "lessons": [
+        "w6-l4",
+        "w5-l2"
+      ],
+      "sources": [
+        {
+          "label": "kubernetes.io の Pod のデバッグ",
+          "url": "https://kubernetes.io/ja/docs/tasks/debug/debug-application/debug-pods/"
+        },
+        {
+          "label": "kubernetes.io の実行中の Pod のデバッグ",
+          "url": "https://kubernetes.io/ja/docs/tasks/debug/debug-application/debug-running-pod/"
+        },
+        {
+          "label": "kubernetes.io の Service のデバッグ",
+          "url": "https://kubernetes.io/ja/docs/tasks/debug/debug-application/debug-service/"
+        },
+        {
+          "label": "kubernetes.io の Pod のライフサイクル",
+          "url": "https://kubernetes.io/ja/docs/concepts/workloads/pods/pod-lifecycle/"
+        },
+        {
+          "label": "kubernetes.io のイメージ (ImagePullBackOff)",
+          "url": "https://kubernetes.io/ja/docs/concepts/containers/images/"
+        },
+        {
+          "label": "kubernetes.io の EndpointSlice",
+          "url": "https://kubernetes.io/ja/docs/concepts/services-networking/endpoint-slices/"
+        },
+        {
+          "label": "kubectl logs のリファレンス",
+          "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_logs/"
+        },
+        {
+          "label": "kubectl events のリファレンス",
+          "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_events/"
+        },
+        {
+          "label": "kubectl exec のリファレンス",
+          "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_exec/"
+        },
+        {
+          "label": "kubectl debug のリファレンス",
+          "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_debug/"
+        },
+        {
+          "label": "kubectl set image のリファレンス",
+          "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_set/kubectl_set_image/"
+        }
+      ]
+    },
+    {
+      "id": "storage",
+      "competency": "Storage",
+      "title": "ストレージ: ボリューム・PV・PVC・StorageClass",
+      "summary": "コンテナの中のファイルは一時的で、コンテナが落ちると失われます。Pod にはボリュームを付けて、データを残したりコンテナどうしで共有したりします。Pod より長く残すデータは、ストレージそのもの (PersistentVolume) と利用者の要求 (PersistentVolumeClaim) に分けて扱い、StorageClass があれば要求に合わせて PV が自動で作られます。",
+      "flow": [
+        {
+          "text": "コンテナの中のディスクのファイルは一時的です。コンテナがクラッシュすると、kubelet はコンテナをきれいな状態で再起動するので、ファイルは失われます。そこで Pod にボリュームを付けて、コンテナのパスにマウントします。"
+        },
+        {
+          "text": "emptyDir は、Pod がノードに割り当てられたときに空で作られ、その Pod がそのノードで動いている間だけあるボリュームです。コンテナがクラッシュしても残りますが、Pod がノードから消されると中のデータも消えます。同じ Pod のコンテナどうしでファイルを共有するのに使えます。",
+          "code": {
+            "language": "yaml",
+            "text": "apiVersion: v1\nkind: Pod\nmetadata:\n  name: cache-demo\nspec:\n  containers:\n  - name: app\n    image: busybox:1.36\n    command: [\"sh\", \"-c\", \"sleep 1h\"]\n    volumeMounts:\n    - name: cache\n      mountPath: /cache\n  volumes:\n  - name: cache\n    emptyDir: {}"
+          }
+        },
+        {
+          "text": "Pod より長く残すデータには PersistentVolume (PV) と PersistentVolumeClaim (PVC) を使います。PV はクラスタのストレージの一部で、管理者が用意するか StorageClass で動的に作られ、使う Pod とは別のライフサイクルを持ちます。PVC は利用者からのストレージの要求で、大きさやアクセスモードを指定します。",
+          "code": {
+            "language": "yaml",
+            "text": "apiVersion: v1\nkind: PersistentVolumeClaim\nmetadata:\n  name: data\nspec:\n  accessModes:\n  - ReadWriteOnce\n  storageClassName: local-path\n  resources:\n    requests:\n      storage: 1Gi"
+          }
+        },
+        {
+          "text": "アクセスモードには、1 つのノードから読み書きでマウントできる ReadWriteOnce (同じノードの Pod どうしなら複数から使えます)、多数のノードから読み取り専用の ReadOnlyMany、多数のノードから読み書きの ReadWriteMany、1 つの Pod だけから読み書きの ReadWriteOncePod があります。どのモードを使えるかはストレージの種類によります。"
+        },
+        {
+          "text": "StorageClass は、ストレージの種類と、PV を作るプロビジョナーを決めます。PVC で StorageClass を指すと、要求に合う PV が自動で作られて結びつきます (動的プロビジョニング)。k3s には Rancher の Local Path Provisioner が入っていて、StorageClass local-path の PV は、既定ではノードの /var/lib/rancher/k3s/storage の下に作られます (--default-local-storage-path で変えられます)。そのため Pod はボリュームのあるノードに縛られます。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl get storageclass"
+          },
+          "output": "NAME                   PROVISIONER             RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE\nlocal-path (default)   rancher.io/local-path   Delete          WaitForFirstConsumer   false                  30d"
+        },
+        {
+          "text": "volumeBindingMode を書かなければ Immediate で、PVC を作るとすぐに PV が用意されます。WaitForFirstConsumer では、PVC を使う Pod が作られるまで PV の用意と結びつけを遅らせ、Pod の置き場所に合わせてストレージを用意します。それまで PVC は Pending のままです。"
+        },
+        {
+          "text": "Pod は volumes の persistentVolumeClaim で PVC の名前を指し、PVC に結びついた PV を使います。StorageClass で作られた PV の再利用ポリシー (reclaimPolicy) は Delete か Retain で、書かなければ Delete です。Delete なら PVC を消すと PV も消え、Retain なら PV とデータが残ります。(コードは Pod のマニフェストの spec の部分だけです)",
+          "code": {
+            "language": "yaml",
+            "text": "spec:\n  containers:\n  - name: app\n    image: busybox:1.36\n    command: [\"sh\", \"-c\", \"sleep 1h\"]\n    volumeMounts:\n    - name: vol\n      mountPath: /data\n  volumes:\n  - name: vol\n    persistentVolumeClaim:\n      claimName: data"
+          }
+        },
+        {
+          "text": "CSI (Container Storage Interface) は、Kubernetes のようなコンテナの基盤が、任意のストレージをコンテナに見せるための標準のインターフェースです。ストレージの業者は、Kubernetes 本体のコードに足さずに CSI のドライバーを作り、クラスタに入れて使えます。"
+        }
+      ],
+      "try": [
+        {
+          "goal": "PVC が Pod を消してもデータを残すことを確かめたいなら",
+          "steps": [
+            {
+              "text": "試す用の名前空間 try-kcna を作ります。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl create namespace try-kcna"
+              },
+              "output": "namespace/try-kcna created"
+            },
+            {
+              "text": "local-path の PVC と、それをマウントして /data/hello.txt に書き込む Pod を作ります。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl apply -n try-kcna -f - <<'EOF'\napiVersion: v1\nkind: PersistentVolumeClaim\nmetadata:\n  name: data\nspec:\n  accessModes:\n  - ReadWriteOnce\n  storageClassName: local-path\n  resources:\n    requests:\n      storage: 1Gi\n---\napiVersion: v1\nkind: Pod\nmetadata:\n  name: writer\nspec:\n  containers:\n  - name: writer\n    image: busybox:1.36\n    command: [\"sh\", \"-c\", \"echo hello > /data/hello.txt && sleep 3600\"]\n    volumeMounts:\n    - name: vol\n      mountPath: /data\n  volumes:\n  - name: vol\n    persistentVolumeClaim:\n      claimName: data\nEOF\nkubectl wait --for=condition=Ready pod/writer -n try-kcna --timeout=120s\nkubectl get pvc -n try-kcna"
+              },
+              "output": "NAME   STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE\ndata   Bound    pvc-3f1c2a7e-8b4d-4e2a-9c61-0d5e7f8a9b10   1Gi        RWO            local-path     <unset>                 20s"
+            },
+            {
+              "text": "書いた Pod を消し、同じ PVC をマウントする別の Pod から読みます。Pod が変わってもファイルが残っています。(Pod が終わるまで 30 秒ほどかかります)",
+              "code": {
+                "language": "bash",
+                "text": "kubectl delete pod writer -n try-kcna\nkubectl apply -n try-kcna -f - <<'EOF'\napiVersion: v1\nkind: Pod\nmetadata:\n  name: reader\nspec:\n  containers:\n  - name: reader\n    image: busybox:1.36\n    command: [\"sh\", \"-c\", \"sleep 3600\"]\n    volumeMounts:\n    - name: vol\n      mountPath: /data\n  volumes:\n  - name: vol\n    persistentVolumeClaim:\n      claimName: data\nEOF\nkubectl wait --for=condition=Ready pod/reader -n try-kcna --timeout=120s\nkubectl exec reader -n try-kcna -- cat /data/hello.txt"
+              },
+              "output": "hello"
+            },
+            {
+              "text": "後片付けです。名前空間ごと消すと、中に作ったものもまとめて消えます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl delete namespace try-kcna"
+              },
+              "output": "namespace \"try-kcna\" deleted"
+            }
+          ]
+        },
+        {
+          "goal": "volumeBindingMode で PVC が Pending のまま待つことを確かめたいなら",
+          "steps": [
+            {
+              "text": "試す用の名前空間 try-kcna を作ります。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl create namespace try-kcna"
+              },
+              "output": "namespace/try-kcna created"
+            },
+            {
+              "text": "StorageClass の一覧で、使う StorageClass の VOLUMEBINDINGMODE を見ます。StorageClass はクラスタ全体のリソースなので、一覧を見る権限が要ります。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl get storageclass"
+              },
+              "output": "NAME                   PROVISIONER             RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE\nlocal-path (default)   rancher.io/local-path   Delete          WaitForFirstConsumer   false                  30d"
+            },
+            {
+              "text": "PVC だけを作ります。VOLUMEBINDINGMODE が WaitForFirstConsumer なら、使う Pod が無いので Pending のままで、Events に最初の利用者を待っている旨が出ます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl apply -n try-kcna -f - <<'EOF'\napiVersion: v1\nkind: PersistentVolumeClaim\nmetadata:\n  name: wait-demo\nspec:\n  accessModes:\n  - ReadWriteOnce\n  storageClassName: local-path\n  resources:\n    requests:\n      storage: 1Gi\nEOF\nkubectl get pvc wait-demo -n try-kcna\nkubectl describe pvc wait-demo -n try-kcna | tail -n 3"
+              },
+              "output": "NAME        STATUS    VOLUME   CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE\nwait-demo   Pending                                      local-path     <unset>                 5s\n  Normal  WaitForFirstConsumer  3s (x2 over 5s)  persistentvolume-controller  waiting for first consumer to be created before binding"
+            },
+            {
+              "text": "この PVC を使う Pod を作ると、PV が作られて PVC が Bound になります。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl apply -n try-kcna -f - <<'EOF'\napiVersion: v1\nkind: Pod\nmetadata:\n  name: consumer\nspec:\n  containers:\n  - name: app\n    image: busybox:1.36\n    command: [\"sh\", \"-c\", \"sleep 3600\"]\n    volumeMounts:\n    - name: vol\n      mountPath: /data\n  volumes:\n  - name: vol\n    persistentVolumeClaim:\n      claimName: wait-demo\nEOF\nkubectl wait --for=condition=Ready pod/consumer -n try-kcna --timeout=120s\nkubectl get pvc wait-demo -n try-kcna"
+              },
+              "output": "NAME        STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE\nwait-demo   Bound    pvc-9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d   1Gi        RWO            local-path     <unset>                 40s"
+            },
+            {
+              "text": "後片付けです。名前空間ごと消すと、中に作ったものもまとめて消えます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl delete namespace try-kcna"
+              },
+              "output": "namespace \"try-kcna\" deleted"
+            }
+          ]
+        },
+        {
+          "goal": "reclaimPolicy が Delete の PV が PVC と一緒に消えることを確かめたいなら",
+          "steps": [
+            {
+              "text": "試す用の名前空間 try-kcna を作ります。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl create namespace try-kcna"
+              },
+              "output": "namespace/try-kcna created"
+            },
+            {
+              "text": "PVC と、それを使う Pod を作り、PVC に結びついた PV の名前と RECLAIM POLICY を見ます。PV はクラスタ全体のリソースなので、kubectl get pv には k3s の管理者の kubeconfig のような権限が要り、無いと Forbidden で失敗します。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl apply -n try-kcna -f - <<'EOF'\napiVersion: v1\nkind: PersistentVolumeClaim\nmetadata:\n  name: data\nspec:\n  accessModes:\n  - ReadWriteOnce\n  storageClassName: local-path\n  resources:\n    requests:\n      storage: 1Gi\n---\napiVersion: v1\nkind: Pod\nmetadata:\n  name: user\nspec:\n  containers:\n  - name: app\n    image: busybox:1.36\n    command: [\"sh\", \"-c\", \"sleep 3600\"]\n    volumeMounts:\n    - name: vol\n      mountPath: /data\n  volumes:\n  - name: vol\n    persistentVolumeClaim:\n      claimName: data\nEOF\nkubectl wait --for=condition=Ready pod/user -n try-kcna --timeout=120s\nkubectl get pv"
+              },
+              "output": "NAME                                       CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM           STORAGECLASS   VOLUMEATTRIBUTESCLASS   REASON   AGE\npvc-3f1c2a7e-8b4d-4e2a-9c61-0d5e7f8a9b10   1Gi        RWO            Delete           Bound    try-kcna/data   local-path     <unset>                          15s"
+            },
+            {
+              "text": "Pod と PVC を消し、少し待ってから PV も消えていることを確かめます (try-kcna/data の行が無くなります)。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl delete pod user -n try-kcna\nkubectl delete pvc data -n try-kcna\nsleep 15\nkubectl get pv"
+              }
+            },
+            {
+              "text": "後片付けです。名前空間ごと消すと、中に作ったものもまとめて消えます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl delete namespace try-kcna"
+              },
+              "output": "namespace \"try-kcna\" deleted"
+            }
+          ]
+        }
+      ],
+      "lessons": [
+        "w6-l3"
+      ],
+      "sources": [
+        {
+          "label": "kubernetes.io のボリューム (emptyDir・CSI)",
+          "url": "https://kubernetes.io/ja/docs/concepts/storage/volumes/"
+        },
+        {
+          "label": "kubernetes.io のエフェメラルボリューム",
+          "url": "https://kubernetes.io/ja/docs/concepts/storage/ephemeral-volumes/"
+        },
+        {
+          "label": "kubernetes.io の永続ボリューム",
+          "url": "https://kubernetes.io/ja/docs/concepts/storage/persistent-volumes/"
+        },
+        {
+          "label": "kubernetes.io の Persistent Volumes (英語版、アクセスモード)",
+          "url": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/"
+        },
+        {
+          "label": "kubernetes.io のストレージクラス",
+          "url": "https://kubernetes.io/ja/docs/concepts/storage/storage-classes/"
+        },
+        {
+          "label": "kubernetes.io のボリュームの動的プロビジョニング",
+          "url": "https://kubernetes.io/ja/docs/concepts/storage/dynamic-provisioning/"
+        },
+        {
+          "label": "k3s の Volumes and Storage (Local Path Provisioner)",
+          "url": "https://docs.k3s.io/add-ons/storage"
+        },
+        {
+          "label": "k3s のソースのマニフェスト local-storage.yaml (v1.33.5+k3s1。手元では kubectl get storageclass local-path -o yaml で確かめる)",
+          "url": "https://raw.githubusercontent.com/k3s-io/k3s/v1.33.5%2Bk3s1/manifests/local-storage.yaml"
+        }
+      ]
+    }
+  ]
+}

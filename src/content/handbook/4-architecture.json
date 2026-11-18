@@ -1,0 +1,634 @@
+{
+  "domain": "Cloud Native Architecture",
+  "topics": [
+    {
+      "id": "observability",
+      "competency": "Observability",
+      "title": "オブザーバビリティ: ログ・メトリクス・トレースで中を知る",
+      "summary": "オブザーバビリティ (可観測性) は、システムが外に出すデータから中の状態を理解し、手を打てる度合いのことです。Kubernetes では、ログは kubectl logs、使用量のメトリクスは metrics-server と kubectl top、部品のメトリクスは /metrics、トレースは OpenTelemetry の形で扱います。集めたものを長く貯めて見るのは Prometheus などの別の道具の役目です。",
+      "flow": [
+        {
+          "text": "オブザーバビリティ (可観測性) は、システムが役に立つ手がかりをどれだけ外に出せるかを表す性質です。外への出力をもとに、システムの状態を理解して対処できるようにします。手がかりの代表は、ログ・メトリクス・トレースの 3 つで、OpenTelemetry の文書ではこれらをシグナルと呼びます。"
+        },
+        {
+          "text": "ログは、サービスや部品が出す時刻付きのメッセージです。コンテナのアプリは標準出力と標準エラーに書くのがいちばん簡単で広く使われるやり方で、kubectl logs で読めます。コンテナが落ちて再起動したときは、--previous (-p) で 1 つ前のコンテナのログを読みます。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl logs deployment/web --tail=5\nkubectl logs web-7c9f6d8b5-k2m4p --previous"
+          },
+          "output": "2026-11-18T09:12:01Z GET /healthz 200\n2026-11-18T09:12:11Z GET /healthz 200\n2026-11-18T09:12:15Z GET /api/orders 500\n2026-11-18T09:12:21Z GET /healthz 200\n2026-11-18T09:12:31Z GET /healthz 200"
+        },
+        {
+          "text": "コンテナがクラッシュしたり、Pod が消されたり、ノードが止まったりしたあとでも、ログを読みたいことがあります。そのためには、ログをノード・Pod・コンテナとは別の保存先と寿命で持ちます。これを「クラスターレベルロギング」と呼びます。Kubernetes はログの保存先を自分では持たないので、各ノードで動くロギングエージェント (全部のノードで動かすので DaemonSet で動かすことが勧められています) などで、別のバックエンドへ送ります。"
+        },
+        {
+          "text": "メトリクスは、インフラやアプリの数値を一定の時間ごとに集計したものです (エラー率・CPU 使用率・リクエストの数など)。CPU とメモリの使用量は、metrics-server が各ノードの kubelet から集め、API サーバーを通して Metrics API (metrics.k8s.io) として出します。kubectl top と HorizontalPodAutoscaler はこの API を読みます。k3s は metrics-server を同梱の部品として入れます。Metrics API は Kubernetes 1.37 で Stable になり、文書の例は metrics.k8s.io/v1 です。どの版が出るかはクラスタと metrics-server の版で変わり、k3s v1.36 では metrics.k8s.io/v1beta1 です。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl top pods -n kube-system --sort-by=memory"
+          },
+          "output": "NAME                                      CPU(cores)   MEMORY(bytes)\ntraefik-d7c9c5778-7gq2p                   2m           48Mi\nmetrics-server-5489f84d5d-7zwkt           6m           24Mi\ncoredns-6799fbcd5-x2k9q                   4m           19Mi\nlocal-path-provisioner-6c86858495-9wqkd   1m           8Mi\n(行の一部を省いた例です。k3s では ServiceLB の svclb-traefik-… と、部品を入れる helm-install-… の Pod も出ます)"
+        },
+        {
+          "text": "Kubernetes の部品も、自分の状態をメトリクスとして出します。多くの場合は HTTP の /metrics で、人も機械も読める Prometheus の形式 (構造のある平文) です。/metrics を読むには、その URL (非リソースの URL) に get できる権限が要ります。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl get --raw /metrics | grep apiserver_request_total | head -3"
+          },
+          "output": "# HELP apiserver_request_total [STABLE] Counter of apiserver requests broken out for each verb, dry run value, group, version, resource, scope, component, and HTTP response code.\n# TYPE apiserver_request_total counter\napiserver_request_total{code=\"200\",component=\"apiserver\",dry_run=\"\",group=\"\",resource=\"pods\",scope=\"namespace\",subresource=\"\",verb=\"LIST\",version=\"v1\"} 1342"
+        },
+        {
+          "text": "Prometheus は、メトリクスを時系列 (記録した時刻と値の並び) として集めて貯める道具です。対象の HTTP の口へ自分から取りに行く pull が基本で、対象はサービスディスカバリか静的な設定で見つけます。push は中継の gateway を通す形で扱えます。時系列はメトリクス名と、ラベルと呼ぶキーと値の組で見分けます。値の種類には、増える一方 (再起動で 0 に戻る) の Counter と、上がりも下がりもする Gauge などがあります。"
+        },
+        {
+          "text": "トレースは、1 つのリクエストがアプリの中を通る道筋です。道筋は処理ごとのスパンに分かれ、各スパンは名前・親のスパン ID・開始と終了の時刻・スパンコンテキスト (トレース ID とスパン ID) などを持ちます。Kubernetes の部品は OpenTelemetry のプロトコル (OTLP) の gRPC でトレースを送れて、既定の送り先は 4317 番です。OpenTelemetry Collector で受け取るときは、受け取り (receivers) と送り出し (exporters) を pipeline でつなぎます。OpenTelemetry は観測のバックエンドそのものではなく、保存と可視化は Jaeger や Prometheus などに任せます。",
+          "code": {
+            "language": "yaml",
+            "text": "receivers:\n  otlp:\n    protocols:\n      grpc:\nexporters:\n  # 本番では、使うバックエンドの exporter に差し替える\n  debug:\n    verbosity: detailed\nservice:\n  pipelines:\n    traces:\n      receivers: [otlp]\n      exporters: [debug]"
+          }
+        },
+        {
+          "text": "集めた数字は、目標と比べて初めて判断に使えます。SLI (Service Level Indicator) は、サービスの水準のある面を、定義をはっきりさせて数で測ったものです (リクエストの遅延など)。SLO (Service Level Objective) は、SLI で測った値の目標の値か範囲です。"
+        }
+      ],
+      "try": [
+        {
+          "goal": "落ちて再起動したコンテナの、前のログとイベントを読んでみたいなら",
+          "steps": [
+            {
+              "text": "練習用の名前空間を作り、起動して 1 行書き、5 秒後にわざと失敗して終わるコンテナの Pod を作ります。kubectl run の Pod は restartPolicy が Always なので、終わるたびに再起動されます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl create namespace try-kcna\nkubectl run crash -n try-kcna --image=busybox:1.36 -- sh -c 'echo \"started at $(date)\"; sleep 5; echo \"giving up\"; exit 1'"
+              },
+              "output": "namespace/try-kcna created\npod/crash created"
+            },
+            {
+              "text": "30 秒ほど待ってから状態を見ます。RESTARTS が増え、STATUS が CrashLoopBackOff になります。これは、失敗を繰り返すコンテナの再起動に、だんだん長くなる待ち時間 (バックオフ) がかかっている状態です。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl get pod crash -n try-kcna"
+              },
+              "output": "NAME    READY   STATUS             RESTARTS      AGE\ncrash   0/1     CrashLoopBackOff   2 (15s ago)   45s"
+            },
+            {
+              "text": "1 つ前のコンテナが書いたログを --previous で読み、この Pod に関わるイベントを並べます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl logs crash -n try-kcna --previous\nkubectl events -n try-kcna --for pod/crash"
+              },
+              "output": "started at Wed Nov 18 09:20:31 UTC 2026\ngiving up\nLAST SEEN   TYPE      REASON    OBJECT      MESSAGE\n50s         Normal    Pulled    Pod/crash   Container image \"busybox:1.36\" already present on machine\n20s         Warning   BackOff   Pod/crash   Back-off restarting failed container crash in pod crash_try-kcna(...)"
+            },
+            {
+              "text": "後片付けをします。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl delete namespace try-kcna"
+              },
+              "output": "namespace \"try-kcna\" deleted"
+            }
+          ]
+        },
+        {
+          "goal": "使用量のメトリクスが、どこから来ているかを確かめたいなら",
+          "steps": [
+            {
+              "text": "練習用の名前空間を作り、Pod を 1 つ動かします。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl create namespace try-kcna\nkubectl run web -n try-kcna --image=nginx:1.27"
+              },
+              "output": "namespace/try-kcna created\npod/web created"
+            },
+            {
+              "text": "k3s が同梱で入れる metrics-server が動いていることと、metrics.k8s.io の API が出ていることを確かめます。Metrics API は Kubernetes 1.37 で Stable になり、文書の例は metrics.k8s.io/v1 です。どの版が出るかはクラスタと metrics-server の版で変わり、k3s v1.36 では metrics.k8s.io/v1beta1 です。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl get deployment metrics-server -n kube-system\nkubectl api-resources --api-group=metrics.k8s.io"
+              },
+              "output": "NAME             READY   UP-TO-DATE   AVAILABLE   AGE\nmetrics-server   1/1     1            1           20d\nNAME    SHORTNAMES   APIVERSION               NAMESPACED   KIND\nnodes                metrics.k8s.io/v1beta1   false        NodeMetrics\npods                 metrics.k8s.io/v1beta1   true         PodMetrics"
+            },
+            {
+              "text": "1 分ほど待ってから、ノードと Pod の使用量を見ます。数値は metrics-server が kubelet から集めたものです。出たばかりの Pod は、まだ数値が無いと出ることがあります。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl top nodes\nkubectl top pods -n try-kcna"
+              },
+              "output": "NAME    CPU(cores)   CPU(%)   MEMORY(bytes)   MEMORY(%)\nk3s-1   212m         5%       1873Mi          24%\nNAME   CPU(cores)   MEMORY(bytes)\nweb    0m           3Mi"
+            },
+            {
+              "text": "部品が出すメトリクスを Prometheus の形式のまま読みます。/metrics への get の権限が要るので、権限の足りない利用者では Forbidden で失敗します (k3s の管理者用の kubeconfig なら読めます)。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl get --raw /metrics | grep '^# TYPE' | head -5"
+              },
+              "output": "# TYPE aggregator_discovery_aggregation_count_total counter\n# TYPE apiserver_admission_controller_admission_duration_seconds histogram\n# TYPE apiserver_audit_event_total counter\n# TYPE apiserver_audit_requests_rejected_total counter\n# TYPE apiserver_cache_list_fetched_objects_total counter"
+            },
+            {
+              "text": "後片付けをします。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl delete namespace try-kcna"
+              },
+              "output": "namespace \"try-kcna\" deleted"
+            }
+          ]
+        }
+      ],
+      "lessons": [
+        "w8-l1",
+        "w8-l2",
+        "w8-l3",
+        "w6-l4",
+        "w8-lab"
+      ],
+      "sources": [
+        {
+          "label": "CNCF クラウドネイティブ用語集: オブザーバビリティ (可観測性)",
+          "url": "https://glossary.cncf.io/ja/observability/"
+        },
+        {
+          "label": "OpenTelemetry: Observability primer",
+          "url": "https://opentelemetry.io/docs/concepts/observability-primer/"
+        },
+        {
+          "label": "OpenTelemetry: Traces",
+          "url": "https://opentelemetry.io/docs/concepts/signals/traces/"
+        },
+        {
+          "label": "OpenTelemetry: What is OpenTelemetry?",
+          "url": "https://opentelemetry.io/docs/what-is-opentelemetry/"
+        },
+        {
+          "label": "kubernetes.io: ロギングのアーキテクチャ",
+          "url": "https://kubernetes.io/ja/docs/concepts/cluster-administration/logging/"
+        },
+        {
+          "label": "kubernetes.io: kubectl logs",
+          "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_logs/"
+        },
+        {
+          "label": "kubernetes.io: kubectl events",
+          "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_events/"
+        },
+        {
+          "label": "kubernetes.io: Pod Lifecycle (CrashLoopBackOff)",
+          "url": "https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/"
+        },
+        {
+          "label": "kubernetes.io: Resource metrics pipeline",
+          "url": "https://kubernetes.io/docs/tasks/debug/debug-cluster/resource-metrics-pipeline/"
+        },
+        {
+          "label": "kubernetes.io: kubectl top pod",
+          "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_top/kubectl_top_pod/"
+        },
+        {
+          "label": "kubernetes.io: Metrics For Kubernetes System Components",
+          "url": "https://kubernetes.io/docs/concepts/cluster-administration/system-metrics/"
+        },
+        {
+          "label": "kubernetes.io: Traces For Kubernetes System Components",
+          "url": "https://kubernetes.io/docs/concepts/cluster-administration/system-traces/"
+        },
+        {
+          "label": "K3s: Managing Packaged Components",
+          "url": "https://docs.k3s.io/installation/packaged-components"
+        },
+        {
+          "label": "Prometheus: Overview",
+          "url": "https://prometheus.io/docs/introduction/overview/"
+        },
+        {
+          "label": "Prometheus: Metric types",
+          "url": "https://prometheus.io/docs/concepts/metric_types/"
+        },
+        {
+          "label": "Google SRE book: Service Level Objectives",
+          "url": "https://sre.google/sre-book/service-level-objectives/"
+        }
+      ]
+    },
+    {
+      "id": "cloud-native-principles",
+      "competency": "Cloud Native Ecosystem and Principles",
+      "title": "クラウドネイティブの考え方と、それを支える標準・オートスケール",
+      "summary": "クラウドネイティブは、コンテナ・マイクロサービス・イミュータブルインフラストラクチャ・宣言型 API などを組み合わせ、安全で回復性があり、可観測な疎結合のシステムを作り、自動化で変更を頻繁に予測どおりに出す実践です。Kubernetes は OCI・CRI・CNI・CSI といった公開の取り決めで部品を差し替えられるようにしています。負荷に合わせて増減するオートスケールと、使わないときは 0 まで縮めるサーバーレスもこの考え方の上にあります。",
+      "flow": [
+        {
+          "text": "CNCF (Cloud Native Computing Foundation) の定義 (v1.1、2024 年 2 月承認) では、クラウドネイティブの実践は、パブリック・プライベート・ハイブリッドのクラウドで、組織の求めに応じたワークロードを、大規模に、プログラムで繰り返せる形で開発・ビルド・デプロイできるようにするものです。安全で、回復性があり、管理しやすく、持続可能で、可観測な形で連携する疎結合のシステムが特徴です。技術と構成は、コンテナ・サービスメッシュ・マルチテナンシー・マイクロサービス・イミュータブルインフラストラクチャ・サーバーレス・宣言型 API などの組み合わせです (これで全部ではありません)。堅牢な自動化と組み合わせると、影響の大きい変更を頻繁に、予測どおりに、少ない手間で出せます。"
+        },
+        {
+          "text": "マイクロサービスは、アプリを特定の機能に絞った独立した小さなサービスに分ける作り方です。イミュータブルインフラストラクチャは、一度置いたら変更しないインフラのことで、コンテナがよい例です。コンテナに永続する変更を加えるには、新しい版のイメージを作るか、イメージからコンテナを作り直します。"
+        },
+        {
+          "text": "宣言型 API では「どうあってほしいか」(望ましい状態) を書き、手順は書きません。たとえば Deployment に理想的な状態を書くと、Deployment コントローラーが現在の状態を理想的な状態へ近づけていきます。Pod が落ちれば、Deployment が作った ReplicaSet のコントローラーが、数を保つために替わりの Pod を作るので、これが自己修復にもつながります。",
+          "code": {
+            "language": "yaml",
+            "text": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web\nspec:\n  replicas: 3          # 望ましい状態: Pod を 3 つ\n  selector:\n    matchLabels:\n      app: web\n  template:\n    metadata:\n      labels:\n        app: web\n    spec:\n      containers:\n      - name: web\n        image: nginx:1.27"
+          }
+        },
+        {
+          "text": "部品を特定の製品に縛らないために、公開の取り決め (オープンな標準) があります。OCI (Open Container Initiative) は 2015 年に Linux Foundation のもとで始まった集まりで、ランタイムの仕様 (runtime-spec)・イメージの仕様 (image-spec)・配布の仕様 (distribution-spec) を決めています。CRI (Container Runtime Interface) は kubelet とコンテナランタイムの間の主な gRPC のプロトコルで、kubelet はこれを通して containerd などのランタイムを使います。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl get nodes -o wide"
+          },
+          "output": "NAME    STATUS   VERSION        CONTAINER-RUNTIME\nk3s-1   Ready    v1.36.3+k3s1   containerd://2.3.4-k3s1.36\n(列の一部を省いた例です)"
+        },
+        {
+          "text": "ネットワークとストレージにも取り決めがあります。Kubernetes のネットワークのモデルは各ノードのコンテナランタイムが実装し、よく使われるランタイムは CNI (Container Network Interface) のプラグインでネットワークを扱います。k3s は既定で Flannel という CNI のプラグインを使います。ストレージでは CSI (Container Storage Interface) を実装したドライバを、Kubernetes 本体の外 (out-of-tree) のプラグインとして使えます。"
+        },
+        {
+          "text": "オートスケールは、負荷に合わせて資源を自動で増減することです。Pod の数を増減するのが横方向 (horizontal)、各 Pod に割り当てる資源を変えるのが縦方向 (vertical) のスケールです。HorizontalPodAutoscaler (HPA) は Kubernetes に入っていて、VerticalPodAutoscaler (VPA) は追加で入れる部品です。キューのメッセージの数などイベントの量で増減するなら、CNCF の Graduated のプロジェクトの KEDA があります。置き場の無い Pod のためにノードを足すのは、Cluster Autoscaler や Karpenter などのノードのオートスケーラーです。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl autoscale deployment php-apache --cpu=50% --min=1 --max=10"
+          },
+          "output": "horizontalpodautoscaler.autoscaling/php-apache autoscaled"
+        },
+        {
+          "text": "サーバーレスは、開発者がサーバーの管理を気にせずにアプリを作って動かせる開発のモデルです。サーバーはありますが開発からは見えなくなり、アプリは需要に応じて自動で増減します。Kubernetes の上のサーバーレスの仕組みの 1 つに Knative Serving があり、使われていないときに 0 まで縮める設定 (enable-scale-to-zero) の既定は true です。HPA で minReplicas を 0 にできるのは、custom (object) か external のメトリクスを使うときで、Kubernetes 1.37 からは、これを受け持つ機能ゲート HPAScaleToZero が既定で有効です (1.36 までは既定で無効の Alpha でした)。"
+        }
+      ],
+      "try": [
+        {
+          "goal": "HPA が負荷に合わせて Pod を増やすのを見てみたいなら",
+          "steps": [
+            {
+              "text": "練習用の名前空間を作り、kubernetes.io の例の php-apache (CPU を使う小さな Web サーバー) を Deployment と Service で動かします。CPU の requests が 200m に書いてあるので、HPA が使用率を計算できます。registry.k8s.io/hpa-example は amd64 (x86_64) 用のイメージだけです。arm64 のノード (Raspberry Pi など) では起動しないので、この手順は amd64 のノードで試してください。ノードの CPU の種類は kubectl get nodes -L kubernetes.io/arch の ARCH の列で見られます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl create namespace try-kcna\nkubectl apply -n try-kcna -f https://k8s.io/examples/application/php-apache.yaml"
+              },
+              "output": "namespace/try-kcna created\ndeployment.apps/php-apache created\nservice/php-apache created"
+            },
+            {
+              "text": "CPU の使用率 50% を目安に 1〜10 個で増減する HPA を作り、状態を見ます。使用率は metrics-server の数値から計算するので、k3s では同梱の metrics-server が動いている必要があります。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl autoscale deployment php-apache -n try-kcna --cpu=50% --min=1 --max=10\nkubectl get hpa php-apache -n try-kcna"
+              },
+              "output": "horizontalpodautoscaler.autoscaling/php-apache autoscaled\nNAME         REFERENCE               TARGETS       MINPODS   MAXPODS   REPLICAS   AGE\nphp-apache   Deployment/php-apache   cpu: 0%/50%   1         10        1          18s"
+            },
+            {
+              "text": "別の端末で、負荷をかける Pod を動かします (Ctrl+C で止めると Pod も消えます)。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl run -i --tty load-generator -n try-kcna --rm --image=busybox:1.28 --restart=Never -- /bin/sh -c \"while sleep 0.01; do wget -q -O- http://php-apache; done\""
+              },
+              "output": "OK!OK!OK!OK!OK!"
+            },
+            {
+              "text": "元の端末で HPA を見続けると、1 分ほどで使用率が上がり、REPLICAS が増えます。負荷を止めると、しばらくしてから 1 つに戻ります。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl get hpa php-apache -n try-kcna --watch"
+              },
+              "output": "NAME         REFERENCE               TARGETS         MINPODS   MAXPODS   REPLICAS   AGE\nphp-apache   Deployment/php-apache   cpu: 250%/50%   1         10        1          3m\nphp-apache   Deployment/php-apache   cpu: 250%/50%   1         10        5          3m15s"
+            },
+            {
+              "text": "後片付けをします。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl delete namespace try-kcna"
+              },
+              "output": "namespace \"try-kcna\" deleted"
+            }
+          ]
+        },
+        {
+          "goal": "宣言した状態に戻る (自己修復) のを確かめたいなら",
+          "steps": [
+            {
+              "text": "練習用の名前空間に、Pod を 3 つ持つ Deployment を作ります。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl create namespace try-kcna\nkubectl create deployment web -n try-kcna --image=nginx:1.27 --replicas=3\nkubectl get pods -n try-kcna"
+              },
+              "output": "namespace/try-kcna created\ndeployment.apps/web created\nNAME                   READY   STATUS    RESTARTS   AGE\nweb-6d4cf56db6-2xk8p   1/1     Running   0          10s\nweb-6d4cf56db6-9vq7m   1/1     Running   0          10s\nweb-6d4cf56db6-tz5lw   1/1     Running   0          10s"
+            },
+            {
+              "text": "Pod を 1 つ手で消し、すぐに一覧を見ます。消した Pod の替わりが作られ、3 つに戻ります (AGE の短い Pod が新しいものです)。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl delete -n try-kcna $(kubectl get pods -n try-kcna -l app=web -o name | head -1)\nkubectl get pods -n try-kcna"
+              },
+              "output": "pod \"web-6d4cf56db6-2xk8p\" deleted\nNAME                   READY   STATUS    RESTARTS   AGE\nweb-6d4cf56db6-9vq7m   1/1     Running   0          40s\nweb-6d4cf56db6-tz5lw   1/1     Running   0          40s\nweb-6d4cf56db6-xw2rd   1/1     Running   0          3s"
+            },
+            {
+              "text": "後片付けをします。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl delete namespace try-kcna"
+              },
+              "output": "namespace \"try-kcna\" deleted"
+            }
+          ]
+        },
+        {
+          "goal": "手元のクラスタが、どの標準の部品で動いているかを見たいなら",
+          "steps": [
+            {
+              "text": "この手順は読むだけで、何も作りません。ノードの CRI のランタイムと版を CONTAINER-RUNTIME の列で見ます。k3s では containerd が出ます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl get nodes -o wide"
+              },
+              "output": "NAME    STATUS   VERSION        CONTAINER-RUNTIME\nk3s-1   Ready    v1.36.3+k3s1   containerd://2.3.4-k3s1.36\n(列の一部を省いた例です)"
+            },
+            {
+              "text": "クラスタで動いている部品を、Pod とイメージの一覧で書き出します。k3s の Flannel (CNI) は k3s の中に組み込まれているので、この一覧には Pod として出ません。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl get pods -A -o custom-columns='NAMESPACE:.metadata.namespace,NAME:.metadata.name,IMAGE:.spec.containers[*].image'"
+              },
+              "output": "NAMESPACE     NAME                                      IMAGE\nkube-system   coredns-6799fbcd5-x2k9q                   rancher/mirrored-coredns-coredns:1.12.3\nkube-system   local-path-provisioner-6c86858495-9wqkd   rancher/local-path-provisioner:v0.0.31\nkube-system   metrics-server-5489f84d5d-7zwkt           rancher/mirrored-metrics-server:v0.8.0\nkube-system   traefik-d7c9c5778-7gq2p                   rancher/mirrored-library-traefik:3.3.6\n(行の一部を省いた例です。k3s では ServiceLB の svclb-traefik-… と、部品を入れる helm-install-… の Pod も出ます)"
+            }
+          ]
+        }
+      ],
+      "lessons": [
+        "w8-l3",
+        "w8-l4",
+        "w1-l3",
+        "w5-l4",
+        "w8-lab",
+        "w2-l3"
+      ],
+      "sources": [
+        {
+          "label": "CNCF のクラウドネイティブの定義 v1.1 (日本語版は v1.0 の訳)",
+          "url": "https://github.com/cncf/toc/blob/main/DEFINITION.md"
+        },
+        {
+          "label": "CNCF クラウドネイティブ用語集: クラウドネイティブテクノロジー",
+          "url": "https://glossary.cncf.io/ja/cloud-native-tech/"
+        },
+        {
+          "label": "CNCF クラウドネイティブ用語集: マイクロサービスアーキテクチャ",
+          "url": "https://glossary.cncf.io/ja/microservices-architecture/"
+        },
+        {
+          "label": "CNCF クラウドネイティブ用語集: イミュータブルインフラストラクチャ",
+          "url": "https://glossary.cncf.io/ja/immutable-infrastructure/"
+        },
+        {
+          "label": "CNCF クラウドネイティブ用語集: オートスケーリング",
+          "url": "https://glossary.cncf.io/ja/auto-scaling/"
+        },
+        {
+          "label": "CNCF クラウドネイティブ用語集: サーバーレス",
+          "url": "https://glossary.cncf.io/ja/serverless/"
+        },
+        {
+          "label": "kubernetes.io: Deployment",
+          "url": "https://kubernetes.io/ja/docs/concepts/workloads/controllers/deployment/"
+        },
+        {
+          "label": "kubernetes.io: Kubernetes Self-Healing",
+          "url": "https://kubernetes.io/docs/concepts/architecture/self-healing/"
+        },
+        {
+          "label": "OCI: About the Open Container Initiative",
+          "url": "https://opencontainers.org/about/overview/"
+        },
+        {
+          "label": "kubernetes.io: コンテナランタイムインターフェース (CRI)",
+          "url": "https://kubernetes.io/ja/docs/concepts/architecture/cri/"
+        },
+        {
+          "label": "kubernetes.io: Find Out What Container Runtime is Used on a Node",
+          "url": "https://kubernetes.io/docs/tasks/administer-cluster/migrating-from-dockershim/find-out-runtime-you-use/"
+        },
+        {
+          "label": "kubernetes.io: Cluster Networking",
+          "url": "https://kubernetes.io/docs/concepts/cluster-administration/networking/"
+        },
+        {
+          "label": "K3s: Basic Network Options (Flannel)",
+          "url": "https://docs.k3s.io/networking/basic-network-options"
+        },
+        {
+          "label": "kubernetes.io: Volumes (CSI)",
+          "url": "https://kubernetes.io/docs/concepts/storage/volumes/"
+        },
+        {
+          "label": "kubernetes.io: Autoscaling Workloads",
+          "url": "https://kubernetes.io/docs/concepts/workloads/autoscaling/"
+        },
+        {
+          "label": "kubernetes.io: Node Autoscaling",
+          "url": "https://kubernetes.io/docs/concepts/cluster-administration/node-autoscaling/"
+        },
+        {
+          "label": "kubernetes.io: Horizontal Pod Autoscaling",
+          "url": "https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/"
+        },
+        {
+          "label": "kubernetes.io: HorizontalPodAutoscaler Walkthrough",
+          "url": "https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale-walkthrough/"
+        },
+        {
+          "label": "kubernetes.io: kubectl autoscale",
+          "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_autoscale/"
+        },
+        {
+          "label": "Knative: Configuring scale to zero",
+          "url": "https://knative.dev/docs/serving/autoscaling/scale-to-zero/"
+        },
+        {
+          "label": "K3s: Managing Packaged Components",
+          "url": "https://docs.k3s.io/installation/packaged-components"
+        }
+      ]
+    },
+    {
+      "id": "cloud-native-community",
+      "competency": "Cloud Native Community and Collaboration",
+      "title": "クラウドネイティブのコミュニティと、一緒に作る仕組み",
+      "summary": "CNCF は、オープンソースで業者に中立なプロジェクトを育てる財団で、TOC がプロジェクトを Sandbox・Incubating・Graduated の段階で受け入れて見守ります。Kubernetes プロジェクトの中は SIG・WG・Committee に分かれ、新しい機能は KEP で提案し、年に約 3 回のリリースで alpha・beta・GA と段階を上げていきます。参加する人は行動規範と CLA に従います。",
+      "flow": [
+        {
+          "text": "CNCF (Cloud Native Computing Foundation) は、オープンソースで業者に中立 (vendor-neutral) なプロジェクトの生態系を育てて保つことで、クラウドネイティブの考え方を広めようとしています。CNCF の技術の統治機関が TOC (Technical Oversight Committee) で、CNCF のすべてのプロジェクトを受け入れて見守ります。"
+        },
+        {
+          "text": "TOC はプロジェクトの段階を 4 つ決めています。Sandbox は開発の初期の試しのプロジェクト、Incubation (Incubating) は採用が広がり安定と成熟に取り組むプロジェクト、Graduated は採用者が本番で使って成熟を示したプロジェクト、Archived は活動が止まったか使うことを勧めないプロジェクトです。Incubating と Graduated へ上がるときは、条件を満たしたかを TOC が Due Diligence で調べ、TOC の 2/3 以上 (supermajority) の賛成で決まります。Sandbox へは cncf/sandbox のリポジトリの申し込みの手順で入ります。"
+        },
+        {
+          "text": "たとえば Prometheus は、2016 年 5 月 9 日に Kubernetes に次ぐ 2 つ目のプロジェクトとして Incubating で受け入れられ、2018 年 8 月 9 日に Graduated になりました。プロジェクトごとの段階は cncf.io/projects の各ページで確かめられます。"
+        },
+        {
+          "text": "TOC のもとには、分野ごとに技術の助言をする TAG (Technical Advisory Group) があります。いまの TAG は Developer Experience・Infrastructure・Operational Resilience・Security and Compliance・Workloads Foundation です。TAG Observability などの以前の TAG は Archived の一覧に移っています。"
+        },
+        {
+          "text": "Kubernetes プロジェクトの中は、主に SIG (Special Interest Group) に分かれています。各 SIG は Networking や Documentation のような特定の話題を受け持ち、複数の会社や組織の人で構成され、担当の範囲や決め方を書いた charter を持ちます。SIG をまたぐ話題や短い期間の話題は WG (Working Group) で話し合います。Security や Code of Conduct のように慎重さが要る話題は、Steering Committee が作る Committee が受け持ち、こちらは誰でも入れるわけではありません。"
+        },
+        {
+          "text": "新しい取り組みは KEP (Kubernetes Enhancement Proposal) で提案し、話し合って調整します。KEP の手順は、まずアイデアを後ろ盾になる SIG に持ちかけるところから始まります。リリースはいまは年に約 3 回で、Kubernetes プロジェクトは最新の 3 つのマイナーリリースのブランチを保守し、1.19 以降の版は約 1 年のパッチのサポートを受けます。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl version"
+          },
+          "output": "Client Version: v1.37.2\nKustomize Version: v5.8.1\nServer Version: v1.36.3+k3s1"
+        },
+        {
+          "text": "機能は Alpha・Beta・GA の段階を踏みます。Alpha の機能は既定で無効で、予告なく取り下げられることがあります。Beta の機能はふつう既定で有効で、よく試されています (ただし Beta の API グループは既定で無効です)。GA (stable) の機能は常に有効で、無効にできません。API の版の名前 (v1alpha1・v1beta1・v1) にもこの段階が表れていて、GA の API の版は非推奨になっても、メジャーバージョンの中では取り除かれません。ここに出る alpha・beta の版の多くは Kubernetes 本体のものではなく、CRD で足した API (traefik.io など) や、metrics-server が足した API (metrics.k8s.io) です。本体の新しい Beta の API は、1.24 から既定で有効になりません。",
+          "code": {
+            "language": "bash",
+            "text": "kubectl api-versions | grep -E 'alpha|beta'"
+          },
+          "output": "metrics.k8s.io/v1beta1\ntraefik.io/v1alpha1\n(クラスタによっては gateway.networking.k8s.io/v1beta1 なども出ます)"
+        },
+        {
+          "text": "コミュニティに参加する人は行動規範 (Code of Conduct) に従います。CNCF には CNCF Community Code of Conduct があり、Kubernetes のコミュニティでの出来事は Kubernetes Code of Conduct Committee に知らせます。Kubernetes の貢献者は全員 CNCF の CLA (Contributor License Agreement) に署名します。"
+        }
+      ],
+      "try": [
+        {
+          "goal": "手元のクラスタの版が、まだ保守されている版かを確かめたいなら",
+          "steps": [
+            {
+              "text": "この手順は読むだけで、何も作りません。クライアント (kubectl) とサーバーの版を見ます。k3s の版は v1.36.3+k3s1 のように、Kubernetes の版に +k3s が付いた形です。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl version"
+              },
+              "output": "Client Version: v1.37.2\nKustomize Version: v5.8.1\nServer Version: v1.36.3+k3s1"
+            },
+            {
+              "text": "Server Version のマイナー版 (例の 1.36) が、kubernetes.io/releases に並ぶ最新の 3 つのマイナーリリースに入っているかを見比べます。入っていなければ、そのマイナー版のブランチはもう保守されていません。"
+            }
+          ]
+        },
+        {
+          "goal": "クラスタの部品が、CNCF のどの段階のプロジェクトかを調べたいなら",
+          "steps": [
+            {
+              "text": "練習用の名前空間を作り、Prometheus の部品のイメージを使う Pod を 1 つ動かします (中身は動かすだけで、集めた数字は使いません)。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl create namespace try-kcna\nkubectl run prom -n try-kcna --image=prom/prometheus:v3.5.0"
+              },
+              "output": "namespace/try-kcna created\npod/prom created"
+            },
+            {
+              "text": "クラスタ全体の Pod のイメージを書き出し、どのプロジェクトの部品かを読み取ります (coredns・traefik・local-path-provisioner・metrics-server・prometheus など)。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl get pods -A -o custom-columns='NAMESPACE:.metadata.namespace,NAME:.metadata.name,IMAGE:.spec.containers[*].image'"
+              },
+              "output": "NAMESPACE     NAME                                      IMAGE\nkube-system   coredns-6799fbcd5-x2k9q                   rancher/mirrored-coredns-coredns:1.12.3\nkube-system   metrics-server-5489f84d5d-7zwkt           rancher/mirrored-metrics-server:v0.8.0\nkube-system   traefik-d7c9c5778-7gq2p                   rancher/mirrored-library-traefik:3.3.6\ntry-kcna      prom                                      prom/prometheus:v3.5.0\n(行の一部を省いた例です。k3s では ServiceLB の svclb-traefik-… と、部品を入れる helm-install-… の Pod も出ます)"
+            },
+            {
+              "text": "書き出した部品を、cncf.io/projects (Graduated と Incubating)・cncf.io/sandbox-projects/ (Sandbox)・cncf.io/archived-projects/ (Archived) で探し、Graduated・Incubating・Sandbox・Archived のどれかを書き出します。見つからないもの (CNCF のプロジェクトではない、または別のプロジェクトの一部) はそう書きます。たとえば Prometheus のページには、Incubating で受け入れられた日と Graduated になった日が載っています。"
+            },
+            {
+              "text": "後片付けをします。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl delete namespace try-kcna"
+              },
+              "output": "namespace \"try-kcna\" deleted"
+            }
+          ]
+        },
+        {
+          "goal": "API の段階 (alpha・beta・stable) を手元で確かめたいなら",
+          "steps": [
+            {
+              "text": "この手順は読むだけで、何も作りません。クラスタが出している API の版のうち、alpha と beta のものを並べます。出てくるものはクラスタの版と設定で変わります。ここに出る alpha・beta の版の多くは Kubernetes 本体のものではなく、CRD で足した API (traefik.io など) や、metrics-server が足した API (metrics.k8s.io) です。本体の新しい Beta の API は、1.24 から既定で有効になりません。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl api-versions | grep -E 'alpha|beta'"
+              },
+              "output": "metrics.k8s.io/v1beta1\ntraefik.io/v1alpha1\n(クラスタによっては gateway.networking.k8s.io/v1beta1 なども出ます)"
+            },
+            {
+              "text": "kubectl api-resources は、グループごとに優先の版 (preferred version) を出します。HorizontalPodAutoscaler は GA の autoscaling/v2 が優先で、同じく GA の autoscaling/v1 も出ています。グループの全部の版は kubectl api-versions | grep '^autoscaling/' で見られます。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl api-resources --api-group=autoscaling\nkubectl api-versions | grep '^autoscaling/'"
+              },
+              "output": "NAME                       SHORTNAMES   APIVERSION       NAMESPACED   KIND\nhorizontalpodautoscalers   hpa          autoscaling/v2   true         HorizontalPodAutoscaler\nautoscaling/v1\nautoscaling/v2"
+            }
+          ]
+        }
+      ],
+      "lessons": [
+        "w8-l4",
+        "w8-lab"
+      ],
+      "sources": [
+        {
+          "label": "CNCF のクラウドネイティブの定義 (日本語版あり)",
+          "url": "https://github.com/cncf/toc/blob/main/DEFINITION.md"
+        },
+        {
+          "label": "CNCF TOC (TOC と TAG の一覧)",
+          "url": "https://github.com/cncf/toc"
+        },
+        {
+          "label": "CNCF TOC: Project lifecycle and process",
+          "url": "https://github.com/cncf/toc/blob/main/process/README.md"
+        },
+        {
+          "label": "CNCF: Graduated and Incubating Projects",
+          "url": "https://www.cncf.io/projects/"
+        },
+        {
+          "label": "CNCF: Prometheus",
+          "url": "https://www.cncf.io/projects/prometheus/"
+        },
+        {
+          "label": "Kubernetes community: governance",
+          "url": "https://github.com/kubernetes/community/blob/master/governance.md"
+        },
+        {
+          "label": "Kubernetes Enhancement Proposals (KEPs)",
+          "url": "https://github.com/kubernetes/enhancements/blob/master/keps/README.md"
+        },
+        {
+          "label": "kubernetes.io: Kubernetes Release Cycle",
+          "url": "https://kubernetes.io/releases/release/"
+        },
+        {
+          "label": "kubernetes.io: Releases",
+          "url": "https://kubernetes.io/ja/releases/"
+        },
+        {
+          "label": "kubernetes.io: Feature Gates (Feature stages)",
+          "url": "https://kubernetes.io/docs/reference/command-line-tools-reference/feature-gates/"
+        },
+        {
+          "label": "kubernetes.io: Kubernetes Deprecation Policy",
+          "url": "https://kubernetes.io/docs/reference/using-api/deprecation-policy/"
+        },
+        {
+          "label": "kubernetes.io: The Kubernetes API (API versioning)",
+          "url": "https://kubernetes.io/docs/concepts/overview/kubernetes-api/"
+        },
+        {
+          "label": "kubernetes.io: kubectl version",
+          "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_version/"
+        },
+        {
+          "label": "kubernetes.io: kubectl api-versions",
+          "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_api-versions/"
+        },
+        {
+          "label": "CNCF Community Code of Conduct",
+          "url": "https://github.com/cncf/foundation/blob/main/code-of-conduct.md"
+        },
+        {
+          "label": "CNCF の Sandbox のプロジェクト",
+          "url": "https://www.cncf.io/sandbox-projects/"
+        },
+        {
+          "label": "CNCF の Archived のプロジェクト",
+          "url": "https://www.cncf.io/archived-projects/"
+        }
+      ]
+    }
+  ]
+}
