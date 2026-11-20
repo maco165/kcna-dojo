@@ -101,6 +101,8 @@ async function run(browser, name, width, height) {
   check(await page.getByText('0 / 30 XP').isVisible(), `${tag} 今日の目標は 0 / 30 XP`);
   check((await page.title()).startsWith('クラネイ'), `${tag} ページの題がクラネイで始まる`);
   check(await page.getByText('クラネイ', { exact: true }).first().isVisible(), `${tag} サイト名クラネイが出る`);
+  const preRead = page.getByRole('navigation', { name: '先に読むハンドブック' });
+  check((await preRead.locator('a[href="/kcna-dojo/handbook/containerization/"]').count()) === 1, `${tag} ホームに、その週で先に読むハンドブックのトピックが出る`);
   await noHorizontalOverflow(page, width, `${tag} ホーム`);
 
   // 2. 4 択のレッスンを解く (1 問目は不正解、残りは正解)
@@ -596,6 +598,7 @@ async function run(browser, name, width, height) {
   await page.waitForURL(/\/lesson\//);
   check(true, `${tag} ハンドブックから練習のレッスンへ飛べる`);
   await page.goto(`${BASE}guide/`);
+  check(await page.getByRole('heading', { name: '学び方' }).isVisible(), `${tag} 説明のページに学び方が出る`);
   await page.getByRole('link', { name: 'Kubernetes Core Concepts' }).click();
   await page.waitForURL(/\/handbook\/core-concepts\//);
   check(true, `${tag} 説明のページの学習要領の表からハンドブックへ飛べる`);
