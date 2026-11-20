@@ -35,6 +35,16 @@ describe('check-content', { timeout: 30_000 }, () => {
     expect(r.out).toContain('OK');
   });
 
+  it('実習は、分かること・用意するものと、打つ手順ごとの「うまくいくと」が無いと落ちる', () => {
+    const lab = (d: any) => d.lessons.find((l: any) => l.kind === 'lab');
+    expect(run(mutate('week1', (d) => delete lab(d).goal)).out).toMatch(/goal/);
+    expect(run(mutate('week1', (d) => (lab(d).needs = []))).out).toMatch(/needs/);
+    const noExpect = run(mutate('week1', (d) => delete lab(d).steps.find((s: any) => s.command).expect));
+    expect(noExpect.code).not.toBe(0);
+    expect(noExpect.out).toMatch(/expect/);
+    expect(run(mutate('week1', (d) => (lab(d).steps[0].stuck = ''))).out).toMatch(/stuck/);
+  });
+
   it('模擬試験用のファイル (exam/ の下) は week 0 で、x- の quiz と x- の問題だけを許す', () => {
     const toExam = (d: any) => {
       d.week = 0;

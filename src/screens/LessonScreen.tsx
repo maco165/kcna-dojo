@@ -1,7 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Button } from '@astryxdesign/core/Button';
 import { CheckboxList, CheckboxListItem } from '@astryxdesign/core/CheckboxList';
-import { Code } from '@astryxdesign/core/Code';
 import { Link } from '@astryxdesign/core/Link';
 import { List, ListItem } from '@astryxdesign/core/List';
 import { ProgressBar } from '@astryxdesign/core/ProgressBar';
@@ -16,7 +15,8 @@ import type { LabLesson, Lesson, Question, QuizLesson } from '../content/types';
 import { XP_PER_CORRECT, XP_PER_LAB } from '../lib/grade';
 import { answerHistory, completeLesson, currentStreak, goalXp, recordAnswer, todayXp, type Progress } from '../lib/progress';
 import { shuffleChoices } from '../lib/shuffle';
-import { weekHref } from '../lib/route';
+import { WEEKS } from '../content/curriculum';
+import { handbookHref, weekHref } from '../lib/route';
 import { WIDE_QUERY, useMediaQuery } from '../lib/useMediaQuery';
 
 type Props = {
@@ -200,6 +200,7 @@ function LabRun({ lesson, week, progress, updateProgress }: Props & { lesson: La
   const [finished, setFinished] = useState(false);
   const total = lesson.steps.length;
   const allDone = checked.length === total;
+  const read = WEEKS.find((w) => w.week === week)?.read ?? [];
 
   const finish = () => {
     updateProgress((p) => completeLesson(p, lesson.id, { correct: 1, total: 1 }, XP_PER_LAB, new Date()));
@@ -229,9 +230,62 @@ function LabRun({ lesson, week, progress, updateProgress }: Props & { lesson: La
       <main className="lesson__main">
         <VStack gap={5}>
           <QuestionHead kind="実習 · 家のクラスタ (k3s) で動かす" domain={lesson.domain} prompt={lesson.title} />
-          <CheckboxList label="手順" description="1 つずつ動かし、できたら印を付けます" value={checked} onChange={setChecked} hasDividers>
+          <section className="lab-prep" aria-labelledby="lab-prep-title">
+            <h2 id="lab-prep-title" className="h-sm">
+              始める前に
+            </h2>
+            <dl className="lab-prep__list">
+              <dt>この実習で分かること</dt>
+              <dd>{lesson.goal}</dd>
+              <dt>用意するもの</dt>
+              <dd>
+                <ul>
+                  {lesson.needs.map((n) => (
+                    <li key={n}>{n}</li>
+                  ))}
+                </ul>
+                <a href={handbookHref('setup-k3s')}>クラスタがまだ無い人は: k3s の入れ方</a>
+              </dd>
+              <dt>先に読む</dt>
+              <dd className="lab-prep__chips">
+                {read.map((r) => (
+                  <a key={r.topic} className="gloss-chip" href={handbookHref(r.topic)}>
+                    {r.label}
+                  </a>
+                ))}
+              </dd>
+            </dl>
+          </section>
+          <CheckboxList label="手順" description="上から順に 1 つずつ動かし、「うまくいくと」のとおりになったら印を付けます" value={checked} onChange={setChecked} hasDividers>
             {lesson.steps.map((s, i) => (
-              <CheckboxListItem key={i} value={String(i)} label={`${i + 1}. ${s.text}`} description={s.command ? <Code>{s.command}</Code> : undefined} />
+              <CheckboxListItem
+                key={i}
+                value={String(i)}
+                label={`手順 ${i + 1}`}
+                description={
+                  <span className="lab-step">
+                    {/* 文は切らずに全部出す (部品の label は 1 行で切れる)。コマンドは改行をそのまま出す (貼って動く形を崩さない) */}
+                    <span className="lab-step__text">{s.text}</span>
+                    {s.command && (
+                      <code className="lab-step__code" translate="no">
+                        {s.command}
+                      </code>
+                    )}
+                    {s.expect && (
+                      <span className="lab-step__note">
+                        <span className="lab-step__tag lab-step__tag--ok">うまくいくと</span>
+                        {s.expect}
+                      </span>
+                    )}
+                    {s.stuck && (
+                      <span className="lab-step__note">
+                        <span className="lab-step__tag lab-step__tag--stuck">つまずいたら</span>
+                        {s.stuck}
+                      </span>
+                    )}
+                  </span>
+                }
+              />
             ))}
           </CheckboxList>
           <Text type="supporting">

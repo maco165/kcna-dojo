@@ -877,34 +877,48 @@
       "summary": "家のクラスタで手を動かす · 7 手順",
       "domain": "Cloud Native Application Delivery",
       "source": "https://helm.sh/docs/intro/using_helm/",
+      "goal": "同じアプリを Helm と Kustomize の両方で入れ、「値を渡してテンプレートから描く」と「元の YAML に上書きを重ねる」の違いを手で確かめます。",
+      "needs": [
+        "k3s のクラスタと、そこにつながる kubectl (k3s のマシンの上なら sudo k3s kubectl でも同じ)",
+        "helm (入れ方は手順 1 のリンク)",
+        "helm が kubectl と同じクラスタにつながること (k3s のマシンでは、環境変数 KUBECONFIG に /etc/rancher/k3s/k3s.yaml を指す)"
+      ],
       "steps": [
         {
           "text": "helm を入れた端末で (入れ方: https://helm.sh/docs/intro/install/)、nginx を動かす見本のチャートのひな形を作る (hello/ に Chart.yaml・values.yaml・templates/ ができる)",
-          "command": "helm create hello"
+          "command": "helm create hello",
+          "expect": "Creating hello と出て、hello というフォルダができる"
         },
         {
           "text": "dojo という namespace に、リリース hello として入れる (REVISION: 1 と出る)",
-          "command": "helm install hello ./hello -n dojo --create-namespace"
+          "command": "helm install hello ./hello -n dojo --create-namespace",
+          "expect": "STATUS: deployed と REVISION: 1 が出る",
+          "stuck": "Kubernetes cluster unreachable と出たら、用意するものの KUBECONFIG を確かめる"
         },
         {
           "text": "--set で replicaCount を 2 にして upgrade し、リビジョンが 2 に増えたことと Pod が 2 つになったことを確かめる",
-          "command": "helm upgrade hello ./hello -n dojo --set replicaCount=2 && helm history hello -n dojo && kubectl get pods -n dojo"
+          "command": "helm upgrade hello ./hello -n dojo --set replicaCount=2 &&\nhelm history hello -n dojo &&\nkubectl get pods -n dojo",
+          "expect": "history に REVISION 1 (superseded) と 2 (deployed) が並び、Pod が 2 つ出る"
         },
         {
           "text": "同じものを Kustomize で書くため、Helm の側と同じ replicaCount=2 でチャートを手元で描いた YAML を base にする (テストの Pod は除く)",
-          "command": "mkdir -p kust/base kust/overlays/home && helm template hello ./hello --set replicaCount=2 --skip-tests > kust/base/hello.yaml && printf 'resources:\\n  - hello.yaml\\n' > kust/base/kustomization.yaml"
+          "command": "mkdir -p kust/base kust/overlays/home &&\nhelm template hello ./hello --set replicaCount=2 --skip-tests > kust/base/hello.yaml &&\nprintf 'resources:\\n  - hello.yaml\\n' > kust/base/kustomization.yaml",
+          "expect": "何も出ない。ls kust/base で hello.yaml と kustomization.yaml が見える"
         },
         {
           "text": "overlay を書く。base を指し、namespace を dojo-kust に、名前の頭に k- を付ける (書き方は https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/ を見る)",
-          "command": "printf 'resources:\\n  - ../../base\\nnamespace: dojo-kust\\nnamePrefix: k-\\n' > kust/overlays/home/kustomization.yaml"
+          "command": "printf 'resources:\\n  - ../../base\\nnamespace: dojo-kust\\nnamePrefix: k-\\n' > kust/overlays/home/kustomization.yaml",
+          "expect": "何も出ない。cat kust/overlays/home/kustomization.yaml で 4 行が見える"
         },
         {
           "text": "当てる前に組み立てた結果を見て、名前が k-hello になっていることを確かめてから、kubectl apply -k で当てる",
-          "command": "kubectl kustomize kust/overlays/home | grep 'name: k-' && kubectl create namespace dojo-kust && kubectl apply -k kust/overlays/home"
+          "command": "kubectl kustomize kust/overlays/home | grep 'name: k-' &&\nkubectl create namespace dojo-kust &&\nkubectl apply -k kust/overlays/home",
+          "expect": "name: k-hello を含む行が出たあと、namespace/dojo-kust created と、serviceaccount・service・deployment の created が並ぶ"
         },
         {
           "text": "Helm の側と Kustomize の側の両方で Pod が動いていることを確かめてから、片付ける",
-          "command": "kubectl get deploy -n dojo && kubectl get deploy -n dojo-kust && kubectl delete -k kust/overlays/home && kubectl delete namespace dojo-kust && helm uninstall hello -n dojo && kubectl delete namespace dojo"
+          "command": "kubectl get deploy -n dojo &&\nkubectl get deploy -n dojo-kust &&\nkubectl delete -k kust/overlays/home &&\nkubectl delete namespace dojo-kust &&\nhelm uninstall hello -n dojo &&\nkubectl delete namespace dojo",
+          "expect": "dojo に hello、dojo-kust に k-hello の Deployment が出たあと、deleted と release \"hello\" uninstalled が並ぶ"
         }
       ]
     }

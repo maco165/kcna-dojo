@@ -85,10 +85,15 @@ for (const file of files) {
 
     if (lesson?.kind === 'lab') {
       if (!isHttpsUrl(lesson.source)) ng(lid, 'source (出典の https の URL) がありません');
+      if (!isNonEmptyString(lesson.goal)) ng(lid, 'goal (この実習で分かること) がありません');
+      if (!Array.isArray(lesson.needs) || lesson.needs.length === 0 || !lesson.needs.every(isNonEmptyString)) ng(lid, 'needs (用意するもの) が 1 つ以上要ります');
       if (!Array.isArray(lesson.steps) || lesson.steps.length === 0) ng(lid, 'steps がありません');
       for (const [si, step] of (lesson.steps ?? []).entries()) {
         if (!isNonEmptyString(step?.text)) ng(lid, `steps[${si}] に text がありません`);
         if (step?.command !== undefined && !isNonEmptyString(step.command)) ng(lid, `steps[${si}] の command が空です`);
+        // 初めての人が成功かどうかを見分けられるよう、打つ手順には見えるはずのものを必ず書く
+        if (step?.command !== undefined && !isNonEmptyString(step.expect)) ng(lid, `steps[${si}] に expect (うまくいくと見えるもの) がありません`);
+        if (step?.stuck !== undefined && !isNonEmptyString(step.stuck)) ng(lid, `steps[${si}] の stuck が空です`);
       }
       continue;
     }

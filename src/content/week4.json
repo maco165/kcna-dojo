@@ -767,34 +767,48 @@
       "summary": "家のクラスタで手を動かす · 7 手順",
       "domain": "Kubernetes Fundamentals",
       "source": "https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale-walkthrough/",
+      "goal": "Pod が Pending のまま止まったときに、理由を Events から読めるようになります。HPA が requests を基準に使用率を測ることも確かめます。",
+      "needs": [
+        "k3s のクラスタと、そこにつながる kubectl (k3s のマシンの上なら sudo k3s kubectl でも同じ)",
+        "metrics-server (k3s には同梱。外していなければそのまま使える)"
+      ],
       "steps": [
         {
           "text": "どのノードにも収まらない大きな CPU の requests (100 個分) を持つ Pod を作る",
-          "command": "kubectl run big --image=nginx:1.27-alpine --overrides='{\"spec\":{\"containers\":[{\"name\":\"big\",\"image\":\"nginx:1.27-alpine\",\"resources\":{\"requests\":{\"cpu\":\"100\"}}}]}}'"
+          "command": "kubectl run big --image=nginx:1.27-alpine --overrides='{\"spec\":{\"containers\":[{\"name\":\"big\",\"image\":\"nginx:1.27-alpine\",\"resources\":{\"requests\":{\"cpu\":\"100\"}}}]}}'",
+          "expect": "pod/big created と出る (作れても、置くノードは決まらない)"
         },
         {
           "text": "STATUS が Pending のままで、NODE が <none> (どこにも置かれていない) ことを確かめる",
-          "command": "kubectl get pod big -o wide"
+          "command": "kubectl get pod big -o wide",
+          "expect": "STATUS が Pending、NODE が <none>"
         },
         {
           "text": "Events の FailedScheduling に Insufficient cpu が出ていることを読む (フィルタリングで全ノードが外れた) (ほかの理由が並ぶこともある。フィルタリングで全ノードが外れた)",
-          "command": "kubectl describe pod big"
+          "command": "kubectl describe pod big",
+          "expect": "最後の Events に Warning FailedScheduling と Insufficient cpu が出る"
         },
         {
           "text": "HPA の対象にする Deployment を作り、CPU の requests を付ける (HPA の使用率は requests に対する割合なので要る)",
-          "command": "kubectl create deployment web --image=nginx:1.27-alpine && kubectl set resources deployment web --requests=cpu=100m"
+          "command": "kubectl create deployment web --image=nginx:1.27-alpine &&\nkubectl set resources deployment web --requests=cpu=100m",
+          "expect": "deployment.apps/web created と deployment.apps/web resource requirements updated が出る"
         },
         {
           "text": "CPU の使用率 50% を目標に、1〜3 個で増減させる HPA を付ける (k3s は metrics-server を同梱しているので、そのまま使える。kubectl 1.33 以前 では --cpu の代わりに --cpu-percent=50)",
-          "command": "kubectl autoscale deployment web --min=1 --max=3 --cpu=50%"
+          "command": "kubectl autoscale deployment web --min=1 --max=3 --cpu=50%",
+          "expect": "horizontalpodautoscaler.autoscaling/web autoscaled と出る",
+          "stuck": "unknown flag: --cpu と出たら、--cpu=50% を --cpu-percent=50 に替える"
         },
         {
           "text": "1〜2 分待って、TARGETS に今の使用率と目標 (例: cpu: 0%/50%) が出ることを確かめる (<unknown> のままならメトリクスが取れていない)",
-          "command": "kubectl get hpa web"
+          "command": "kubectl get hpa web",
+          "expect": "TARGETS が cpu: 0%/50% のように数字になり、REPLICAS が 1",
+          "stuck": "<unknown> のままなら、もう 1 分待つ。変わらなければ kubectl top pods でメトリクスが取れているかを見る"
         },
         {
           "text": "片付ける",
-          "command": "kubectl delete pod/big hpa/web deployment/web"
+          "command": "kubectl delete pod/big hpa/web deployment/web",
+          "expect": "pod・horizontalpodautoscaler・deployment の deleted が 3 行出る"
         }
       ]
     }

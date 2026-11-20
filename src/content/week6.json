@@ -828,34 +828,47 @@
       "summary": "家のクラスタで手を動かす · 7 手順",
       "domain": "Container Orchestration",
       "source": "https://docs.k3s.io/add-ons/storage",
+      "goal": "権限を ServiceAccount に絞って与えること、PVC でデータの置き場を確保すること、壊れた Pod の理由を読んで直すことを、1 つの namespace の中で試します。",
+      "needs": [
+        "k3s のクラスタと、管理者の kubeconfig でつながる kubectl (k3s のマシンの上なら sudo k3s kubectl)",
+        "local-path の StorageClass (k3s には同梱)"
+      ],
       "steps": [
         {
           "text": "k3s の管理者の kubeconfig で行う (namespace ごとに権限を与えている場合は、作った直後に自分へ admin を結ぶ: kubectl create rolebinding me-admin --clusterrole=admin --user=<自分の利用者名> -n w6-lab)。実習用の namespace と、読むだけの ServiceAccount を作り、組み込みの ClusterRole view を RoleBinding でこの namespace の中だけに与える",
-          "command": "kubectl create namespace w6-lab && kubectl create serviceaccount viewer -n w6-lab && kubectl create rolebinding viewer-view --clusterrole=view --serviceaccount=w6-lab:viewer -n w6-lab"
+          "command": "kubectl create namespace w6-lab &&\nkubectl create serviceaccount viewer -n w6-lab &&\nkubectl create rolebinding viewer-view --clusterrole=view --serviceaccount=w6-lab:viewer -n w6-lab",
+          "expect": "namespace/w6-lab・serviceaccount/viewer・rolebinding…/viewer-view の created が 3 行出る"
         },
         {
           "text": "viewer になりすまして確かめる。w6-lab の Pod の一覧は yes、削除は no、default の Pod の一覧は no になる",
-          "command": "kubectl auth can-i list pods -n w6-lab --as=system:serviceaccount:w6-lab:viewer; kubectl auth can-i delete pods -n w6-lab --as=system:serviceaccount:w6-lab:viewer; kubectl auth can-i list pods -n default --as=system:serviceaccount:w6-lab:viewer"
+          "command": "kubectl auth can-i list pods -n w6-lab --as=system:serviceaccount:w6-lab:viewer\nkubectl auth can-i delete pods -n w6-lab --as=system:serviceaccount:w6-lab:viewer\nkubectl auth can-i list pods -n default --as=system:serviceaccount:w6-lab:viewer",
+          "expect": "上から yes・no・no と出る"
         },
         {
           "text": "k3s に同梱の local-path の StorageClass で PVC を作り、それをマウントして /data/hello.txt に書き込む Pod を作る",
-          "command": "kubectl apply -n w6-lab -f - <<'EOF'\napiVersion: v1\nkind: PersistentVolumeClaim\nmetadata:\n  name: data\nspec:\n  accessModes:\n  - ReadWriteOnce\n  storageClassName: local-path\n  resources:\n    requests:\n      storage: 1Gi\n---\napiVersion: v1\nkind: Pod\nmetadata:\n  name: writer\nspec:\n  containers:\n  - name: writer\n    image: busybox:1.36\n    command: [\"sh\", \"-c\", \"echo hello > /data/hello.txt && sleep 3600\"]\n    volumeMounts:\n    - name: vol\n      mountPath: /data\n  volumes:\n  - name: vol\n    persistentVolumeClaim:\n      claimName: data\nEOF"
+          "command": "kubectl apply -n w6-lab -f - <<'EOF'\napiVersion: v1\nkind: PersistentVolumeClaim\nmetadata:\n  name: data\nspec:\n  accessModes:\n  - ReadWriteOnce\n  storageClassName: local-path\n  resources:\n    requests:\n      storage: 1Gi\n---\napiVersion: v1\nkind: Pod\nmetadata:\n  name: writer\nspec:\n  containers:\n  - name: writer\n    image: busybox:1.36\n    command: [\"sh\", \"-c\", \"echo hello > /data/hello.txt && sleep 3600\"]\n    volumeMounts:\n    - name: vol\n      mountPath: /data\n  volumes:\n  - name: vol\n    persistentVolumeClaim:\n      claimName: data\nEOF",
+          "expect": "persistentvolumeclaim/data created と pod/writer created が出る"
         },
         {
           "text": "Pod が起動するのを待ち、PVC が Bound になって VOLUME の欄に PV の名前が出ることと、Pod の中から書いたファイルが読めることを確かめる (管理者の kubeconfig なら kubectl get pv で PV も見られる)",
-          "command": "kubectl wait --for=condition=Ready pod/writer -n w6-lab --timeout=120s && kubectl get pvc -n w6-lab && kubectl exec -n w6-lab writer -- cat /data/hello.txt"
+          "command": "kubectl wait --for=condition=Ready pod/writer -n w6-lab --timeout=120s &&\nkubectl get pvc -n w6-lab &&\nkubectl exec -n w6-lab writer -- cat /data/hello.txt",
+          "expect": "pod/writer condition met、PVC の STATUS が Bound、最後に hello と出る",
+          "stuck": "時間切れになったら kubectl describe pod writer -n w6-lab の Events を読む"
         },
         {
           "text": "わざと存在しないタグのイメージで Deployment を作る。30 秒ほど待って STATUS が ErrImagePull か ImagePullBackOff になっていることを見て、describe の Events で not found の理由を読む",
-          "command": "kubectl create deployment broken --image=nginx:no-such-tag -n w6-lab && sleep 30 && kubectl get pods -n w6-lab -l app=broken && kubectl describe pods -n w6-lab -l app=broken"
+          "command": "kubectl create deployment broken --image=nginx:no-such-tag -n w6-lab &&\nsleep 30 &&\nkubectl get pods -n w6-lab -l app=broken &&\nkubectl describe pods -n w6-lab -l app=broken",
+          "expect": "STATUS が ErrImagePull か ImagePullBackOff で、Events に Failed to pull image と not found が出る"
         },
         {
           "text": "正しいイメージに差し替えて、Pod が Running になるのを確かめる (コンテナ名は kubectl create deployment がイメージ名から付けた nginx)",
-          "command": "kubectl set image deployment/broken nginx=nginx:1.27-alpine -n w6-lab && kubectl rollout status deployment/broken -n w6-lab"
+          "command": "kubectl set image deployment/broken nginx=nginx:1.27-alpine -n w6-lab &&\nkubectl rollout status deployment/broken -n w6-lab",
+          "expect": "deployment \"broken\" successfully rolled out と出る"
         },
         {
           "text": "片付ける (namespace ごと消すと、PVC と RoleBinding と ServiceAccount も消える)",
-          "command": "kubectl delete namespace w6-lab"
+          "command": "kubectl delete namespace w6-lab",
+          "expect": "namespace \"w6-lab\" deleted と出る (消え終わるまで少し待つ)"
         }
       ]
     }

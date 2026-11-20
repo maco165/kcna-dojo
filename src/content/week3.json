@@ -803,34 +803,47 @@
       "summary": "家のクラスタで手を動かす · 7 手順",
       "domain": "Kubernetes Fundamentals",
       "source": "https://kubernetes.io/ja/docs/concepts/workloads/controllers/deployment/",
+      "goal": "Deployment の更新が ReplicaSet の入れ替えで進むことと、1 つ前へ巻き戻せること、CronJob が時刻になると Job を作ることを確かめます。",
+      "needs": [
+        "k3s のクラスタと、そこにつながる kubectl (k3s のマシンの上なら sudo k3s kubectl でも同じ)",
+        "イメージ (nginx と busybox) を取りに行けるネットワーク"
+      ],
       "steps": [
         {
           "text": "nginx:1.26-alpine で 3 つのレプリカの Deployment web を作り、全部の Pod が揃うまで待つ (Pod にはラベル app=web が付く)",
-          "command": "kubectl create deployment web --image=nginx:1.26-alpine --replicas=3 && kubectl rollout status deployment/web"
+          "command": "kubectl create deployment web --image=nginx:1.26-alpine --replicas=3 &&\nkubectl rollout status deployment/web",
+          "expect": "deployment \"web\" successfully rolled out と出る"
         },
         {
           "text": "コンテナ nginx のイメージを nginx:1.27-alpine に更新し、ローリングアップデートが終わるまで見届ける",
-          "command": "kubectl set image deployment/web nginx=nginx:1.27-alpine && kubectl rollout status deployment/web"
+          "command": "kubectl set image deployment/web nginx=nginx:1.27-alpine &&\nkubectl rollout status deployment/web",
+          "expect": "Waiting for deployment … が流れたあと、successfully rolled out と出る"
         },
         {
           "text": "リビジョンが 2 つになったこと、古い ReplicaSet が 0 個に縮んで残っていることを確かめる",
-          "command": "kubectl rollout history deployment/web && kubectl get rs -l app=web"
+          "command": "kubectl rollout history deployment/web &&\nkubectl get rs -l app=web",
+          "expect": "REVISION に 1 と 2 が並ぶ。ReplicaSet は 2 行で、片方の DESIRED が 0、もう片方が 3"
         },
         {
           "text": "1 つ前のリビジョンへ巻き戻し、イメージが nginx:1.26-alpine に戻ったことを確かめる",
-          "command": "kubectl rollout undo deployment/web && kubectl rollout status deployment/web && kubectl get deployment web -o jsonpath='{.spec.template.spec.containers[0].image}'"
+          "command": "kubectl rollout undo deployment/web &&\nkubectl rollout status deployment/web &&\nkubectl get deployment web -o jsonpath='{.spec.template.spec.containers[0].image}'",
+          "expect": "最後に nginx:1.26-alpine と出る"
         },
         {
           "text": "毎分 date を出す CronJob hello を作る",
-          "command": "kubectl create cronjob hello --image=busybox:1.36 --schedule=\"*/1 * * * *\" -- date"
+          "command": "kubectl create cronjob hello --image=busybox:1.36 --schedule=\"*/1 * * * *\" -- date",
+          "expect": "cronjob.batch/hello created と出る"
         },
         {
           "text": "1〜2 分待って Job ができ COMPLETIONS が 1/1 になったことを確かめ、表示された Job の名前でログを読む (日時が出る)",
-          "command": "kubectl get cronjob hello && kubectl get jobs && kubectl logs $(kubectl get jobs -o name | grep /hello- | tail -n 1)"
+          "command": "kubectl get cronjob hello &&\nkubectl get jobs &&\nkubectl logs $(kubectl get jobs -o name | grep /hello- | tail -n 1)",
+          "expect": "hello-<数字> という Job の COMPLETIONS が 1/1 で、最後に日時が 1 行出る",
+          "stuck": "Job がまだ無ければ、1 分待ってもう一度打つ"
         },
         {
           "text": "片付ける (CronJob を消すと、作られた Job と Pod も消える)",
-          "command": "kubectl delete cronjob hello && kubectl delete deployment web"
+          "command": "kubectl delete cronjob hello &&\nkubectl delete deployment web",
+          "expect": "cronjob.batch \"hello\" deleted と deployment.apps \"web\" deleted が出る"
         }
       ]
     }

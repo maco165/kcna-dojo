@@ -53,7 +53,8 @@ export type QuizLesson = {
   questions: Question[];
 };
 
-export type LabStep = { text: string; command?: string };
+/** expect は打ったあとに見えるはずのもの (コマンドのある手順には必ず付ける)。stuck はうまくいかないときに最初に見るところ */
+export type LabStep = { text: string; command?: string; expect?: string; stuck?: string };
 
 /** 家のクラスタで手を動かす実習。手順を全部確かめたら完了にする */
 export type LabLesson = {
@@ -62,6 +63,10 @@ export type LabLesson = {
   title: string;
   summary: string;
   domain: Domain;
+  /** この実習で分かること */
+  goal: string;
+  /** 用意するもの */
+  needs: string[];
   steps: LabStep[];
   source: string;
 };

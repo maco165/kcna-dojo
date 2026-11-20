@@ -792,34 +792,49 @@
       "summary": "家のクラスタで手を動かす · 7 手順",
       "domain": "Container Orchestration",
       "source": "https://docs.k3s.io/networking/networking-services",
+      "goal": "外からの要求が Ingress → Service → Pod と届く経路を自分でたどり、NetworkPolicy で 1 本だけ止められることを確かめます。",
+      "needs": [
+        "k3s のクラスタと、そこにつながる kubectl (k3s のマシンの上なら sudo k3s kubectl でも同じ)",
+        "Traefik と ServiceLB を外していない、既定の構成の k3s",
+        "クラスタの外から curl を打てる機械 (ノードの IP に届くこと)"
+      ],
       "steps": [
         {
           "text": "nginx を 2 つ動かし、80 番で受ける ClusterIP の Service を作る (Pod には app=web のラベルが付き、Service はそれを選ぶ)",
-          "command": "kubectl create deployment web --image=nginx:1.27-alpine --replicas=2 && kubectl expose deployment web --port=80"
+          "command": "kubectl create deployment web --image=nginx:1.27-alpine --replicas=2 &&\nkubectl expose deployment web --port=80",
+          "expect": "deployment.apps/web created と service/web exposed が出る"
         },
         {
           "text": "使い捨ての Pod から、Service を名前で引いて中身を取る (nginx の歓迎ページの HTML が返る)",
-          "command": "kubectl run tmp --rm -it --image=busybox:1.36 --restart=Never -- wget -qO- -T 3 http://web.default.svc.cluster.local"
+          "command": "kubectl run tmp --rm -it --image=busybox:1.36 --restart=Never -- wget -qO- -T 3 http://web.default.svc.cluster.local",
+          "expect": "Welcome to nginx! を含む HTML が出て、最後に pod \"tmp\" deleted と出る",
+          "stuck": "つながらなければ、kubectl get pods -l app=web で Pod が Running になっているかを見てから、もう一度打つ"
         },
         {
           "text": "IngressClass の名前を確かめ (権限が無ければ kubectl get ingress -A の CLASS 列を見る)、Traefik の Ingress を作る",
-          "command": "kubectl get ingress -A ; kubectl create ingress web --class=traefik --rule=\"web.example.test/*=web:80\""
+          "command": "kubectl get ingress -A \nkubectl create ingress web --class=traefik --rule=\"web.example.test/*=web:80\"",
+          "expect": "ingress.networking.k8s.io/web created と出る"
         },
         {
           "text": "クラスタの外の機械から、ノードの IP の 80 番へ Host ヘッダーを付けて繋ぐ (<ノードのIP> は kubectl get nodes -o wide の INTERNAL-IP)",
-          "command": "curl -H \"Host: web.example.test\" http://<ノードのIP>/"
+          "command": "curl -H \"Host: web.example.test\" http://<ノードのIP>/",
+          "expect": "手順 2 と同じ Welcome to nginx! の HTML が返る",
+          "stuck": "404 page not found なら、Host ヘッダーの名前が Ingress の rule と同じかを見る。つながらなければ、ノードの IP と 80 番に届くかを確かめる"
         },
         {
           "text": "経路を外 → Ingress → Service → Pod の順にたどる。Traefik の LoadBalancer の Service (ServiceLB が 80 と 443 をノードで受ける) → Ingress の振り分け → Service の EndpointSlice → その IP の Pod の順に、IP とポートがつながっているかを見る (Traefik の Namespace は 1 つ目のコマンドで確かめる)",
-          "command": "kubectl get svc -A | grep traefik && kubectl describe ingress web && kubectl get endpointslices -l kubernetes.io/service-name=web && kubectl get pods -l app=web -o wide"
+          "command": "kubectl get svc -A | grep traefik &&\nkubectl describe ingress web &&\nkubectl get endpointslices -l kubernetes.io/service-name=web &&\nkubectl get pods -l app=web -o wide",
+          "expect": "traefik の Service の TYPE が LoadBalancer。Ingress の Backends と EndpointSlice の ENDPOINTS に、Pod の IP が 2 つ出る"
         },
         {
           "text": "NetworkPolicy で、web の Pod へは Traefik のいる Namespace (ここでは kube-system) からだけ入れるようにする。k3s は NetworkPolicy のコントローラーを同梱しているので、入れ足さずに効く。手順 2 をもう一度走らせると繋がらずに失敗し (k3s ではすぐにエラーになる。プラグインによっては時間切れになる)、手順 4 の curl は今までどおり返ることを確かめる",
-          "command": "kubectl apply -f - <<'EOF'\napiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: web-from-traefik-only\nspec:\n  podSelector:\n    matchLabels:\n      app: web\n  policyTypes:\n    - Ingress\n  ingress:\n    - from:\n        - namespaceSelector:\n            matchLabels:\n              kubernetes.io/metadata.name: kube-system\nEOF"
+          "command": "kubectl apply -f - <<'EOF'\napiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: web-from-traefik-only\nspec:\n  podSelector:\n    matchLabels:\n      app: web\n  policyTypes:\n    - Ingress\n  ingress:\n    - from:\n        - namespaceSelector:\n            matchLabels:\n              kubernetes.io/metadata.name: kube-system\nEOF",
+          "expect": "networkpolicy.networking.k8s.io/web-from-traefik-only created と出る"
         },
         {
           "text": "片付ける",
-          "command": "kubectl delete networkpolicy web-from-traefik-only && kubectl delete ingress web && kubectl delete service web && kubectl delete deployment web"
+          "command": "kubectl delete networkpolicy web-from-traefik-only &&\nkubectl delete ingress web &&\nkubectl delete service web &&\nkubectl delete deployment web",
+          "expect": "networkpolicy・ingress・service・deployment の deleted が 4 行出る"
         }
       ]
     }
