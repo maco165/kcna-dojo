@@ -8,10 +8,12 @@ import { HStack, VStack } from '@astryxdesign/core/Stack';
 import { StatusDot } from '@astryxdesign/core/StatusDot';
 import { Text } from '@astryxdesign/core/Text';
 import { XMarkIcon } from '@heroicons/react/24/outline';
+import { AskAiLinks } from '../components/AskAi';
 import ChoiceQuestionView from '../components/ChoiceQuestionView';
 import FillQuestionView from '../components/FillQuestionView';
 import { ActionArea, PrimaryAction, QuestionHead } from '../components/QuestionFrame';
 import type { LabLesson, Lesson, Question, QuizLesson } from '../content/types';
+import { labStepText } from '../lib/askAi';
 import { XP_PER_CORRECT, XP_PER_LAB } from '../lib/grade';
 import { answerHistory, completeLesson, currentStreak, goalXp, recordAnswer, todayXp, type Progress } from '../lib/progress';
 import { shuffleChoices } from '../lib/shuffle';
@@ -283,6 +285,9 @@ function LabRun({ lesson, week, progress, updateProgress }: Props & { lesson: La
                         {s.stuck}
                       </span>
                     )}
+                    <span className="lab-step__ask">
+                      <AskAiLinks text={labStepText(lesson, i)} lead="AI に聞く" />
+                    </span>
                   </span>
                 }
               />

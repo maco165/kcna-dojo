@@ -2766,6 +2766,10 @@ html[data-loading='true'] body::before {
   overflow-wrap: anywhere;
 }
 
+.lab-step__ask {
+  display: block;
+}
+
 .lab-step__tag {
   display: inline-block;
   margin-right: 8px;
