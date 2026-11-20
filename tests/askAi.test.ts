@@ -97,3 +97,13 @@ describe('aiLinks', () => {
     expect(new URL(links.chatgpt).searchParams.get('q')).toBe(text);
   });
 });
+
+describe('Claude と ChatGPT には同じ文を入れる', () => {
+  it('2 つのリンクの q を戻すと、どちらも元の文と同じ (コピーのボタンもこの文を写す)', () => {
+    const text = questionText(fill, { picked: 'describe', correct: false });
+    const links = aiLinks(text);
+    const q = (url: string) => new URL(url).searchParams.get('q');
+    expect(q(links.claude)).toBe(text);
+    expect(q(links.chatgpt)).toBe(text);
+  });
+});

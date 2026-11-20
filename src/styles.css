@@ -2784,3 +2784,23 @@ html[data-loading='true'] body::before {
 .lab-step__tag--stuck {
   color: var(--color-text-secondary);
 }
+
+/* AI に聞くの「文をコピー」の結果と、コピーできなかったときに見せる文 */
+.ask-ai__status {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.ask-ai__text {
+  width: 100%;
+  max-width: 40em;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-container);
+  background: var(--color-background-card);
+  color: var(--color-text-primary);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.6;
+}
