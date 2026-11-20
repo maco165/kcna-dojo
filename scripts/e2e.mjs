@@ -227,6 +227,10 @@ async function run(browser, name, width, height) {
   await page.goto(`${BASE}lesson/${lab.id}/`);
   const finish = page.getByRole('button', { name: '完了にする' });
   check(await finish.isDisabled(), `${tag} 実習は印を付けるまで完了にできない`);
+  const prep = page.getByRole('region', { name: '始める前に' });
+  check((await prep.getByText('この実習で分かること').count()) === 1 && (await prep.locator('a[href="/kcna-dojo/handbook/setup-k3s/"]').count()) === 1 && (await prep.locator('a[href="/kcna-dojo/handbook/containerization/"]').count()) === 1, `${tag} 実習の頭に、分かること・用意するもの・k3s の入れ方・先に読むトピックが出る`);
+  check((await page.locator('.lab-step__tag--ok').count()) === lab.steps.filter((s) => s.command).length, `${tag} 実習の打つ手順ごとに「うまくいくと」が出る`);
+  await noHorizontalOverflow(page, width, `${tag} 実習`);
   for (const box of await page.getByRole('checkbox').all()) await box.check();
   await finish.click();
   await page.getByRole('heading', { name: 'レッスン完了' }).waitFor();

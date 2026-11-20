@@ -139,7 +139,7 @@ flowchart TD
 | 共通 | `id` `type` `prompt` `explanation` `source` | `id` は全体で重複しない。`source` は確かめた公式の文書の https の URL |
 | `fill` (穴埋め) | `language` (`bash` / `yaml` / `dockerfile`)、`code`、`answers` | `code` に `{{blank}}` をちょうど 1 つ。`candidates` (押して入れる候補。重複しない)、`output` (正解のあとに出す実行結果の例)、`wrongNotes` (候補ごとのなぜ違うか) は任意 |
 | `choice` (4 択) | `choices` (`id` と `text`)、`answer` | `answer` は選択肢の `id`。`why` (なぜ違うか)、`code` (出力を読む問題の出力)、`fixedOrder` (混ぜない) は任意。選択肢の文に「A」「B」など位置を書かない |
-| 実習 (`kind: lab`) | `steps` (`text`、任意で `command`)、`source` | 全部の手順に印を付けると完了にできる |
+| 実習 (`kind: lab`) | `goal` (この実習で分かること)、`needs` (用意するもの)、`steps` (`text`、任意で `command`・`expect`・`stuck`)、`source` | 初めての人が進められるよう、頭に「始める前に」(分かること・用意するもの・k3s の入れ方へのリンク・その週の先に読むトピック) を出す。`command` のある手順には `expect` (うまくいくと見えるもの) が必須で、`stuck` (つまずいたら最初に見るところ) は任意。手順の文は切らずに全部出し、コマンドは改行をそのまま出す (`&&` でつなぐ長い 1 行は行に分けて書く)。全部の手順に印を付けると完了にできる |
 | レッスン | `id` `title` `summary` `domain` | `quiz` は 5 問以上。`domain` は試験の 4 分野のどれか |
 
 週の並び・日付・「説明できるようにすること」は `src/content/curriculum.ts`。

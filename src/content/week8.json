@@ -991,26 +991,38 @@
       "summary": "家のクラスタで手を動かす · 6 手順",
       "domain": "Cloud Native Architecture",
       "source": "https://docs.k3s.io/installation/packaged-components",
+      "goal": "クラスタの今の使用量を数字で見られるようになり、入っている部品が CNCF のどの段階のプロジェクトかを自分で調べられるようになります。",
+      "needs": [
+        "k3s のクラスタと、そこにつながる kubectl (k3s のマシンの上なら sudo k3s kubectl でも同じ)",
+        "metrics-server (k3s には同梱。外していなければそのまま使える)",
+        "ブラウザ (CNCF の Landscape を見る)"
+      ],
       "steps": [
         {
           "text": "k3s が同梱の部品として入れる metrics-server が動いていることを確かめる (READY が 1/1 なら使える)",
-          "command": "kubectl get deployment metrics-server -n kube-system"
+          "command": "kubectl get deployment metrics-server -n kube-system",
+          "expect": "READY が 1/1"
         },
         {
           "text": "ノードごとの CPU とメモリの使用量を見る (CPU の m はミリコア)",
-          "command": "kubectl top nodes"
+          "command": "kubectl top nodes",
+          "expect": "ノードごとに、CPU とメモリの使用量と割合 (%) が出る",
+          "stuck": "Metrics API not available と出たら、metrics-server が動き出すまで 1〜2 分待つ"
         },
         {
           "text": "すべての namespace の Pod の使用量を、メモリの多い順に見る",
-          "command": "kubectl top pods -A --sort-by=memory"
+          "command": "kubectl top pods -A --sort-by=memory",
+          "expect": "メモリを多く使っている Pod から順に並ぶ"
         },
         {
           "text": "クラスタに入っている部品を、Pod とイメージの一覧で書き出す (coredns・traefik・local-path-provisioner・metrics-server など)",
-          "command": "kubectl get pods -A -o custom-columns='NAMESPACE:.metadata.namespace,NAME:.metadata.name,IMAGE:.spec.containers[*].image'"
+          "command": "kubectl get pods -A -o custom-columns='NAMESPACE:.metadata.namespace,NAME:.metadata.name,IMAGE:.spec.containers[*].image'",
+          "expect": "NAMESPACE・NAME・IMAGE の 3 列で、Pod の数だけ行が出る"
         },
         {
           "text": "ノードのコンテナランタイムと Kubernetes の版も書き出す (CONTAINER-RUNTIME と VERSION の列)",
-          "command": "kubectl get nodes -o wide"
+          "command": "kubectl get nodes -o wide",
+          "expect": "VERSION が v1.xx.x+k3s1 の形、CONTAINER-RUNTIME が containerd://… の形"
         },
         {
           "text": "書き出した部品 (Kubernetes・containerd・CoreDNS・Traefik・metrics-server と、k3s に組み込まれていて Pod には出ない flannel など) を CNCF の Landscape (https://landscape.cncf.io/) で探し、Graduated・Incubating・Sandbox のどれかを書き出す。段階の付かないもの (CNCF のプロジェクトではない、または別のプロジェクトの一部) はそう書き、段階は cncf.io/projects の各ページでも確かめる"

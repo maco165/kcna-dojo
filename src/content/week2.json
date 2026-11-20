@@ -857,34 +857,47 @@
       "summary": "家のクラスタで手を動かす · 7 手順",
       "domain": "Kubernetes Fundamentals",
       "source": "https://docs.k3s.io/architecture",
+      "goal": "コントロールプレーンの部品がどこで動いているかを確かめ、消した Pod をコントローラーが元の数に戻すところを自分の目で見ます。",
+      "needs": [
+        "k3s のクラスタと、そこにつながる kubectl (k3s のマシンの上なら sudo k3s kubectl でも同じ)",
+        "手順 3 だけ: server ノードの端末に入れること (ssh など)"
+      ],
       "steps": [
         {
           "text": "ノードの一覧を出し、ROLES の列で server (control-plane,master などと出る) と agent (<none> と出る) を見分け、CONTAINER-RUNTIME の列でランタイム (containerd://…-k3s…) を確かめる",
-          "command": "kubectl get nodes -o wide"
+          "command": "kubectl get nodes -o wide",
+          "expect": "ノードの数だけ行が出て、STATUS が Ready"
         },
         {
           "text": "kube-system の Pod がどのノードで動くかを見る。CoreDNS や Traefik などの同梱の部品はあるが、kube-apiserver や etcd の Pod は無いことを確かめる",
-          "command": "kubectl get pods -n kube-system -o wide"
+          "command": "kubectl get pods -n kube-system -o wide",
+          "expect": "coredns・traefik・metrics-server・local-path-provisioner などの Pod が Running で並ぶ (helm-install-… は Completed で正しい)"
         },
         {
           "text": "server ノードに入り、コントロールプレーンの部品が 1 つの k3s server のプロセスとして動いていることを確かめる (agent ノードでは k3s agent のプロセスが出る)",
-          "command": "ps -ef | grep -E '[k]3s (server|agent)'"
+          "command": "ps -ef | grep -E '[k]3s (server|agent)'",
+          "expect": "k3s server を含む行が出る"
         },
         {
           "text": "各ノードの kubelet が更新している心拍 (Lease) を見る。ノードと同じ名前の Lease が並ぶ (Forbidden と出たら、server ノードに入って sudo k3s kubectl で見る)",
-          "command": "kubectl get leases -n kube-node-lease || sudo k3s kubectl get leases -n kube-node-lease"
+          "command": "kubectl get leases -n kube-node-lease || sudo k3s kubectl get leases -n kube-node-lease",
+          "expect": "ノードと同じ名前の行が、ノードの数だけ出る"
         },
         {
           "text": "望ましい状態として、nginx を 2 つ動かす Deployment を作り、どのノードに置かれたかを見る",
-          "command": "kubectl create deployment web --image=nginx:1.27 --replicas=2 && kubectl get pods -l app=web -o wide"
+          "command": "kubectl create deployment web --image=nginx:1.27 --replicas=2 &&\nkubectl get pods -l app=web -o wide",
+          "expect": "deployment.apps/web created のあと、web-… の Pod が 2 行出る (作った直後は ContainerCreating でよい)"
         },
         {
           "text": "Pod を手で消し、コントローラーが新しい名前の Pod を作って 2 つに戻すことを確かめる (少し待ってから get をもう一度打つ)",
-          "command": "kubectl delete pod -l app=web && kubectl get pods -l app=web -o wide"
+          "command": "kubectl delete pod -l app=web &&\nkubectl get pods -l app=web -o wide",
+          "expect": "deleted が 2 行出たあと、前とは違う名前の Pod が出る",
+          "stuck": "Pod が 2 つ揃っていなければ、数秒待って kubectl get pods -l app=web -o wide をもう一度打つ"
         },
         {
           "text": "片付ける",
-          "command": "kubectl delete deployment web"
+          "command": "kubectl delete deployment web",
+          "expect": "deployment.apps \"web\" deleted と出る"
         }
       ]
     }

@@ -2681,3 +2681,102 @@ html[data-loading='true'] body::before {
   line-height: 1.7;
   color: var(--color-text-secondary);
 }
+
+/* ---------- 実習 ---------- */
+
+.lab-prep {
+  padding: var(--spacing-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-container);
+  background: var(--color-background-surface);
+}
+
+.lab-prep__list {
+  margin: var(--spacing-3) 0 0;
+  display: grid;
+  gap: var(--spacing-1);
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--color-text-primary);
+}
+
+.lab-prep__list dt {
+  margin-top: var(--spacing-2);
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.lab-prep__list dt:first-child {
+  margin-top: 0;
+}
+
+.lab-prep__list dd {
+  margin: 0;
+}
+
+.lab-prep__list ul {
+  margin: 0 0 var(--spacing-1);
+  padding-left: 1.4em;
+  list-style: disc;
+}
+
+.lab-prep__list a:not(.gloss-chip) {
+  color: var(--color-text-accent);
+}
+
+.lab-prep__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.lab-step {
+  display: grid;
+  gap: var(--spacing-2);
+  min-width: 0;
+}
+
+.lab-step__text {
+  display: block;
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--color-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.lab-step__code {
+  display: block;
+  padding: var(--spacing-2) var(--spacing-3);
+  border-radius: var(--radius-container);
+  background: var(--color-background-muted);
+  font-family: var(--font-family-code, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--color-text-primary);
+  /* 改行はそのまま、長い行は折り返す */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.lab-step__note {
+  display: block;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--color-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.lab-step__tag {
+  display: inline-block;
+  margin-right: 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.lab-step__tag--ok {
+  color: var(--color-text-success);
+}
+
+.lab-step__tag--stuck {
+  color: var(--color-text-secondary);
+}

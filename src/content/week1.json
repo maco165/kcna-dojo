@@ -597,33 +597,50 @@
       "summary": "家のクラスタで手を動かす · 7 手順",
       "domain": "Kubernetes Fundamentals",
       "source": "https://docs.k3s.io/cli",
+      "goal": "自分で作ったイメージが、レジストリを通さなくても k3s の containerd に取り込めば Pod として動くことを確かめます。Docker と k3s は別々のイメージの置き場を持つことが分かります。",
+      "needs": [
+        "k3s が動いている Linux のマシン 1 台 (そのマシンの端末で打つ)",
+        "同じマシンに Docker (イメージを作るのに使う)",
+        "sudo が使えること"
+      ],
       "steps": [
         {
-          "text": "Docker を入れた k3s のノードで、作業フォルダに index.html と Dockerfile を作る (Dockerfile は FROM nginx:1.27-alpine と COPY の 2 行)"
+          "text": "作業フォルダを作り、index.html と Dockerfile (FROM と COPY の 2 行) を置く",
+          "command": "mkdir hello && cd hello\necho '<h1>hello from k3s</h1>' > index.html\nprintf 'FROM nginx:1.27-alpine\\nCOPY index.html /usr/share/nginx/html/index.html\\n' > Dockerfile\nls",
+          "expect": "Dockerfile と index.html の 2 つが出る"
         },
         {
           "text": "イメージを作る",
-          "command": "docker build -t hello:0.1 ."
+          "command": "docker build -t hello:0.1 .",
+          "expect": "最後に naming to docker.io/library/hello:0.1 (古い Docker では Successfully tagged hello:0.1) と出る",
+          "stuck": "permission denied と出たら、docker の前に sudo を付ける"
         },
         {
           "text": "このノードの k3s の containerd に取り込む (イメージはこのノードにだけ入る)",
-          "command": "docker save hello:0.1 | sudo k3s ctr images import -"
+          "command": "docker save hello:0.1 | sudo k3s ctr images import -",
+          "expect": "unpacking docker.io/library/hello:0.1 … done と出る"
         },
         {
           "text": "取り込めたことを CRI の道具で確かめる",
-          "command": "sudo k3s crictl images | grep hello"
+          "command": "sudo k3s crictl images | grep hello",
+          "expect": "docker.io/library/hello と 0.1 の行が出る",
+          "stuck": "何も出なければ、手順 3 の取り込みが終わっていない。手順 3 をもう一度打つ"
         },
         {
           "text": "レジストリから取りに行かせず、イメージを取り込んだこのノードに Pod を置く (k3s のノード名はふつうホスト名)",
-          "command": "kubectl run hello --image=hello:0.1 --image-pull-policy=Never --overrides=\"{\\\"spec\\\":{\\\"nodeName\\\":\\\"$(hostname)\\\"}}\""
+          "command": "kubectl run hello --image=hello:0.1 --image-pull-policy=Never --overrides=\"{\\\"spec\\\":{\\\"nodeName\\\":\\\"$(hostname)\\\"}}\"",
+          "expect": "pod/hello created と出る (--image-pull-policy=Never は「レジストリへ取りに行かない」、--overrides の nodeName は「このノードに置く」の指定)"
         },
         {
           "text": "Running になり、どのノードで動いているかを確かめる",
-          "command": "kubectl get pod hello -o wide"
+          "command": "kubectl get pod hello -o wide",
+          "expect": "STATUS が Running で、NODE がこのマシンの名前",
+          "stuck": "ErrImageNeverPull なら、イメージがそのノードに無い。手順 3 と 4 を確かめる"
         },
         {
           "text": "片付ける",
-          "command": "kubectl delete pod hello"
+          "command": "kubectl delete pod hello",
+          "expect": "pod \"hello\" deleted と出る"
         }
       ]
     }

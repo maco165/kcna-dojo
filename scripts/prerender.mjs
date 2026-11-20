@@ -214,7 +214,7 @@ export async function buildPages(load) {
         path: `lesson/${l.id}/`,
         title: `${l.title} (第 ${w.week} 週)`,
         description: clip(`第 ${w.week} 週 ${w.title} のレッスン「${l.title}」。${l.summary}。${qs[0]?.prompt ?? ''}`),
-        body: [`<p>${link(`week/${w.week}/`, `第 ${w.week} 週 ${w.title}`)}</p>`, `<h1>${esc(l.title)}</h1>`, `<p>${esc(l.summary)}</p>`, qs.length ? `<ol>${qs.map((q) => `<li>${esc(q.prompt)}</li>`).join('')}</ol>` : ''].join('\n'),
+        body: [`<p>${link(`week/${w.week}/`, `第 ${w.week} 週 ${w.title}`)}</p>`, `<h1>${esc(l.title)}</h1>`, `<p>${esc(l.summary)}</p>`, l.kind === 'lab' ? `<h2>この実習で分かること</h2><p>${esc(l.goal)}</p><h2>用意するもの</h2><ul>${l.needs.map((n) => `<li>${esc(n)}</li>`).join('')}</ul><h2>手順</h2><ol>${l.steps.map((s) => `<li>${esc(s.text)}</li>`).join('')}</ol>` : '', qs.length ? `<ol>${qs.map((q) => `<li>${esc(q.prompt)}</li>`).join('')}</ol>` : ''].join('\n'),
       });
     }
   }
