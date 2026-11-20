@@ -784,7 +784,7 @@
           "expect": "STATUS が Pending、NODE が <none>"
         },
         {
-          "text": "Events の FailedScheduling に Insufficient cpu が出ていることを読む (フィルタリングで全ノードが外れた) (ほかの理由が並ぶこともある。フィルタリングで全ノードが外れた)",
+          "text": "Events の FailedScheduling に Insufficient cpu が出ていることを読む (フィルタリングで全ノードが外れた。ほかの理由が並ぶこともある)",
           "command": "kubectl describe pod big",
           "expect": "最後の Events に Warning FailedScheduling と Insufficient cpu が出る"
         },

@@ -864,7 +864,7 @@
       ],
       "steps": [
         {
-          "text": "ノードの一覧を出し、ROLES の列で server (control-plane,master などと出る) と agent (<none> と出る) を見分け、CONTAINER-RUNTIME の列でランタイム (containerd://…-k3s…) を確かめる",
+          "text": "ノードの一覧を出し、ROLES の列で server (control-plane と出る。古い k3s では control-plane,master) と agent (<none> と出る) を見分け、CONTAINER-RUNTIME の列でランタイム (containerd://…-k3s…) を確かめる",
           "command": "kubectl get nodes -o wide",
           "expect": "ノードの数だけ行が出て、STATUS が Ready"
         },
@@ -897,7 +897,7 @@
         {
           "text": "片付ける",
           "command": "kubectl delete deployment web",
-          "expect": "deployment.apps \"web\" deleted と出る"
+          "expect": "deployment.apps \"web\" deleted と出る (kubectl 1.34 以降は後ろに from default namespace が付く)"
         }
       ]
     }
