@@ -103,6 +103,23 @@ body {
   color: var(--color-text-primary);
 }
 
+.pre-read {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 0 var(--spacing-4) var(--spacing-3);
+}
+
+.desk__main > .pre-read {
+  padding: 0;
+}
+
+.pre-read__label {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
 .rows {
   background: var(--color-background-surface);
   border-top: 1px solid var(--color-border);

@@ -78,6 +78,8 @@ export async function buildPages(load) {
     body: [
       '<h1>Kubernetes とこのサイト</h1>',
       `<p>${esc(DEFINITION)}</p>`,
+      '<h2>学び方</h2>',
+      '<p>レッスンは問題から始まります。Kubernetes が初めての人は、週の一覧の「先に読む」からハンドブックのトピックを読んでから解きます。触ったことがある人は解いてから、答えたあとの「読み直す」で戻ります。</p>',
       '<h2>出題範囲 (学習要領)</h2>',
       ...CURRICULUM.map((c) => `<h3>${esc(c.domain)}</h3><ul>${c.competencies.map((x) => `<li>${esc(x.ja)} (${esc(x.en)})</li>`).join('')}</ul>`),
       `<p>${link('handbook/', 'ハンドブック')}・${link('glossary/', '用語集')}</p>`,
@@ -204,7 +206,7 @@ export async function buildPages(load) {
       path: `week/${w.week}/`,
       title: `第 ${w.week} 週 ${w.title}`,
       description: clip(`第 ${w.week} 週 ${w.title} (${w.domain}・${w.area})。この週で説明できるようにすること: ${w.goals.join('・')}`),
-      body: [`<h1>第 ${w.week} 週 ${esc(w.title)}</h1>`, `<p>${esc(w.domain)} · ${esc(w.area)}</p>`, '<h2>この週で説明できるようにすること</h2>', `<ol>${w.goals.map((g) => `<li>${esc(g)}</li>`).join('')}</ol>`, '<h2>レッスン</h2>', `<ul>${ls.map((l) => `<li>${link(`lesson/${l.id}/`, l.title)} (${esc(l.summary)})</li>`).join('')}</ul>`].join('\n'),
+      body: [`<h1>第 ${w.week} 週 ${esc(w.title)}</h1>`, `<p>${esc(w.domain)} · ${esc(w.area)}</p>`, '<h2>この週で説明できるようにすること</h2>', `<ol>${w.goals.map((g) => `<li>${esc(g)}</li>`).join('')}</ol>`, '<h2>先に読む</h2>', `<ul>${w.read.map((r) => `<li>${link(`handbook/${r.topic}/`, r.label)}</li>`).join('')}</ul>`, '<h2>レッスン</h2>', `<ul>${ls.map((l) => `<li>${link(`lesson/${l.id}/`, l.title)} (${esc(l.summary)})</li>`).join('')}</ul>`].join('\n'),
     });
     for (const l of ls) {
       const qs = l.kind === 'quiz' ? l.questions : [];

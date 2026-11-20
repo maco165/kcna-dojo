@@ -98,6 +98,20 @@ function Goals({ meta }: { meta: WeekMeta }) {
   );
 }
 
+/** 先に読むハンドブックのトピック。読まなくてもレッスンは開ける (鍵は掛けない) */
+function PreRead({ meta }: { meta: WeekMeta }) {
+  return (
+    <nav className="pre-read" aria-label="先に読むハンドブック">
+      <span className="pre-read__label">先に読む</span>
+      {meta.read.map((r) => (
+        <a key={r.topic} className="gloss-chip" href={handbookHref(r.topic)}>
+          {r.label}
+        </a>
+      ))}
+    </nav>
+  );
+}
+
 /* ---------- スマホ ---------- */
 
 function PhoneHome({ s, progress }: { s: Summary; progress: Progress }) {
@@ -140,6 +154,8 @@ function PhoneHome({ s, progress }: { s: Summary; progress: Progress }) {
             要点を読む
           </Link>
         </div>
+
+        <PreRead meta={meta} />
 
         <div className="rows">
           {lessons.length > 0 ? (
@@ -387,6 +403,7 @@ function DesktopHome({ s, progress }: { s: Summary; progress: Progress }) {
 
         <div className="desk__body">
           <main className="desk__main">
+            <PreRead meta={meta} />
             <Card padding={0}>
               {rows.length > 0 ? (
                 <Table data={rows} columns={columns} idKey="id" />

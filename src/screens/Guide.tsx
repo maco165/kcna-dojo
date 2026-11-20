@@ -326,6 +326,22 @@ function Body() {
           </ol>
         </section>
 
+        <section aria-labelledby="guide-way" className="guide-section">
+          <h2 id="guide-way" className="guide-h2">
+            学び方
+          </h2>
+          <p className="guide-muted">レッスンは問題から始まります。読んでから解くか、解いてから読むかは、どちらでも進められます。</p>
+          <ol className="guide-steps">
+            <li>
+              Kubernetes が初めての人は、週の一覧の「先に読む」から <a href={handbookHref()}>ハンドブック</a> のトピックを読む。触ったことがある人は、読まずに解き始めてよい
+            </li>
+            <li>その週のレッスンを解く。答えたあとに、解説と出典、出てきたコマンドの説明が出る</li>
+            <li>間違えた問題は、答えたあとの「読み直す」からハンドブックと用語集に戻る</li>
+            <li>週末の実習で、手元のクラスタで動かして確かめる</li>
+            <li>間違えた問題は 1・3・7 日後に復習に出る。8 週を終えたら模擬試験で仕上げる</li>
+          </ol>
+        </section>
+
         <section aria-labelledby="guide-outline" className="guide-section guide-section--wide">
           <h2 id="guide-outline" className="guide-h2">
             学習要領と、このサイトで学ぶ場所
