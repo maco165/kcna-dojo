@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ChoiceQuestion, FillQuestion } from '../src/content/types';
-import { MAX_PROMPT_LENGTH, aiLinks, questionText } from '../src/lib/askAi';
+import { MAX_PROMPT_LENGTH, aiLinks, labStepText, questionText } from '../src/lib/askAi';
 
 const fill: FillQuestion = {
   id: 'f1',
@@ -52,6 +52,38 @@ describe('questionText', () => {
   it('長すぎる文は切る', () => {
     const long = { ...choice, prompt: 'あ'.repeat(5000) };
     expect(questionText(long).length).toBe(MAX_PROMPT_LENGTH);
+  });
+});
+
+describe('labStepText', () => {
+  const lab = {
+    title: '週末の実習: 作ったイメージを k3s で動かす',
+    steps: [
+      { text: 'イメージを作る', command: 'docker build -t hello:0.1 .', expect: 'naming to の行が出る', stuck: 'sudo を付ける' },
+      { text: 'Landscape で段階を調べる' },
+      { text: '長い手順', command: 'x'.repeat(3000), expect: 'y' },
+    ],
+  };
+  it('実習の題名・手順の番号と文・コマンド・うまくいくとを入れ、説明とエラーの読み方を頼む', () => {
+    const t = labStepText(lab, 0);
+    expect(t).toContain('実習: 週末の実習: 作ったイメージを k3s で動かす');
+    expect(t).toContain('手順 1: イメージを作る');
+    expect(t).toContain('```bash\ndocker build -t hello:0.1 .\n```');
+    expect(t).toContain('うまくいくと: naming to の行が出る');
+    expect(t).toContain('オプションごとに説明');
+    expect(t).toContain('出たエラーをこのあとに貼ります');
+  });
+  it('コマンドの無い手順は、コードの枠を入れず、何をすればよいかを頼む', () => {
+    const t = labStepText(lab, 1);
+    expect(t).toContain('手順 2: Landscape で段階を調べる');
+    expect(t).not.toContain('```');
+    expect(t).not.toContain('うまくいくと');
+    expect(t).toContain('何をすればよいか');
+  });
+  it('長い手順は上限で切る', () => {
+    const t = labStepText(lab, 2);
+    expect(t.length).toBe(MAX_PROMPT_LENGTH);
+    expect(t.endsWith('…')).toBe(true);
   });
 });
 

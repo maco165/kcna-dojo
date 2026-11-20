@@ -230,6 +230,9 @@ async function run(browser, name, width, height) {
   const prep = page.getByRole('region', { name: '始める前に' });
   check((await prep.getByText('この実習で分かること').count()) === 1 && (await prep.locator('a[href="/kcna-dojo/handbook/setup-k3s/"]').count()) === 1 && (await prep.locator('a[href="/kcna-dojo/handbook/containerization/"]').count()) === 1, `${tag} 実習の頭に、分かること・用意するもの・k3s の入れ方・先に読むトピックが出る`);
   check((await page.locator('.lab-step__tag--ok').count()) === lab.steps.filter((s) => s.command).length, `${tag} 実習の打つ手順ごとに「うまくいくと」が出る`);
+  const labAsk = await page.getByRole('link', { name: 'Claude' }).first().getAttribute('href');
+  const labAsked = decodeURIComponent(labAsk.split('?q=')[1]);
+  check((await page.getByRole('link', { name: 'Claude' }).count()) === lab.steps.length && labAsk.startsWith('https://claude.ai/new?q=') && labAsked.includes(lab.steps[0].text) && labAsked.includes(lab.title), `${tag} 実習の手順ごとに、手順の文を入れた AI を開ける`);
   await noHorizontalOverflow(page, width, `${tag} 実習`);
   for (const box of await page.getByRole('checkbox').all()) await box.check();
   await finish.click();
