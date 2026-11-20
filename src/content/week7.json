@@ -881,7 +881,7 @@
       "needs": [
         "k3s のクラスタと、そこにつながる kubectl (k3s のマシンの上なら sudo k3s kubectl でも同じ)",
         "helm (入れ方は手順 1 のリンク)",
-        "helm が kubectl と同じクラスタにつながること (k3s のマシンでは、環境変数 KUBECONFIG に /etc/rancher/k3s/k3s.yaml を指す)"
+        "helm が kubectl と同じクラスタにつながること (k3s のマシンでは、環境変数 KUBECONFIG に /etc/rancher/k3s/k3s.yaml を指す。このファイルは既定で root しか読めない)"
       ],
       "steps": [
         {
@@ -893,7 +893,7 @@
           "text": "dojo という namespace に、リリース hello として入れる (REVISION: 1 と出る)",
           "command": "helm install hello ./hello -n dojo --create-namespace",
           "expect": "STATUS: deployed と REVISION: 1 が出る",
-          "stuck": "Kubernetes cluster unreachable と出たら、用意するものの KUBECONFIG を確かめる"
+          "stuck": "cluster unreachable を含むエラーが出たら、用意するものの KUBECONFIG を確かめる"
         },
         {
           "text": "--set で replicaCount を 2 にして upgrade し、リビジョンが 2 に増えたことと Pod が 2 つになったことを確かめる",

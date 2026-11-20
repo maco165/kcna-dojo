@@ -606,19 +606,19 @@
       "steps": [
         {
           "text": "作業フォルダを作り、index.html と Dockerfile (FROM と COPY の 2 行) を置く",
-          "command": "mkdir hello && cd hello\necho '<h1>hello from k3s</h1>' > index.html\nprintf 'FROM nginx:1.27-alpine\\nCOPY index.html /usr/share/nginx/html/index.html\\n' > Dockerfile\nls",
+          "command": "mkdir -p hello && cd hello\necho '<h1>hello from k3s</h1>' > index.html\nprintf 'FROM nginx:1.27-alpine\\nCOPY index.html /usr/share/nginx/html/index.html\\n' > Dockerfile\nls",
           "expect": "Dockerfile と index.html の 2 つが出る"
         },
         {
           "text": "イメージを作る",
           "command": "docker build -t hello:0.1 .",
-          "expect": "最後に naming to docker.io/library/hello:0.1 (古い Docker では Successfully tagged hello:0.1) と出る",
-          "stuck": "permission denied と出たら、docker の前に sudo を付ける"
+          "expect": "終わりのほうに naming to docker.io/library/hello:0.1 の行が出る (その後に unpacking to … が続く版もある)",
+          "stuck": "permission denied と出たら、docker の前に sudo を付ける (手順 3 の docker save にも付ける)"
         },
         {
           "text": "このノードの k3s の containerd に取り込む (イメージはこのノードにだけ入る)",
           "command": "docker save hello:0.1 | sudo k3s ctr images import -",
-          "expect": "unpacking docker.io/library/hello:0.1 … done と出る"
+          "expect": "unpacking docker.io/library/hello:0.1 (sha256:…)...done と出る"
         },
         {
           "text": "取り込めたことを CRI の道具で確かめる",
@@ -640,7 +640,7 @@
         {
           "text": "片付ける",
           "command": "kubectl delete pod hello",
-          "expect": "pod \"hello\" deleted と出る"
+          "expect": "pod \"hello\" deleted と出る (kubectl 1.34 以降は後ろに from default namespace が付く)"
         }
       ]
     }

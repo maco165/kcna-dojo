@@ -1007,7 +1007,7 @@
           "text": "ノードごとの CPU とメモリの使用量を見る (CPU の m はミリコア)",
           "command": "kubectl top nodes",
           "expect": "ノードごとに、CPU とメモリの使用量と割合 (%) が出る",
-          "stuck": "Metrics API not available と出たら、metrics-server が動き出すまで 1〜2 分待つ"
+          "stuck": "Metrics API not available や metrics not available yet と出たら、metrics-server が動き出すまで 1〜2 分待つ"
         },
         {
           "text": "すべての namespace の Pod の使用量を、メモリの多い順に見る",

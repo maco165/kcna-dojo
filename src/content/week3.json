@@ -843,7 +843,7 @@
         {
           "text": "片付ける (CronJob を消すと、作られた Job と Pod も消える)",
           "command": "kubectl delete cronjob hello &&\nkubectl delete deployment web",
-          "expect": "cronjob.batch \"hello\" deleted と deployment.apps \"web\" deleted が出る"
+          "expect": "cronjob.batch \"hello\" deleted と deployment.apps \"web\" deleted が出る (kubectl 1.34 以降は後ろに from default namespace が付く)"
         }
       ]
     }
