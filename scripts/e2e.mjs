@@ -216,7 +216,7 @@ async function run(browser, name, width, height) {
     window.__copied = null;
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (t) => { window.__copied = t; } } });
   });
-  await page.getByRole('button', { name: /文をコピー/ }).first().click();
+  await page.getByRole('button', { name: /プロンプトをコピー/ }).first().click();
   await page.getByText('コピーしました').first().waitFor({ timeout: 3000 }).catch(() => {});
   check((await page.evaluate(() => window.__copied)) === asked && (await page.getByText('コピーしました').first().isVisible()), `${tag} 文をコピーのボタンで、リンクと同じ文が写り、コピーしましたと出る`);
   // クリップボードが使えないときは、文を見せて手でコピーしてもらう
@@ -224,8 +224,8 @@ async function run(browser, name, width, height) {
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async () => { throw new Error('denied'); } } });
     document.execCommand = () => false;
   });
-  await page.getByRole('button', { name: /文をコピー/ }).first().click();
-  const shown = page.getByRole('textbox', { name: 'AI に貼る文' }).first();
+  await page.getByRole('button', { name: /プロンプトをコピー/ }).first().click();
+  const shown = page.getByRole('textbox', { name: /の文$/ }).first();
   await shown.waitFor({ timeout: 3000 }).catch(() => {});
   check((await shown.inputValue().catch(() => '')) === asked, `${tag} コピーできないときは、同じ文を選べる形で見せる`);
   await page.goto(`${BASE}lesson/w1-l1/`);

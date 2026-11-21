@@ -10,7 +10,7 @@ export default defineConfig({
   plugins: [react()],
   test: {
     environment: 'jsdom',
-    include: ['tests/**/*.test.ts'],
+    include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx'],
     // vitest は base を / にするので、テストでも公開と同じ置き場所で経路を作る
     env: { BASE_URL: BASE },
   },

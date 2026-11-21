@@ -286,7 +286,7 @@ function LabRun({ lesson, week, progress, updateProgress }: Props & { lesson: La
                       </span>
                     )}
                     <span className="lab-step__ask">
-                      <AskAiLinks text={labStepText(lesson, i)} lead="AI に聞く" />
+                      <AskAiLinks text={labStepText(lesson, i)} lead="AI に聞く" inDialog />
                     </span>
                   </span>
                 }

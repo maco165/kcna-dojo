@@ -9,18 +9,25 @@ export async function copyText(text: string): Promise<boolean> {
   } catch {
     // 下の方法を試す
   }
+  // 選ぶと押したボタンからフォーカスが外れるので、あとで戻す
+  const prev = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  const area = document.createElement('textarea');
   try {
-    const area = document.createElement('textarea');
     area.value = text;
     area.setAttribute('readonly', '');
     area.style.position = 'fixed';
     area.style.opacity = '0';
+    // iOS で選ぶときに画面が拡大されないよう 16px にする
+    area.style.fontSize = '16px';
     document.body.appendChild(area);
     area.select();
-    const ok = document.execCommand('copy');
-    area.remove();
-    return ok;
+    // iOS Safari は select() だけでは選べないことがあるので、範囲でも選ぶ
+    area.setSelectionRange(0, text.length);
+    return document.execCommand('copy');
   } catch {
     return false;
+  } finally {
+    area.remove();
+    prev?.focus();
   }
 }
