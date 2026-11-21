@@ -210,6 +210,24 @@ async function run(browser, name, width, height) {
   check(claudeHref.startsWith('https://claude.ai/new?q=') && asked.includes(q4.prompt), `${tag} Claude のリンクに問題文が入る`);
   check(asked.includes('私の答えは get で不正解'), `${tag} 答えたあとのリンクには自分の答えが入る`);
   check(chatgptHref.startsWith('https://chatgpt.com/?q='), `${tag} ChatGPT のリンクがある`);
+  // 文をコピー: Claude と ChatGPT に入る文と同じ文をクリップボードへ写し、「コピーしました」と出す
+  check(new URL(chatgptHref).searchParams.get('q') === asked, `${tag} Claude と ChatGPT のリンクには同じ文が入る`);
+  await page.evaluate(() => {
+    window.__copied = null;
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (t) => { window.__copied = t; } } });
+  });
+  await page.getByRole('button', { name: /プロンプトをコピー/ }).first().click();
+  await page.getByText('コピーしました').first().waitFor({ timeout: 3000 }).catch(() => {});
+  check((await page.evaluate(() => window.__copied)) === asked && (await page.getByText('コピーしました').first().isVisible()), `${tag} 文をコピーのボタンで、リンクと同じ文が写り、コピーしましたと出る`);
+  // クリップボードが使えないときは、文を見せて手でコピーしてもらう
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async () => { throw new Error('denied'); } } });
+    document.execCommand = () => false;
+  });
+  await page.getByRole('button', { name: /プロンプトをコピー/ }).first().click();
+  const shown = page.getByRole('textbox', { name: /の文$/ }).first();
+  await shown.waitFor({ timeout: 3000 }).catch(() => {});
+  check((await shown.inputValue().catch(() => '')) === asked, `${tag} コピーできないときは、同じ文を選べる形で見せる`);
   await page.goto(`${BASE}lesson/w1-l1/`);
   const before = new URL(await page.getByRole('link', { name: 'Claude' }).getAttribute('href')).searchParams.get('q') ?? '';
   check(before.includes(l1.questions[0].prompt) && !before.includes('正解は'), `${tag} 答える前のリンクには正解を入れない`);

@@ -97,3 +97,4 @@ describe('aiLinks', () => {
     expect(new URL(links.chatgpt).searchParams.get('q')).toBe(text);
   });
 });
+

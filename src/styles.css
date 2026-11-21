@@ -2784,3 +2784,81 @@ html[data-loading='true'] body::before {
 .lab-step__tag--stuck {
   color: var(--color-text-secondary);
 }
+
+/* AI に聞くの「文をコピー」の結果と、コピーできなかったときに見せる文 */
+.ask-ai__status {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.ask-ai__text {
+  width: 100%;
+  max-width: 40em;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-container);
+  background: var(--color-background-card);
+  color: var(--color-text-primary);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.ask-ai__dialog {
+  width: min(40em, calc(100vw - 32px));
+  box-sizing: border-box;
+  padding: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-container);
+  background: var(--color-background-card);
+  color: var(--color-text-primary);
+}
+
+.ask-ai__dialog[open] {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ask-ai__dialog::backdrop {
+  background: rgb(0 0 0 / 40%);
+}
+
+/*
+ * AI に聞く: PC は見出し・Claude・ChatGPT・プロンプトをコピーを 1 行に並べる。
+ * スマホは見出しの下に Claude・ChatGPT・プロンプトをコピーを縦に 1 つずつ並べ、ボタンの内側の余白の分だけ左へ寄せて、見出しの文字と左端をそろえる
+ */
+.ask-ai {
+  --ask-ai-pad: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+
+.ask-ai__group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+@media (max-width: 767.98px) {
+  .ask-ai {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .ask-ai__group {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    margin-left: calc(-1 * var(--ask-ai-pad));
+  }
+
+  /* コピーの結果はボタンの右ではなく下に出し、見出しの文字に左端をそろえる */
+  .ask-ai__status:not(:empty) {
+    margin-left: var(--ask-ai-pad);
+  }
+}
