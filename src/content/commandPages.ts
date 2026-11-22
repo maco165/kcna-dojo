@@ -5,6 +5,8 @@ import type { CommandData, CommandEntry, CommandFlag } from '../lib/commandRefs'
 
 export type CommandPageExtra = {
   id: string;
+  /** ページの題名 (<title>) に使う短い名前。title が長くて題名が 35 字を超えるときだけ持つ (src/lib/pageTitle.ts の withSite) */
+  short?: string;
   /** 打ってから結果が出るまでに中で起きること (段ごとの文) */
   inside: string[];
   /** 送る API の要求 (Kubernetes の API を呼ばない道具は空) */
@@ -39,10 +41,10 @@ export const COMMAND_PAGES: CommandPage[] = DATA.commands.flatMap((c) => {
 
 export const findCommandPage = (id: string) => COMMAND_PAGES.find((p) => p.id === id);
 
-/** ページの題名 (画面・書き出す HTML で共通) */
+/** ページの短い題名 (画面・書き出す HTML で共通)。見出しと同じコマンドの名前にする (ページごとに違う題名にするため) */
 export const commandPageTitle = (id: string) => {
   const c = findCommandPage(id);
-  return c ? `${c.command} の中身と使い方` : 'コマンド';
+  return c ? (c.short ?? c.command) : 'コマンド';
 };
 
 /** 一覧の段の順 (道具) */

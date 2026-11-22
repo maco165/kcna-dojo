@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { AppShell } from '@astryxdesign/core/AppShell';
+import Crumbs from '../components/Crumbs';
 import { Link } from '@astryxdesign/core/Link';
 import { VStack } from '@astryxdesign/core/Stack';
 import { Text } from '@astryxdesign/core/Text';
@@ -290,7 +291,7 @@ function Body({ isWide, termId }: { isWide: boolean; termId?: string }) {
   return (
     <VStack gap={4}>
       <VStack gap={1}>
-        <Text type="supporting">{SITE_NAME}</Text>
+        <Crumbs items={[{ name: '用語集' }]} />
         <h1 className="week-title">用語集</h1>
         <Text type="supporting">問題とハンドブックに出る {TERMS.length} 語の説明です。ハンドブックで分からない語を調べ、それでも分からなければ AI に聞けます。</Text>
       </VStack>

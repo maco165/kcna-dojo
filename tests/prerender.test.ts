@@ -9,7 +9,7 @@ const template = readFileSync(path.resolve(process.cwd(), 'index.html'), 'utf8')
 describe('ページの書き出し', () => {
   it('題名・説明・canonical・OGP・本文を、そのページのものにする', () => {
     const html = renderPage(template, { path: 'handbook/storage/', title: 'ストレージ', description: '説明', body: '<h1>ストレージ</h1>' });
-    expect(html).toContain('<title>ストレージ | クラネイ — KCNA-JP 対策</title>');
+    expect(html).toContain('<title>ストレージ | クラネイ</title>');
     expect(html).toContain('<link rel="canonical" href="https://maco165.github.io/kcna-dojo/handbook/storage/"');
     expect(html).toContain('<meta property="og:url" content="https://maco165.github.io/kcna-dojo/handbook/storage/"');
     expect(html).toContain('<meta name="description" content="説明"');

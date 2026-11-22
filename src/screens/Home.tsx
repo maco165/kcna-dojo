@@ -1,5 +1,6 @@
 import { AppShell } from '@astryxdesign/core/AppShell';
 import { Button } from '@astryxdesign/core/Button';
+import Crumbs from '../components/Crumbs';
 import { Card } from '@astryxdesign/core/Card';
 import { Heading } from '@astryxdesign/core/Heading';
 import { Link } from '@astryxdesign/core/Link';
@@ -15,7 +16,7 @@ import RepoLink from '../components/RepoLink';
 import SiteLogo from '../components/SiteLogo';
 import StatusIcon from '../components/StatusIcon';
 import { WEEKS, type WeekMeta } from '../content/curriculum';
-import type { Lesson } from '../content/types';
+import type { LessonMeta as Lesson } from '../content/types';
 import {
   DOMAINS,
   domainAccuracy,
@@ -145,6 +146,7 @@ function PhoneHome({ s, progress }: { s: Summary; progress: Progress }) {
       <main className="page__main">
         <div className="week-head">
           <VStack gap={0.5}>
+            {meta.week !== 1 && <Crumbs items={[{ name: `第 ${meta.week} 週 ${meta.title}` }]} />}
             <Text type="supporting">
               第 {meta.week} 週 · {meta.area} · {doneCount(meta, progress)}/{lessons.length} 完了
             </Text>
@@ -377,6 +379,7 @@ function DesktopHome({ s, progress }: { s: Summary; progress: Progress }) {
       <div className="desk">
         <header className="desk__head">
           <VStack gap={0.5}>
+            {meta.week !== 1 && <Crumbs items={[{ name: `第 ${meta.week} 週 ${meta.title}` }]} />}
             <Text type="supporting">
               第 {meta.week} 週 · {meta.domain} · {meta.area} · {formatDate(meta.start)}〜{formatDate(weekEnd(meta.start))}
             </Text>

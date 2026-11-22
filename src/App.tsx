@@ -10,7 +10,7 @@ import { useEffect, useLayoutEffect, useReducer, useRef, type ReactNode } from '
 import { colorMode } from './lib/progress';
 import { useProgress } from './lib/useProgress';
 import Home from './screens/Home';
-import LessonScreen from './screens/LessonScreen';
+import { LoadBoundary, LoadFailed } from './components/LoadBoundary';
 
 export default function App() {
   const route = useRoute();
@@ -18,7 +18,8 @@ export default function App() {
   const found = route.name === 'lesson' ? findLesson(route.lessonId) : undefined;
 
   const [, rerender] = useReducer((n: number) => n + 1, 0);
-  const lazyName = isLazy(route.name) ? route.name : undefined;
+  // 知らないレッスンの id はホームを出す (レッスンの部品を読まない)
+  const lazyName = isLazy(route.name) && !(route.name === 'lesson' && !found) ? route.name : undefined;
   const Screen = lazyName ? loadedScreen(lazyName) : undefined;
   // まだ読んでいない画面なら読み、読み終えたら描き直す (その間は前の画面を出したままにして、白い画面を見せない)
   useEffect(() => {
@@ -44,15 +45,18 @@ export default function App() {
   else if (Screen && route.name === 'compare') screen = <Screen key={route.tableId ?? 'index'} progress={progress} tableId={route.tableId} />;
   else if (Screen && route.name === 'glossary') screen = <Screen key={route.termId ?? 'index'} progress={progress} termId={route.termId} />;
   else if (Screen && (route.name === 'guide' || route.name === 'progress' || route.name === 'about')) screen = <Screen progress={progress} />;
+  else if (Screen && route.name === 'lesson') screen = <Screen key={route.lessonId} lessonId={route.lessonId} progress={progress} updateProgress={updateProgress} />;
   else if (Screen) screen = <Screen progress={progress} updateProgress={updateProgress} />;
-  else if (found) screen = <LessonScreen key={found.lesson.id} lesson={found.lesson} week={found.week} progress={progress} updateProgress={updateProgress} />;
   else screen = <Home week={route.name === 'home' ? route.week : 1} progress={progress} />;
   if (!(lazyName && !Screen)) last.current = screen;
 
   return (
     <InternationalizationProvider locale="ja-JP" messages={{ 'ja-JP': jaJP }}>
       <Theme theme={kcnaTheme} mode={colorMode(progress)}>
-        {screen}
+        {/* 画面の部品が描画の途中で投げても (後から読むチャンクが 404 など)、白紙にせず読み直しを出す */}
+        <LoadBoundary resetKey={JSON.stringify(route)} fallback={<LoadFailed />}>
+          {screen}
+        </LoadBoundary>
       </Theme>
     </InternationalizationProvider>
   );

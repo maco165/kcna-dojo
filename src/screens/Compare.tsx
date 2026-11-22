@@ -1,6 +1,7 @@
 // 似た語の比較表 (/compare/ と /compare/<id>/)。試験で取り違えやすい語の組ごとに、観点を並べた表・取り違えやすい点・違いが見えるコード・出典を出す。
 // 中身の正本は src/content/compare.json (公式の文書で確かめて書く)
 import { AppShell } from '@astryxdesign/core/AppShell';
+import Crumbs from '../components/Crumbs';
 import { CodeBlock } from '@astryxdesign/core/CodeBlock';
 import { Link } from '@astryxdesign/core/Link';
 import { Text } from '@astryxdesign/core/Text';
@@ -9,7 +10,7 @@ import BottomTabs from '../components/BottomTabs';
 import RepoLink from '../components/RepoLink';
 import SiteLogo from '../components/SiteLogo';
 import { dueReviewCount } from '../content';
-import { COMPARE_TABLES, findTable, type CompareTable } from '../content/compare';
+import { COMPARE_LEAD, COMPARE_TABLES, findTable, type CompareTable } from '../content/compare';
 import { compareHref, glossaryHref, glossaryTermHref, handbookHref } from '../lib/route';
 import type { Progress } from '../lib/progress';
 import { SITE_NAME } from '../lib/site';
@@ -19,11 +20,9 @@ function Index() {
   return (
     <div className="hb cmp">
       <div className="hb-head">
-        <Text type="supporting">{SITE_NAME}</Text>
+        <Crumbs items={[{ name: '似た語の比較表' }]} />
         <h1 className="week-title">似た語の比較表</h1>
-        <p className="hb-lead">
-          試験で取り違えやすい語の組ごとに、何をするか・いつ使うか・どこが違うかを 1 つの表に並べました。表の下に、取り違えやすい点と、違いが見えるマニフェストやコマンドを添えています。中身は公式の文書 (kubernetes.io の英語版の最新など) で確かめ、出典を付けています。
-        </p>
+        <p className="hb-lead">{COMPARE_LEAD}</p>
         <p className="hb-lead hb-muted">
           1 語ずつの説明は <a href={glossaryHref}>用語集</a>、仕組みの流れは <a href={handbookHref()}>ハンドブック</a> にあります。
         </p>
@@ -46,14 +45,7 @@ function Index() {
 function Table({ t }: { t: CompareTable }) {
   return (
     <article className="hb cmp" aria-labelledby="cmp-title">
-      <nav aria-label="パンくず" className="hb-crumbs">
-        <ol>
-          <li>
-            <a href={compareHref()}>似た語の比較表</a>
-          </li>
-          <li aria-current="page">{t.title}</li>
-        </ol>
-      </nav>
+      <Crumbs items={[{ name: '似た語の比較表', href: compareHref() }, { name: t.title }]} />
       <div className="hb-head">
         <h1 id="cmp-title" className="week-title">
           {t.title}

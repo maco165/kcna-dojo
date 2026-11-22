@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { allQuestions } from '../src/content';
+import { allQuestions } from '../src/content/lessons';
 import { pickPractice } from '../src/lib/practice';
 
 /** 決まった並びを返す乱数 (テストを毎回同じにする) */

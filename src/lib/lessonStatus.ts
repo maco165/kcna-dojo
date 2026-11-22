@@ -1,5 +1,5 @@
 import { WEEKS } from '../content/curriculum';
-import type { Domain, Lesson } from '../content/types';
+import type { Domain, LessonMeta as Lesson } from '../content/types';
 import { dayKey, type Progress } from './progress';
 
 export type LessonStatus = 'done' | 'next' | 'pending';

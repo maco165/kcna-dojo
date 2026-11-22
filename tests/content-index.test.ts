@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { dueQuestions, dueReviewCount, findQuestion, isKnownQuestion } from '../src/content';
+import { dueQuestions, dueReviewCount, isKnownQuestion } from '../src/content';
+import { findQuestion } from '../src/content/lessons';
 import { EXAM_ONLY, findExamQuestion } from '../src/content/examBank';
 import { emptyProgress, recordAnswer, upcomingReview } from '../src/lib/progress';
 
@@ -35,5 +36,16 @@ describe('復習の問題を問題データから引く', () => {
       expect(r.question.id.startsWith('x-')).toBe(true);
       expect(findQuestion(r.question.id)).toBeUndefined();
     }
+  });
+});
+
+describe('週の問題の軽い形 (vite.config.ts の lightLessons)', () => {
+  it('curriculum.ts の WEEKS は問題を id・形・問題文だけで持ち、全文 (lessons.ts) と同じ問題を同じ順で持つ', async () => {
+    const { WEEKS } = await import('../src/content/curriculum');
+    const { WEEK_CONTENTS } = await import('../src/content/lessons');
+    const light = WEEKS.flatMap((w) => (w.content?.lessons ?? []).flatMap((l) => (l.kind === 'quiz' ? l.questions : [])));
+    const full = WEEK_CONTENTS.flatMap((w) => w.lessons.flatMap((l) => (l.kind === 'quiz' ? l.questions : [])));
+    expect(light.length).toBeGreaterThan(200);
+    expect(light).toEqual(full.map(({ id, type, prompt }) => ({ id, type, prompt })));
   });
 });

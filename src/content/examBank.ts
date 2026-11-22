@@ -1,6 +1,6 @@
 // 模擬試験用の問題 (レッスンに無い初見の問題)。正本は src/content/exam/*.json (週のファイルと同じ形で、week は 0)。
 // 模擬試験と復習の画面を開いたときにだけ読む (最初に読む JS に入れない)
-import type { QuestionRef } from '.';
+import type { QuestionRef } from './lessons';
 import type { Lesson, Question } from './types';
 
 type ExamFile = { week: 0; lessons: Lesson[] };

@@ -5,6 +5,7 @@
       "id": "application-delivery",
       "competency": "Application Delivery",
       "title": "アプリを届ける流れ (CI/CD・GitOps・Helm・Kustomize)",
+      "short": "アプリを届ける流れ (CI/CD・GitOps)",
       "summary": "コードの変更をこまめに統合して成果物を作る CI と、それを環境へ届ける CD を土台に、Kubernetes では望ましい状態をマニフェストで宣言し、Deployment のローリング更新で入れ替えます。マニフェストの束ね方には Helm と Kustomize があり、GitOps では Git に置いた宣言を正本にして、エージェントがクラスタを合わせ続けます。",
       "flow": [
         {

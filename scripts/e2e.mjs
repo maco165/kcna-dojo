@@ -69,14 +69,15 @@ const choiceLabel = (q, choiceId) => {
 function checkFirstLoad() {
   const html = readFileSync(new URL('../dist/index.html', import.meta.url), 'utf8');
   const files = [...new Set([...html.matchAll(/\/kcna-dojo\/assets\/([^"]+\.js)/g)].map((m) => m[1]))];
-  const gz = files.reduce((n, f) => n + gzipSync(readFileSync(new URL(`../dist/assets/${f}`, import.meta.url))).length, 0);
+  const gz = files.reduce((n, f) => n + gzipSync(readFileSync(new URL(`../dist/assets/${f}`, import.meta.url)), { level: 9 }).length, 0);
   const kb = Math.round(gz / 1024);
-  check(kb <= 380, `最初に読む JS は gzip で 380KB まで (${kb}KB、${files.length} ファイル)`);
+  // 2026-11-22 に週の問題の全文とレッスンの画面を開いたときに読むようにして 326KB → 240KB (gzip -9 で測った値)。ゆとりを 10KB だけ見る
+  check(kb <= 250, `最初に読む JS は gzip で 250KB まで (${kb}KB、${files.length} ファイル)`);
   // 名前だけでなく中身でも見る (静的に取り込まれて本体に混ざっても気づけるように)。それぞれのデータにしか無い文字で調べる
-  const marks = { ハンドブックのデータ: 'k3s-vs-kubernetes', 用語集のデータ: 'container-image', 説明のページ: '2026-03-22 の版', 模擬試験用の問題: 'のイメージを更新した直後に', 比較表のデータ: 'volumeClaimTemplates:  # Pod ごとに', コマンドの説明: 'リソースの一覧や状態を表で表示します', コマンドのページのデータ: 'Initial install underway', コマンドのページの中身: 'のような種類の名前を、API のグループ・版・資源に引き当てます' };
+  const marks = { ハンドブックのデータ: 'k3s-vs-kubernetes', 用語集のデータ: 'container-image', 説明のページ: '2026-03-22 の版', 模擬試験用の問題: 'のイメージを更新した直後に', 比較表のデータ: 'volumeClaimTemplates:  # Pod ごとに', コマンドの説明: 'リソースの一覧や状態を表で表示します', コマンドのページのデータ: 'Initial install underway', コマンドのページの中身: 'のような種類の名前を、API のグループ・版・資源に引き当てます', 週の問題の解説: 'VM はハイパーバイザーの上でゲスト OS ごと動きます' };
   const text = files.map((f) => readFileSync(new URL(`../dist/assets/${f}`, import.meta.url), 'utf8')).join('\n');
   const found = Object.entries(marks).filter(([, m]) => text.includes(m)).map(([k]) => k);
-  check(found.length === 0, `ハンドブック・用語集・説明のページ・模擬試験用の問題・コマンドの説明・比較表・コマンドのページは最初に読まない ${found.join(',')}`);
+  check(found.length === 0, `ハンドブック・用語集・説明のページ・模擬試験用の問題・コマンドの説明・比較表・コマンドのページ・週の問題の全文は最初に読まない ${found.join(',')}`);
   // 書き出したハンドブックの目次も、画面と同じ 2 部 (h2) と段 (h3) の組みにする
   const hbHtml = readFileSync(new URL('../dist/handbook/index.html', import.meta.url), 'utf8');
   const hbHeads = [...hbHtml.matchAll(/<h([23])>([^<]*)<\/h\1>/g)].map((m) => `${m[1]}:${m[2]}`);
@@ -758,7 +759,7 @@ async function run(browser, name, width, height) {
     await page.locator('.cmp-table').waitFor();
     await page.waitForTimeout(500);
     page.off('request', onReq);
-    check((await page.title()).includes('の違い') && !loaded.some((u) => /\/handbook-[^/]*\.js$/.test(u)), `${tag} 比較表へ移ると題名が表の題名になり、ハンドブックのデータは読まない (${await page.title()})`);
+    check((await page.title()) === 'Service の 4 つの type の違い | クラネイ' && !loaded.some((u) => /\/handbook-[^/]*\.js$/.test(u)), `${tag} 比較表へ移ると題名が表の題名になり、ハンドブックのデータは読まない (${await page.title()})`);
     await page.goto(`${BASE}glossary/deployment/`);
     await page.getByRole('heading', { name: '似た語と比べる' }).first().waitFor({ timeout: 5000 }).catch(() => {});
     check((await page.locator('a.gloss-chip[href*="/compare/"]').count()) >= 1, `${tag} 用語集の語から、その語の比較表へ飛べる`);
@@ -773,7 +774,7 @@ async function run(browser, name, width, height) {
     await page.locator('.cmdp-inside').waitFor();
     check((await page.locator('.cmdp-inside li').count()) >= 3, `${tag} コマンドのページに中で何が起きるかの段がある`);
     check((await page.locator('.cmdp-api tbody tr').count()) >= 1 && (await page.locator('a[href^="https://github.com/kubernetes/kubectl/blob/"]').count()) >= 1, `${tag} コマンドのページに API の要求と実装へのリンクがある`);
-    check((await page.title()).startsWith('kubectl get の中身と使い方'), `${tag} コマンドのページの題名 (${await page.title()})`);
+    check((await page.title()) === 'kubectl get | クラネイ', `${tag} コマンドのページの題名 (${await page.title()})`);
     await noHorizontalOverflow(page, width, `${tag} コマンドのページ`);
     // スマホでは全部のページの横のはみ出しを見る (長い API のパスなど、ページごとに中身が違うため)
     if (width < 768) {
@@ -858,6 +859,44 @@ async function run(browser, name, width, height) {
     await page.goBack();
     await page.getByRole('heading', { name: '全体の流れ' }).waitFor();
     check(new URL(page.url()).pathname === '/kcna-dojo/handbook/storage/', `${tag} 戻るで前のページに戻る`);
+    // パンくず: 画面 (JS が描いたあと) にも、書き出した HTML (BreadcrumbList) と同じ階層で、トップから出る
+    const crumbHrefs = () => page.locator('nav[aria-label="パンくず"] a').evaluateAll((as) => as.map((a) => a.getAttribute('href')));
+    check(JSON.stringify(await crumbHrefs()) === JSON.stringify(['/kcna-dojo/', '/kcna-dojo/handbook/']), `${tag} ハンドブックのトピックのパンくずはトップ・ハンドブックの順 (${await crumbHrefs()})`);
+    for (const [p, name] of [['glossary/', '用語集'], ['week/2/', 'クラスタの構成']]) {
+      await page.goto(`${BASE}${p}`);
+      await page.getByRole('heading', { name, level: 1 }).first().waitFor();
+      // 書き出した HTML のパンくずではなく、画面が描いたパンくずを見る (React が #root を置き換えるまで待つ)
+      await page.waitForFunction(() => !document.querySelector('#root > main.prerender'));
+      const current = await page.locator('nav[aria-label="パンくず"] [aria-current="page"]').first().textContent();
+      check(JSON.stringify(await crumbHrefs()) === JSON.stringify(['/kcna-dojo/']) && current.includes(name), `${tag} ${p} のパンくずはトップから出る (${await crumbHrefs()} / ${current})`);
+    }
+  }
+
+  // 後から読むチャンクを読めない (新しい版を出したあとの開いたままのタブなど) ときも白紙にしない。
+  // 別のページで調べ、ここで出るエラーは上のエラーの検査に入れない
+  {
+    const bp = await context.newPage();
+    const rootText = () => bp.evaluate(() => document.getElementById('root')?.innerText.trim().length ?? 0);
+    // 答えたあとの部品 (読み直す先・出てきたコマンド) が 404 でも、レッスンの画面は残り、次へ進める
+    await bp.route(/\/assets\/(ReadMore|CommandNotes)-[^/]+\.js$/, (r) => r.fulfill({ status: 404, body: '' }));
+    await bp.goto(`${BASE}lesson/${l1.id}/`);
+    await bp.waitForFunction(() => !document.querySelector('#root > main.prerender'));
+    const q = l1.questions[0];
+    await bp.getByRole('radio', { name: choiceLabel(q, q.answer) }).check();
+    await bp.getByRole('button', { name: '確かめる' }).click();
+    await bp.waitForTimeout(1000);
+    check((await rootText()) > 100 && (await bp.getByRole('button', { name: /次へ|結果を見る/ }).count()) >= 1, `${tag} 答えたあとの部品のチャンクが 404 でも白紙にならず、次へ進める (${await rootText()} 字)`);
+    // ホームを開いたあとレッスンの画面と問題の全文のチャンクが 404 になっても、白紙にしない (読み直して書き出した HTML を出す)
+    let block = false;
+    await bp.unrouteAll();
+    await bp.route(/\/assets\/(LessonRoute|LessonScreen|lessons)-[^/]+\.js$/, (r) => (block ? r.fulfill({ status: 404, body: '' }) : r.continue()));
+    await bp.goto(BASE);
+    await bp.waitForFunction(() => !document.querySelector('#root > main.prerender'));
+    block = true;
+    await bp.locator(`a[href="/kcna-dojo/lesson/${l1.id}/"]`).first().click();
+    await bp.waitForTimeout(2000);
+    check((await rootText()) > 100, `${tag} レッスンの画面のチャンクが 404 でも白紙にならない (${await rootText()} 字)`);
+    await bp.close();
   }
 
   check(errors.length === 0, `${tag} ページのエラーが無い ${errors.length ? errors.join(' / ') : ''}`);

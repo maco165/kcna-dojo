@@ -1,9 +1,10 @@
-// 開いたときに読む画面 (最初の JS を軽くするため)。ホームとレッスンは本体に入れ、ほかはそれぞれの画面を開いたときに読む。
-// ハンドブックと用語集のデータも、その画面の分と一緒に読まれる
+// 開いたときに読む画面 (最初の JS を軽くするため)。ホームは本体に入れ、ほかはそれぞれの画面を開いたときに読む。
+// ハンドブックと用語集のデータも、その画面の分と一緒に読まれる。レッスンは問題の全文 (content/lessons.ts) と一緒に読む
 import type { ComponentType } from 'react';
 import type { Route } from './route';
 
 const LOADERS = {
+  lesson: () => import('../screens/LessonRoute'),
   exam: () => import('../screens/ExamScreen'),
   handbook: () => import('../screens/Handbook'),
   guide: () => import('../screens/Guide'),

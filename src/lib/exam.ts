@@ -19,6 +19,13 @@ export const EXAM_WEIGHTS: Record<Domain, number> = {
 
 export type BankItem = { question: Question; domain: Domain };
 
+/** 模擬試験の始めの説明 (画面と書き出す HTML で共通)。sets は決まった回の数、fresh は初見の問題だけの回、bankSize は第 1〜8 週の問題の数 */
+export const examIntro = (sets: number, fresh: number[], bankSize: number) =>
+  `本番と同じ 4 分野の配点の割合で ${EXAM_QUESTIONS} 問を出します。問題が決まっていて互いに重ならない第 1〜${sets} 回と、毎回選び直すランダムがあります。第 1〜${sets - fresh.length} 回とランダムは第 1〜8 週の問題 (${bankSize} 問) から、第 ${fresh.join('・')} 回はレッスンに無い初見の問題から出します。時間は ${EXAM_MINUTES} 分で、途中では答えを見せず、最後にまとめて採点します。`;
+
+/** 合格の目安の説明 (画面と書き出す HTML で共通) */
+export const PASS_NOTE = `合格の目安は ${Math.round(PASS_MARK * 100)}% としています (LF の多肢選択式試験に共通の合格点です)。答えて間違えた問題は復習に入ります。`;
+
 /** 配点の割合で各分野の問題の数を決める (端数は大きい順に配り、合計を total にそろえる) */
 export function domainCounts(total: number = EXAM_QUESTIONS): Record<Domain, number> {
   const entries = Object.entries(EXAM_WEIGHTS) as [Domain, number][];

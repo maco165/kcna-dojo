@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { WEEKS } from '../src/content/curriculum';
 import { CURRICULUM, EXAM_FACTS, SAMPLE_QUESTION_ID, SOURCES, SOURCE_SITES, STUDY_MATERIALS } from '../src/content/guide';
 import { EXAM_WEIGHTS } from '../src/lib/exam';
-import { findQuestion } from '../src/content';
+import { WEEK_CONTENTS, findQuestion } from '../src/content/lessons';
 import type { WeekContent } from '../src/content/types';
 import { contentStats } from '../src/lib/contentStats';
 
@@ -26,7 +26,7 @@ describe('contentStats', () => {
   });
   it('実データ: 出典の合計が問題の数と同じで、kubernetes.io がいちばん多い', () => {
     const s = contentStats(
-      WEEKS.map((w) => w.content),
+      WEEK_CONTENTS,
       0,
     );
     expect(s.sources.reduce((a, b) => a + b.count, 0)).toBe(s.questions);
@@ -57,7 +57,7 @@ describe('学習要領と情報源', () => {
   });
   it('問題の出典のサイトには、すべて名前と入口の URL がある (名前の無いホストを出さない)', () => {
     const s = contentStats(
-      WEEKS.map((w) => w.content),
+      WEEK_CONTENTS,
       0,
     );
     for (const x of s.sources) expect(SOURCE_SITES[x.host], x.host).toBeDefined();

@@ -781,6 +781,7 @@
   },
   {
     "id": "kubectl-create-secret-docker-registry",
+    "short": "create secret docker-registry",
     "inside": [
       "kubeconfig を読んで行き先を決めます。--docker-server・--docker-username・--docker-password (と --docker-email) から、~/.docker/config.json と同じ形の JSON ({\"auths\":{\"<サーバー>\":{\"username\":...,\"password\":...,\"auth\":...}}}) を手元で作ります。auth は「ユーザー名:パスワード」を Base64 にしたものです。",
       "その JSON を .dockerconfigjson のキーに入れ、type: kubernetes.io/dockerconfigjson の Secret を組み立てます。--from-file で、すでにある config.json をそのまま入れることもできます。",

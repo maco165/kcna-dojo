@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { AppShell } from '@astryxdesign/core/AppShell';
+import Crumbs from '../components/Crumbs';
 import { Link } from '@astryxdesign/core/Link';
 import { Text } from '@astryxdesign/core/Text';
 import AppSideNav from '../components/AppSideNav';
 import BottomTabs from '../components/BottomTabs';
 import RepoLink from '../components/RepoLink';
 import SiteLogo from '../components/SiteLogo';
-import { dueReviewCount, findQuestion } from '../content';
+import { dueReviewCount } from '../content';
+import { WEEK_CONTENTS, findQuestion } from '../content/lessons';
 import { WEEKS } from '../content/curriculum';
 import glossary from '../content/glossary.json';
 import {
@@ -36,7 +38,7 @@ import { SITE_NAME } from '../lib/site';
 import { WIDE_QUERY, useMediaQuery } from '../lib/useMediaQuery';
 
 const STATS = contentStats(
-  WEEKS.map((w) => w.content),
+  WEEK_CONTENTS,
   (glossary as { terms: unknown[] }).terms.length,
 );
 /** 週の番号の並びを「第 1〜4 週」「第 7 週」の形にする */
@@ -192,6 +194,9 @@ function Body() {
   const sourceLabel = [...top.map((s) => `${s.host} ${s.count} 問`), `そのほか ${restCount} 問`].join('、');
   return (
     <div className="guide">
+      <div className="guide-crumbs">
+        <Crumbs items={[{ name: 'Kubernetes とこのサイト' }]} />
+      </div>
       <section className="guide-hero" aria-labelledby="guide-title">
         <ClusterAnimation />
         <div className="guide-hero__fg">

@@ -11,7 +11,8 @@ import AppSideNav from '../components/AppSideNav';
 import BottomTabs from '../components/BottomTabs';
 import RepoLink from '../components/RepoLink';
 import SiteLogo from '../components/SiteLogo';
-import { allQuestions, dueQuestions, dueReviewCount, findQuestion, isKnownQuestion, type QuestionRef } from '../content';
+import { dueQuestions, dueReviewCount, isKnownQuestion } from '../content';
+import { allQuestions, findQuestion, type QuestionRef } from '../content/lessons';
 import { findExamQuestion } from '../content/examBank';
 
 /** 復習ではレッスンの問題と模擬試験用の問題の両方を引く */

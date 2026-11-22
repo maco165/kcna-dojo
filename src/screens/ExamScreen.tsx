@@ -1,5 +1,7 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertDialog } from '@astryxdesign/core/AlertDialog';
+import { LazyPart } from '../components/LoadBoundary';
+import Crumbs from '../components/Crumbs';
 import { AppShell } from '@astryxdesign/core/AppShell';
 import { Banner } from '@astryxdesign/core/Banner';
 import { Button } from '@astryxdesign/core/Button';
@@ -19,9 +21,10 @@ import BottomTabs from '../components/BottomTabs';
 import Feedback from '../components/Feedback';
 import RepoLink from '../components/RepoLink';
 import SiteLogo from '../components/SiteLogo';
-import { dueReviewCount, questionBank } from '../content';
+import { dueReviewCount } from '../content';
+import { questionBank } from '../content/lessons';
 import type { Domain, Question } from '../content/types';
-import { EXAM_MINUTES, EXAM_QUESTIONS, EXAM_WEIGHTS, PASS_MARK, domainCounts, formatClock, gradeExam, isAnswered, isCorrect, defaultChoice, lastExamOf, recordExam, startExam, type ExamChoice, type ExamSet, type BankItem, type ExamAnswer, type ExamResult, weakDomains } from '../lib/exam';
+import { EXAM_MINUTES, EXAM_WEIGHTS, PASS_MARK, PASS_NOTE, domainCounts, examIntro, formatClock, gradeExam, isAnswered, isCorrect, defaultChoice, lastExamOf, recordExam, startExam, type ExamChoice, type ExamSet, type BankItem, type ExamAnswer, type ExamResult, weakDomains } from '../lib/exam';
 import examSets from '../content/examSets.json';
 import { EXAM_ONLY } from '../content/examBank';
 import { normalizeAnswer } from '../lib/grade';
@@ -80,11 +83,9 @@ function Intro({ progress, choice: picked, onChoice, onStart }: { progress: Prog
   return (
     <VStack gap={6}>
       <VStack gap={1}>
-        <Text type="supporting">{SITE_NAME}</Text>
+        <Crumbs items={[{ name: '模擬試験' }]} />
         <h1 className="week-title">模擬試験</h1>
-        <Text type="supporting">
-          本番と同じ 4 分野の配点の割合で {EXAM_QUESTIONS} 問を出します。問題が決まっていて互いに重ならない第 1〜{EXAM_SETS.length} 回と、毎回選び直すランダムがあります。第 1〜{EXAM_SETS.length - FRESH_SETS.length} 回とランダムは第 1〜8 週の問題 ({bankSize} 問) から、第 {FRESH_SETS.join('・')} 回はレッスンに無い初見の問題から出します。時間は {EXAM_MINUTES} 分で、途中では答えを見せず、最後にまとめて採点します。
-        </Text>
+        <Text type="supporting">{examIntro(EXAM_SETS.length, FRESH_SETS, bankSize)}</Text>
       </VStack>
       <Card padding={4}>
         <VStack gap={3}>
@@ -94,7 +95,7 @@ function Intro({ progress, choice: picked, onChoice, onStart }: { progress: Prog
               <ListItem key={d} label={d} endContent={<Text type="supporting">{`配点 ${EXAM_WEIGHTS[d]}% · ${counts[d]} 問`}</Text>} />
             ))}
           </List>
-          <Text type="supporting">合格の目安は {Math.round(PASS_MARK * 100)}% としています (LF の多肢選択式試験に共通の合格点です)。答えて間違えた問題は復習に入ります。</Text>
+          <Text type="supporting">{PASS_NOTE}</Text>
           <RadioList label="回を選ぶ" value={choice} onChange={setChoice}>
             {EXAM_SETS.map((set) => {
               const e = last(set.id);
@@ -307,9 +308,9 @@ function Result({ items, answers, result, onRestart }: { items: BankItem[]; answ
               />
             );
           })}
-          <Suspense fallback={null}>
+          <LazyPart>
             <WeakDomains domains={weakDomains(result)} />
-          </Suspense>
+          </LazyPart>
         </VStack>
       </Card>
       {wrong.length > 0 && (
@@ -345,9 +346,9 @@ function Result({ items, answers, result, onRestart }: { items: BankItem[]; answ
                   {q.type === 'fill' && <CodeBlock code={q.code.replace('{{blank}}', '____')} width="100%" size="sm" hasCopyButton={false} />}
                   <Text type="supporting">あなたの答え: {mine}</Text>
                   <Feedback correct={false} correctAnswer={correctAnswer} explanation={q.explanation} note={q.type === 'choice' ? q.choices.find((c) => c.id === answer)?.why : q.wrongNotes?.[normalizeAnswer(answer ?? '')]} source={q.source} question={q} notesOpen={false} />
-                  <Suspense fallback={null}>
+                  <LazyPart>
                     <ReadMore question={q} domain={item.domain} />
-                  </Suspense>
+                  </LazyPart>
                   <AskAi question={q} answered={isAnswered(answer) ? { picked: answer, correct: false } : undefined} />
                 </VStack>
               </Card>

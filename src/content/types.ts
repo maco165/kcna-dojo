@@ -77,3 +77,12 @@ export type WeekContent = {
   week: number;
   lessons: Lesson[];
 };
+
+/**
+ * 週の一覧・進み具合・題名に使う軽いレッスン (問題は id・形・問題文だけ)。最初に読む JS を軽くするため、
+ * ホームと本体は週のファイルを ?light で読み (vite.config.ts の lightLessons)、問題の全文は lessons.ts から読む
+ */
+export type QuestionMeta = Pick<Question, 'id' | 'type' | 'prompt'>;
+export type QuizLessonMeta = Omit<QuizLesson, 'questions'> & { questions: QuestionMeta[] };
+export type LessonMeta = QuizLessonMeta | LabLesson;
+export type WeekIndex = { week: number; lessons: LessonMeta[] };

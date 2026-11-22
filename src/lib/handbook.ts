@@ -1,5 +1,5 @@
 // ハンドブックのデータの検査。違反を文で返す (空なら OK)
-const TOPIC_KEYS = new Set(['id', 'competency', 'title', 'summary', 'flow', 'try', 'lessons', 'sources', 'noTermLinks']);
+const TOPIC_KEYS = new Set(['id', 'competency', 'title', 'summary', 'flow', 'try', 'lessons', 'sources', 'noTermLinks', 'short']);
 const STEP_KEYS = new Set(['text', 'code', 'output', 'result']);
 const RESULT_KEYS = new Set(['text', 'tone']);
 /** 結果の文の長さの上限 (絵の 1 行に収める) */

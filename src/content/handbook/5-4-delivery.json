@@ -5,6 +5,7 @@
       "id": "authn-authz-basics",
       "competency": "付録: 認証と認可",
       "title": "認証と認可の基本: 証明書・TLS・OAuth 2.0・OpenID Connect と Kubernetes",
+      "short": "認証と認可の基本: 証明書・TLS・OIDC",
       "summary": "認証 (authentication) は「誰か」を確かめること、認可 (authorization) は「何をしてよいか」を決めることです。Kubernetes の API サーバーは、TLS でつながったリクエストをまず認証し、名前とグループなどを決めてから、RBAC などの認可に渡します。ここでは、その下にある公開鍵と証明書・TLS・OAuth 2.0・OpenID Connect の考え方と、Kubernetes での使われ方 (X.509 のクライアント証明書・OIDC・ServiceAccount のトークン) をまとめます。",
       "flow": [
         {

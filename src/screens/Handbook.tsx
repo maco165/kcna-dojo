@@ -1,5 +1,6 @@
 import { AppShell } from '@astryxdesign/core/AppShell';
 import { CodeBlock } from '@astryxdesign/core/CodeBlock';
+import Crumbs from '../components/Crumbs';
 import { Link } from '@astryxdesign/core/Link';
 import { Text } from '@astryxdesign/core/Text';
 import AppSideNav from '../components/AppSideNav';
@@ -159,7 +160,7 @@ function Index({ progress }: { progress: Progress }) {
   return (
     <div className="hb">
       <div className="hb-head">
-        <Text type="supporting">{SITE_NAME}</Text>
+        <Crumbs items={[{ name: 'ハンドブック' }]} />
         <h1 className="week-title">ハンドブック</h1>
         <p className="hb-lead">
           学習要領 (KCNA の公開カリキュラムの細目) ごとに、公式のドキュメントに沿って、実際のコマンドと出力の例で全体の流れを説明します。それぞれに「試したいなら」の手順があり、名前空間 try-kcna
@@ -228,15 +229,7 @@ function Topic({ id, progress, updateProgress }: { id: string; progress: Progres
   const prose = { summary: link(t.summary), flow: t.flow.map((s) => link(s.text)), tries: t.try.map((x) => x.steps.map((s) => link(s.text))) };
   return (
     <article className="hb" aria-labelledby="hb-title">
-      <nav aria-label="パンくず" className="hb-crumbs">
-        <ol>
-          <li>
-            <a href={handbookHref()}>ハンドブック</a>
-          </li>
-          <li>{sectionName(t.domain)}</li>
-          <li aria-current="page">{t.title}</li>
-        </ol>
-      </nav>
+      <Crumbs items={[{ name: 'ハンドブック', href: handbookHref() }, { name: sectionName(t.domain) }, { name: t.title }]} />
       <div className="hb-head">
         <span className="hb-topic__kicker">
           <ScopeTag extra={isAppendixDomain(t.domain)} />
