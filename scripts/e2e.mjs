@@ -107,6 +107,63 @@ function checkSpeedBuild() {
   check(data.length >= 5 && literal.length === 0, `大きなデータのチャンクは JSON.parse で読む (${data.length} ファイル、そうでないもの ${literal.join(',')})`);
 }
 
+/**
+ * 学びを続ける仕組み (休みの札・週の目標・カレンダー・復習の予測・到達・.ics) を、決まった時刻と記録で見る。
+ * 前の版の記録 (札・solved・run の無い形) を読ませても画面が落ちないことも見る
+ */
+async function checkStudyFeatures(browser, width) {
+  const tag = `[学びの仕組み ${width}]`;
+  const context = await browser.newContext({ viewport: { width, height: 900 }, acceptDownloads: true });
+  const page = await context.newPage();
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  // 2026-11-25 (水) 21:00。11/09〜11/22 に学び (札 2 個)、11/23 は休み、11/24 に学んだ。週の目標は 3 日
+  await page.clock.setFixedTime(new Date(2026, 10, 25, 21, 0));
+  const q1 = l1.questions[0].id;
+  const day = (d) => `2026-11-${String(d).padStart(2, '0')}`;
+  const byDay = Object.fromEntries(Array.from({ length: 14 }, (_, i) => [day(9 + i), 9]));
+  byDay[day(24)] = 9;
+  const state = {
+    v: 1,
+    streak: { count: 15, lastDay: day(24), freezes: 1, toNext: 1, used: [day(23)] },
+    xp: { total: 135, byDay },
+    lessons: {},
+    answers: { [q1]: { right: 1, wrong: 1, last: '2026-11-24T00:00:00.000Z', stage: 0, nextReview: day(26), run: 0 } },
+    solved: { [day(24)]: 20 },
+    profile: { dailyGoalXp: 30, weeklyDays: 3 },
+  };
+  await page.addInitScript((v) => localStorage.getItem('kcna.v1') || localStorage.setItem('kcna.v1', v), JSON.stringify(state));
+  await page.goto(BASE);
+  await page.getByRole('heading', { name: 'コンテナの基礎' }).waitFor();
+  check(await page.getByText(/休みの札 1 \/ 2 · 11\/23 に使った/).first().isVisible(), `${tag} ホームに休みの札の数と使った日が出る`);
+  check(await page.getByText(/今週 1 \/ 3 日/).first().isVisible(), `${tag} ホームに今週の学んだ日 / 週の目標が出る (月曜から)`);
+  await page.goto(`${BASE}progress/`);
+  const cal = page.getByRole('list', { name: /過去 26 週の学んだ日/ });
+  await cal.waitFor();
+  const cells = await cal.getByRole('listitem').count();
+  // 26 週 (月曜始まり) のうち、今日 (水) より後の 4 日は描かない
+  check(cells === 26 * 7 - 4, `${tag} カレンダーは過去 26 週の今日までのマス (${cells})`);
+  check((await cal.getByRole('img', { name: '11月24日(火) 20 問' }).count()) === 1 && (await cal.getByRole('img', { name: '11月10日(火) 学んだ (問題の数の記録なし)' }).count()) === 1, `${tag} マスは日付と問題の数を読み上げる (数の記録の無い日も学んだと出す)`);
+  check((await cal.locator('[title="11月24日(火) 20 問"]').count()) === 1, `${tag} マスに title がある`);
+  check(await page.getByRole('img', { name: /11\/26 1 問/ }).isVisible(), `${tag} この先 14 日の復習の件数が出る`);
+  check(await page.getByText(/Kubernetes Fundamentals \(\d+ 問\)/).isVisible() && (await page.getByText(/間違えた \(直近\) 1 \(/).count()) === 1, `${tag} 問題ごとの到達を分野ごとに数と割合で出す`);
+  await noHorizontalOverflow(page, width, `${tag} 進捗`);
+  await page.goto(`${BASE}settings/`);
+  await page.getByRole('heading', { name: 'カレンダーに学ぶ予定を入れる' }).waitFor();
+  check((await page.getByRole('checkbox', { checked: true }).count()) === 3, `${tag} 週の目標 3 日なら、曜日を 3 つ選んでおく`);
+  const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: '予定をダウンロード (.ics)' }).click()]);
+  const ics = readFileSync(await download.path(), 'utf8');
+  check(download.suggestedFilename().endsWith('.ics') && ics.startsWith('BEGIN:VCALENDAR\r\n') && ics.endsWith('END:VCALENDAR\r\n') && /RRULE:FREQ=WEEKLY;BYDAY=MO,WE,FR/.test(ics) && /BEGIN:VTIMEZONE/.test(ics), `${tag} 設定から学ぶ予定の .ics を保存できる`);
+  await noHorizontalOverflow(page, width, `${tag} 設定`);
+  // 前の版の記録 (札・solved・run・週の目標の無い形) を読ませても落ちない
+  await page.evaluate(() => localStorage.setItem('kcna.v1', JSON.stringify({ v: 1, streak: { count: 2, lastDay: '2026-11-24' }, xp: { total: 6, byDay: { '2026-11-24': 6 } }, lessons: {}, answers: { x: { right: 1, wrong: 0, last: '' } } })));
+  await page.goto(`${BASE}progress/`);
+  await page.getByRole('list', { name: /過去 26 週の学んだ日/ }).waitFor();
+  check(await page.getByText('0 / 2').first().isVisible(), `${tag} 前の版の記録は休みの札 0 個で読む`);
+  check(errors.length === 0, `${tag} 画面のエラーが無い (${errors.join(' / ')})`);
+  await context.close();
+}
+
 async function run(browser, name, width, height) {
   const context = await browser.newContext({ viewport: { width, height } });
   const page = await context.newPage();
@@ -1071,6 +1128,8 @@ try {
   checkSpeedBuild();
   await run(browser, 'phone', 390, 844);
   await run(browser, 'pc', 1280, 860);
+  await checkStudyFeatures(browser, 390);
+  await checkStudyFeatures(browser, 1280);
 } catch (e) {
   console.log(`FAIL 実行中に止まりました: ${e.message}`);
   failures++;
