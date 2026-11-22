@@ -44,12 +44,24 @@ export const MAX_EXAM_RECORDS = 20;
 /** ハンドブックのトピックごとの読んだ記録。seen は「全体の流れ」の何段目までを画面に出したか、done は確認済み */
 export type HandbookRecord = { seen: number; done?: boolean; at: string };
 
+/**
+ * 連続日数。freezes は休みの札の数 (0〜MAX_FREEZES)、toNext は次の札まで学んだ日の数 (0〜6)、
+ * used は札を使った日 (古い順に最大 MAX_USED 件)。札の欄が無い前の版の記録は 0 個から数える
+ */
+export type Streak = { count: number; lastDay: string | null; freezes?: number; toNext?: number; used?: string[] };
+
+/** 休みの札の上限と、1 個たまるまでに学ぶ日の数 */
+export const MAX_FREEZES = 2;
+export const FREEZE_EVERY = 7;
+/** 札を使った日を残す数 */
+export const MAX_USED = 14;
+
 export type Progress = {
   v: 1;
   handbook?: Record<string, HandbookRecord>;
   profile?: Profile;
   exams?: ExamRecord[];
-  streak: { count: number; lastDay: string | null };
+  streak: Streak;
   xp: { total: number; byDay: Record<string, number> };
   lessons: Record<string, LessonRecord>;
   answers: Record<string, AnswerRecord>;
@@ -139,6 +151,13 @@ export function normalizeProgress(raw: unknown): Progress | null {
       return a;
     }),
   };
+  // 休みの札 (前の版の記録には無い。無ければ書かない)
+  if (isCount(streak.freezes) && streak.freezes >= 1) out.streak.freezes = Math.min(Math.floor(streak.freezes), MAX_FREEZES);
+  if (isCount(streak.toNext) && streak.toNext >= 1) out.streak.toNext = Math.min(Math.floor(streak.toNext), FREEZE_EVERY - 1);
+  if (Array.isArray(streak.used)) {
+    const used = [...new Set(streak.used.filter(isValidDay))].sort().slice(-MAX_USED);
+    if (used.length > 0) out.streak.used = used;
+  }
   if (Array.isArray(raw.exams)) {
     out.exams = raw.exams
       .filter((e): e is Record<string, unknown> => isObject(e) && typeof e.at === 'string' && !Number.isNaN(Date.parse(e.at)) && isCount(e.correct) && isCount(e.total) && (e.total as number) > 0 && (e.correct as number) <= (e.total as number))
@@ -251,16 +270,49 @@ export function upcomingReview(p: Progress, now: Date, isKnown: (id: string) => 
   return { day: days[0], count: days.filter((d) => d === days[0]).length };
 }
 
+/** 前に学んだ日と今日の間で、学ばなかった日の数 (前に学んでいない・日付が戻ったときは null) */
+function missedDays(lastDay: string | null, today: string): number | null {
+  if (!lastDay) return null;
+  const gap = daysBetween(lastDay, today) - 1;
+  return gap >= 0 ? gap : null;
+}
+
+/**
+ * 今日学んだときの連続日数と休みの札。順番は「使う → たまる」:
+ * 1. 学ばなかった日があり、その日数ぶんの札があれば、札を使って連続を保つ (今日の分の 1 だけ増える。休んだ日は数えない)。
+ *    足りなければ札は使わずに 1 から数え直す
+ * 2. 今日が新しく学んだ日なら、次の札までの日を 1 進め、7 日で札を 1 個足す (上限 2 個。上限でも日は数え、7 日で 0 に戻す)
+ */
+export function advanceStreak(s: Streak, today: string): Streak {
+  if (s.lastDay === today) return { ...s, count: Math.max(s.count, 1) };
+  let freezes = s.freezes ?? 0;
+  let used = s.used ?? [];
+  let count: number;
+  const missed = missedDays(s.lastDay, today);
+  if (missed === 0) count = s.count + 1;
+  else if (missed !== null && s.count > 0 && missed <= freezes) {
+    freezes -= missed;
+    used = [...used, ...Array.from({ length: missed }, (_, i) => addDays(s.lastDay!, i + 1))].slice(-MAX_USED);
+    count = s.count + 1;
+  } else count = 1;
+  let toNext = (s.toNext ?? 0) + 1;
+  if (toNext >= FREEZE_EVERY) {
+    toNext = 0;
+    freezes = Math.min(MAX_FREEZES, freezes + 1);
+  }
+  const out: Streak = { count, lastDay: today };
+  if (freezes > 0) out.freezes = freezes;
+  if (toNext > 0) out.toNext = toNext;
+  if (used.length > 0) out.used = used;
+  return out;
+}
+
 /** 学んだ日の XP を足し、連続日数を進める (レッスンと復習で共通) */
 function addActivity(p: Progress, xpGained: number, now: Date): Progress {
   const today = dayKey(now);
-  let count: number;
-  if (p.streak.lastDay === today) count = Math.max(p.streak.count, 1);
-  else if (p.streak.lastDay === addDays(today, -1)) count = p.streak.count + 1;
-  else count = 1;
   return {
     ...p,
-    streak: { count, lastDay: today },
+    streak: advanceStreak(p.streak, today),
     xp: { total: p.xp.total + xpGained, byDay: { ...p.xp.byDay, [today]: (p.xp.byDay[today] ?? 0) + xpGained } },
   };
 }
@@ -289,11 +341,29 @@ export function todayXp(p: Progress, now: Date): number {
   return p.xp.byDay[dayKey(now)] ?? 0;
 }
 
-/** 今日か昨日に学んでいれば続いている。2 日以上空いたら 0 */
+/**
+ * 今日か昨日に学んでいれば続いている。空いた日 (昨日まで) を休みの札で埋められるうちも続いている
+ * (今日学べば札を使う)。埋められなければ 0
+ */
 export function currentStreak(p: Progress, now: Date): number {
   const today = dayKey(now);
   if (p.streak.lastDay === today || p.streak.lastDay === addDays(today, -1)) return p.streak.count;
-  return 0;
+  const missed = missedDays(p.streak.lastDay, today);
+  return missed !== null && missed <= (p.streak.freezes ?? 0) ? p.streak.count : 0;
+}
+
+/** 札の表示: "休みの札 1 / 2"。使った日は新しいものから 3 つまで "· 11/20・11/21 に使った"、今日学ぶと使うなら "· 今日学ぶと 1 個使う" */
+export function freezeText(f: { have: number; used: string[]; pending: number }): string {
+  const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
+  const used = f.used.slice(-3).map(md).join('・');
+  return `休みの札 ${f.have} / ${MAX_FREEZES}${f.pending > 0 ? ` · 今日学ぶと ${f.pending} 個使う` : ''}${used ? ` · ${used} に使った` : ''}`;
+}
+
+/** 休みの札の数と、使った日 (古い順)。pending は今日学ぶと札を使う日の数 (0 なら使わない) */
+export function freezeStatus(p: Progress, now: Date): { have: number; used: string[]; pending: number } {
+  const missed = missedDays(p.streak.lastDay, dayKey(now));
+  const have = p.streak.freezes ?? 0;
+  return { have, used: p.streak.used ?? [], pending: missed !== null && missed >= 1 && missed <= have && p.streak.count > 0 ? missed : 0 };
 }
 
 export function goalXp(p: Progress): number {

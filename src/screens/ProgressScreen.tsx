@@ -12,7 +12,7 @@ import SiteLogo from '../components/SiteLogo';
 import { dueReviewCount } from '../content';
 import { WEEKS } from '../content/curriculum';
 import { DOMAINS, domainAccuracy, planStatus, weeklyXp } from '../lib/lessonStatus';
-import { currentStreak, daysToExam, type Progress } from '../lib/progress';
+import { FREEZE_EVERY, MAX_FREEZES, currentStreak, daysToExam, freezeStatus, freezeText, type Progress } from '../lib/progress';
 import { examHref, reviewHref, settingsHref, weekHref } from '../lib/route';
 import { SITE_NAME } from '../lib/site';
 import { WIDE_QUERY, useMediaQuery } from '../lib/useMediaQuery';
@@ -27,6 +27,7 @@ function Body({ progress }: { progress: Progress }) {
   const days = weeklyXp(progress, now);
   const maxXp = Math.max(1, ...days.map((d) => d.xp));
   const due = dueReviewCount(progress, now);
+  const freeze = freezeStatus(progress, now);
   const labsNote = plan.labsLeft > 0 ? ` (実習 ${plan.labsLeft} つ残り)` : '';
   const planText =
     plan.expected === 0 ? 'これから' : plan.done >= plan.expected ? `予定どおり${labsNote}` : `${plan.expected - plan.done} レッスン遅れ${labsNote}`;
@@ -43,7 +44,7 @@ function Body({ progress }: { progress: Progress }) {
         <h1 className="week-title">進捗</h1>
       </VStack>
 
-      <dl className="stats stats--card">
+      <dl className="stats stats--card stats--four">
         <div className="stats__item">
           <dt>
             <Text type="supporting">{examDays === null || examDays >= 0 ? '試験まで' : '試験日'}</Text>
@@ -58,11 +59,20 @@ function Body({ progress }: { progress: Progress }) {
         </div>
         <div className="stats__item">
           <dt>
+            <Text type="supporting">休みの札</Text>
+          </dt>
+          <dd>
+            {freeze.have} / {MAX_FREEZES}
+          </dd>
+        </div>
+        <div className="stats__item">
+          <dt>
             <Text type="supporting">計画</Text>
           </dt>
           <dd className={plan.expected > 0 && plan.done < plan.expected ? 'text-warning' : undefined}>{planText}</dd>
         </div>
       </dl>
+      <Text type="supporting">{`${freezeText(freeze)}。休みの札は学んだ日が ${FREEZE_EVERY} 日たまるごとに 1 個 (${MAX_FREEZES} 個まで) で、学ばなかった日があると、次に学んだときに自動で使って連続を保ちます。`}</Text>
 
       <Card padding={4}>
         <VStack gap={3}>

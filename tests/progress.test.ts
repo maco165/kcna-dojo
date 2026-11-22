@@ -55,7 +55,7 @@ describe('completeLesson', () => {
   it('同じ日に続けても連続日数は増えない', () => {
     let p = completeLesson(emptyProgress(), 'w1-l1', score, 12, at('2026-11-23', 9));
     p = completeLesson(p, 'w1-l2', score, 12, at('2026-11-23', 21));
-    expect(p.streak).toEqual({ count: 1, lastDay: '2026-11-23' });
+    expect(p.streak).toEqual({ count: 1, lastDay: '2026-11-23', toNext: 1 });
   });
 
   it('翌日に解くと 1 増え、1 日空くと 1 に戻る', () => {
@@ -270,7 +270,7 @@ describe('復習の予定 (1・3・7 日後)', () => {
   it('復習を終えると XP が入り連続日数が進むが、レッスンの完了は付かない', () => {
     const p = completeReview(emptyProgress(), 6, at('2026-11-24'));
     expect(p.xp.total).toBe(6);
-    expect(p.streak).toEqual({ count: 1, lastDay: '2026-11-24' });
+    expect(p.streak).toEqual({ count: 1, lastDay: '2026-11-24', toNext: 1 });
     expect(p.lessons).toEqual({});
   });
 });

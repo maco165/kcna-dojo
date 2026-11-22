@@ -28,7 +28,7 @@ import {
 } from '../lib/lessonStatus';
 import { downloadProgress } from '../lib/download';
 import { SITE_NAME, SITE_TAGLINE } from '../lib/site';
-import { addDays, currentStreak, daysToExam, goalXp, planStart, todayXp, weekStartDay, type Progress } from '../lib/progress';
+import { addDays, currentStreak, daysToExam, freezeStatus, freezeText, goalXp, planStart, todayXp, weekStartDay, type Progress } from '../lib/progress';
 import { aboutHref, compareHref, examHref, glossaryHref, guideHref, handbookHref, lessonHref, reviewHref, settingsHref, weekHref } from '../lib/route';
 import { dueQuestions, dueReviewCount } from '../content';
 import { WIDE_QUERY, useMediaQuery } from '../lib/useMediaQuery';
@@ -54,6 +54,8 @@ type Summary = {
   goal: number;
   /** 週の日付を数える起点 (利用者の開始日) */
   start: string;
+  /** 休みの札 ("休みの札 1 / 2 · 11/20 に使った") */
+  freeze: string;
 };
 
 function summarize(week: number, progress: Progress): Summary {
@@ -69,6 +71,7 @@ function summarize(week: number, progress: Progress): Summary {
     examDays: daysToExam(progress, now),
     goal: goalXp(progress),
     start: planStart(progress, now),
+    freeze: freezeText(freezeStatus(progress, now)),
   };
 }
 
@@ -166,6 +169,7 @@ function PhoneHome({ s, progress }: { s: Summary; progress: Progress }) {
           hasValueLabel
           formatValueLabel={() => goalLabel(s.today, s.goal)}
         />
+        <Text type="supporting">{s.freeze}</Text>
       </section>
 
       <main className="page__main">
@@ -419,6 +423,7 @@ function DesktopHome({ s, progress }: { s: Summary; progress: Progress }) {
             <Text type="supporting">
               連続 <Text weight="semibold">{s.streak} 日</Text>
             </Text>
+            <Text type="supporting">{s.freeze}</Text>
             <Text type="supporting">
               {s.examDays === null ? (
                 <ExamDays days={null} />
