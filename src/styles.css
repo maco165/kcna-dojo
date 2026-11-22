@@ -3057,3 +3057,48 @@ html[data-loading='true'] body::before {
   font-size: var(--text-supporting-size);
   color: var(--color-text-primary);
 }
+
+/* 模擬試験の問題の一覧: 回答済みは塗り、未回答は枠だけ、見直す印は旗 (色だけに頼らない) */
+.exam-nav__grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+  gap: var(--spacing-1);
+}
+
+.exam-nav__item {
+  position: relative;
+  width: 100%;
+  min-height: 44px;
+  border-radius: var(--radius-inner);
+  border: 1px solid var(--color-border-emphasized);
+  background: var(--color-background-card);
+  color: var(--color-text-primary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.exam-nav__item--done {
+  background: var(--color-accent-muted);
+  border-color: var(--color-accent);
+}
+
+.exam-nav__item[aria-current='step'] {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+  font-weight: 600;
+}
+
+.exam-nav__item:focus-visible {
+  outline: 2px solid var(--color-text-primary);
+  outline-offset: 2px;
+}
+
+.exam-nav__flag {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  color: var(--color-text-warning);
+}

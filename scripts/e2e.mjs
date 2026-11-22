@@ -497,6 +497,9 @@ async function run(browser, name, width, height) {
   else await page.getByRole('textbox', { name: '空欄' }).fill('x');
   await page.getByRole('button', { name: '次へ' }).click();
   check(await page.getByText(/模擬試験 · 2 \/ 60 問 · 答えた 1/).isVisible(), `${tag} 次へで 2 問目に進み、答えた数が数えられる`);
+  // 2 問目に「あとで見直す」の印を付ける。印は途中の保存にも入る
+  await page.getByRole('button', { name: 'あとで見直す' }).click();
+  check(await page.waitForFunction(() => JSON.stringify(JSON.parse(localStorage.getItem('kcna.exam.v1') ?? '{}').marks) === '[1]').then(() => true, () => false), `${tag} 見直す印を途中の保存に入れる`);
   // 途中で再読み込みしても、続きから解ける (回・答え・いまの問題・期限を保存する)
   const secondPrompt = await page.locator('main h1, main h2').first().textContent();
   const savedEndsAt = await page.evaluate(() => JSON.parse(localStorage.getItem('kcna.exam.v1') ?? '{}').endsAt);
@@ -507,8 +510,18 @@ async function run(browser, name, width, height) {
   check(await page.getByText(/模擬試験 · 2 \/ 60 問 · 答えた 1/).isVisible(), `${tag} 続きから解くと、同じ問題・同じ答えた数から始まる`);
   check(typeof savedEndsAt === 'number' && (await page.evaluate(() => JSON.parse(localStorage.getItem('kcna.exam.v1') ?? '{}').endsAt)) === savedEndsAt, `${tag} 続きから解いても残り時間の期限は最初のまま`);
   check((await page.locator('main h1, main h2').first().textContent()) === secondPrompt, `${tag} 続きから解くと、閉じる前と同じ問題が出る`);
+  check((await page.getByRole('button', { name: 'あとで見直す' }).getAttribute('aria-pressed')) === 'true', `${tag} 続きから解くと見直す印も戻る`);
+  // 問題の一覧: 60 問のボタンが状態を読み上げ、押すとその問題へ移る
+  await page.getByRole('button', { name: /^問題の一覧 \(未回答 59 · 印 1\)$/ }).click();
+  const nav = page.getByRole('navigation', { name: '問題の一覧' });
+  check((await nav.getByRole('button').count()) === 60, `${tag} 問題の一覧に 60 問のボタンがある`);
+  check((await nav.getByRole('button', { name: '1 問目 回答済み' }).count()) === 1 && (await nav.getByRole('button', { name: '2 問目 未回答・見直す印あり・表示中' }).count()) === 1, `${tag} 問題の一覧は回答済み・未回答・印を文字で読み上げる`);
+  await noHorizontalOverflow(page, width, `${tag} 模擬試験の問題の一覧`);
+  await nav.getByRole('button', { name: /^1 問目/ }).click();
+  check(await page.getByText(/模擬試験 · 1 \/ 60 問/).isVisible(), `${tag} 問題の一覧から好きな問題へ移れる`);
   await page.getByRole('button', { name: '採点する' }).first().click();
   check(await page.getByText(/まだ答えていない問題が 59 問あります/).isVisible(), `${tag} 採点の前に答えていない数を知らせる`);
+  check(await page.getByText(/「あとで見直す」の印が 1 問に付いています/).isVisible(), `${tag} 採点の前に見直す印の数を知らせる`);
   await page.getByRole('button', { name: '採点する' }).last().click();
   await page.getByRole('heading', { name: '結果' }).waitFor();
   const afterExam = await page.evaluate(() => JSON.parse(localStorage.getItem('kcna.v1') ?? 'null'));

@@ -26,10 +26,15 @@ export type SavedExam = {
   index: number;
   /** 時間切れになる時刻 (ミリ秒) */
   endsAt: number;
+  /** 「あとで見直す」の印を付けた問題の番号 (0 から)。前の版の保存には無い。印が無ければ書かない */
+  marks?: number[];
 };
 
-/** 解いている途中の状態 */
-export type ExamProgress = { id: string; set?: number; items: BankItem[]; answers: ExamAnswer[]; index: number; endsAt: number };
+/** 解いている途中の状態。marks は問題ごとの「あとで見直す」の印 (無ければ印なし) */
+export type ExamProgress = { id: string; set?: number; items: BankItem[]; answers: ExamAnswer[]; index: number; endsAt: number; marks?: boolean[] };
+
+/** 印の数 */
+export const markCount = (marks: boolean[] | undefined) => (marks ?? []).filter(Boolean).length;
 
 /** 回の id を作る (始めた時刻と乱数) */
 export const newExamId = (now: number = Date.now(), random: () => number = Math.random) => `${now.toString(36)}-${Math.floor(random() * 36 ** 6).toString(36)}`;
@@ -100,6 +105,8 @@ export function saveExam(e: ExamProgress, storage: KeyValueStorage | undefined =
     index: e.index,
     endsAt: e.endsAt,
   };
+  const marks = (e.marks ?? []).flatMap((m, i) => (m && i < e.items.length ? [i] : []));
+  if (marks.length > 0) saved.marks = marks;
   try {
     storage.setItem(EXAM_SAVE_KEY, JSON.stringify(saved));
     return true;
@@ -165,7 +172,10 @@ export function loadExam(bank: BankItem[], storage: KeyValueStorage | undefined 
     }
   }
   const answers = s.answers.map((a) => (typeof a === 'string' ? a : undefined));
-  return { id: s.id, ...(Number.isInteger(s.set) && s.set! >= 1 ? { set: s.set } : {}), items, answers, index: s.index!, endsAt: s.endsAt };
+  // 印は番号の並び。形の違う・範囲の外の番号は捨てる (印が読めなくても続きからは解ける)
+  const marks = items.map(() => false);
+  if (Array.isArray(s.marks)) for (const i of s.marks) if (Number.isInteger(i) && i >= 0 && i < items.length) marks[i] = true;
+  return { id: s.id, ...(Number.isInteger(s.set) && s.set! >= 1 ? { set: s.set } : {}), items, answers, index: s.index!, endsAt: s.endsAt, marks };
 }
 
 /** 期限を過ぎているか (過ぎていれば、続きからではなく時間切れの結果にする) */
