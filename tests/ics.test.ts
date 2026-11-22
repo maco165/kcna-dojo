@@ -65,29 +65,62 @@ describe('.ics の形 (RFC 5545)', () => {
   });
 });
 
+/** VTIMEZONE の行から、UTC の時点のずれ (分) を求める (観測の DTSTART は切り替える前の壁時計。RRULE は使わない) */
+function offsetFromVtimezone(lines: string[], t: number): number {
+  const obs: { onset: number; from: number; to: number }[] = [];
+  const mins = (v: string) => (v[0] === '-' ? -1 : 1) * (Number(v.slice(1, 3)) * 60 + Number(v.slice(3, 5)));
+  let cur: Record<string, string> = {};
+  for (const l of lines) {
+    if (l === 'BEGIN:STANDARD' || l === 'BEGIN:DAYLIGHT') cur = {};
+    else if (l === 'END:STANDARD' || l === 'END:DAYLIGHT') {
+      const d = cur.DTSTART;
+      const from = mins(cur.TZOFFSETFROM);
+      const wallMs = Date.UTC(+d.slice(0, 4), +d.slice(4, 6) - 1, +d.slice(6, 8), +d.slice(9, 11), +d.slice(11, 13));
+      obs.push({ onset: wallMs - from * 60_000, from, to: mins(cur.TZOFFSETTO) });
+    } else {
+      const i = l.indexOf(':');
+      cur[l.slice(0, i)] = l.slice(i + 1);
+    }
+  }
+  obs.sort((x, y) => x.onset - y.onset);
+  let off = obs[0].from;
+  for (const o of obs) if (o.onset <= t) off = o.to;
+  return off;
+}
+
 describe('VTIMEZONE', () => {
   it('夏時間の無い時刻帯は STANDARD だけ', () => {
     expect(vtimezone('Asia/Tokyo', now)).toEqual(['BEGIN:VTIMEZONE', 'TZID:Asia/Tokyo', 'BEGIN:STANDARD', 'DTSTART:19700101T000000', 'TZOFFSETFROM:+0900', 'TZOFFSETTO:+0900', 'END:STANDARD', 'END:VTIMEZONE']);
     expect(offsetMinutes('Asia/Kolkata', now)).toBe(330);
   });
 
-  it('ニューヨーク: 3 月の第 2 日曜 2:00 に夏時間、11 月の第 1 日曜 2:00 に戻る (去年を起点)', () => {
-    const tz = vtimezone('America/New_York', now).join('\n');
-    expect(tz).toContain('BEGIN:DAYLIGHT\nDTSTART:20250309T020000\nTZOFFSETFROM:-0500\nTZOFFSETTO:-0400\nRRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=2SU\nEND:DAYLIGHT');
-    expect(tz).toContain('BEGIN:STANDARD\nDTSTART:20251102T020000\nTZOFFSETFROM:-0400\nTZOFFSETTO:-0500\nRRULE:FREQ=YEARLY;BYMONTH=11;BYDAY=1SU\nEND:STANDARD');
-  });
-
-  it('ロンドンは最後の日曜 (-1SU)、シドニーは南半球 (10 月に夏時間)', () => {
-    const lon = vtimezone('Europe/London', now).join('\n');
-    expect(lon).toContain('DTSTART:20250330T010000\nTZOFFSETFROM:+0000\nTZOFFSETTO:+0100\nRRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU');
-    expect(lon).toContain('RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU');
-    const syd = vtimezone('Australia/Sydney', now).join('\n');
-    expect(syd).toContain('BEGIN:DAYLIGHT\nDTSTART:20251005T020000\nTZOFFSETFROM:+1000\nTZOFFSETTO:+1100\nRRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=1SU');
-    expect(syd).toContain('BEGIN:STANDARD\nDTSTART:20250406T030000\nTZOFFSETFROM:+1100\nTZOFFSETTO:+1000\nRRULE:FREQ=YEARLY;BYMONTH=4;BYDAY=1SU');
+  it('切り替えを去年から 5 年先まで 1 つずつ書き、RRULE は使わない (ニューヨーク)', () => {
+    const tz = vtimezone('America/New_York', now);
+    expect(tz.join('\n')).toContain('BEGIN:DAYLIGHT\nDTSTART:20250309T020000\nTZOFFSETFROM:-0500\nTZOFFSETTO:-0400\nEND:DAYLIGHT');
+    expect(tz.join('\n')).toContain('BEGIN:STANDARD\nDTSTART:20311102T020000\nTZOFFSETFROM:-0400\nTZOFFSETTO:-0500\nEND:STANDARD');
+    expect(tz.filter((l) => l.startsWith('RRULE'))).toEqual([]);
+    expect(tz.filter((l) => l === 'BEGIN:DAYLIGHT')).toHaveLength(7); // 2025〜2031
   });
 
   it('切り替えの時点を分まで求める', () => {
     const [spring] = transitions('America/New_York', 2025);
     expect(spring.at.toISOString()).toBe('2025-03-09T07:00:00.000Z');
   });
+
+  it('Node の全時刻帯で、2026-11-23〜2029-11-22 の毎日のずれが Intl と同じ', () => {
+    const zones = Intl.supportedValuesOf('timeZone');
+    expect(zones.length).toBeGreaterThan(300);
+    const bad: string[] = [];
+    for (const tz of zones) {
+      const lines = vtimezone(tz, now);
+      for (let t = Date.UTC(2026, 10, 23, 12); t <= Date.UTC(2029, 10, 22, 12); t += 86_400_000) {
+        const want = offsetMinutes(tz, new Date(t));
+        if (offsetFromVtimezone(lines, t) !== want) {
+          bad.push(`${tz} ${new Date(t).toISOString().slice(0, 10)}`);
+          break;
+        }
+      }
+    }
+    expect(bad).toEqual([]);
+  }, 180_000);
 });
