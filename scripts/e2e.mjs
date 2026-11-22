@@ -73,6 +73,9 @@ function checkFirstLoad() {
   const kb = Math.round(gz / 1024);
   // 2026-11-22 に週の問題の全文とレッスンの画面を開いたときに読むようにして 326KB → 240KB (gzip -9 で測った値)。ゆとりを 10KB だけ見る
   check(kb <= 250, `最初に読む JS は gzip で 250KB まで (${kb}KB、${files.length} ファイル)`);
+  // 2026-11-23: まとめのカードの部品を React.lazy にしたら、rolldown が本体を切り直して 13 → 15 本になり、Actions の Lighthouse で
+  // どのページも LCP が約 200ms 延びた。量 (KB) が同じでも本数が増えると遅くなるので、本数も見る
+  check(files.length <= 13, `最初に読む JS は 13 本まで (${files.length} 本)`);
   // 名前だけでなく中身でも見る (静的に取り込まれて本体に混ざっても気づけるように)。それぞれのデータにしか無い文字で調べる
   const marks = { ハンドブックのデータ: 'k3s-vs-kubernetes', 用語集のデータ: 'container-image', 説明のページ: '2026-03-22 の版', 模擬試験用の問題: 'のイメージを更新した直後に', 比較表のデータ: 'volumeClaimTemplates:  # Pod ごとに', コマンドの説明: 'リソースの一覧や状態を表で表示します', コマンドのページのデータ: 'Initial install underway', コマンドのページの中身: 'のような種類の名前を、API のグループ・版・資源に引き当てます', 週の問題の解説: 'VM はハイパーバイザーの上でゲスト OS ごと動きます' };
   const text = files.map((f) => readFileSync(new URL(`../dist/assets/${f}`, import.meta.url), 'utf8')).join('\n');
