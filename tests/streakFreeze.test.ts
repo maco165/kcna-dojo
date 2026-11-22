@@ -105,4 +105,21 @@ describe('休みの札', () => {
     const bad = normalizeProgress({ v: 1, streak: { count: 1, lastDay: '2026-11-20', freezes: 9, toNext: 30, used: ['2026-02-31', 'x', '2026-11-01', '2026-11-01'] }, xp: { total: 0, byDay: {} }, lessons: {}, answers: {} })!;
     expect(bad.streak).toEqual({ count: 1, lastDay: '2026-11-20', freezes: MAX_FREEZES, toNext: FREEZE_EVERY - 1, used: ['2026-11-01'] });
   });
+  it('日付が戻ったとき (時刻帯を西へ移った) は同じ日とみなし、連続も札も数え直さない (R-004)', () => {
+    const s: Streak = { count: 5, lastDay: '2026-11-21', freezes: 1, toNext: 3 };
+    const back = advanceStreak(s, '2026-11-20');
+    expect(back).toEqual(s);
+    // 翌日 (元の日付) にも、もう一度数えない
+    expect(advanceStreak(back, '2026-11-21')).toEqual(s);
+    expect(advanceStreak(back, '2026-11-22')).toEqual({ count: 6, lastDay: '2026-11-22', freezes: 1, toNext: 4 });
+    const p = { ...emptyProgress(), streak: s };
+    expect(currentStreak(p, at('2026-11-20'))).toBe(5);
+  });
+
+  it('連続が 0 の記録では札を使わない (R-006)', () => {
+    const s = advanceStreak({ count: 0, lastDay: '2026-11-20', freezes: 2 }, '2026-11-22');
+    expect(s.count).toBe(1);
+    expect(s.freezes).toBe(2);
+    expect(s.used).toBeUndefined();
+  });
 });

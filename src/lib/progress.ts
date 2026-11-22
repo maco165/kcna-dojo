@@ -133,6 +133,23 @@ export function isValidDay(v: unknown): v is string {
   return dayKey(new Date(y, m - 1, d)) === v;
 }
 
+/**
+ * 知らない欄 (この版の後で足された欄) をそのまま写す。古い版の画面が開いたままのタブで保存しても、
+ * 新しい版が足した欄を消さないため (知っている欄は呼ぶ側が確かめて書く)
+ */
+function unknownFields(raw: Record<string, unknown>, known: readonly string[]): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(raw)) if (!known.includes(k) && k !== '__proto__' && k !== 'constructor' && k !== 'prototype') out[k] = v;
+  return out;
+}
+
+const KNOWN = {
+  top: ['v', 'handbook', 'profile', 'exams', 'streak', 'xp', 'lessons', 'answers', 'solved'],
+  streak: ['count', 'lastDay', 'freezes', 'toNext', 'used'],
+  profile: ['dailyGoalXp', 'examDate', 'startDate', 'colorMode', 'weeklyDays'],
+  answer: ['right', 'wrong', 'last', 'stage', 'nextReview', 'run'],
+} as const;
+
 /** 値を 1 つずつ確かめ、形の合うものだけ残す (読み込んだファイルや壊れた localStorage で画面が落ちないように) */
 function cleanRecords<T>(raw: unknown, clean: (v: Record<string, unknown>) => T | null): Record<string, T> {
   const out: Record<string, T> = {};
@@ -156,8 +173,10 @@ export function normalizeProgress(raw: unknown): Progress | null {
     for (const [day, v] of Object.entries(xp.byDay)) if (isValidDay(day) && isCount(v)) byDay[day] = v;
   }
   const out: Progress = {
+    ...(unknownFields(raw, KNOWN.top) as object),
     v: 1,
     streak: {
+      ...(unknownFields(streak, KNOWN.streak) as object),
       count: isCount(streak.count) ? Math.floor(streak.count) : 0,
       lastDay: isValidDay(streak.lastDay) ? streak.lastDay : null,
     },
@@ -167,6 +186,7 @@ export function normalizeProgress(raw: unknown): Progress | null {
     ),
     answers: cleanRecords(raw.answers, (v) => {
       const a: AnswerRecord = {
+        ...(unknownFields(v, KNOWN.answer) as object),
         right: isCount(v.right) ? Math.floor(v.right) : 0,
         wrong: isCount(v.wrong) ? Math.floor(v.wrong) : 0,
         last: typeof v.last === 'string' ? v.last : '',
@@ -204,6 +224,7 @@ export function normalizeProgress(raw: unknown): Progress | null {
   if (Object.keys(handbook).length > 0) out.handbook = handbook;
   if (profile) {
     out.profile = {
+      ...(unknownFields(profile, KNOWN.profile) as object),
       dailyGoalXp: (GOAL_CHOICES as readonly number[]).includes(profile.dailyGoalXp as number) ? (profile.dailyGoalXp as number) : DEFAULT_GOAL_XP,
     };
     // 受験日と開始日は、実在する日付のときだけ残す (前の版が書いた受験日もそのまま読む)
@@ -259,7 +280,10 @@ function safeLocalStorage(): Storage | undefined {
 export function recordAnswer(p: Progress, questionId: string, correct: boolean, now: Date): Progress {
   const today = dayKey(now);
   const prev = p.answers[questionId] ?? { right: 0, wrong: 0, last: '' };
+  // 知らない欄 (新しい版が足した欄) は残し、復習の予定は下で決め直す
+  const { stage: _stage, nextReview: _next, ...kept } = prev;
   const next: AnswerRecord = {
+    ...kept,
     right: prev.right + (correct ? 1 : 0),
     wrong: prev.wrong + (correct ? 0 : 1),
     last: now.toISOString(),
@@ -320,7 +344,9 @@ function missedDays(lastDay: string | null, today: string): number | null {
  * 2. 今日が新しく学んだ日なら、次の札までの日を 1 進め、7 日で札を 1 個足す (上限 2 個。上限でも日は数え、7 日で 0 に戻す)
  */
 export function advanceStreak(s: Streak, today: string): Streak {
-  if (s.lastDay === today) return { ...s, count: Math.max(s.count, 1) };
+  // 前に学んだ日が今日より後 (時刻帯を西へ移った・端末の時計を戻した) なら、同じ日とみなす。
+  // 学んだ日は新しいほうを保ち、連続も札も数え直さない (翌日にもう一度数えないため)
+  if (s.lastDay !== null && s.lastDay >= today) return { ...s, count: Math.max(s.count, 1) };
   let freezes = s.freezes ?? 0;
   let used = s.used ?? [];
   let count: number;
@@ -336,7 +362,9 @@ export function advanceStreak(s: Streak, today: string): Streak {
     toNext = 0;
     freezes = Math.min(MAX_FREEZES, freezes + 1);
   }
-  const out: Streak = { count, lastDay: today };
+  // 知らない欄は残す
+  const { freezes: _f, toNext: _t, used: _u, ...kept } = s;
+  const out: Streak = { ...kept, count, lastDay: today };
   if (freezes > 0) out.freezes = freezes;
   if (toNext > 0) out.toNext = toNext;
   if (used.length > 0) out.used = used;
@@ -383,7 +411,7 @@ export function todayXp(p: Progress, now: Date): number {
  */
 export function currentStreak(p: Progress, now: Date): number {
   const today = dayKey(now);
-  if (p.streak.lastDay === today || p.streak.lastDay === addDays(today, -1)) return p.streak.count;
+  if (p.streak.lastDay !== null && p.streak.lastDay >= addDays(today, -1)) return p.streak.count;
   const missed = missedDays(p.streak.lastDay, today);
   return missed !== null && missed <= (p.streak.freezes ?? 0) ? p.streak.count : 0;
 }
