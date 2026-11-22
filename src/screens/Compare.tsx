@@ -9,7 +9,7 @@ import BottomTabs from '../components/BottomTabs';
 import RepoLink from '../components/RepoLink';
 import SiteLogo from '../components/SiteLogo';
 import { dueReviewCount } from '../content';
-import { COMPARE_TABLES, findTable, type CompareTable } from '../content/compare';
+import { COMPARE_LEAD, COMPARE_TABLES, findTable, type CompareTable } from '../content/compare';
 import { compareHref, glossaryHref, glossaryTermHref, handbookHref } from '../lib/route';
 import type { Progress } from '../lib/progress';
 import { SITE_NAME } from '../lib/site';
@@ -21,9 +21,7 @@ function Index() {
       <div className="hb-head">
         <Text type="supporting">{SITE_NAME}</Text>
         <h1 className="week-title">似た語の比較表</h1>
-        <p className="hb-lead">
-          試験で取り違えやすい語の組ごとに、何をするか・いつ使うか・どこが違うかを 1 つの表に並べました。表の下に、取り違えやすい点と、違いが見えるマニフェストやコマンドを添えています。中身は公式の文書 (kubernetes.io の英語版の最新など) で確かめ、出典を付けています。
-        </p>
+        <p className="hb-lead">{COMPARE_LEAD}</p>
         <p className="hb-lead hb-muted">
           1 語ずつの説明は <a href={glossaryHref}>用語集</a>、仕組みの流れは <a href={handbookHref()}>ハンドブック</a> にあります。
         </p>

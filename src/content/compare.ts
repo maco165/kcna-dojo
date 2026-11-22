@@ -21,6 +21,10 @@ export type CompareTable = {
 
 export const COMPARE_TABLES = data as CompareTable[];
 
+/** 一覧の始めの説明 (画面と書き出す HTML で共通) */
+export const COMPARE_LEAD =
+  '試験で取り違えやすい語の組ごとに、何をするか・いつ使うか・どこが違うかを 1 つの表に並べました。表の下に、取り違えやすい点と、違いが見えるマニフェストやコマンドを添えています。中身は公式の文書 (kubernetes.io の英語版の最新など) で確かめ、出典を付けています。';
+
 export const findTable = (id: string) => COMPARE_TABLES.find((t) => t.id === id);
 
 /** 表のページの短い題名 (画面・書き出す HTML で共通) */

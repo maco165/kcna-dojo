@@ -107,3 +107,43 @@ describe('構造化データとパンくず', () => {
     expect([...l2.doc.querySelectorAll('#root nav a')].map((a) => a.getAttribute('href'))).toEqual(['/kcna-dojo/', '/kcna-dojo/week/2/']);
   });
 });
+
+/** JS なしの本文の字数 (#root の中の文字。script と style を除き、空白を数えない) */
+const bodyChars = (doc: Document) => {
+  const root = doc.querySelector('#root')!.cloneNode(true) as Element;
+  root.querySelectorAll('script, style').forEach((x) => x.remove());
+  return (root.textContent ?? '').replace(/\s/g, '').length;
+};
+
+describe('JS なしの本文', () => {
+  it('模擬試験・このサイトについて・全レッスンは 400 字以上', () => {
+    const targets = indexed().filter(({ page }) => page.path === 'exam/' || page.path === 'about/' || page.path.startsWith('lesson/'));
+    expect(targets.length).toBeGreaterThan(40);
+    const thin = targets.map(({ page, doc }) => [page.path, bodyChars(doc)] as const).filter(([, n]) => n < 400);
+    expect(thin).toEqual([]);
+  });
+  it('模擬試験とこのサイトについての説明は仮の文でない', () => {
+    for (const p of ['exam/', 'about/']) {
+      const { doc } = docs.find((d) => d.page.path === p)!;
+      expect(doc.querySelector('meta[name="description"]')!.getAttribute('content'), p).not.toMatch(/の画面。$/);
+    }
+    expect(docs.find((d) => d.page.path === 'about/')!.doc.querySelector('#root')!.textContent).toContain('非公式');
+  });
+  it('検索に載るページは本文を区切る h2 を持つ', () => {
+    const none = indexed().filter(({ doc }) => doc.querySelectorAll('#root h2').length === 0).map(({ page }) => page.path);
+    expect(none).toEqual([]);
+  });
+  it('レッスンのページに答えと解説を書かない (画面でも答えるまで出ないため)', async () => {
+    const { WEEKS } = await import('../src/content/curriculum');
+    for (const w of WEEKS) {
+      for (const l of w.content?.lessons ?? []) {
+        if (l.kind !== 'quiz') continue;
+        const html = docs.find((d) => d.page.path === `lesson/${l.id}/`)!.doc.querySelector('#root')!.innerHTML;
+        for (const q of l.questions) {
+          expect(html, q.id).not.toContain(q.explanation.slice(0, 40).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'));
+          if (q.type === 'choice') for (const c of q.choices) if (c.why) expect(html, q.id).not.toContain(c.why.slice(0, 30));
+        }
+      }
+    }
+  });
+});

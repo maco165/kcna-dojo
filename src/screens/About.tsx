@@ -14,6 +14,7 @@ import { NEW_ISSUE_URL, REPO_URL } from '../lib/links';
 import { guideHref } from '../lib/route';
 import type { Progress } from '../lib/progress';
 import { dueReviewCount } from '../content';
+import { ABOUT } from '../content/about';
 import { SITE_NAME, SITE_TAGLINE } from '../lib/site';
 import { WIDE_QUERY, useMediaQuery } from '../lib/useMediaQuery';
 
@@ -28,16 +29,14 @@ function Body() {
           {SITE_NAME} · {SITE_TAGLINE}
         </Text>
         <h1 className="week-title">このサイトについて</h1>
-        <Text type="supporting">
-          {SITE_NAME} (クラウドネイティブの略) は、KCNA-JP (Kubernetes and Cloud Native Associate 日本語版) の対策のための、個人が作った非公式の学習サイトです。コマンドや YAML の穴埋め・4 択を週ごとのレッスンで解きます。
-        </Text>
-        <Text type="supporting">The Linux Foundation・CNCF とは関係ありません。Kubernetes と KCNA は The Linux Foundation の商標です。</Text>
+        <Text type="supporting">{ABOUT.intro}</Text>
+        <Text type="supporting">{ABOUT.notice}</Text>
       </VStack>
 
       <Card padding={4}>
         <VStack gap={3}>
           <h2 className="h-sm">ソースコード</h2>
-          <Text type="supporting">サイトのコードと問題のデータは、すべて GitHub で公開しています。</Text>
+          <Text type="supporting">{ABOUT.source}</Text>
           <div>
             <Button
               variant="primary"
@@ -55,9 +54,7 @@ function Body() {
       <Card padding={4}>
         <VStack gap={3}>
           <h2 className="h-sm">問題の誤りを見つけたら</h2>
-          <Text type="supporting">
-            問題は公式の文書 (kubernetes.io・docs.k3s.io など) で確かめて書いていますが、誤りがあれば Issue で知らせてください。問題の id (例: w1-l3-q2) を添えると早く直せます。
-          </Text>
+          <Text type="supporting">{ABOUT.issue}</Text>
           <div>
             <Button label="Issue を書く" icon={<ExclamationCircleIcon width={18} height={18} />} endContent={external} href={NEW_ISSUE_URL} target="_blank" rel="noopener noreferrer" />
           </div>
@@ -65,13 +62,13 @@ function Body() {
       </Card>
 
       <List hasDividers edge="flush" header={<h2 className="h-sm">知っておくこと</h2>}>
-        <ListItem label="記録の置き場所" description="進み具合はこのブラウザの localStorage (キー kcna.v1) にだけ残り、サーバーには送りません。" />
-        <ListItem label="AI に聞く" description="問題文を入れた Claude / ChatGPT を新しいタブで開くだけで、送るかどうかは開いた先で決めます。" />
+        <ListItem label="記録の置き場所" description={ABOUT.storage} />
+        <ListItem label="AI に聞く" description={ABOUT.askAi} />
         <ListItem
           label="問題について"
           description={
             <Text type="supporting">
-              実際の試験問題は写していません。各問の解説の下に出典を付けています。作り方と出典の内訳は <Link href={guideHref}>Kubernetes とこのサイト</Link> に。
+              {ABOUT.questions}作り方と出典の内訳は <Link href={guideHref}>Kubernetes とこのサイト</Link> に。
             </Text>
           }
         />

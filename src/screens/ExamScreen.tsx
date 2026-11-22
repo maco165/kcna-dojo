@@ -21,7 +21,7 @@ import RepoLink from '../components/RepoLink';
 import SiteLogo from '../components/SiteLogo';
 import { dueReviewCount, questionBank } from '../content';
 import type { Domain, Question } from '../content/types';
-import { EXAM_MINUTES, EXAM_QUESTIONS, EXAM_WEIGHTS, PASS_MARK, domainCounts, formatClock, gradeExam, isAnswered, isCorrect, defaultChoice, lastExamOf, recordExam, startExam, type ExamChoice, type ExamSet, type BankItem, type ExamAnswer, type ExamResult, weakDomains } from '../lib/exam';
+import { EXAM_MINUTES, EXAM_WEIGHTS, PASS_MARK, PASS_NOTE, domainCounts, examIntro, formatClock, gradeExam, isAnswered, isCorrect, defaultChoice, lastExamOf, recordExam, startExam, type ExamChoice, type ExamSet, type BankItem, type ExamAnswer, type ExamResult, weakDomains } from '../lib/exam';
 import examSets from '../content/examSets.json';
 import { EXAM_ONLY } from '../content/examBank';
 import { normalizeAnswer } from '../lib/grade';
@@ -82,9 +82,7 @@ function Intro({ progress, choice: picked, onChoice, onStart }: { progress: Prog
       <VStack gap={1}>
         <Text type="supporting">{SITE_NAME}</Text>
         <h1 className="week-title">模擬試験</h1>
-        <Text type="supporting">
-          本番と同じ 4 分野の配点の割合で {EXAM_QUESTIONS} 問を出します。問題が決まっていて互いに重ならない第 1〜{EXAM_SETS.length} 回と、毎回選び直すランダムがあります。第 1〜{EXAM_SETS.length - FRESH_SETS.length} 回とランダムは第 1〜8 週の問題 ({bankSize} 問) から、第 {FRESH_SETS.join('・')} 回はレッスンに無い初見の問題から出します。時間は {EXAM_MINUTES} 分で、途中では答えを見せず、最後にまとめて採点します。
-        </Text>
+        <Text type="supporting">{examIntro(EXAM_SETS.length, FRESH_SETS, bankSize)}</Text>
       </VStack>
       <Card padding={4}>
         <VStack gap={3}>
@@ -94,7 +92,7 @@ function Intro({ progress, choice: picked, onChoice, onStart }: { progress: Prog
               <ListItem key={d} label={d} endContent={<Text type="supporting">{`配点 ${EXAM_WEIGHTS[d]}% · ${counts[d]} 問`}</Text>} />
             ))}
           </List>
-          <Text type="supporting">合格の目安は {Math.round(PASS_MARK * 100)}% としています (LF の多肢選択式試験に共通の合格点です)。答えて間違えた問題は復習に入ります。</Text>
+          <Text type="supporting">{PASS_NOTE}</Text>
           <RadioList label="回を選ぶ" value={choice} onChange={setChoice}>
             {EXAM_SETS.map((set) => {
               const e = last(set.id);
