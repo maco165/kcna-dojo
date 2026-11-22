@@ -84,6 +84,29 @@ function checkFirstLoad() {
   check(hbHeads.filter((h) => h.startsWith('2:')).join('|') === '2:試験の範囲|2:範囲外: 一緒に知っておくと役立つこと' && hbHeads.filter((h) => h.startsWith('3:')).length === 9 && hbHtml.includes('<section id="hb-part-extra">'), `書き出したハンドブックの目次は 2 部 (h2) と 9 段 (h3) (${hbHeads.length})`);
 }
 
+/**
+ * 速さの見張り (Lighthouse のスマホで遅かった所): Astryx の CSS から使わないクラスを除き (vite.config.ts の purgeStylex)、
+ * 除きすぎていないこと。大きなデータは JSON.parse の形で読むこと (vite.config.ts の jsonParse)
+ */
+function checkSpeedBuild() {
+  const assets = readdirSync(new URL('../dist/assets/', import.meta.url));
+  const read = (f) => readFileSync(new URL(`../dist/assets/${f}`, import.meta.url), 'utf8');
+  const cssFiles = assets.filter((f) => f.endsWith('.css'));
+  const css = cssFiles.map(read).join('\n');
+  const cssGz = Math.round(cssFiles.reduce((n, f) => n + gzipSync(readFileSync(new URL(`../dist/assets/${f}`, import.meta.url)), { level: 9 }).length, 0) / 1024);
+  // 2026-11-23: 除く前は gzip で 47KB (Astryx の CSS をそのまま入れていた)。除いたあと 37KB
+  check(cssGz <= 40, `描画を止める CSS は gzip で 40KB まで (${cssGz}KB)`);
+  const classes = (t) => new Set([...t.matchAll(/\.(x[a-z0-9]{4,10})(?![\w-])/g)].map((m) => m[1]));
+  const all = classes(readFileSync(new URL('../node_modules/@astryxdesign/core/dist/astryx.css', import.meta.url), 'utf8'));
+  const kept = classes(css);
+  const js = assets.filter((f) => f.endsWith('.js')).map(read).join('\n');
+  const missing = [...new Set(js.match(/\bx[a-z0-9]{4,10}\b/g))].filter((c) => all.has(c) && !kept.has(c));
+  check(missing.length === 0, `JS が付ける Astryx のクラスは、CSS から除いていない (落ちたもの ${missing.length}: ${missing.slice(0, 5).join(' ')})`);
+  const data = assets.filter((f) => /^(lessons|handbook|glossary|commandPages|examBank)-/.test(f));
+  const literal = data.filter((f) => !/JSON\.parse\(/.test(read(f).slice(0, 400)));
+  check(data.length >= 5 && literal.length === 0, `大きなデータのチャンクは JSON.parse で読む (${data.length} ファイル、そうでないもの ${literal.join(',')})`);
+}
+
 async function run(browser, name, width, height) {
   const context = await browser.newContext({ viewport: { width, height } });
   const page = await context.newPage();
@@ -734,6 +757,10 @@ async function run(browser, name, width, height) {
     await page.getByRole('heading', { name: '全体の流れ' }).waitFor();
     const steps = await page.locator('[data-flow-step]').count();
     await page.waitForTimeout(300);
+    // 画面の外のコードは軽い表示で先に出し (最初の描画を止めない)、画面に近づくと CodeBlock (色分け・コピー) に替わる
+    const lazyBefore = await page.locator('[data-lazy-code]').count();
+    const blocksBefore = await page.locator('.hb-step .astryx-code-block').count();
+    check(lazyBefore >= 3 && blocksBefore < lazyBefore, `${tag} 開いた直後、画面の外のハンドブックのコードは軽い表示 (CodeBlock ${blocksBefore}・軽い表示 ${lazyBefore})`);
     check(((await hb()).storage?.seen ?? 0) < steps, `${tag} 開いた直後は全部を読んだことにならない`);
     await page.locator('[data-flow-step="2"]').scrollIntoViewIfNeeded();
     await page.evaluate(() => document.querySelector('[data-flow-step="2"]').scrollIntoView({ block: 'start' }));
@@ -754,6 +781,7 @@ async function run(browser, name, width, height) {
     await page.evaluate((n) => document.querySelector(`[data-flow-step="${n}"]`).scrollIntoView({ block: 'start' }), steps - 1);
     await page.waitForTimeout(400);
     check((await hb()).storage?.seen === steps, `${tag} 最後の段まで出すと、全部の段を読んだことになる (${steps})`);
+    check((await page.locator('.hb-flow [data-lazy-code]').evaluateAll((els) => els.filter((el) => { const r = el.getBoundingClientRect(); return r.bottom > 0 && r.top < innerHeight; }).length)) === 0 && (await page.locator('.hb-step .astryx-code-block').count()) > blocksBefore, `${tag} 画面に入ったコードは CodeBlock に替わる`);
     const toggle = page.getByRole('button', { name: '確認済みにする' });
     await toggle.focus();
     await page.keyboard.press('Enter');
@@ -1003,6 +1031,7 @@ try {
   await waitForServer();
   browser = await chromium.launch();
   checkFirstLoad();
+  checkSpeedBuild();
   await run(browser, 'phone', 390, 844);
   await run(browser, 'pc', 1280, 860);
 } catch (e) {
