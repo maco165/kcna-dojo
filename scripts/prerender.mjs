@@ -11,6 +11,9 @@ const DIST = path.join(ROOT, 'dist');
 export const ORIGIN = 'https://maco165.github.io';
 export const BASE = '/kcna-dojo/';
 
+const SITE_NAME = 'クラネイ';
+const SITE_TITLE = 'クラネイ — KCNA-JP 対策';
+
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const url = (p) => `${ORIGIN}${BASE}${p}`;
 const link = (p, text) => `<a href="${BASE}${p}">${esc(text)}</a>`;
@@ -33,8 +36,9 @@ const SLOTS = {
 };
 
 /** dist/index.html を型にして、1 ページ分の HTML を作る。置き換えは関数で渡す ($1 などを置き換えの記号として読ませない) */
-export function renderPage(template, { path: p, title, description, body, noindex = false, canonical }) {
-  const full = title ? `${title} | クラネイ — KCNA-JP 対策` : 'クラネイ — KCNA-JP 対策';
+export function renderPage(template, { path: p, title, fullTitle, description, body, noindex = false, canonical }) {
+  // fullTitle は buildPages が画面と同じ関数 (src/lib/pageTitle.ts の withSite) で決める。無ければ同じ形で作る
+  const full = fullTitle ?? (title ? `${title} | ${SITE_NAME}` : SITE_TITLE);
   const can = url(canonical ?? p);
   const attr = (v) => (_, a, b) => `${a}${v}${b}`;
   const set = {
@@ -60,6 +64,7 @@ export function renderPage(template, { path: p, title, description, body, noinde
 /** すべてのページ (経路・題名・説明・本文・検索に載せるか) を、画面と同じデータから作る */
 export async function buildPages(load) {
   const { pageTitle } = await load('/src/lib/pageMeta.ts');
+  const { withSite } = await load('/src/lib/pageTitle.ts');
   const { parseRoute } = await load('/src/lib/route.ts');
   const titleOf = (p) => pageTitle(parseRoute(`${BASE}${p}`));
   const { WEEKS } = await load('/src/content/curriculum.ts');
@@ -182,7 +187,7 @@ export async function buildPages(load) {
   for (const t of tables) {
     pages.push({
       path: `compare/${t.id}/`,
-      title: t.title,
+      title: t.short ?? t.title,
       description: clip(t.lead),
       body: [
         `<p>${link('compare/', '似た語の比較表')}</p>`,
@@ -212,7 +217,7 @@ export async function buildPages(load) {
       const qs = l.kind === 'quiz' ? l.questions : [];
       pages.push({
         path: `lesson/${l.id}/`,
-        title: `${l.title} (第 ${w.week} 週)`,
+        title: l.title,
         description: clip(`第 ${w.week} 週 ${w.title} のレッスン「${l.title}」。${l.summary}。${qs[0]?.prompt ?? ''}`),
         body: [`<p>${link(`week/${w.week}/`, `第 ${w.week} 週 ${w.title}`)}</p>`, `<h1>${esc(l.title)}</h1>`, `<p>${esc(l.summary)}</p>`, l.kind === 'lab' ? `<h2>この実習で分かること</h2><p>${esc(l.goal)}</p><h2>用意するもの</h2><ul>${l.needs.map((n) => `<li>${esc(n)}</li>`).join('')}</ul><h2>手順</h2><ol>${l.steps.map((s) => `<li>${esc(s.text)}</li>`).join('')}</ol>` : '', qs.length ? `<ol>${qs.map((q) => `<li>${esc(q.prompt)}</li>`).join('')}</ol>` : ''].join('\n'),
       });
@@ -225,7 +230,10 @@ export async function buildPages(load) {
     pages.push({ path: p, title, description: `クラネイの${title}の画面。`, body: `<h1>${esc(title)}</h1>`, noindex: personal, inSitemap: !personal });
   }
   // 題名は画面と同じ関数で決める (サイトの中で移ったときの document.title と食い違わないように)
-  for (const page of pages) page.title = titleOf(page.path) ?? page.title;
+  for (const page of pages) {
+    page.title = titleOf(page.path) ?? page.title;
+    page.fullTitle = withSite(page.title);
+  }
   // 第 1 週はトップと同じ画面なので、トップを正にして sitemap から外す
   const week1 = pages.find((x) => x.path === 'week/1/');
   if (week1) Object.assign(week1, { canonical: '', inSitemap: false });

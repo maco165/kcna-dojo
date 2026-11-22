@@ -773,7 +773,7 @@ async function run(browser, name, width, height) {
     await page.locator('.cmdp-inside').waitFor();
     check((await page.locator('.cmdp-inside li').count()) >= 3, `${tag} コマンドのページに中で何が起きるかの段がある`);
     check((await page.locator('.cmdp-api tbody tr').count()) >= 1 && (await page.locator('a[href^="https://github.com/kubernetes/kubectl/blob/"]').count()) >= 1, `${tag} コマンドのページに API の要求と実装へのリンクがある`);
-    check((await page.title()).startsWith('kubectl get の中身と使い方'), `${tag} コマンドのページの題名 (${await page.title()})`);
+    check((await page.title()) === 'kubectl get | クラネイ', `${tag} コマンドのページの題名 (${await page.title()})`);
     await noHorizontalOverflow(page, width, `${tag} コマンドのページ`);
     // スマホでは全部のページの横のはみ出しを見る (長い API のパスなど、ページごとに中身が違うため)
     if (width < 768) {

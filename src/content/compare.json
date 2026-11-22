@@ -2,6 +2,7 @@
   {
     "id": "workloads",
     "title": "Deployment・StatefulSet・DaemonSet・Job・CronJob の違い",
+    "short": "ワークロードの種類 (Deployment など) の違い",
     "lead": "どれも Pod を作って管理するワークロード (仕事の単位) のリソースですが、Pod をいくつ・どこで・いつまで動かすかが違います。試験では用途から正しいリソースを選ばせる問題がよく出ます。",
     "columns": [
       {
@@ -135,6 +136,7 @@
   {
     "id": "service-types",
     "title": "Service の ClusterIP・NodePort・LoadBalancer・ExternalName の違い",
+    "short": "Service の 4 つの type の違い",
     "lead": "Service は入れ替わる Pod の前に置く、変わらない入口です。type によって、どこから届くか (クラスタの中だけか、外からもか) が変わります。",
     "columns": [
       {
@@ -222,6 +224,7 @@
   {
     "id": "service-ingress-gateway",
     "title": "Service (LoadBalancer)・Ingress・Gateway API の違い",
+    "short": "Service・Ingress・Gateway API の違い",
     "lead": "クラスタの外から通信を届ける方法は 3 つあります。何を見て振り分けるかと、Kubernetes に最初から入っているかが違います。",
     "columns": [
       {
@@ -487,6 +490,7 @@
   {
     "id": "rbac",
     "title": "Role・ClusterRole・RoleBinding・ClusterRoleBinding の違い",
+    "short": "Role と RoleBinding (RBAC) の違い",
     "lead": "RBAC (ロールに基づくアクセス制御) は、権限の中身 (Role) と、それを誰に渡すか (Binding) を分けて書きます。それぞれに名前空間の中だけのものとクラスタ全体のものがあり、4 つの組み合わせを取り違えやすいところです。",
     "columns": [
       {
@@ -871,6 +875,7 @@
   {
     "id": "scheduling-constraints",
     "title": "taint/toleration・nodeSelector・node affinity・pod affinity の違い",
+    "short": "taint と affinity (置く場所の指定) の違い",
     "lead": "どれも Pod をどのノードに置くかを左右しますが、ノードが Pod を遠ざけるのか、Pod がノードや他の Pod を選ぶのかが違います。",
     "columns": [
       {

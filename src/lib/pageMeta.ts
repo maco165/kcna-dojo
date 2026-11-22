@@ -10,7 +10,10 @@ export { SITE_TITLE };
 
 /** 画面の短い題名 (トップは undefined) */
 export function pageTitle(route: Route): string | undefined {
-  if (route.name === 'handbook' && route.topicId) return findTopic(route.topicId)?.topic.title ?? 'ハンドブック';
+  if (route.name === 'handbook' && route.topicId) {
+    const t = findTopic(route.topicId)?.topic;
+    return t ? (t.short ?? t.title) : 'ハンドブック';
+  }
   if (route.name === 'glossary' && route.termId) {
     const t = (glossary as { terms: GlossaryTerm[] }).terms.find((x) => x.id === route.termId);
     return t ? `${t.term} (用語集)` : '用語集';

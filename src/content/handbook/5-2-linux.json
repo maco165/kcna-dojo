@@ -5,6 +5,7 @@
       "id": "linux-history",
       "competency": "付録: Linux の歴史",
       "title": "Linux の歴史: UNIX・GNU・Linux カーネル・ディストリビューション",
+      "short": "Linux の歴史: UNIX・GNU・カーネル",
       "summary": "Linux は、1969 年に生まれた UNIX をまねて、1991 年に Linus Torvalds が一から書いたカーネル (OS の中心のプログラム) です。1983 年に始まった GNU プロジェクトの道具と組み合わさって、自由に使える OS がそろいました。カーネルと道具をまとめて配るものがディストリビューションです。Kubernetes のコントロールプレーンは Linux の上でしか動かず、コンテナも Linux のカーネルの機能で作られています。",
       "flow": [
         {
@@ -320,6 +321,7 @@
       "id": "container-internals",
       "competency": "付録: コンテナの仕組み",
       "title": "コンテナの仕組み: chroot から namespaces・cgroups、OCI、CRI まで",
+      "short": "コンテナの仕組み: namespaces と cgroups",
       "summary": "コンテナは、ホストのカーネルを分け合いながら、namespaces で見える範囲を、cgroups で使える資源の量を分けたプロセスです。chroot・FreeBSD の jail・LXC・Docker と仕組みが育ち、2015 年に OCI がイメージと動かし方の仕様を決めました。Kubernetes では kubelet が CRI で containerd などのランタイムに頼み、containerd は runc を通してカーネルの機能を使います。",
       "flow": [
         {

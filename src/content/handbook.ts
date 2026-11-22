@@ -13,6 +13,8 @@ export type HandbookTopic = {
   id: string;
   competency: string;
   title: string;
+  /** ページの題名 (<title>) に使う短い名前。title が長くて題名が 35 字を超えるときだけ持つ (src/lib/pageTitle.ts の withSite) */
+  short?: string;
   summary: string;
   flow: HandbookStep[];
   try: HandbookTry[];

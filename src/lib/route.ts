@@ -97,7 +97,7 @@ export function useRoute(): Route {
         void import('../content/commandPages').then((m) => shown === at && (document.title = withSite(m.commandPageTitle(id))));
       } else if (next.name === 'compare' && next.tableId) {
         const id = next.tableId;
-        void import('../content/compare').then((m) => shown === at && (document.title = withSite(m.findTable(id)?.title ?? '似た語の比較表')));
+        void import('../content/compare').then((m) => shown === at && (document.title = withSite(m.tableTitle(id))));
       }
       else document.title = withSite(lightTitle(next));
       onRouteChanged();

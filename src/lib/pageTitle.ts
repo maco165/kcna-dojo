@@ -3,8 +3,10 @@
 import { WEEKS } from '../content/curriculum';
 import { findLesson } from '../content';
 import type { Route } from './route';
+import { SITE_NAME, SITE_TAGLINE } from './site';
 
-export const SITE_TITLE = 'クラネイ — KCNA-JP 対策';
+/** トップの題名。ほかのページは「ページの名前 | クラネイ」にする (検索の結果で切られない長さに収めるため。全ページ 35 字以内は tests/pages.test.ts が見る) */
+export const SITE_TITLE = `${SITE_NAME} — ${SITE_TAGLINE}`;
 
 /** ハンドブックのトピックか用語集の語なら、題名に重いデータが要る */
 export const needsHeavyTitle = (route: Route) => (route.name === 'handbook' && !!route.topicId) || (route.name === 'glossary' && !!route.termId);
@@ -19,16 +21,18 @@ export function lightTitle(route: Route): string | undefined {
     }
     case 'lesson': {
       const f = findLesson(route.lessonId);
-      return f ? `${f.lesson.title} (第 ${f.week} 週)` : undefined;
+      // 週はパンくずに出すので題名には入れない (35 字に収めるため。レッスンの名前は週をまたいで重ならない)
+      return f ? f.lesson.title : undefined;
     }
     case 'handbook':
       return 'ハンドブック';
     case 'glossary':
       return '用語集';
+    // 比較表の表とコマンドのページの題名は、それぞれのデータが要るので、ここでは決めない (route.ts と prerender が決める)
     case 'compare':
-      return '似た語の比較表';
+      return route.tableId ? undefined : '似た語の比較表';
     case 'commands':
-      return 'コマンド';
+      return route.commandId ? undefined : 'コマンド';
     case 'guide':
       return 'Kubernetes とこのサイト';
     case 'review':
@@ -44,4 +48,9 @@ export function lightTitle(route: Route): string | undefined {
   }
 }
 
-export const withSite = (t: string | undefined) => (t ? `${t} | ${SITE_TITLE}` : SITE_TITLE);
+/** 題名の長さの上限 (検索の結果で切られにくい長さ)。字数は文字の数で数える */
+export const TITLE_MAX = 35;
+const SUFFIX = ` | ${SITE_NAME}`;
+
+/** タブ・履歴・検索の結果に出る題名。サイト名を足すと上限を超える名前は、名前だけにする (トップは SITE_TITLE) */
+export const withSite = (t: string | undefined) => (!t ? SITE_TITLE : [...t].length + [...SUFFIX].length <= TITLE_MAX ? `${t}${SUFFIX}` : t);

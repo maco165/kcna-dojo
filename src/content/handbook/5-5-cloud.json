@@ -120,6 +120,7 @@
       "id": "load-balancers",
       "competency": "付録: ロードバランサー (L4 と L7)",
       "title": "ロードバランサー: L4 と L7、AWS の NLB と ALB、Kubernetes とのつながり",
+      "short": "ロードバランサー: L4 と L7、NLB と ALB",
       "summary": "ロードバランサーは、届いた通信を複数の宛先に振り分け、宛先の健康を見て、健康なものにだけ送ります。L4 (トランスポート層) で振り分けるものは TCP や UDP の接続を見て、L7 (アプリケーション層) で振り分けるものは HTTP のホストやパスまで見ます。AWS では NLB が L4、ALB が L7 です。Kubernetes では、LoadBalancer の Service がクラウドのロードバランサーを作り、Ingress や Gateway API から L7 のロードバランサーを作ります。k3s では ServiceLB がその役をノードの上で受け持ちます。",
       "flow": [
         {

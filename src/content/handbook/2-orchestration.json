@@ -5,6 +5,7 @@
       "id": "networking",
       "competency": "Networking",
       "title": "ネットワーク: Pod・Service・DNS・入口・NetworkPolicy",
+      "short": "ネットワーク: Pod・Service・DNS",
       "summary": "Kubernetes では Pod ごとにクラスタ全体で一意の IP が付き、Pod どうしは NAT (アドレス変換) なしで直接通信できます。Pod は作り直されると IP が変わるので、Service が変わらない名前と IP を与え、DNS でその名前を引けるようにします。外からの入口には NodePort・LoadBalancer・Ingress・Gateway API があり、NetworkPolicy で Pod に届く通信を絞れます。",
       "flow": [
         {
