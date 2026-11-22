@@ -150,6 +150,10 @@ async function checkStudyFeatures(browser, width) {
   await noHorizontalOverflow(page, width, `${tag} 進捗`);
   await page.goto(`${BASE}settings/`);
   await page.getByRole('heading', { name: 'カレンダーに学ぶ予定を入れる' }).waitFor();
+  // 入力欄は押したときに読む (設定の画面を軽くするため)
+  check((await page.getByRole('textbox', { name: '時刻' }).count()) === 0, `${tag} 予定の入力欄は押すまで読まない`);
+  await page.getByRole('button', { name: '予定を作る' }).click();
+  await page.getByRole('textbox', { name: '時刻' }).waitFor();
   check((await page.getByRole('checkbox', { checked: true }).count()) === 3, `${tag} 週の目標 3 日なら、曜日を 3 つ選んでおく`);
   const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: '予定をダウンロード (.ics)' }).click()]);
   const ics = readFileSync(await download.path(), 'utf8');
