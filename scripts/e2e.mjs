@@ -443,8 +443,11 @@ async function run(browser, name, width, height) {
   check(/^kcna-progress-\d{4}-\d{2}-\d{2}\.json$/.test(download.suggestedFilename()), `${tag} 記録を書き出すと日付入りの JSON が保存される`);
   const exported = JSON.parse(await (await import('node:fs/promises')).readFile(await download.path(), 'utf8'));
   check(exported.v === 1 && exported.profile?.dailyGoalXp === 10, `${tag} 書き出した中身が今の記録と同じ`);
+  // 途中の模擬試験の保存も、記録を消すと消える
+  await page.evaluate(() => localStorage.setItem('kcna.exam.v1', '{"v":1,"id":"e2e"}'));
   await page.getByRole('button', { name: '記録を消す' }).click();
   await page.getByRole('button', { name: '消す', exact: true }).click();
+  check(await page.evaluate(() => localStorage.getItem('kcna.exam.v1') === null), `${tag} 記録を消すと途中の模擬試験の保存も消える`);
   const cleared = await page.evaluate(() => JSON.parse(localStorage.getItem('kcna.v1') ?? 'null'));
   check(Object.keys(cleared?.lessons ?? {}).length === 0 && cleared?.profile?.dailyGoalXp === 10, `${tag} 記録を消すと進捗は空で、目標は残る`);
   await page.locator('input[type="file"]').setInputFiles({ name: 'back.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(exported)) });
@@ -567,6 +570,17 @@ async function run(browser, name, width, height) {
     await tp.getByRole('heading', { name: '結果' }).waitFor();
     const after2 = await tp.evaluate(() => JSON.parse(localStorage.getItem('kcna.v1') ?? '{}').exams?.length ?? 0);
     check(after2 === before2 + 1 && (await tp.evaluate(() => localStorage.getItem('kcna.exam.v1') === null)), `${tag} 期限を過ぎてから開くと時間切れの結果になり、保存を消す (${before2} → ${after2})`);
+    // 「続きから解く」の案内を開いたまま期限が来たら、その場で時間切れの結果にする (前の回を記録せずに上書きしない)
+    await tp.getByRole('button', { name: '模擬試験の最初へ戻る' }).click();
+    await tp.getByRole('button', { name: /を始める$/ }).click();
+    await tp.getByText(/模擬試験 · 1 \/ 60 問/).waitFor();
+    await tp.reload();
+    await tp.getByRole('button', { name: '続きから解く' }).waitFor();
+    const before3 = await tp.evaluate(() => JSON.parse(localStorage.getItem('kcna.v1') ?? '{}').exams?.length ?? 0);
+    await tp.clock.fastForward('01:31:00');
+    await tp.getByRole('heading', { name: '結果' }).waitFor({ timeout: 10000 }).catch(() => {});
+    const after3 = await tp.evaluate(() => JSON.parse(localStorage.getItem('kcna.v1') ?? '{}').exams?.length ?? 0);
+    check(after3 === before3 + 1 && (await tp.evaluate(() => localStorage.getItem('kcna.exam.v1') === null)), `${tag} 案内を開いたまま期限が来ると、時間切れの結果を 1 回記録する (${before3} → ${after3})`);
     await tp.close();
   }
 

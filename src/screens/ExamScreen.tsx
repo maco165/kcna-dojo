@@ -28,7 +28,7 @@ import { EXAM_MINUTES, EXAM_WEIGHTS, PASS_MARK, PASS_NOTE, domainCounts, examInt
 import examSets from '../content/examSets.json';
 import { EXAM_ONLY } from '../content/examBank';
 import { normalizeAnswer } from '../lib/grade';
-import { clearExam, isExpired, loadExam, saveExam, type ExamProgress } from '../lib/examSave';
+import { clearExam, finishExam, isExpired, loadExam, newExamId, saveExam, type ExamProgress } from '../lib/examSave';
 import type { Progress } from '../lib/progress';
 import { SITE_NAME } from '../lib/site';
 import { WIDE_QUERY, useMediaQuery } from '../lib/useMediaQuery';
@@ -220,12 +220,15 @@ function ExamQuestion({ question, answer, onAnswer }: { question: Question; answ
 }
 
 function Running({
+  examId,
   items,
   set,
   resume,
   onFinish,
   onQuit,
 }: {
+  /** 回ごとの id (保存と、採点した回の記録に使う) */
+  examId: string;
   items: BankItem[];
   set?: number;
   /** 続きから解くときの答え・いまの問題・期限 */
@@ -237,10 +240,12 @@ function Running({
   const [answers, setAnswers] = useState<ExamAnswer[]>(() => resume?.answers ?? items.map(() => undefined));
   const [endsAt] = useState(() => resume?.endsAt ?? Date.now() + EXAM_MINUTES * 60 * 1000);
   const [left, setLeft] = useState(() => (endsAt - Date.now()) / 1000);
-  // 答えるたび・問題を移るたびに保存する (再読み込みや開き直しで続きから解けるように)
+  // 答えるたび・問題を移るたびに保存する (再読み込みや開き直しで続きから解けるように)。
+  // 一度書いたあとは、保存がまだ自分の回のときだけ書き直す (ほかのタブが採点して消した保存を戻さない)
+  const wrote = useRef(false);
   useEffect(() => {
-    saveExam({ set, items, answers, index, endsAt });
-  }, [set, items, answers, index, endsAt]);
+    if (saveExam({ id: examId, set, items, answers, index, endsAt }, undefined, { onlyIfCurrent: wrote.current })) wrote.current = true;
+  }, [examId, set, items, answers, index, endsAt]);
   const [confirm, setConfirm] = useState(false);
   const [confirmQuit, setConfirmQuit] = useState(false);
   const answered = answers.filter(isAnswered).length;
@@ -423,8 +428,12 @@ export default function ExamScreen({ progress, updateProgress }: Props) {
   // 途中で閉じた模擬試験 (問題は決まった回の束から引き直す。ランダムの問題も同じ束に入っている)
   const [saved, setSaved] = useState<ExamProgress | null>(() => loadExam(setBank()));
   const [resume, setResume] = useState<ExamProgress | null>(null);
+  const [examId, setExamId] = useState('');
   const start = (c: ExamChoice) => {
+    // 案内を開いている間に期限を過ぎた途中の回は、上書きする前に時間切れで記録する
+    if (saved && isExpired(saved, Date.now()) && finishExam(saved.id)) updateProgress((p) => recordExam(p, saved.items, saved.answers, new Date(), saved.set));
     const next = startExam(c, EXAM_SETS, c === 'random' ? questionBank() : setBank());
+    setExamId(newExamId());
     setSet(next.set);
     setItems(next.items);
     setAnswers([]);
@@ -434,10 +443,10 @@ export default function ExamScreen({ progress, updateProgress }: Props) {
     window.scrollTo(0, 0);
   };
 
-  const finish = (final: ExamAnswer[], done: { items: BankItem[]; set?: number } = { items, set }) => {
+  const finish = (final: ExamAnswer[], done: { id: string; items: BankItem[]; set?: number } = { id: examId, items, set }) => {
     const now = new Date();
-    clearExam();
-    updateProgress((p) => recordExam(p, done.items, final, now, done.set));
+    // ほかのタブでもう採点した回なら、記録をもう一度付けない (結果は出す)
+    if (finishExam(done.id)) updateProgress((p) => recordExam(p, done.items, final, now, done.set));
     setItems(done.items);
     setSet(done.set);
     setAnswers(final);
@@ -446,23 +455,31 @@ export default function ExamScreen({ progress, updateProgress }: Props) {
     window.scrollTo(0, 0);
   };
 
-  // 閉じている間に期限を過ぎていたら、続きからではなく時間切れの結果にする (記録は 1 回だけ)
+  // 閉じている間に期限を過ぎていたら、続きからではなく時間切れの結果にする (記録は 1 回だけ)。
+  // 案内を開いたまま期限が来たときも、期限の時刻に張った時計で同じにする
   const expiredDone = useRef(false);
+  const [tick, setTick] = useState(0);
   useEffect(() => {
-    if (!saved || !isExpired(saved, Date.now()) || expiredDone.current) return;
+    if (!saved || expiredDone.current) return;
+    const rest = saved.endsAt - Date.now();
+    if (rest > 0) {
+      const id = window.setTimeout(() => setTick((t) => t + 1), Math.min(rest + 50, 2 ** 31 - 1));
+      return () => window.clearTimeout(id);
+    }
     expiredDone.current = true;
-    finish(saved.answers, { items: saved.items, set: saved.set });
+    finish(saved.answers, { id: saved.id, items: saved.items, set: saved.set });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [saved]);
+  }, [saved, tick]);
 
   const resumeSaved = () => {
     if (!saved) return;
     if (isExpired(saved, Date.now())) {
-      finish(saved.answers, { items: saved.items, set: saved.set });
+      finish(saved.answers, { id: saved.id, items: saved.items, set: saved.set });
       return;
     }
     setSet(saved.set);
     setItems(saved.items);
+    setExamId(saved.id);
     setResume(saved);
     setSaved(null);
     setPhase('running');
@@ -478,7 +495,7 @@ export default function ExamScreen({ progress, updateProgress }: Props) {
     setPhase('intro');
   };
 
-  if (phase === 'running') return <Running items={items} set={set} resume={resume} onFinish={(a) => finish(a)} onQuit={quit} />;
+  if (phase === 'running') return <Running examId={examId} items={items} set={set} resume={resume} onFinish={(a) => finish(a)} onQuit={quit} />;
   return (
     <Frame progress={progress}>
       {phase === 'result' && result ? (

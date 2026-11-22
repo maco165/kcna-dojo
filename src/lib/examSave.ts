@@ -1,16 +1,23 @@
 // 模擬試験の途中の保存。再読み込みや開き直しで「続きから解く」を出すため、解いている回の問題の並び・
 // 選択肢の並び・答え・いまの問題・残り時間の期限 (時刻) を localStorage の別のキーに置く。
 // 進捗 (kcna.v1) とは分ける (様式を変えず、書き出す記録にも途中の答えを入れない)。採点したら・やめたら消す。
+// 回ごとに id を持ち、採点した回の id は別のキーに残す。2 つのタブで同じ回を開いていても、片方が採点したあとに
+// もう片方が保存し直したり、同じ回をもう一度採点して記録を 2 回付けたりしないため
 import type { Question } from '../content/types';
 import type { BankItem, ExamAnswer } from './exam';
 
 export const EXAM_SAVE_KEY = 'kcna.exam.v1';
+/** 採点した回の id (新しい順に最大 MAX_DONE 件) */
+export const EXAM_DONE_KEY = 'kcna.exam.done.v1';
+const MAX_DONE = 20;
 
 type KeyValueStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 
 /** 保存する形。order は 4 択の選択肢の id か、穴埋めの候補の画面の並び */
 export type SavedExam = {
   v: 1;
+  /** 回ごとの id (始めたときに作る) */
+  id: string;
   /** 決まった回の番号 (ランダムは持たない) */
   set?: number;
   items: { id: string; order?: string[] }[];
@@ -22,7 +29,10 @@ export type SavedExam = {
 };
 
 /** 解いている途中の状態 */
-export type ExamProgress = { set?: number; items: BankItem[]; answers: ExamAnswer[]; index: number; endsAt: number };
+export type ExamProgress = { id: string; set?: number; items: BankItem[]; answers: ExamAnswer[]; index: number; endsAt: number };
+
+/** 回の id を作る (始めた時刻と乱数) */
+export const newExamId = (now: number = Date.now(), random: () => number = Math.random) => `${now.toString(36)}-${Math.floor(random() * 36 ** 6).toString(36)}`;
 
 function safeLocalStorage(): Storage | undefined {
   try {
@@ -34,11 +44,56 @@ function safeLocalStorage(): Storage | undefined {
 
 const orderOf = (q: Question): string[] | undefined => (q.type === 'choice' ? q.choices.map((c) => c.id) : q.candidates);
 
-/** 途中の状態を保存する。保存できない環境では何もしない (その場限りで解ける) */
-export function saveExam(e: ExamProgress, storage: KeyValueStorage | undefined = safeLocalStorage()): void {
-  if (!storage) return;
+function finishedIds(storage: KeyValueStorage | undefined): string[] {
+  try {
+    const v = JSON.parse(storage?.getItem(EXAM_DONE_KEY) ?? '[]');
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+/** その回をもう採点したか (ほかのタブで採点した回も) */
+export const isFinished = (id: string, storage: KeyValueStorage | undefined = safeLocalStorage()) => finishedIds(storage).includes(id);
+
+/**
+ * 採点した回の id を残し、途中の保存を消す。もう採点した回なら false (記録を付けない)。
+ * 呼ぶ側は true のときだけ記録を付ける
+ */
+export function finishExam(id: string, storage: KeyValueStorage | undefined = safeLocalStorage()): boolean {
+  const done = finishedIds(storage);
+  clearExam(storage);
+  if (done.includes(id)) return false;
+  try {
+    storage?.setItem(EXAM_DONE_KEY, JSON.stringify([id, ...done].slice(0, MAX_DONE)));
+  } catch {
+    // 残せなくても、この画面では 1 回だけ記録する
+  }
+  return true;
+}
+
+/** 保存されている途中の回の id (無ければ null) */
+function savedId(storage: KeyValueStorage): string | null {
+  try {
+    const v = JSON.parse(storage.getItem(EXAM_SAVE_KEY) ?? 'null');
+    return v && typeof v.id === 'string' ? v.id : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 途中の状態を保存する。保存できない環境では何もしない (その場限りで解ける)。
+ * onlyIfCurrent のときは、保存がまだ自分の回のときだけ書く (ほかのタブが採点して消した・別の回を始めたなら書かない)。
+ * 採点した回は書かない。書いたら true
+ */
+export function saveExam(e: ExamProgress, storage: KeyValueStorage | undefined = safeLocalStorage(), { onlyIfCurrent = false } = {}): boolean {
+  if (!storage) return false;
+  if (isFinished(e.id, storage)) return false;
+  if (onlyIfCurrent && savedId(storage) !== e.id) return false;
   const saved: SavedExam = {
     v: 1,
+    id: e.id,
     ...(e.set ? { set: e.set } : {}),
     items: e.items.map((b) => ({ id: b.question.id, order: orderOf(b.question) })),
     answers: e.items.map((_, i) => e.answers[i] ?? null),
@@ -47,8 +102,10 @@ export function saveExam(e: ExamProgress, storage: KeyValueStorage | undefined =
   };
   try {
     storage.setItem(EXAM_SAVE_KEY, JSON.stringify(saved));
+    return true;
   } catch {
     // 容量の上限などで保存できなくても、解くのは続けられる
+    return false;
   }
 }
 
@@ -83,8 +140,13 @@ export function loadExam(bank: BankItem[], storage: KeyValueStorage | undefined 
     return null;
   }
   const s = raw as Partial<SavedExam>;
-  if (!s || s.v !== 1 || !Array.isArray(s.items) || !Array.isArray(s.answers) || s.items.length === 0 || s.answers.length !== s.items.length) return null;
+  if (!s || s.v !== 1 || typeof s.id !== 'string' || !Array.isArray(s.items) || !Array.isArray(s.answers) || s.items.length === 0 || s.answers.length !== s.items.length) return null;
   if (typeof s.endsAt !== 'number' || !Number.isFinite(s.endsAt) || !Number.isInteger(s.index) || s.index! < 0 || s.index! >= s.items.length) return null;
+  // ほかのタブでもう採点した回の保存は捨てる (続きから解いて、もう一度記録を付けないため)
+  if (isFinished(s.id, storage)) {
+    clearExam(storage);
+    return null;
+  }
   const byId = new Map(bank.map((b) => [b.question.id, b]));
   const items: BankItem[] = [];
   for (const it of s.items) {
@@ -103,7 +165,7 @@ export function loadExam(bank: BankItem[], storage: KeyValueStorage | undefined 
     }
   }
   const answers = s.answers.map((a) => (typeof a === 'string' ? a : undefined));
-  return { ...(Number.isInteger(s.set) && s.set! >= 1 ? { set: s.set } : {}), items, answers, index: s.index!, endsAt: s.endsAt };
+  return { id: s.id, ...(Number.isInteger(s.set) && s.set! >= 1 ? { set: s.set } : {}), items, answers, index: s.index!, endsAt: s.endsAt };
 }
 
 /** 期限を過ぎているか (過ぎていれば、続きからではなく時間切れの結果にする) */
