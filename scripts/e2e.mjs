@@ -469,6 +469,16 @@ async function run(browser, name, width, height) {
   else await page.getByRole('textbox', { name: '空欄' }).fill('x');
   await page.getByRole('button', { name: '次へ' }).click();
   check(await page.getByText(/模擬試験 · 2 \/ 60 問 · 答えた 1/).isVisible(), `${tag} 次へで 2 問目に進み、答えた数が数えられる`);
+  // 途中で再読み込みしても、続きから解ける (回・答え・いまの問題・期限を保存する)
+  const secondPrompt = await page.locator('main h1, main h2').first().textContent();
+  const savedEndsAt = await page.evaluate(() => JSON.parse(localStorage.getItem('kcna.exam.v1') ?? '{}').endsAt);
+  await page.reload();
+  await page.getByText('途中の第 1 回があります').waitFor();
+  check(await page.getByText(/60 問のうち 1 問に答えています/).isVisible(), `${tag} 再読み込みすると、途中の模擬試験の答えた数を出す`);
+  await page.getByRole('button', { name: '続きから解く' }).click();
+  check(await page.getByText(/模擬試験 · 2 \/ 60 問 · 答えた 1/).isVisible(), `${tag} 続きから解くと、同じ問題・同じ答えた数から始まる`);
+  check(typeof savedEndsAt === 'number' && (await page.evaluate(() => JSON.parse(localStorage.getItem('kcna.exam.v1') ?? '{}').endsAt)) === savedEndsAt, `${tag} 続きから解いても残り時間の期限は最初のまま`);
+  check((await page.locator('main h1, main h2').first().textContent()) === secondPrompt, `${tag} 続きから解くと、閉じる前と同じ問題が出る`);
   await page.getByRole('button', { name: '採点する' }).first().click();
   check(await page.getByText(/まだ答えていない問題が 59 問あります/).isVisible(), `${tag} 採点の前に答えていない数を知らせる`);
   await page.getByRole('button', { name: '採点する' }).last().click();
@@ -494,6 +504,12 @@ async function run(browser, name, width, height) {
   await page.getByRole('button', { name: '模擬試験をやめる' }).click();
   await page.getByRole('button', { name: 'やめる', exact: true }).click();
   await page.getByRole('button', { name: /を始める$/ }).waitFor();
+  check(await page.evaluate(() => localStorage.getItem('kcna.exam.v1') === null), `${tag} 模擬試験をやめたら途中の保存を消す`);
+  // 途中で再読み込みして「やめて最初から」を選ぶと、保存を消して回の選択に戻る
+  await page.getByRole('button', { name: /を始める$/ }).click();
+  await page.reload();
+  await page.getByRole('button', { name: 'やめて最初から' }).click();
+  check((await page.getByRole('button', { name: '続きから解く' }).count()) === 0 && (await page.evaluate(() => localStorage.getItem('kcna.exam.v1') === null)), `${tag} やめて最初からで途中の保存を消す`);
   check(await page.getByText(/第 1 回 · \d+ \/ 60 \(\d+%\)/).first().isVisible(), `${tag} 模擬試験の画面にこれまでの結果が回の名前つきで出る`);
   await page.goto(`${BASE}progress/`);
   await page.getByRole('heading', { name: '進捗' }).waitFor();
@@ -514,6 +530,18 @@ async function run(browser, name, width, height) {
     check(after === before + 1, `${tag} 時間切れで 1 回だけ自動で採点する (${before} → ${after})`);
     const lastSet = await tp.evaluate(() => JSON.parse(localStorage.getItem('kcna.v1') ?? '{}').exams?.[0]?.set);
     check(lastSet === 2, `${tag} 時間切れの採点にも回の番号が残る (第 1 回を解いたあとは第 2 回が選ばれている: ${lastSet})`);
+    check(await tp.evaluate(() => localStorage.getItem('kcna.exam.v1') === null), `${tag} 採点したら途中の保存を消す`);
+    // 途中で閉じて、期限を過ぎてから開くと、続きからではなく時間切れの結果にする
+    await tp.goto(`${BASE}exam/`);
+    await tp.getByRole('button', { name: /を始める$/ }).click();
+    await tp.getByText(/模擬試験 · 1 \/ 60 問/).waitFor();
+    const before2 = await tp.evaluate(() => JSON.parse(localStorage.getItem('kcna.v1') ?? '{}').exams?.length ?? 0);
+    await tp.goto('about:blank');
+    await tp.clock.fastForward('01:31:00');
+    await tp.goto(`${BASE}exam/`);
+    await tp.getByRole('heading', { name: '結果' }).waitFor();
+    const after2 = await tp.evaluate(() => JSON.parse(localStorage.getItem('kcna.v1') ?? '{}').exams?.length ?? 0);
+    check(after2 === before2 + 1 && (await tp.evaluate(() => localStorage.getItem('kcna.exam.v1') === null)), `${tag} 期限を過ぎてから開くと時間切れの結果になり、保存を消す (${before2} → ${after2})`);
     await tp.close();
   }
 

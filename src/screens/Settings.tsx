@@ -15,6 +15,7 @@ import RepoLink from '../components/RepoLink';
 import SiteLogo from '../components/SiteLogo';
 import { dueReviewCount } from '../content';
 import { downloadProgress } from '../lib/download';
+import { clearExam } from '../lib/examSave';
 import {
   COLOR_MODES,
   GOAL_CHOICES,
@@ -194,6 +195,8 @@ function Body({ progress, updateProgress }: Props) {
         cancelLabel="やめる"
         onAction={() => {
           updateProgress((p) => resetProgress(p));
+          // 途中の模擬試験も消す (記録を消したあとに、前の答えで続きから解けないように)
+          clearExam();
           setConfirmReset(false);
           setDone('記録を消しました。');
         }}
