@@ -263,7 +263,7 @@ function Body({ progress, updateProgress }: Props) {
         isOpen={confirmReset}
         onOpenChange={setConfirmReset}
         title="記録を消しますか?"
-        description="完了したレッスン・XP・連続日数・問題ごとの正誤・模擬試験の結果・ハンドブックの読んだ記録を消します。目標・受験日・画面の色の設定は残ります。消す前に書き出しておくと、あとで読み込んで戻せます。"
+        description="完了したレッスン・XP・連続日数と休みの札・日ごとの答えた数・問題ごとの正誤・模擬試験の結果・ハンドブックの読んだ記録を消します。目標・受験日・画面の色の設定は残ります。消す前に書き出しておくと、あとで読み込んで戻せます。"
         actionLabel="消す"
         cancelLabel="やめる"
         onAction={() => {
