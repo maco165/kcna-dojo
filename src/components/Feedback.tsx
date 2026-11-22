@@ -1,5 +1,6 @@
-import { lazy, Suspense, type ReactNode } from 'react';
+import { lazy, type ReactNode } from 'react';
 import { Banner } from '@astryxdesign/core/Banner';
+import { LazyPart } from './LoadBoundary';
 import { Link } from '@astryxdesign/core/Link';
 import { VStack } from '@astryxdesign/core/Stack';
 import { Text } from '@astryxdesign/core/Text';
@@ -52,9 +53,9 @@ export default function Feedback({
       />
       {extra}
       {question && (
-        <Suspense fallback={null}>
+        <LazyPart>
           <CommandNotes question={question} open={notesOpen} />
-        </Suspense>
+        </LazyPart>
       )}
     </>
   );

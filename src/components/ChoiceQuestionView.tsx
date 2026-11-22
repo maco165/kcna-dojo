@@ -1,5 +1,6 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, useEffect, useState } from 'react';
 import { CodeBlock } from '@astryxdesign/core/CodeBlock';
+import { LazyPart } from './LoadBoundary';
 import { RadioList, RadioListItem } from '@astryxdesign/core/RadioList';
 import { VStack } from '@astryxdesign/core/Stack';
 import type { ChoiceQuestion } from '../content/types';
@@ -75,9 +76,9 @@ export default function ChoiceQuestionView({
               question={question}
             />
             <PrimaryAction label={nextLabel} onClick={onNext} />
-            <Suspense fallback={null}>
+            <LazyPart>
               <ReadMore question={question} domain={domain} />
-            </Suspense>
+            </LazyPart>
             <AskAi question={question} answered={{ picked: value, correct: result }} />
           </>
         )}

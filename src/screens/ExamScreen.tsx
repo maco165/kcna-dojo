@@ -1,5 +1,6 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertDialog } from '@astryxdesign/core/AlertDialog';
+import { LazyPart } from '../components/LoadBoundary';
 import Crumbs from '../components/Crumbs';
 import { AppShell } from '@astryxdesign/core/AppShell';
 import { Banner } from '@astryxdesign/core/Banner';
@@ -307,9 +308,9 @@ function Result({ items, answers, result, onRestart }: { items: BankItem[]; answ
               />
             );
           })}
-          <Suspense fallback={null}>
+          <LazyPart>
             <WeakDomains domains={weakDomains(result)} />
-          </Suspense>
+          </LazyPart>
         </VStack>
       </Card>
       {wrong.length > 0 && (
@@ -345,9 +346,9 @@ function Result({ items, answers, result, onRestart }: { items: BankItem[]; answ
                   {q.type === 'fill' && <CodeBlock code={q.code.replace('{{blank}}', '____')} width="100%" size="sm" hasCopyButton={false} />}
                   <Text type="supporting">あなたの答え: {mine}</Text>
                   <Feedback correct={false} correctAnswer={correctAnswer} explanation={q.explanation} note={q.type === 'choice' ? q.choices.find((c) => c.id === answer)?.why : q.wrongNotes?.[normalizeAnswer(answer ?? '')]} source={q.source} question={q} notesOpen={false} />
-                  <Suspense fallback={null}>
+                  <LazyPart>
                     <ReadMore question={q} domain={item.domain} />
-                  </Suspense>
+                  </LazyPart>
                   <AskAi question={q} answered={isAnswered(answer) ? { picked: answer, correct: false } : undefined} />
                 </VStack>
               </Card>

@@ -1,5 +1,6 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, useEffect, useState } from 'react';
 import { Button } from '@astryxdesign/core/Button';
+import { LazyPart } from './LoadBoundary';
 import { CodeBlock } from '@astryxdesign/core/CodeBlock';
 import { HStack, VStack } from '@astryxdesign/core/Stack';
 import { Text } from '@astryxdesign/core/Text';
@@ -165,9 +166,9 @@ export default function FillQuestionView({
               extra={result && question.output ? <CodeBlock code={question.output} title="実行結果の例 (列の一部)" width="100%" size="sm" hasCopyButton={false} /> : undefined}
             />
             <PrimaryAction label={nextLabel} onClick={onNext} kbdHint="Enter で次へ" />
-            <Suspense fallback={null}>
+            <LazyPart>
               <ReadMore question={question} domain={domain} />
-            </Suspense>
+            </LazyPart>
             <AskAi question={question} answered={{ picked: typed, correct: result }} />
           </>
         )}

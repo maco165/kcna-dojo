@@ -2867,3 +2867,12 @@ html[data-loading='true'] body::before {
     margin-left: var(--ask-ai-pad);
   }
 }
+
+/* 画面を読み込めなかったときの知らせ (src/components/LoadBoundary.tsx) */
+.load-failed {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 24px 16px;
+}

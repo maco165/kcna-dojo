@@ -872,6 +872,33 @@ async function run(browser, name, width, height) {
     }
   }
 
+  // 後から読むチャンクを読めない (新しい版を出したあとの開いたままのタブなど) ときも白紙にしない。
+  // 別のページで調べ、ここで出るエラーは上のエラーの検査に入れない
+  {
+    const bp = await context.newPage();
+    const rootText = () => bp.evaluate(() => document.getElementById('root')?.innerText.trim().length ?? 0);
+    // 答えたあとの部品 (読み直す先・出てきたコマンド) が 404 でも、レッスンの画面は残り、次へ進める
+    await bp.route(/\/assets\/(ReadMore|CommandNotes)-[^/]+\.js$/, (r) => r.fulfill({ status: 404, body: '' }));
+    await bp.goto(`${BASE}lesson/${l1.id}/`);
+    await bp.waitForFunction(() => !document.querySelector('#root > main.prerender'));
+    const q = l1.questions[0];
+    await bp.getByRole('radio', { name: choiceLabel(q, q.answer) }).check();
+    await bp.getByRole('button', { name: '確かめる' }).click();
+    await bp.waitForTimeout(1000);
+    check((await rootText()) > 100 && (await bp.getByRole('button', { name: /次へ|結果を見る/ }).count()) >= 1, `${tag} 答えたあとの部品のチャンクが 404 でも白紙にならず、次へ進める (${await rootText()} 字)`);
+    // ホームを開いたあとレッスンの画面と問題の全文のチャンクが 404 になっても、白紙にしない (読み直して書き出した HTML を出す)
+    let block = false;
+    await bp.unrouteAll();
+    await bp.route(/\/assets\/(LessonRoute|LessonScreen|lessons)-[^/]+\.js$/, (r) => (block ? r.fulfill({ status: 404, body: '' }) : r.continue()));
+    await bp.goto(BASE);
+    await bp.waitForFunction(() => !document.querySelector('#root > main.prerender'));
+    block = true;
+    await bp.locator(`a[href="/kcna-dojo/lesson/${l1.id}/"]`).first().click();
+    await bp.waitForTimeout(2000);
+    check((await rootText()) > 100, `${tag} レッスンの画面のチャンクが 404 でも白紙にならない (${await rootText()} 字)`);
+    await bp.close();
+  }
+
   check(errors.length === 0, `${tag} ページのエラーが無い ${errors.length ? errors.join(' / ') : ''}`);
   await context.close();
 }

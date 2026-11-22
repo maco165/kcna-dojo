@@ -10,6 +10,7 @@ import { useEffect, useLayoutEffect, useReducer, useRef, type ReactNode } from '
 import { colorMode } from './lib/progress';
 import { useProgress } from './lib/useProgress';
 import Home from './screens/Home';
+import { LoadBoundary, LoadFailed } from './components/LoadBoundary';
 
 export default function App() {
   const route = useRoute();
@@ -52,7 +53,10 @@ export default function App() {
   return (
     <InternationalizationProvider locale="ja-JP" messages={{ 'ja-JP': jaJP }}>
       <Theme theme={kcnaTheme} mode={colorMode(progress)}>
-        {screen}
+        {/* 画面の部品が描画の途中で投げても (後から読むチャンクが 404 など)、白紙にせず読み直しを出す */}
+        <LoadBoundary resetKey={JSON.stringify(route)} fallback={<LoadFailed />}>
+          {screen}
+        </LoadBoundary>
       </Theme>
     </InternationalizationProvider>
   );
