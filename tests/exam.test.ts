@@ -125,3 +125,17 @@ describe('recordExam', () => {
     expect(next.exams?.[0].correct).toBe(EXAM_QUESTIONS - 2);
   });
 });
+
+describe('合格の目安 (KCNA の試験のページに合格点の数字が無いので、断定しない)', () => {
+  it('模擬試験の説明と試験の形式の表は、75% を「目安」と書き、出所の但し書きを付ける', async () => {
+    const { PASS_NOTE } = await import('../src/lib/exam');
+    const { EXAM_FACTS } = await import('../src/content/guide');
+    expect(PASS_NOTE).toContain('目安');
+    expect(PASS_NOTE).toContain('KCNA と名指しではない');
+    expect(PASS_NOTE).not.toMatch(/合格点です/);
+    const pass = EXAM_FACTS.find((f) => f.label.startsWith('合格'))!;
+    expect(pass.label).toBe('合格の目安');
+    expect(pass.value).toContain('目安');
+    expect(pass.note).toMatch(/数字は無い/);
+  });
+});

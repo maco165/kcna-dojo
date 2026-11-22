@@ -51,7 +51,7 @@ export const EXAM_FACTS: { label: string; value: string; note?: string; sources:
   { label: '形式', value: 'オンラインの監督付き・多肢選択式', sources: [SOURCES.kcnaJp] },
   { label: '時間', value: `${EXAM_MINUTES} 分`, sources: [SOURCES.kcnaJp, SOURCES.mcInstructions] },
   { label: '問題数', value: `${EXAM_QUESTIONS} 問`, note: 'LF の多肢選択式試験に共通の記述', sources: [SOURCES.mcInstructions] },
-  { label: '合格', value: `${Math.round(PASS_MARK * 100)}% 以上`, note: 'LF の多肢選択式試験に共通の記述', sources: [SOURCES.mcFaq] },
+  { label: '合格の目安', value: `${Math.round(PASS_MARK * 100)}% 以上 (目安)`, note: 'KCNA の試験のページに合格点の数字は無い。LF の多肢選択式試験の FAQ に共通の記述で、KCNA と名指しではない', sources: [SOURCES.mcFaq] },
   { label: '言語', value: '問題は日本語。日本語版として申し込む。監督者は英語を話すが、試験のブラウザで日本語を選ぶと監督者・サポートとのやり取りは自動翻訳の日本語になる', sources: [SOURCES.kcnaJp, SOURCES.language] },
   { label: '有効期間', value: '2 年', sources: [SOURCES.kcnaJp] },
   { label: '受験料', value: '$250 (再受験 1 回つき)', sources: [SOURCES.kcnaJp] },

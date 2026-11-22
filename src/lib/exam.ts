@@ -6,7 +6,10 @@ import { shuffleChoices } from './shuffle';
 
 export const EXAM_QUESTIONS = 60;
 export const EXAM_MINUTES = 90;
-/** 合格点。LF の多肢選択式試験に共通の記述 (KCNA と名指しではない)。正本の出典は content/guide.ts の EXAM_FACTS */
+/**
+ * 合格の目安。KCNA の試験のページには合格点の数字が無い。LF の多肢選択式試験の FAQ に共通の記述 (KCNA と名指しではない) の 75% を
+ * 目安に使う (合格点と断定しない)。出典は content/guide.ts の EXAM_FACTS
+ */
 export const PASS_MARK = 0.75;
 
 /** 試験の 4 分野の配点 (%)。正本は Linux Foundation の KCNA の試験のページ */
@@ -24,7 +27,7 @@ export const examIntro = (sets: number, fresh: number[], bankSize: number) =>
   `本番と同じ 4 分野の配点の割合で ${EXAM_QUESTIONS} 問を出します。問題が決まっていて互いに重ならない第 1〜${sets} 回と、毎回選び直すランダムがあります。第 1〜${sets - fresh.length} 回とランダムは第 1〜8 週の問題 (${bankSize} 問) から、第 ${fresh.join('・')} 回はレッスンに無い初見の問題から出します。時間は ${EXAM_MINUTES} 分で、途中では答えを見せず、最後にまとめて採点します。`;
 
 /** 合格の目安の説明 (画面と書き出す HTML で共通) */
-export const PASS_NOTE = `合格の目安は ${Math.round(PASS_MARK * 100)}% としています (LF の多肢選択式試験に共通の合格点です)。答えて間違えた問題は復習に入ります。`;
+export const PASS_NOTE = `${Math.round(PASS_MARK * 100)}% を合格の目安にしています。KCNA の試験のページには合格点の数字が無く、LF の多肢選択式試験の FAQ に共通の記述 (KCNA と名指しではない) を目安に使っています。答えて間違えた問題は復習に入ります。`;
 
 /** 配点の割合で各分野の問題の数を決める (端数は大きい順に配り、合計を total にそろえる) */
 export function domainCounts(total: number = EXAM_QUESTIONS): Record<Domain, number> {
