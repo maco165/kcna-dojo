@@ -334,7 +334,8 @@ export async function buildPages(load) {
       path: `week/${w.week}/`,
       title: `第 ${w.week} 週 ${w.title}`,
       description: clip(`第 ${w.week} 週 ${w.title} (${w.domain}・${w.area})。この週で説明できるようにすること: ${w.goals.join('・')}`),
-      body: [`<h1>第 ${w.week} 週 ${esc(w.title)}</h1>`, `<p>${esc(w.domain)} · ${esc(w.area)}</p>`, '<h2>この週で説明できるようにすること</h2>', `<ol>${w.goals.map((g) => `<li>${esc(g)}</li>`).join('')}</ol>`, '<h2>先に読む</h2>', `<ul>${w.read.map((r) => `<li>${link(`handbook/${r.topic}/`, r.label)}</li>`).join('')}</ul>`, '<h2>レッスン</h2>', ls.map(weekLessonHtml).join('\n')].join('\n'),
+      // 第 1 週はトップと同じ画面なので、h1 も画面と同じサイト名にし、週の名前は h2 にする
+      body: [w.week === 1 ? `<h1>${esc(SITE_TITLE)}</h1>\n<h2>第 1 週 ${esc(w.title)}</h2>` : `<h1>第 ${w.week} 週 ${esc(w.title)}</h1>`, `<p>${esc(w.domain)} · ${esc(w.area)}</p>`, '<h2>この週で説明できるようにすること</h2>', `<ol>${w.goals.map((g) => `<li>${esc(g)}</li>`).join('')}</ol>`, '<h2>先に読む</h2>', `<ul>${w.read.map((r) => `<li>${link(`handbook/${r.topic}/`, r.label)}</li>`).join('')}</ul>`, '<h2>レッスン</h2>', ls.map(weekLessonHtml).join('\n')].join('\n'),
     });
     for (const l of ls) {
       const qs = l.kind === 'quiz' ? l.questions : [];

@@ -988,7 +988,7 @@ async function run(browser, name, width, height) {
   }
 
   // 描画後の h1 は、書き出した HTML の h1 と同じ (ホームはサイト名、週は「第 n 週 …」、レッスンはレッスン名、用語のページは語の名前)。h1 は 1 つだけ
-  for (const p of ['', 'week/2/', 'lesson/w2-l1/', 'glossary/etcd/']) {
+  for (const p of ['', 'week/1/', 'week/2/', 'lesson/w2-l1/', 'glossary/etcd/']) {
     const html = await (await fetch(`${BASE}${p}`)).text();
     const written = html.match(/<h1>([^<]*)<\/h1>/)?.[1].replace(/&amp;/g, '&') ?? '(無し)';
     await page.goto(`${BASE}${p}`);
