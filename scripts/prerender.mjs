@@ -84,6 +84,21 @@ export async function buildPages(load) {
   const { WEEK_CONTENTS, questionBank } = await load('/src/content/lessons.ts');
   const fullOf = new Map(WEEK_CONTENTS.map((c) => [c.week, c.lessons]));
   const lessonsOf = (w) => fullOf.get(w.week) ?? [];
+  // ページどうしのつながり。画面 (ハンドブック・コマンド・用語集) が出すのと同じデータから、JS なしの HTML にもリンクを書く
+  const { findLesson: findLessonMeta } = await load('/src/content/index.ts');
+  const { commandUses } = await load('/src/lib/commandRefs.ts');
+  const commandData = (await load('/src/content/commands.json')).default;
+  const lessonLinks = (ids) => {
+    const found = [...new Set(ids)].map((id) => [id, findLessonMeta(id)]).filter(([, f]) => f);
+    return found.length ? `<ul>${found.map(([id, f]) => `<li>${link(`lesson/${id}/`, `第 ${f.week} 週 ${f.lesson.title}`)}</li>`).join('')}</ul>` : '';
+  };
+  /** コマンドの id → それが出てくるレッスンの id (出てくる順)。画面のコマンドのページと同じく commandUses で数える */
+  const lessonsOfCommand = new Map();
+  for (const c of WEEK_CONTENTS) for (const l of c.lessons) for (const q of l.kind === 'quiz' ? l.questions : []) for (const u of commandUses(q, commandData)) {
+    const ids = lessonsOfCommand.get(u.entry.id) ?? [];
+    if (!ids.includes(l.id)) ids.push(l.id);
+    lessonsOfCommand.set(u.entry.id, ids);
+  }
   /** 解説の記事 (ハンドブックのトピック・コマンド・比較表)。出典を citation にする */
   const article = (headline, sources) => ({ '@type': 'TechArticle', headline, citation: [...new Map(sources.map((s) => [s.url, s])).values()].map((s) => ({ '@type': 'CreativeWork', name: s.label, url: s.url })) });
 
@@ -135,9 +150,12 @@ export async function buildPages(load) {
         `<ol>${t.flow.map(step).join('')}</ol>`,
         '<h2>試したいなら</h2>',
         ...t.try.map((x) => `<h3>${esc(x.goal)}</h3><ol>${x.steps.map(step).join('')}</ol>`),
+        t.lessons.length && lessonLinks(t.lessons) ? `<h2>問題で練習する</h2>${lessonLinks(t.lessons)}` : '',
         '<h2>出典 (公式のドキュメント)</h2>',
         `<ul>${t.sources.map((s) => `<li><a href="${esc(s.url)}">${esc(s.label)}</a></li>`).join('')}</ul>`,
-      ].join('\n'),
+      ]
+        .filter(Boolean)
+        .join('\n'),
     });
   }
 
@@ -148,6 +166,11 @@ export async function buildPages(load) {
   const { DOMAINS } = await load('/src/lib/lessonStatus.ts');
   const ORDER = DOMAINS.map((d) => d.name);
   const sorted = sortTerms(terms).map((t) => ({ ...t, domain: termDomain(t, (id) => findLesson(id)?.lesson.domain, ORDER) }));
+  // 語の出てくるレッスン (画面の「出てくるレッスン」と同じ)
+  const termLessons = (t) => {
+    const found = (t.lessons ?? []).map((id) => [id, findLesson(id)]).filter(([, f]) => f);
+    return found.length ? ` 出てくるレッスン: ${found.map(([id, f]) => link(`lesson/${id}/`, `第 ${f.week} 週 ${f.lesson.title}`)).join('、')}` : '';
+  };
   const termGroups = [...ORDER.map((d) => ({ d, items: sorted.filter((t) => t.domain === d) })), { d: '範囲外', items: sorted.filter((t) => !t.domain) }].filter((g) => g.items.length > 0);
   pages.push({
     path: 'glossary/',
@@ -161,7 +184,7 @@ export async function buildPages(load) {
     body: [
       '<h1>用語集</h1>',
       // 画面の一覧と同じく、語の出てくるレッスンの分野ごとに分け (h2)、どのレッスンにも出ない語は「範囲外」にまとめる
-      ...termGroups.map((g) => `<section><h2>${esc(g.d)} (${g.items.length} 語)</h2><dl>${g.items.map((t) => `<dt id="${esc(t.id)}">${esc(t.term)}${t.aliases?.length ? ` (${esc(t.aliases.join('・'))})` : ''}</dt><dd>${esc(t.description)} <a href="${esc(t.source)}">出典</a></dd>`).join('')}</dl></section>`),
+      ...termGroups.map((g) => `<section><h2>${esc(g.d)} (${g.items.length} 語)</h2><dl>${g.items.map((t) => `<dt id="${esc(t.id)}">${esc(t.term)}${t.aliases?.length ? ` (${esc(t.aliases.join('・'))})` : ''}</dt><dd>${esc(t.description)} <a href="${esc(t.source)}">出典</a>${termLessons(t)}</dd>`).join('')}</dl></section>`),
     ].join('\n'),
   });
   for (const t of terms) {
@@ -199,6 +222,7 @@ export async function buildPages(load) {
         ...c.examples.map((e) => `<h3>${esc(e.title)}</h3><pre><code>${esc(e.output ? `${e.code}\n${e.output}` : e.code)}</code></pre>${e.note ? `<p>${esc(e.note)}</p>` : ''}`),
         c.verbose ? `<h3>-v で見える要求</h3><pre><code>${esc(`${c.verbose.code}\n${c.verbose.output}`)}</code></pre>` : '',
         c.impl ? `<h2>実装を読む</h2><p><a href="${esc(implUrl(c.impl))}">${esc(`${c.impl.repo} ${c.impl.ref} の ${c.impl.path}`)}</a></p><pre><code>${esc(c.impl.excerpt)}</code></pre>` : '',
+        lessonsOfCommand.has(c.id) ? `<h2>出てくるレッスン</h2>${lessonLinks(lessonsOfCommand.get(c.id))}` : '',
         '<h2>出典</h2>',
         `<ul>${[{ label: `${c.command} の公式リファレンス`, url: c.source }, ...c.sources.filter((x) => x.url !== c.source)].map((x) => `<li><a href="${esc(x.url)}">${esc(x.label)}</a></li>`).join('')}</ul>`,
       ]
@@ -232,7 +256,7 @@ export async function buildPages(load) {
       body: [
         `<h1>${esc(t.title)}</h1>`,
         `<p>${esc(t.lead)}</p>`,
-        `<table><thead><tr><th scope="col">観点</th>${t.columns.map((c) => `<th scope="col">${esc(c.name)}</th>`).join('')}</tr></thead><tbody>${t.rows.map((r) => `<tr><th scope="row">${esc(r.label)}</th>${r.cells.map((c) => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>`,
+        `<table><thead><tr><th scope="col">観点</th>${t.columns.map((c) => `<th scope="col">${c.term ? link(`glossary/#${c.term}`, c.name) : esc(c.name)}</th>`).join('')}</tr></thead><tbody>${t.rows.map((r) => `<tr><th scope="row">${esc(r.label)}</th>${r.cells.map((c) => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>`,
         '<h2>取り違えやすい点</h2>',
         `<ul>${t.pitfalls.map((p) => `<li>${esc(p)}</li>`).join('')}</ul>`,
         '<h2>違いが見えるコード</h2>',
@@ -262,6 +286,16 @@ export async function buildPages(load) {
     (l.kind === 'lab'
       ? `<p>${esc(l.goal)}</p>`
       : `<p>問うことの例:</p><ul>${l.questions.slice(0, WEEK_PROMPTS).map((q) => `<li>${esc(q.prompt)}</li>`).join('')}</ul>`);
+  // レッスン → 出てくる用語とコマンド (用語集とコマンドのページから見たつながりの逆向き)
+  const commandPageIds = new Set(COMMAND_PAGES.map((c) => c.id));
+  const relatedOfLesson = (l) => {
+    const ts = glossary.terms.filter((t) => t.lessons?.includes(l.id));
+    const cs = COMMAND_PAGES.filter((c) => commandPageIds.has(c.id) && lessonsOfCommand.get(c.id)?.includes(l.id));
+    return [
+      ts.length ? `<h2>出てくる用語</h2><ul>${ts.map((t) => `<li>${link(`glossary/#${t.id}`, t.term)}</li>`).join('')}</ul>` : '',
+      cs.length ? `<h2>出てくるコマンド</h2><ul>${cs.map((c) => `<li>${link(`commands/${c.id}/`, c.command)}</li>`).join('')}</ul>` : '',
+    ].join('');
+  };
   for (const w of WEEKS) {
     const ls = lessonsOf(w);
     pages.push({
@@ -285,6 +319,7 @@ export async function buildPages(load) {
           l.kind === 'lab'
             ? `<h2>この実習で分かること</h2><p>${esc(l.goal)}</p><h2>用意するもの</h2><ul>${l.needs.map((n) => `<li>${esc(n)}</li>`).join('')}</ul><h2>手順</h2><ol>${l.steps.map((s) => `<li><p>${esc(s.text)}</p>${s.command ? `<pre><code>${esc(s.command)}</code></pre>` : ''}</li>`).join('')}</ol>`
             : `<h2>問題</h2><ol>${qs.map(questionHtml).join('')}</ol>`,
+          relatedOfLesson(l),
           w.read.length ? `<h2>先に読む</h2><ul>${w.read.map((r) => `<li>${link(`handbook/${r.topic}/`, r.label)}</li>`).join('')}</ul>` : '',
         ].join('\n'),
       });

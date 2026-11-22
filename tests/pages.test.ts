@@ -181,3 +181,39 @@ describe('JS なしの本文', { timeout: 30_000 }, () => {
     }
   });
 });
+
+// 画面にあるページどうしのつながりを、JS なしの HTML にも書く (検索エンジンがリンクをたどれるように)
+describe('JS なしの HTML のページどうしのリンク', { timeout: 30_000 }, () => {
+  const hrefs = (root: Document | Element, prefix: string) =>
+    [...root.querySelectorAll(root instanceof Element ? 'a[href]' : '#root a[href]')].map((a) => a.getAttribute('href')!).filter((h) => h.startsWith(`${BASE}${prefix}`)).map((h) => h.slice(BASE.length));
+  const doc = (p: string) => docs.find(({ page }) => page.path === p)!.doc;
+  it('サイトの中へのリンクは、どれも書き出すページを指す (用語集の語は一覧の # を指す)', () => {
+    // トップ ('') は index.html そのもの
+    const paths = new Set(['', ...pages.map((p) => p.path)]);
+    const termIds = new Set([...doc('glossary/').querySelectorAll('dt[id]')].map((d) => d.id));
+    const broken = docs.flatMap(({ page, doc: d }) =>
+      hrefs(d, '').filter((h) => {
+        const [p, hash] = h.split('#');
+        return !paths.has(p) || (p === 'glossary/' && hash !== undefined && !termIds.has(hash));
+      }).map((h) => `${page.path} → ${h}`),
+    );
+    expect(broken).toEqual([]);
+  });
+  it('用語集の語とレッスンは両向きにつながる (語 → 出てくるレッスン、レッスン → 出てくる用語)', () => {
+    const glossary = doc('glossary/');
+    const pairs = [...glossary.querySelectorAll('dt[id]')].flatMap((dt) => hrefs(dt.nextElementSibling!, 'lesson/').map((l) => [dt.id, l] as const));
+    expect(pairs.length).toBeGreaterThan(100);
+    const missing = pairs.filter(([term, lesson]) => !hrefs(doc(lesson), 'glossary/').includes(`glossary/#${term}`));
+    expect(missing).toEqual([]);
+  });
+  it('ハンドブックのトピックとコマンドのページは、問題で練習するレッスンへリンクする', () => {
+    const topics = docs.filter(({ page }) => /^handbook\/[^/]+\/$/.test(page.path));
+    const commands = docs.filter(({ page }) => /^commands\/[^/]+\/$/.test(page.path));
+    const noLesson = (xs: typeof docs) => xs.filter(({ doc: d }) => hrefs(d, 'lesson/').length === 0).map(({ page }) => page.path);
+    // 練習するレッスンを持たない付録のトピックとコマンドもあるので、半分より多くがつながっていることと、レッスンの側からの逆向きを見る
+    expect(noLesson(topics).length).toBeLessThan(topics.length / 2);
+    expect(noLesson(commands).length).toBeLessThan(commands.length / 2);
+    const back = commands.flatMap(({ page, doc: d }) => hrefs(d, 'lesson/').filter((l) => !hrefs(doc(l), 'commands/').includes(page.path)).map((l) => `${page.path} ← ${l}`));
+    expect(back).toEqual([]);
+  });
+});
