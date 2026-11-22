@@ -2,7 +2,6 @@ import { AppShell } from '@astryxdesign/core/AppShell';
 import { Button } from '@astryxdesign/core/Button';
 import Crumbs from '../components/Crumbs';
 import { Card } from '@astryxdesign/core/Card';
-import { Heading } from '@astryxdesign/core/Heading';
 import { Link } from '@astryxdesign/core/Link';
 import { List, ListItem } from '@astryxdesign/core/List';
 import { ProgressBar } from '@astryxdesign/core/ProgressBar';
@@ -28,7 +27,7 @@ import {
   type LessonStatus,
 } from '../lib/lessonStatus';
 import { downloadProgress } from '../lib/download';
-import { SITE_NAME } from '../lib/site';
+import { SITE_NAME, SITE_TAGLINE } from '../lib/site';
 import { addDays, currentStreak, daysToExam, goalXp, planStart, todayXp, weekStartDay, type Progress } from '../lib/progress';
 import { aboutHref, compareHref, examHref, glossaryHref, guideHref, handbookHref, lessonHref, reviewHref, settingsHref, weekHref } from '../lib/route';
 import { dueQuestions, dueReviewCount } from '../content';
@@ -96,6 +95,20 @@ export default function Home({ week, progress }: { week: number; progress: Progr
   return isWide ? <DesktopHome s={s} progress={progress} /> : <PhoneHome s={s} progress={progress} />;
 }
 
+/**
+ * ホームの見出し。h1 は書き出す HTML の h1 とそろえる: トップ (第 1 週) はサイト名「クラネイ — KCNA-JP 対策」で週の名前は h2、
+ * 第 2 週からは「第 n 週 週の名前」(week/<n>/ の書き出しと同じ)
+ */
+function WeekHeading({ meta, desk }: { meta: WeekMeta; desk?: boolean }) {
+  if (meta.week === 1) return <h2 className={desk ? 'week-title week-title--desk' : 'week-title'}>{meta.title}</h2>;
+  return <h1 className={desk ? 'week-title week-title--desk' : 'week-title'}>{`第 ${meta.week} 週 ${meta.title}`}</h1>;
+}
+
+/** トップだけの h1 (サイト名と副題。書き出す index.html の h1 と同じ) */
+function SiteHeading({ meta }: { meta: WeekMeta }) {
+  return meta.week === 1 ? <h1 className="home-site-title">{`${SITE_NAME} — ${SITE_TAGLINE}`}</h1> : null;
+}
+
 function scrollToGoals(e: React.MouseEvent) {
   e.preventDefault();
   document.getElementById('goals')?.scrollIntoView({ behavior: 'smooth' });
@@ -159,10 +172,11 @@ function PhoneHome({ s, progress }: { s: Summary; progress: Progress }) {
         <div className="week-head">
           <VStack gap={0.5}>
             {meta.week !== 1 && <Crumbs items={[{ name: `第 ${meta.week} 週 ${meta.title}` }]} />}
+            <SiteHeading meta={meta} />
             <Text type="supporting">
               第 {meta.week} 週 · {meta.area} · {doneCount(meta, progress)}/{lessons.length} 完了
             </Text>
-            <h1 className="week-title">{meta.title}</h1>
+            <WeekHeading meta={meta} />
           </VStack>
           <Link href={weekHref(meta.week)} onClick={scrollToGoals}>
             要点を読む
@@ -392,10 +406,11 @@ function DesktopHome({ s, progress }: { s: Summary; progress: Progress }) {
         <header className="desk__head">
           <VStack gap={0.5}>
             {meta.week !== 1 && <Crumbs items={[{ name: `第 ${meta.week} 週 ${meta.title}` }]} />}
+            <SiteHeading meta={meta} />
             <Text type="supporting">
               第 {meta.week} 週 · {meta.domain} · {meta.area} · {weekRange(s.start, meta.week)}
             </Text>
-            <Heading level={1}>{meta.title}</Heading>
+            <WeekHeading meta={meta} desk />
           </VStack>
           <HStack gap={6} wrap="wrap">
             <Text type="supporting">

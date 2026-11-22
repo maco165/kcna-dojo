@@ -950,6 +950,18 @@ async function run(browser, name, width, height) {
     }
   }
 
+  // 描画後の h1 は、書き出した HTML の h1 と同じ (ホームはサイト名、週は「第 n 週 …」、レッスンはレッスン名、用語のページは語の名前)。h1 は 1 つだけ
+  for (const p of ['', 'week/2/', 'lesson/w2-l1/', 'glossary/etcd/']) {
+    const html = await (await fetch(`${BASE}${p}`)).text();
+    const written = html.match(/<h1>([^<]*)<\/h1>/)?.[1].replace(/&amp;/g, '&') ?? '(無し)';
+    await page.goto(`${BASE}${p}`);
+    await page.waitForFunction(() => !document.querySelector('#root > main.prerender') && !document.querySelector('#root > main[style]'));
+    await page.locator('h1, h2').first().waitFor();
+    const shown = (await page.locator('h1').allInnerTexts()).map((t) => t.trim());
+    check(shown.length === 1 && shown[0] === written, `${tag} /${p} の描画後の h1 は書き出した h1 と同じ (${written} / ${shown.join(' · ')})`);
+    if (p.startsWith('lesson/')) check((await page.getByRole('heading', { level: 2 }).first().innerText()).length > 10, `${tag} レッスンの問題文は h2`);
+  }
+
   // 後から読むチャンクを読めない (新しい版を出したあとの開いたままのタブなど) ときも白紙にしない。
   // 別のページで調べ、ここで出るエラーは上のエラーの検査に入れない
   {
