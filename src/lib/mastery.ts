@@ -1,18 +1,21 @@
 // 問題ごとの到達 (まだ・間違えた・1 回正解・2 回続けて正解) を、学習要領の 4 分野ごとに数える。進捗の画面を開いたときにだけ読む。
-// 問題はレッスンの問題 (週のファイル) と模擬試験用の初見の問題 (exam/*.json)。どちらも ?light の軽い形 (id と分野) で読む
+// 問題はレッスンの問題 (週のファイルの ?light の軽い形。本体がもう読んでいる) と、模擬試験用の初見の問題 (exam/*.json の ?ids の形: id と分野だけ)
 import { WEEKS } from '../content/curriculum';
 import type { Domain, WeekIndex } from '../content/types';
 import { DOMAINS } from './lessonStatus';
 import { masteryOf, type Mastery, type Progress } from './progress';
 
-const EXAM_FILES = import.meta.glob<WeekIndex>('../content/exam/*.json', { eager: true, import: 'default', query: '?light' });
+/** 模擬試験用の問題は id と分野だけの形 (vite.config.ts の ?ids) で読む (問題文まで読むと進捗の画面が重くなる) */
+type IdsFile = { lessons: { kind: string; domain: Domain; ids: string[] }[] };
+const EXAM_FILES = import.meta.glob<IdsFile>('../content/exam/*.json', { eager: true, import: 'default', query: '?ids' });
 
 export type QuestionDomain = { id: string; domain: Domain };
 
 /** 数える問題: レッスンの問題と模擬試験用の問題 (実習は入れない) */
 export function allQuestionDomains(): QuestionDomain[] {
   const fromLessons = (lessons: WeekIndex['lessons']) => lessons.flatMap((l) => (l.kind === 'quiz' ? l.questions.map((q) => ({ id: q.id, domain: l.domain })) : []));
-  return [...WEEKS.flatMap((w) => fromLessons(w.content?.lessons ?? [])), ...Object.keys(EXAM_FILES).sort().flatMap((k) => fromLessons(EXAM_FILES[k].lessons))];
+  const fromIds = (f: IdsFile) => f.lessons.flatMap((l) => (l.kind === 'quiz' ? l.ids.map((id) => ({ id, domain: l.domain })) : []));
+  return [...WEEKS.flatMap((w) => fromLessons(w.content?.lessons ?? [])), ...Object.keys(EXAM_FILES).sort().flatMap((k) => fromIds(EXAM_FILES[k]))];
 }
 
 export const MASTERY_ORDER: Mastery[] = ['twice', 'once', 'wrong', 'new'];
