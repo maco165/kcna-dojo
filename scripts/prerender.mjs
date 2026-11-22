@@ -256,13 +256,19 @@ export async function buildPages(load) {
     const parts = [choice ? `4 択 ${choice} 問` : '', qs.length - choice ? `穴埋め ${qs.length - choice} 問` : ''].filter(Boolean);
     return parts.length > 1 ? `${parts.join('・')}の全 ${qs.length} 問` : parts[0];
   };
+  // 週のページのレッスンごとの項目。何を問うかが分かるよう、答える前に見える問題文を先頭から数問 (実習は目的) だけ書く。答え・選択肢は書かない
+  const weekLessonHtml = (l) =>
+    `<h3>${link(`lesson/${l.id}/`, l.title)}</h3><p>${esc(l.summary)}</p>` +
+    (l.kind === 'lab'
+      ? `<p>${esc(l.goal)}</p>`
+      : `<p>問うことの例:</p><ul>${l.questions.slice(0, WEEK_PROMPTS).map((q) => `<li>${esc(q.prompt)}</li>`).join('')}</ul>`);
   for (const w of WEEKS) {
     const ls = lessonsOf(w);
     pages.push({
       path: `week/${w.week}/`,
       title: `第 ${w.week} 週 ${w.title}`,
       description: clip(`第 ${w.week} 週 ${w.title} (${w.domain}・${w.area})。この週で説明できるようにすること: ${w.goals.join('・')}`),
-      body: [`<h1>第 ${w.week} 週 ${esc(w.title)}</h1>`, `<p>${esc(w.domain)} · ${esc(w.area)}</p>`, '<h2>この週で説明できるようにすること</h2>', `<ol>${w.goals.map((g) => `<li>${esc(g)}</li>`).join('')}</ol>`, '<h2>先に読む</h2>', `<ul>${w.read.map((r) => `<li>${link(`handbook/${r.topic}/`, r.label)}</li>`).join('')}</ul>`, '<h2>レッスン</h2>', `<ul>${ls.map((l) => `<li>${link(`lesson/${l.id}/`, l.title)} (${esc(l.summary)})</li>`).join('')}</ul>`].join('\n'),
+      body: [`<h1>第 ${w.week} 週 ${esc(w.title)}</h1>`, `<p>${esc(w.domain)} · ${esc(w.area)}</p>`, '<h2>この週で説明できるようにすること</h2>', `<ol>${w.goals.map((g) => `<li>${esc(g)}</li>`).join('')}</ol>`, '<h2>先に読む</h2>', `<ul>${w.read.map((r) => `<li>${link(`handbook/${r.topic}/`, r.label)}</li>`).join('')}</ul>`, '<h2>レッスン</h2>', ls.map(weekLessonHtml).join('\n')].join('\n'),
     });
     for (const l of ls) {
       const qs = l.kind === 'quiz' ? l.questions : [];
@@ -396,6 +402,9 @@ export function crumbsOf(p, parent) {
   const up = parent ?? (list ? `${list[1]}/` : '');
   return up === '' ? ['', p] : ['', up, p];
 }
+
+/** 週のページに、レッスンごとに書く問題文の数 */
+const WEEK_PROMPTS = 2;
 
 /** lastmod は付けない (作るたびの日付では正しくなく、Google はいつも正しいときだけ使うため) */
 export function sitemap(pages) {

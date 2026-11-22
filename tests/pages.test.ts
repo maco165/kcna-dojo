@@ -115,9 +115,10 @@ const bodyChars = (doc: Document) => {
 };
 
 describe('JS なしの本文', { timeout: 30_000 }, () => {
-  it('模擬試験・このサイトについて・全レッスンは 400 字以上', () => {
-    const targets = indexed().filter(({ page }) => page.path === 'exam/' || page.path === 'about/' || page.path.startsWith('lesson/'));
-    expect(targets.length).toBeGreaterThan(40);
+  it('検索に載る全ページは 400 字以上 (模擬試験・このサイトについて・全レッスン・週のページを含む)', () => {
+    const targets = indexed();
+    expect(targets.filter(({ page }) => page.path.startsWith('lesson/')).length).toBeGreaterThanOrEqual(40);
+    expect(targets.filter(({ page }) => page.path.startsWith('week/')).length).toBeGreaterThanOrEqual(7);
     const thin = targets.map(({ page, doc }) => [page.path, bodyChars(doc)] as const).filter(([, n]) => n < 400);
     expect(thin).toEqual([]);
   });
