@@ -2876,3 +2876,29 @@ html[data-loading='true'] body::before {
   gap: 12px;
   padding: 24px 16px;
 }
+
+/* 誤答のあとの選択肢の札 (src/components/ChoiceQuestionView.tsx の ChoiceMark)。印と文字で示し、色は補い */
+.choice-mark {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  padding: 0 var(--spacing-2);
+  border: 1px solid currentColor;
+  border-radius: var(--radius-full);
+  font-size: var(--text-supporting-size);
+  font-weight: 600;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+.choice-mark--answer {
+  color: var(--color-text-success);
+  background: var(--color-success-muted);
+}
+.choice-mark--picked {
+  color: var(--color-text-error);
+  background: var(--color-error-muted);
+}
+/* 答えたあとの選択肢は押せなくなって薄く描かれる。札の付いた 2 つ (正解と選んだ答え) は薄くしない (札の文字のコントラストを保ち、2 つを目立たせる) */
+.astryx-radio-list-item[data-disabled]:has(.choice-mark) > span {
+  opacity: 1;
+}

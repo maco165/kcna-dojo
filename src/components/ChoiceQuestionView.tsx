@@ -55,7 +55,7 @@ export default function ChoiceQuestionView({
 
       <RadioList label="選択肢" isLabelHidden value={value} onChange={setValue} isDisabled={checked}>
         {question.choices.map((c, i) => (
-          <RadioListItem key={c.id} value={c.id} label={`${String.fromCharCode(65 + i)}. ${c.text}`} />
+          <RadioListItem key={c.id} value={c.id} label={`${String.fromCharCode(65 + i)}. ${c.text}`} align="first-line" endContent={result === false ? <ChoiceMark isAnswer={c.id === question.answer} isPicked={c.id === value} /> : undefined} />
         ))}
       </RadioList>
 
@@ -85,4 +85,14 @@ export default function ChoiceQuestionView({
       </ActionArea>
     </VStack>
   );
+}
+
+/**
+ * 誤答のあと、選択肢の上に正解と選んだ答えを示す札。色だけに頼らず、印 (○ / ×) と文字で分かるようにする
+ * (選択肢は答えたあと押せなくなって薄く描かれるので、札は薄くしない色で描く。styles.css の .choice-mark)
+ */
+export function ChoiceMark({ isAnswer, isPicked }: { isAnswer: boolean; isPicked: boolean }) {
+  if (isAnswer) return <span className="choice-mark choice-mark--answer"><span aria-hidden="true">○ </span>正解</span>;
+  if (isPicked) return <span className="choice-mark choice-mark--picked"><span aria-hidden="true">× </span>選んだ答え</span>;
+  return null;
 }

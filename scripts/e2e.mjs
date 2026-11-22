@@ -121,6 +121,39 @@ async function run(browser, name, width, height) {
       const answerLetter = answerLabel.trim().slice(0, 1);
       check(/^[A-D]$/.test(answerLetter) && (await page.getByText(`不正解 · 正しくは ${answerLetter}`).isVisible()), `${tag} 「正しくは ${answerLetter}」が画面の並びと合う`);
       check(await page.getByText(q.explanation).isVisible(), `${tag} 不正解のとき解説が出る`);
+      // 誤答のあと、選択肢の上に正解と選んだ答えを印と文字で示す (色だけに頼らない)。押せなくなって薄く描かれても、札の文字のコントラストは 4.5 以上
+      const marks = await page.evaluate(() => {
+        const toRgb = (c) => {
+          const cv = document.createElement('canvas');
+          cv.width = cv.height = 1;
+          const x = cv.getContext('2d');
+          x.fillStyle = c;
+          x.fillRect(0, 0, 1, 1);
+          const [r, g, b, a] = x.getImageData(0, 0, 1, 1).data;
+          return [r, g, b, a / 255];
+        };
+        const lum = ([r, g, b]) => [r, g, b].map((v) => ((v /= 255) <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)).reduce((s, v, i) => s + v * [0.2126, 0.7152, 0.0722][i], 0);
+        const mix = (a, b, t) => a.map((v, i) => v * t + b[i] * (1 - t));
+        const page = toRgb(getComputedStyle(document.body).backgroundColor);
+        return [...document.querySelectorAll('.choice-mark')].map((el) => {
+          let alpha = 1;
+          for (let n = el; n; n = n.parentElement) alpha *= Number(getComputedStyle(n).opacity);
+          const st = getComputedStyle(el);
+          const bgRaw = toRgb(st.backgroundColor);
+          const bg = mix(mix(bgRaw, page, bgRaw[3]), page, alpha);
+          const fg = mix(toRgb(st.color), page, alpha);
+          const [l1, l2] = [lum(fg), lum(bg)].sort((a, b) => b - a);
+          // 札の付いた選択肢 (radio を持ついちばん近い祖先) の文
+          let row = el.parentElement;
+          while (row && !row.querySelector('input[type="radio"]')) row = row.parentElement;
+          return { text: el.textContent, row: row?.textContent ?? '', ratio: (l1 + 0.05) / (l2 + 0.05) };
+        });
+      });
+      const answerText = q.choices.find((c) => c.id === q.answer).text;
+      const pickedText = q.choices.find((c) => c.id === wrong).text;
+      check(marks.length === 2 && marks.some((m) => m.text === '○ 正解') && marks.some((m) => m.text === '× 選んだ答え'), `${tag} 誤答のあと、正解と選んだ答えに印と文字の札が付く (${marks.map((m) => m.text).join('・')})`);
+      check(marks.every((m) => m.ratio >= 4.5), `${tag} 札の文字のコントラストが 4.5 以上 (${marks.map((m) => m.ratio.toFixed(2)).join('・')})`);
+      check(marks.find((m) => m.text === '○ 正解')?.row.includes(answerText) && marks.find((m) => m.text === '× 選んだ答え')?.row.includes(pickedText), `${tag} 札は正解の選択肢と選んだ選択肢に付く`);
       // 解説の近くに、問題の id・レッスン・ページの URL を入れた GitHub の新しい Issue へのリンク (答えや記録は入れない)
       const report = new URL((await page.getByRole('link', { name: /この問題の誤りを報告/ }).getAttribute('href')) ?? 'about:blank');
       const reportBody = report.searchParams.get('body') ?? '';
