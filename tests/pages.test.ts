@@ -3,50 +3,44 @@ import path from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
 // @ts-expect-error 書き出しの手順は JS (scripts/prerender.mjs)
 import { buildPages, renderPage } from '../scripts/prerender.mjs';
-import { commandPageTitle } from '../src/content/commandPages';
-import { tableTitle } from '../src/content/compare';
-import { fullTitle } from '../src/lib/pageMeta';
-import { withSite } from '../src/lib/pageTitle';
+import { resolveTitle } from '../src/lib/pageTitle';
 import { BASE, parseRoute } from '../src/lib/route';
 
 // 書き出す全ページ (scripts/prerender.mjs の buildPages) を作り、検索に載るページの題名・本文・構造化データを見る
 type Page = { path: string; title?: string; noindex?: boolean; canonical?: string; inSitemap?: boolean };
 const template = readFileSync(path.resolve(process.cwd(), 'index.html'), 'utf8');
 let pages: Page[] = [];
-let docs: { page: Page; doc: Document; html: string }[] = [];
+let docs: { page: Page; doc: Document; html: string; titles: { title: string; og?: string | null; twitter?: string | null } }[] = [];
 beforeAll(async () => {
   pages = await buildPages((m: string) => import(/* @vite-ignore */ path.join(process.cwd(), m)));
   docs = pages.map((page) => {
     const html = renderPage(template, page);
-    return { page, html, doc: new DOMParser().parseFromString(html, 'text/html') };
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    // 題名の抜き出しはここで済ませる (テストの中で 268 ページを読むと、負荷が高いときに 5 秒を超えるため)
+    const titles = { title: doc.title, og: doc.querySelector('meta[property="og:title"]')?.getAttribute('content'), twitter: doc.querySelector('meta[name="twitter:title"]')?.getAttribute('content') };
+    return { page, html, doc, titles };
   });
 }, 60_000);
 /** 検索に載るページ (noindex でなく、canonical を別のページに向けていない) */
 const indexed = () => docs.filter(({ page }) => !page.noindex && (page.canonical === undefined || page.canonical === page.path));
 const len = (s: string) => [...s].length;
 
-describe('書き出す全ページ', () => {
+describe('書き出す全ページ', { timeout: 30_000 }, () => {
   it('検索に載るページの題名は重ならない (og:title・twitter:title も同じ題名)', () => {
     const seen = new Map<string, string>();
-    for (const { page, doc } of indexed()) {
-      const t = doc.title;
+    for (const { page, titles } of indexed()) {
+      const t = titles.title;
       expect(seen.get(t), `${page.path} と ${seen.get(t)} の題名が同じ: ${t}`).toBeUndefined();
       seen.set(t, page.path);
-      expect(doc.querySelector('meta[property="og:title"]')?.getAttribute('content')).toBe(t);
-      expect(doc.querySelector('meta[name="twitter:title"]')?.getAttribute('content')).toBe(t);
+      expect(titles.og, page.path).toBe(t);
+      expect(titles.twitter, page.path).toBe(t);
     }
     expect(seen.size).toBeGreaterThan(140);
   });
-  it('書き出した題名は、サイトの中で移ったときの document.title (src/lib/route.ts) と同じ', () => {
-    // route.ts と同じ分け方: コマンドのページと比較表の表はそれぞれのデータで、ほかは pageMeta で決める
-    const client = (p: string) => {
-      const r = parseRoute(`${BASE}${p}`);
-      if (r.name === 'commands' && r.commandId) return withSite(commandPageTitle(r.commandId));
-      if (r.name === 'compare' && r.tableId) return withSite(tableTitle(r.tableId));
-      return fullTitle(r);
-    };
+  it('書き出した題名は、サイトの中で移ったときの document.title (src/lib/route.ts が使う resolveTitle) と同じ', async () => {
     // week/1/ はトップと同じ画面で、サイトの中のリンクはトップを指す (canonical もトップ) ので除く
-    const diff = docs.filter(({ page }) => page.path !== 'week/1/').filter(({ page, doc }) => client(page.path) !== doc.title).map(({ page, doc }) => [page.path, doc.title, client(page.path)]);
+    const rows = await Promise.all(docs.filter(({ page }) => page.path !== 'week/1/').map(async ({ page, titles }) => [page.path, titles.title, await resolveTitle(parseRoute(`${BASE}${page.path}`))]));
+    const diff = rows.filter(([, a, b]) => a !== b);
     expect(diff).toEqual([]);
   });
   it('どのページの題名も 35 字以内', () => {
@@ -65,7 +59,7 @@ const ldOf = (doc: Document): Ld[] => [...doc.querySelectorAll('script[type="app
 const expectedType = (p: string) =>
   /^(handbook|commands|compare)\/[^/]+\/$/.test(p) ? 'TechArticle' : p === 'glossary/' ? 'DefinedTermSet' : p.startsWith('lesson/') ? 'LearningResource' : undefined;
 
-describe('構造化データとパンくず', () => {
+describe('構造化データとパンくず', { timeout: 30_000 }, () => {
   it('検索に載るページは BreadcrumbList と種類ごとの型を持ち、JSON として読めて url が canonical と合う。WebSite はトップだけ', () => {
     for (const { page, doc } of indexed()) {
       const canonical = doc.querySelector('link[rel="canonical"]')?.getAttribute('href');
@@ -98,6 +92,11 @@ describe('構造化データとパンくず', () => {
       // 自分の前までをリンクにし、リンク先は BreadcrumbList の item と同じ
       expect(li.slice(0, -1).map((x) => new URL(x.querySelector('a')!.getAttribute('href')!, ORIGIN_BASE).href)).toEqual(items.slice(0, -1).map((x) => x.item));
       expect(li.at(-1)!.getAttribute('aria-current')).toBe('page');
+      // 最後の項目は見出し (h1) と同じ名前 (題名の short ではない)。TechArticle なら headline とも同じ
+      const h1 = doc.querySelector('#root h1')!.textContent;
+      expect(li.at(-1)!.textContent, page.path).toBe(h1);
+      const article = ldOf(doc).find((x) => x['@type'] === 'TechArticle') as { headline?: string } | undefined;
+      if (article) expect(article.headline, page.path).toBe(h1);
     }
   });
   it('第 1 週のレッスンのパンくずは、トップと同じ画面の week/1/ を通らない', () => {
@@ -115,7 +114,7 @@ const bodyChars = (doc: Document) => {
   return (root.textContent ?? '').replace(/\s/g, '').length;
 };
 
-describe('JS なしの本文', () => {
+describe('JS なしの本文', { timeout: 30_000 }, () => {
   it('模擬試験・このサイトについて・全レッスンは 400 字以上', () => {
     const targets = indexed().filter(({ page }) => page.path === 'exam/' || page.path === 'about/' || page.path.startsWith('lesson/'));
     expect(targets.length).toBeGreaterThan(40);
@@ -138,12 +137,46 @@ describe('JS なしの本文', () => {
     for (const w of WEEK_CONTENTS) {
       for (const l of w.lessons) {
         if (l.kind !== 'quiz') continue;
-        const html = docs.find((d) => d.page.path === `lesson/${l.id}/`)!.doc.querySelector('#root')!.innerHTML;
+        const text = docs.find((d) => d.page.path === `lesson/${l.id}/`)!.doc.querySelector('#root')!.textContent ?? '';
+        // 問題データ (問題文・選択肢・候補) にこの語は出ないので、本文に出たら答えを書いている
+        expect(text, l.id).not.toMatch(/正解|答え/);
+        // 答える前に画面に出るもの (問題文・コード・選択肢・候補)。これに含まれる文は、本文にあっても答えの漏れではない
+        const visible = l.questions.flatMap((q) => [q.prompt, ...(q.type === 'choice' ? [q.code?.text ?? '', ...q.choices.map((c) => c.text)] : [q.code, ...(q.candidates ?? [])])]).join('\n');
         for (const q of l.questions) {
-          expect(html, q.id).not.toContain(q.explanation.slice(0, 40).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'));
-          if (q.type === 'choice') for (const c of q.choices) if (c.why) expect(html, q.id).not.toContain(c.why.slice(0, 30));
+          const hidden = [q.explanation, ...(q.type === 'choice' ? q.choices.map((c) => c.why ?? '') : [q.output ?? '', ...Object.values(q.wrongNotes ?? {})])].filter((x) => x.trim().length >= 8 && !visible.includes(x));
+          // 書き出しの esc を戻した文字 (textContent) と、文の全体で比べる (innerHTML は " を &quot; にしないので符号で比べない)
+          for (const x of hidden) expect(text, q.id).not.toContain(x);
         }
       }
+    }
+  });
+  it('選択肢と候補の並びは正解の位置を見せない (正解がどの位置にも 1/4 ±30% の範囲で来る)', async () => {
+    const { WEEK_CONTENTS } = await import('../src/content/lessons');
+    const choice = [0, 0, 0, 0];
+    const fill = [0, 0, 0, 0];
+    for (const w of WEEK_CONTENTS) {
+      for (const l of w.lessons) {
+        if (l.kind !== 'quiz') continue;
+        const items = [...docs.find((d) => d.page.path === `lesson/${l.id}/`)!.doc.querySelectorAll('#root h2 + ol > li')];
+        expect(items.length, l.id).toBe(l.questions.length);
+        l.questions.forEach((q, i) => {
+          if (q.type === 'choice') {
+            if (q.fixedOrder) return;
+            const shown = [...items[i].querySelectorAll('ul.q-choices > li')].map((x) => x.textContent);
+            expect([...shown].sort(), q.id).toEqual(q.choices.map((c) => c.text).sort());
+            choice[shown.indexOf(q.choices.find((c) => c.id === q.answer)!.text)]++;
+          } else if (q.candidates?.length === 4) {
+            const shown = [...items[i].querySelectorAll('ul.q-candidates > li')].map((x) => x.textContent ?? '');
+            expect([...shown].sort(), q.id).toEqual([...q.candidates].sort());
+            fill[shown.findIndex((x) => q.answers.includes(x))]++;
+          }
+        });
+      }
+    }
+    for (const [name, counts] of [['4 択', choice], ['穴埋めの候補', fill]] as const) {
+      const n = counts.reduce((a, b) => a + b, 0);
+      expect(n, name).toBeGreaterThan(80);
+      for (const c of counts) expect(Math.abs(c - n / 4), `${name} の正解の位置 ${counts.join('/')}`).toBeLessThanOrEqual((n / 4) * 0.3);
     }
   });
 });

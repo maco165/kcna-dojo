@@ -48,6 +48,18 @@ export function lightTitle(route: Route): string | undefined {
   }
 }
 
+/**
+ * そのページのタブの題名を決める (サイトの中で移ったとき route.ts が使う。書き出した題名と同じことは tests/pages.test.ts が見る)。
+ * ハンドブックのトピックと用語集の語は pageMeta、コマンドのページはコマンドのデータ、比較表の表は比較表のデータだけを後から読む
+ * (pageMeta はハンドブックのデータも読むので、コマンドと比較表には使わない)
+ */
+export async function resolveTitle(route: Route): Promise<string> {
+  if (needsHeavyTitle(route)) return (await import('./pageMeta')).fullTitle(route);
+  if (route.name === 'commands' && route.commandId) return withSite((await import('../content/commandPages')).commandPageTitle(route.commandId));
+  if (route.name === 'compare' && route.tableId) return withSite((await import('../content/compare')).tableTitle(route.tableId));
+  return withSite(lightTitle(route));
+}
+
 /** 題名の長さの上限 (検索の結果で切られにくい長さ)。字数は文字の数で数える */
 export const TITLE_MAX = 35;
 const SUFFIX = ` | ${SITE_NAME}`;

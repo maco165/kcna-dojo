@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { lightTitle, needsHeavyTitle, withSite } from './pageTitle';
+import { resolveTitle } from './pageTitle';
 import { onRouteChanged, savePosition, startScrollMemory } from './scrollMemory';
 
 // 経路は # の無い URL (/kcna-dojo/handbook/core-concepts/ など) で、History API で切り替える。
@@ -87,19 +87,9 @@ export function useRoute(): Route {
       const next = parseRoute(shown);
       setRoute(next);
       // 書き出した HTML の題名はページごとなので、サイトの中で移ったときも合わせる。
-      // ハンドブックのトピックと用語集の語だけは、題名に重いデータが要るので後から読む (読み終えたときに、まだ同じページにいるときだけ書く)
+      // 題名に重いデータが要るページは後から読むので、読み終えたときに、まだ同じページにいるときだけ書く
       const at = shown;
-      if (needsHeavyTitle(next)) void import('./pageMeta').then((m) => shown === at && (document.title = m.fullTitle(next)));
-      // 比較表の表は、比較表のデータだけを読んで題名を決める (pageMeta はハンドブックのデータも読むので使わない)
-      else if (next.name === 'commands' && next.commandId) {
-        // コマンドのページは、コマンドのデータだけを読んで題名を決める
-        const id = next.commandId;
-        void import('../content/commandPages').then((m) => shown === at && (document.title = withSite(m.commandPageTitle(id))));
-      } else if (next.name === 'compare' && next.tableId) {
-        const id = next.tableId;
-        void import('../content/compare').then((m) => shown === at && (document.title = withSite(m.tableTitle(id))));
-      }
-      else document.title = withSite(lightTitle(next));
+      void resolveTitle(next).then((t) => shown === at && (document.title = t));
       onRouteChanged();
     };
     const onPop = () => {

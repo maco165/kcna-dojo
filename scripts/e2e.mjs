@@ -759,7 +759,7 @@ async function run(browser, name, width, height) {
     await page.locator('.cmp-table').waitFor();
     await page.waitForTimeout(500);
     page.off('request', onReq);
-    check((await page.title()).includes('の違い') && !loaded.some((u) => /\/handbook-[^/]*\.js$/.test(u)), `${tag} 比較表へ移ると題名が表の題名になり、ハンドブックのデータは読まない (${await page.title()})`);
+    check((await page.title()) === 'Service の 4 つの type の違い | クラネイ' && !loaded.some((u) => /\/handbook-[^/]*\.js$/.test(u)), `${tag} 比較表へ移ると題名が表の題名になり、ハンドブックのデータは読まない (${await page.title()})`);
     await page.goto(`${BASE}glossary/deployment/`);
     await page.getByRole('heading', { name: '似た語と比べる' }).first().waitFor({ timeout: 5000 }).catch(() => {});
     check((await page.locator('a.gloss-chip[href*="/compare/"]').count()) >= 1, `${tag} 用語集の語から、その語の比較表へ飛べる`);

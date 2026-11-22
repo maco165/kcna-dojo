@@ -124,6 +124,7 @@ export async function buildPages(load) {
     pages.push({
       path: `handbook/${t.id}/`,
       title: t.title,
+      heading: t.title,
       description: clip(t.summary),
       entity: article(t.title, t.sources),
       body: [
@@ -181,6 +182,7 @@ export async function buildPages(load) {
     pages.push({
       path: `commands/${c.id}/`,
       title: commandPageTitle(c.id),
+      heading: c.command,
       description: clip(`${c.summary} ${c.detail ?? ''}`),
       entity: article(c.command, [{ label: `${c.command} の公式リファレンス`, url: c.source }, ...c.sources]),
       body: [
@@ -224,6 +226,7 @@ export async function buildPages(load) {
     pages.push({
       path: `compare/${t.id}/`,
       title: t.short ?? t.title,
+      heading: t.title,
       description: clip(t.lead),
       entity: article(t.title, t.sources),
       body: [
@@ -242,12 +245,12 @@ export async function buildPages(load) {
 
   // 週とレッスン (問題文までを書き、答えと解説は書かない。画面でも答えるまで出ないため)
   // 問題は画面で答える前に見えるもの (問題文・コード・選択肢・候補) だけを書く。空欄は ＿＿＿ にする。
-  // 選択肢と候補はデータの並びでは正解が前に寄るので (画面は出すたびに混ぜる)、文字の順に並べて正解の位置を見せない
-  const byText = (xs) => [...xs].sort((a, b) => a.localeCompare(b, 'ja'));
+  // 選択肢と候補はデータの並びでは正解が前に寄るので (画面は出すたびに混ぜる)、問題の id から決まる順に混ぜて正解の位置を見せない
+  // (書き出すたびに同じ順。文字の順は正解の位置が偏るので使わない。偏りは tests/pages.test.ts が見る)
   const questionHtml = (q) =>
     q.type === 'choice'
-      ? `<li><p>${esc(q.prompt)}</p>${q.code ? `<pre><code>${esc(q.code.text)}</code></pre>` : ''}<ul>${(q.fixedOrder ? q.choices.map((c) => c.text) : byText(q.choices.map((c) => c.text))).map((t) => `<li>${esc(t)}</li>`).join('')}</ul></li>`
-      : `<li><p>${esc(q.prompt)}</p><pre><code>${esc(q.code.replace('{{blank}}', '＿＿＿'))}</code></pre>${q.candidates?.length ? `<p>候補: ${byText(q.candidates).map(esc).join('・')}</p>` : ''}</li>`;
+      ? `<li><p>${esc(q.prompt)}</p>${q.code ? `<pre><code>${esc(q.code.text)}</code></pre>` : ''}<ul class="q-choices">${(q.fixedOrder ? q.choices.map((c) => c.text) : mixById(q.choices.map((c) => c.text), q.id)).map((t) => `<li>${esc(t)}</li>`).join('')}</ul></li>`
+      : `<li><p>${esc(q.prompt)}</p><pre><code>${esc(q.code.replace('{{blank}}', '＿＿＿'))}</code></pre>${q.candidates?.length ? `<p>候補</p><ul class="q-candidates">${mixById(q.candidates, q.id).map((t) => `<li><code>${esc(t)}</code></li>`).join('')}</ul>` : ''}</li>`;
   const quizShape = (qs) => {
     const choice = qs.filter((q) => q.type === 'choice').length;
     const parts = [choice ? `4 択 ${choice} 問` : '', qs.length - choice ? `穴埋め ${qs.length - choice} 問` : ''].filter(Boolean);
@@ -272,7 +275,7 @@ export async function buildPages(load) {
         body: [
           `<h1>${esc(l.title)}</h1>`,
           `<p>${esc(l.summary)}</p>`,
-          `<p>第 ${w.week} 週「${esc(w.title)}」(${esc(w.domain)} · ${esc(w.area)}) の${l.kind === 'lab' ? '実習です。家のクラスタ (k3s) で手順を順に打ち、全部の手順を確かめたら完了にします' : `レッスンです。${quizShape(qs)}を順に解きます。答えると正解と解説、公式の文書の出典が出ます`}。</p>`,
+          `<p>第 ${w.week} 週「${esc(w.title)}」(${esc(w.domain)} · ${esc(w.area)}) の${l.kind === 'lab' ? '実習です。家のクラスタ (k3s) で手順を順に打ち、全部の手順を確かめたら完了にします' : `レッスンです。${quizShape(qs)}を順に解きます。1 問解くごとに、解説と公式の文書の出典が出ます`}。</p>`,
           l.kind === 'lab'
             ? `<h2>この実習で分かること</h2><p>${esc(l.goal)}</p><h2>用意するもの</h2><ul>${l.needs.map((n) => `<li>${esc(n)}</li>`).join('')}</ul><h2>手順</h2><ol>${l.steps.map((s) => `<li><p>${esc(s.text)}</p>${s.command ? `<pre><code>${esc(s.command)}</code></pre>` : ''}</li>`).join('')}</ol>`
             : `<h2>問題</h2><ol>${qs.map(questionHtml).join('')}</ol>`,
@@ -345,7 +348,8 @@ export async function buildPages(load) {
   const byPath = new Map(pages.map((x) => [x.path, x]));
   for (const page of pages) {
     if (!isIndexed(page)) continue;
-    const crumbs = crumbsOf(page.path, page.parent).map((p) => ({ path: p, name: p === '' ? SITE_NAME : byPath.get(p).title }));
+    // パンくずの名前は見出し (h1) と同じ名前にする (題名の short は使わない。画面のパンくず・TechArticle の headline とそろえる)
+    const crumbs = crumbsOf(page.path, page.parent).map((p) => ({ path: p, name: p === '' ? SITE_NAME : (byPath.get(p).heading ?? byPath.get(p).title) }));
     const last = crumbs.length - 1;
     const nav = `<nav aria-label="パンくず" class="hb-crumbs"><ol>${crumbs.map((c, i) => (i === last ? `<li aria-current="page">${esc(c.name)}</li>` : `<li>${link(c.path, c.name)}</li>`)).join('')}</ol></nav>`;
     page.body = `${nav}\n${page.body}`;
@@ -354,6 +358,29 @@ export async function buildPages(load) {
     page.jsonLd = main ? [main, breadcrumb] : [breadcrumb];
   }
   return pages;
+}
+
+/**
+ * 並びを key (問題の id) から決まる順に混ぜる。同じ key なら毎回同じ順 (書き出すたびに HTML が変わらない)。
+ * key の FNV-1a のハッシュを種にした mulberry32 で Fisher–Yates
+ */
+export function mixById(xs, key) {
+  let h = 0x811c9dc5;
+  for (const ch of String(key)) h = Math.imul(h ^ ch.codePointAt(0), 0x01000193);
+  let s = h >>> 0;
+  const rand = () => {
+    s = (s + 0x6d2b79f5) >>> 0;
+    let t = s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const a = [...xs];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
 }
 
 /** 検索に載るページか (noindex でなく、canonical を別のページに向けていない) */
