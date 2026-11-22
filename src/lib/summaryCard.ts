@@ -31,7 +31,8 @@ export function cardData(p: Progress, now: Date, domains: DomainMastery[]): Card
     to,
     days: Math.max(1, daysBetween(from, to) + 1),
     studiedDays: Object.keys(p.xp.byDay).length,
-    solved: Object.values(p.answers).reduce((s, a) => s + a.right + a.wrong, 0),
+    // 解いた問題: 答えたことのある問題の数 (同じ問題を何度答えても 1 問)
+    solved: Object.keys(p.answers).length,
     streak: currentStreak(p, now),
     domains,
   };

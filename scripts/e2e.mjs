@@ -179,7 +179,7 @@ async function checkStudyFeatures(browser, width) {
   const card = page.getByRole('img', { name: /^クラネイの学習のまとめ。/ });
   await card.waitFor();
   const alt = await card.getAttribute('alt');
-  check(/2026\/11\/09〜2026\/11\/25 \(17 日\) に 15 日学び、2 問を解いた。連続 15 日/.test(alt) && !/w1-|受験/.test(alt), `${tag} まとめのカードの説明に期間・学んだ日・解いた問題・連続が入り、問題の id は入らない (${alt.slice(0, 60)})`);
+  check(/2026\/11\/09〜2026\/11\/25 \(17 日\) に 15 日学び、1 問を解いた。連続 15 日/.test(alt) && !/w1-|受験/.test(alt), `${tag} まとめのカードの説明に期間・学んだ日・解いた問題・連続が入り、問題の id は入らない (${alt.slice(0, 60)})`);
   const [cardFile] = await Promise.all([page.waitForEvent('download'), page.getByRole('link', { name: '画像を保存' }).click()]);
   const png = readFileSync(await cardFile.path());
   check(png.subarray(1, 4).toString() === 'PNG' && png.readUInt32BE(16) === 1080 && png.readUInt32BE(20) === 1350 && cardFile.suggestedFilename() === 'kcna-summary-2026-11-25.png', `${tag} まとめのカードを 1080×1350 の PNG で保存できる (${png.readUInt32BE(16)}×${png.readUInt32BE(20)})`);

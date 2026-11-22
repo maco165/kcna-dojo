@@ -46,7 +46,8 @@ describe('学習のまとめのカード', () => {
   it('期間・学んだ日・解いた問題・連続・分野ごとの到達を数える', () => {
     const p = sample();
     const d = cardData(p, at('2026-11-03'), masteryByDomain(p))!;
-    expect(d).toMatchObject({ from: '2026-11-01', to: '2026-11-03', days: 3, studiedDays: 1, solved: 3, streak: 1 });
+    // 答えは 3 回 (q1 を 2 回・q2 を 1 回) だが、解いた問題は 2 問 (R-008)
+    expect(d).toMatchObject({ from: '2026-11-01', to: '2026-11-03', days: 3, studiedDays: 1, solved: 2, streak: 1 });
     expect(d.domains[0].counts).toMatchObject({ twice: 1, wrong: 1 });
     expect(cardFileName(d)).toBe('kcna-summary-2026-11-03.png');
   });
@@ -58,10 +59,10 @@ describe('学習のまとめのカード', () => {
     drawCard(ctx, d);
     expect(rects[0]).toEqual([0, 0, CARD_WIDTH, CARD_HEIGHT]);
     const all = texts.join('\n');
-    for (const s of ['学習のまとめ', '2026/11/01 〜 2026/11/03 (3 日)', '学んだ日', '解いた問題', '連続', '1 日', '3 問', 'Fundamentals', 'Orchestration', 'App Delivery', 'Architecture', 'maco165.github.io/kcna-dojo']) expect(all).toContain(s);
+    for (const s of ['学習のまとめ', '2026/11/01 〜 2026/11/03 (3 日)', '学んだ日', '解いた問題', '連続', '1 日', '2 問', 'Fundamentals', 'Orchestration', 'App Delivery', 'Architecture', 'maco165.github.io/kcna-dojo']) expect(all).toContain(s);
     expect(all).not.toMatch(/w1-l1|2027|受験/);
     const alt = cardAlt(d);
-    expect(alt).toContain('3 問を解いた');
+    expect(alt).toContain('2 問を解いた');
     expect(alt).not.toMatch(/w1-l1|2027/);
   });
 });
