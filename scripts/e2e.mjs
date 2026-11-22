@@ -596,7 +596,8 @@ async function run(browser, name, width, height) {
     // 範囲外の札で、試験の範囲の外の語 (レッスンに出ない語) だけに絞れる
     await page.getByRole('button', { name: /^範囲外/ }).click();
     const outCount = await termButtons.count();
-    check(outCount >= 20 && (await page.getByText('Linux の namespaces').first().isVisible()), `${tag} 範囲外の札で、範囲外の語に絞れる (${outCount} 語)`);
+    // スマホの一覧の行は content-visibility: auto で、画面の外の行は描かれない (見えるかではなく、一覧にあるかを見る)
+    check(outCount >= 20 && (await termButtons.filter({ hasText: 'Linux の namespaces' }).count()) >= 1, `${tag} 範囲外の札で、範囲外の語に絞れる (${outCount} 語)`);
     await page.getByRole('button', { name: /^すべて/ }).click();
   }
   await page.getByRole('button', { name: /^設計 \d+/ }).click();
