@@ -9,7 +9,7 @@ import { dueReviewCount } from '../content';
 import { REPO_URL } from '../lib/links';
 import { SITE_NAME, SITE_TAGLINE } from '../lib/site';
 import { aboutHref, commandsHref, compareHref, examHref, glossaryHref, guideHref, handbookHref, progressHref, reviewHref, settingsHref, weekHref } from '../lib/route';
-import { GitHubMark } from './RepoLink';
+import { ExternalAnchor, GitHubMark } from './RepoLink';
 
 /** PC の左の一覧 */
 export default function AppSideNav({ current, week, progress }: { current: 'learn' | 'about' | 'settings' | 'review' | 'progress' | 'exam' | 'glossary' | 'guide' | 'handbook' | 'compare' | 'commands'; week?: number; progress: Progress }) {
@@ -20,7 +20,7 @@ export default function AppSideNav({ current, week, progress }: { current: 'lear
       footer={
         <SideNavSection title="このサイト" isHeaderHidden>
           <SideNavItem label="このサイトについて" icon={InformationCircleIcon} href={aboutHref} isSelected={current === 'about'} />
-          <SideNavItem label="GitHub のリポジトリ" icon={() => <GitHubMark size={20} />} href={REPO_URL} />
+          <SideNavItem label="GitHub のリポジトリ" icon={() => <GitHubMark size={20} />} href={REPO_URL} as={ExternalAnchor} />
         </SideNavSection>
       }
     >

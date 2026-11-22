@@ -1,5 +1,11 @@
+import type { AnchorHTMLAttributes } from 'react';
 import { Button } from '@astryxdesign/core/Button';
 import { REPO_URL } from '../lib/links';
+
+/** 別タブで開く a。SideNavItem の as に渡す (SideNavItem は target を受け取らない) */
+export function ExternalAnchor(props: AnchorHTMLAttributes<HTMLAnchorElement>) {
+  return <a {...props} target="_blank" rel="noopener noreferrer" />;
+}
 
 /** GitHub の印 (公式の mark の形) */
 export function GitHubMark({ size = 18 }: { size?: number }) {

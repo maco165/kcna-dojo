@@ -400,7 +400,7 @@ export async function buildPages(load) {
       `<p>${esc(ABOUT.intro)}</p>`,
       `<p>${esc(ABOUT.notice)}</p>`,
       '<h2>ソースコード</h2>',
-      `<p>${esc(ABOUT.source)} <a href="${esc(REPO_URL)}">GitHub のリポジトリ (github.com/maco165/kcna-dojo)</a></p>`,
+      `<p>${esc(ABOUT.source)} <a href="${esc(REPO_URL)}" target="_blank" rel="noopener noreferrer">GitHub のリポジトリ (github.com/maco165/kcna-dojo)</a></p>`,
       '<h2>問題の誤りを見つけたら</h2>',
       `<p>${esc(ABOUT.issue)} <a href="${esc(NEW_ISSUE_URL)}">Issue を書く</a></p>`,
       '<h2>知っておくこと</h2>',
