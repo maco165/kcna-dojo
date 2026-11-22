@@ -12,9 +12,9 @@ import SiteLogo from '../components/SiteLogo';
 import { dueReviewCount, isExamQuestionId, isKnownQuestion } from '../content';
 import { ReviewForecast, StudyCalendar } from '../components/StudyCalendar';
 import MasteryCard from '../components/MasteryCard';
-import { LazyPart } from '../components/LoadBoundary';
 import { cardData } from '../lib/summaryCard';
-import { lazy, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
+import SummaryCard from '../components/SummaryCard';
 import { masteryByDomain } from '../lib/mastery';
 import { WEEKS } from '../content/curriculum';
 import { DOMAINS, domainAccuracy, planStatus, weeklyXp } from '../lib/lessonStatus';
@@ -22,9 +22,6 @@ import { FREEZE_EVERY, MAX_FREEZES, currentStreak, daysToExam, freezeStatus, fre
 import { examHref, reviewHref, settingsHref, weekHref } from '../lib/route';
 import { SITE_NAME } from '../lib/site';
 import { WIDE_QUERY, useMediaQuery } from '../lib/useMediaQuery';
-
-// まとめのカード (canvas に描く部品) は押したときに読む
-const SummaryCard = lazy(() => import('../components/SummaryCard'));
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 
@@ -188,9 +185,7 @@ function SummarySection({ progress, now, mastery }: { progress: Progress; now: D
         {!data ? (
           <Text type="supporting">まだ記録がありません。レッスンを 1 つ終えると作れます。</Text>
         ) : open ? (
-          <LazyPart>
-            <SummaryCard data={data} />
-          </LazyPart>
+          <SummaryCard data={data} />
         ) : (
           <div>
             <Button label="まとめのカードを作る" onClick={() => setOpen(true)} />
