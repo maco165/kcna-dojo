@@ -94,7 +94,7 @@ function checkSpeedBuild() {
   const cssFiles = assets.filter((f) => f.endsWith('.css'));
   const css = cssFiles.map(read).join('\n');
   const cssGz = Math.round(cssFiles.reduce((n, f) => n + gzipSync(readFileSync(new URL(`../dist/assets/${f}`, import.meta.url)), { level: 9 }).length, 0) / 1024);
-  // 2026-11-23: 除く前は gzip で 47KB (Astryx の CSS をそのまま入れていた)。除いたあと 37KB
+  // 2026-11-23: 除く前は gzip -9 で 45KB (Astryx の CSS をそのまま入れていた)。除いたあと 37KB
   check(cssGz <= 40, `描画を止める CSS は gzip で 40KB まで (${cssGz}KB)`);
   const classes = (t) => new Set([...t.matchAll(/\.(x[a-z0-9]{4,10})(?![\w-])/g)].map((m) => m[1]));
   const all = classes(readFileSync(new URL('../node_modules/@astryxdesign/core/dist/astryx.css', import.meta.url), 'utf8'));
@@ -761,6 +761,10 @@ async function run(browser, name, width, height) {
     const lazyBefore = await page.locator('[data-lazy-code]').count();
     const blocksBefore = await page.locator('.hb-step .astryx-code-block').count();
     check(lazyBefore >= 3 && blocksBefore < lazyBefore, `${tag} 開いた直後、画面の外のハンドブックのコードは軽い表示 (CodeBlock ${blocksBefore}・軽い表示 ${lazyBefore})`);
+    // 軽い表示と CodeBlock は同じ高さ (替わるときに位置がずれない)。いちばん下の段の軽い表示の高さを覚え、最後の段まで出したあとに比べる
+    const lastLazy = await page.locator('.hb-flow > li[data-flow-step]:has([data-lazy-code])').last().getAttribute('data-flow-step');
+    const lastCode = page.locator(`li[data-flow-step="${lastLazy}"] .hb-step`).first().locator(':scope > :is(.code-lite, .astryx-code-block)').first();
+    const liteH = await lastCode.evaluate((el) => el.getBoundingClientRect().height);
     check(((await hb()).storage?.seen ?? 0) < steps, `${tag} 開いた直後は全部を読んだことにならない`);
     await page.locator('[data-flow-step="2"]').scrollIntoViewIfNeeded();
     await page.evaluate(() => document.querySelector('[data-flow-step="2"]').scrollIntoView({ block: 'start' }));
@@ -782,6 +786,9 @@ async function run(browser, name, width, height) {
     await page.waitForTimeout(400);
     check((await hb()).storage?.seen === steps, `${tag} 最後の段まで出すと、全部の段を読んだことになる (${steps})`);
     check((await page.locator('.hb-flow [data-lazy-code]').evaluateAll((els) => els.filter((el) => { const r = el.getBoundingClientRect(); return r.bottom > 0 && r.top < innerHeight; }).length)) === 0 && (await page.locator('.hb-step .astryx-code-block').count()) > blocksBefore, `${tag} 画面に入ったコードは CodeBlock に替わる`);
+    const blockH = await lastCode.evaluate((el) => (el.classList.contains('astryx-code-block') ? el.getBoundingClientRect().height : -1)).catch(() => -1);
+    const blockH2 = blockH > 0 ? blockH : await page.locator(`li[data-flow-step="${lastLazy}"] .hb-step .astryx-code-block`).first().evaluate((el) => el.getBoundingClientRect().height);
+    check(Math.abs(blockH2 - liteH) <= 1, `${tag} 軽い表示と CodeBlock の高さが同じ (${liteH.toFixed(1)} → ${blockH2.toFixed(1)})`);
     const toggle = page.getByRole('button', { name: '確認済みにする' });
     await toggle.focus();
     await page.keyboard.press('Enter');

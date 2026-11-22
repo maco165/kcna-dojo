@@ -23,7 +23,9 @@ export default function LazyCodeBlock({ code, language, title, hasCopyButton = f
           setNear(true);
         }
       },
-      { rootMargin: AHEAD },
+      // PC は本文の欄 (.astryx-layout-content) がスクロールする。rootMargin は途中のスクロールの枠の切り取りを広げないので、
+      // その枠を root にする (スマホは文書全体がスクロールするので、画面が root)
+      { root: ref.current.closest('.astryx-layout-content'), rootMargin: AHEAD },
     );
     io.observe(ref.current);
     return () => io.disconnect();

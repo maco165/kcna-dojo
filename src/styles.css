@@ -2963,7 +2963,8 @@ html[data-loading='true'] body::before {
 }
 .code-lite__body {
   margin: 0;
-  padding: 12px 16px;
+  /* CodeBlock は本文の上の余白 12px のうち 8px を帯に重ねるので、上は 4px にして高さをそろえる */
+  padding: 4px 16px 12px;
   overflow-x: auto;
   font-size: 12px;
   line-height: 1.4286;
@@ -2981,9 +2982,4 @@ html[data-loading='true'] body::before {
 .gloss-row {
   content-visibility: auto;
   contain-intrinsic-size: auto 76px;
-}
-/* 書き出した HTML の本文 (JS が描くまで出る main.prerender)。長いページ (用語集の一覧など) では、画面の外の段落・項目の配置を省く */
-.prerender :is(p, li, dt, dd, pre, table) {
-  content-visibility: auto;
-  contain-intrinsic-size: auto 3em;
 }
