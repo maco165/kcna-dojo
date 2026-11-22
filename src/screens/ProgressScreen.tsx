@@ -9,7 +9,8 @@ import AppSideNav from '../components/AppSideNav';
 import BottomTabs from '../components/BottomTabs';
 import RepoLink from '../components/RepoLink';
 import SiteLogo from '../components/SiteLogo';
-import { dueReviewCount } from '../content';
+import { dueReviewCount, isExamQuestionId, isKnownQuestion } from '../content';
+import { ReviewForecast, StudyCalendar } from '../components/StudyCalendar';
 import { WEEKS } from '../content/curriculum';
 import { DOMAINS, domainAccuracy, planStatus, weeklyXp } from '../lib/lessonStatus';
 import { FREEZE_EVERY, MAX_FREEZES, currentStreak, daysToExam, freezeStatus, freezeText, type Progress } from '../lib/progress';
@@ -134,6 +135,10 @@ function Body({ progress }: { progress: Progress }) {
           <Button label="模擬試験へ" href={examHref} />
         </HStack>
       </Card>
+
+      <StudyCalendar progress={progress} now={now} />
+
+      <ReviewForecast progress={progress} now={now} isKnown={(id) => isExamQuestionId(id) || isKnownQuestion(id)} />
 
       <List hasDividers header={<h2 className="h-sm">週ごとの進み具合</h2>}>
         {WEEKS.map((w) => {

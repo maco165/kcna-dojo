@@ -65,6 +65,8 @@ export type Progress = {
   xp: { total: number; byDay: Record<string, number> };
   lessons: Record<string, LessonRecord>;
   answers: Record<string, AnswerRecord>;
+  /** 日ごとの答えた問題の数 (レッスン・復習・模擬試験)。前の版の記録には無い */
+  solved?: Record<string, number>;
 };
 
 type KeyValueStorage = Pick<Storage, 'getItem' | 'setItem'>;
@@ -151,6 +153,11 @@ export function normalizeProgress(raw: unknown): Progress | null {
       return a;
     }),
   };
+  if (isObject(raw.solved)) {
+    const solved: Record<string, number> = {};
+    for (const [day, v] of Object.entries(raw.solved)) if (isValidDay(day) && isCount(v) && v >= 1) solved[day] = Math.floor(v);
+    if (Object.keys(solved).length > 0) out.solved = solved;
+  }
   // 休みの札 (前の版の記録には無い。無ければ書かない)
   if (isCount(streak.freezes) && streak.freezes >= 1) out.streak.freezes = Math.min(Math.floor(streak.freezes), MAX_FREEZES);
   if (isCount(streak.toNext) && streak.toNext >= 1) out.streak.toNext = Math.min(Math.floor(streak.toNext), FREEZE_EVERY - 1);
@@ -246,7 +253,7 @@ export function recordAnswer(p: Progress, questionId: string, correct: boolean, 
     next.stage = prev.stage ?? 0;
     next.nextReview = prev.nextReview;
   }
-  return { ...p, answers: { ...p.answers, [questionId]: next } };
+  return { ...p, answers: { ...p.answers, [questionId]: next }, solved: { ...p.solved, [today]: (p.solved?.[today] ?? 0) + 1 } };
 }
 
 /** 今日までに予定が来ている復習の問題の id (予定の早い順) */

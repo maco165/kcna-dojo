@@ -2996,3 +2996,64 @@ html[data-loading='true'] body::before {
   content-visibility: auto;
   contain-intrinsic-size: auto 76px;
 }
+
+/* 進捗の画面: 過去 26 週の学んだ日のマス (縦に月〜日、左が古い)。段は色の濃さと、マスごとの読み上げ・title で伝える */
+.cal {
+  display: grid;
+  grid-template-rows: repeat(7, auto);
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 2px;
+}
+
+.cal__cell {
+  display: block;
+  aspect-ratio: 1;
+  border-radius: 2px;
+  background: var(--color-background-muted);
+  /* 地 (カード) と見分けるための枠。段の差は濃さで、地との差は枠で出す */
+  box-shadow: inset 0 0 0 1px var(--color-border);
+}
+
+.cal__mark {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.cal__cell--key {
+  width: 12px;
+}
+
+.cal__cell--future {
+  background: transparent;
+  box-shadow: none;
+}
+
+.cal__cell--l1 {
+  background: color-mix(in srgb, var(--color-accent) 30%, var(--color-background-card));
+}
+
+.cal__cell--l2 {
+  background: color-mix(in srgb, var(--color-accent) 55%, var(--color-background-card));
+}
+
+.cal__cell--l3 {
+  background: color-mix(in srgb, var(--color-accent) 80%, var(--color-background-card));
+}
+
+.cal__cell--l4 {
+  background: var(--color-accent);
+  box-shadow: inset 0 0 0 1px var(--color-text-primary);
+}
+
+.xp-chart--forecast {
+  grid-template-columns: repeat(14, minmax(0, 1fr));
+  gap: var(--spacing-1);
+}
+
+.xp-chart__value {
+  text-align: center;
+  font-size: var(--text-supporting-size);
+  color: var(--color-text-primary);
+}
