@@ -3144,3 +3144,13 @@ html[data-loading='true'] body::before {
 .result__share {
   margin-bottom: var(--spacing-3);
 }
+
+/* 進捗の画面: 学習のまとめのカードの見本 (縦 1350 を画面の幅に縮める) */
+.summary-card__img {
+  display: block;
+  width: 100%;
+  max-width: 360px;
+  height: auto;
+  border-radius: var(--radius-container);
+  border: 1px solid var(--color-border);
+}

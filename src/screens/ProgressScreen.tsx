@@ -12,6 +12,9 @@ import SiteLogo from '../components/SiteLogo';
 import { dueReviewCount, isExamQuestionId, isKnownQuestion } from '../content';
 import { ReviewForecast, StudyCalendar } from '../components/StudyCalendar';
 import MasteryCard from '../components/MasteryCard';
+import { LazyPart } from '../components/LoadBoundary';
+import { cardData } from '../lib/summaryCard';
+import { lazy, useMemo, useState } from 'react';
 import { masteryByDomain } from '../lib/mastery';
 import { WEEKS } from '../content/curriculum';
 import { DOMAINS, domainAccuracy, planStatus, weeklyXp } from '../lib/lessonStatus';
@@ -19,6 +22,9 @@ import { FREEZE_EVERY, MAX_FREEZES, currentStreak, daysToExam, freezeStatus, fre
 import { examHref, reviewHref, settingsHref, weekHref } from '../lib/route';
 import { SITE_NAME } from '../lib/site';
 import { WIDE_QUERY, useMediaQuery } from '../lib/useMediaQuery';
+
+// まとめのカード (canvas に描く部品) は押したときに読む
+const SummaryCard = lazy(() => import('../components/SummaryCard'));
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 
@@ -31,6 +37,7 @@ function Body({ progress }: { progress: Progress }) {
   const maxXp = Math.max(1, ...days.map((d) => d.xp));
   const due = dueReviewCount(progress, now);
   const freeze = freezeStatus(progress, now);
+  const mastery = useMemo(() => masteryByDomain(progress), [progress]);
   const labsNote = plan.labsLeft > 0 ? ` (実習 ${plan.labsLeft} つ残り)` : '';
   const planText =
     plan.expected === 0 ? 'これから' : plan.done >= plan.expected ? `予定どおり${labsNote}` : `${plan.expected - plan.done} レッスン遅れ${labsNote}`;
@@ -95,7 +102,9 @@ function Body({ progress }: { progress: Progress }) {
         </VStack>
       </Card>
 
-      <MasteryCard rows={masteryByDomain(progress)} />
+      <MasteryCard rows={mastery} />
+
+      <SummarySection progress={progress} now={now} mastery={mastery} />
 
       <Card padding={4}>
         <VStack gap={3}>
@@ -160,6 +169,35 @@ function Body({ progress }: { progress: Progress }) {
         })}
       </List>
     </VStack>
+  );
+}
+
+/** 学習のまとめのカード: 押すと描き、保存と共有を出す */
+function SummarySection({ progress, now, mastery }: { progress: Progress; now: Date; mastery: ReturnType<typeof masteryByDomain> }) {
+  const [open, setOpen] = useState(false);
+  const day = now.toDateString();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const data = useMemo(() => cardData(progress, now, mastery), [progress, mastery, day]);
+  return (
+    <Card padding={4}>
+      <VStack gap={3}>
+        <VStack gap={0.5}>
+          <h2 className="h-sm">学習のまとめのカード</h2>
+          <Text type="supporting">学んだ期間・解いた問題の数・連続日数・分野ごとの到達を 1 枚の画像 (1080×1350) にします。</Text>
+        </VStack>
+        {!data ? (
+          <Text type="supporting">まだ記録がありません。レッスンを 1 つ終えると作れます。</Text>
+        ) : open ? (
+          <LazyPart>
+            <SummaryCard data={data} />
+          </LazyPart>
+        ) : (
+          <div>
+            <Button label="まとめのカードを作る" onClick={() => setOpen(true)} />
+          </div>
+        )}
+      </VStack>
+    </Card>
   );
 }
 

@@ -166,6 +166,15 @@ async function checkStudyFeatures(browser, width) {
   check((await cal.locator('[title="11月24日(火) 20 問"]').count()) === 1, `${tag} マスに title がある`);
   check(await page.getByRole('img', { name: /11\/26 1 問/ }).isVisible(), `${tag} この先 14 日の復習の件数が出る`);
   check(await page.getByText(/Kubernetes Fundamentals \(\d+ 問\)/).isVisible() && (await page.getByText(/間違えた \(直近\) 1 \(/).count()) === 1, `${tag} 問題ごとの到達を分野ごとに数と割合で出す`);
+  // 学習のまとめのカード: 押すと描き (部品は押したときに読む)、1080×1350 の PNG を保存できる
+  await page.getByRole('button', { name: 'まとめのカードを作る' }).click();
+  const card = page.getByRole('img', { name: /^クラネイの学習のまとめ。/ });
+  await card.waitFor();
+  const alt = await card.getAttribute('alt');
+  check(/2026\/11\/09〜2026\/11\/25 \(17 日\) に 15 日学び、2 問を解いた。連続 15 日/.test(alt) && !/w1-|受験/.test(alt), `${tag} まとめのカードの説明に期間・学んだ日・解いた問題・連続が入り、問題の id は入らない (${alt.slice(0, 60)})`);
+  const [cardFile] = await Promise.all([page.waitForEvent('download'), page.getByRole('link', { name: '画像を保存' }).click()]);
+  const png = readFileSync(await cardFile.path());
+  check(png.subarray(1, 4).toString() === 'PNG' && png.readUInt32BE(16) === 1080 && png.readUInt32BE(20) === 1350 && cardFile.suggestedFilename() === 'kcna-summary-2026-11-25.png', `${tag} まとめのカードを 1080×1350 の PNG で保存できる (${png.readUInt32BE(16)}×${png.readUInt32BE(20)})`);
   await noHorizontalOverflow(page, width, `${tag} 進捗`);
   await page.goto(`${BASE}settings/`);
   await page.getByRole('heading', { name: 'カレンダーに学ぶ予定を入れる' }).waitFor();
