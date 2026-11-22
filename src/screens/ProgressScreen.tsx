@@ -11,6 +11,8 @@ import RepoLink from '../components/RepoLink';
 import SiteLogo from '../components/SiteLogo';
 import { dueReviewCount, isExamQuestionId, isKnownQuestion } from '../content';
 import { ReviewForecast, StudyCalendar } from '../components/StudyCalendar';
+import MasteryCard from '../components/MasteryCard';
+import { masteryByDomain } from '../lib/mastery';
 import { WEEKS } from '../content/curriculum';
 import { DOMAINS, domainAccuracy, planStatus, weeklyXp } from '../lib/lessonStatus';
 import { FREEZE_EVERY, MAX_FREEZES, currentStreak, daysToExam, freezeStatus, freezeText, type Progress } from '../lib/progress';
@@ -92,6 +94,8 @@ function Body({ progress }: { progress: Progress }) {
           })}
         </VStack>
       </Card>
+
+      <MasteryCard rows={masteryByDomain(progress)} />
 
       <Card padding={4}>
         <VStack gap={3}>

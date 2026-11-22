@@ -8,7 +8,29 @@ export type LessonRecord = { done: boolean; best: number; at: string };
  * 問題ごとの記録。復習の予定 (nextReview) があるものが復習の対象。
  * stage は復習で続けて正解した回数 (0〜2)。
  */
-export type AnswerRecord = { right: number; wrong: number; last: string; stage?: number; nextReview?: string };
+export type AnswerRecord = { right: number; wrong: number; last: string; stage?: number; nextReview?: string; run?: number };
+
+/** 続けて正解した数の上限 (それより先は数えない) */
+export const MAX_RUN = 9;
+
+/** 問題ごとの到達: まだ解いていない・直近で間違えた・1 回正解・2 回続けて正解 */
+export type Mastery = 'new' | 'wrong' | 'once' | 'twice';
+
+/**
+ * 問題の到達。run (続けて正解した数) があればそれで決める。run の無い前の版の記録は、正誤の数と復習の段階から推す:
+ * 正解が無ければ間違えた、間違いが無ければ正解の数 (2 回からは続けて正解)、両方あれば復習の段階
+ * (予定が無い = 復習を終えた、段階 2 = 2 回続けて正解、段階 1 = 1 回正解、段階 0 = 間違えた)
+ */
+export function masteryOf(rec: AnswerRecord | undefined): Mastery {
+  if (!rec || rec.right + rec.wrong === 0) return 'new';
+  if (rec.run !== undefined) return rec.run === 0 ? 'wrong' : rec.run === 1 ? 'once' : 'twice';
+  if (rec.right === 0) return 'wrong';
+  if (rec.wrong === 0) return rec.right >= 2 ? 'twice' : 'once';
+  if (rec.nextReview === undefined || (rec.stage ?? 0) >= 2) return 'twice';
+  return (rec.stage ?? 0) >= 1 ? 'once' : 'wrong';
+}
+
+const RUN_OF: Record<Mastery, number> = { new: 0, wrong: 0, once: 1, twice: 2 };
 
 /** 問題ごとの記録を 1 行の文にする (例: これまで 3 回 (正解 2・不正解 1) · 最後 11/18)。記録が無ければ「はじめて」 */
 export function answerHistory(rec: AnswerRecord | undefined): string {
@@ -149,6 +171,7 @@ export function normalizeProgress(raw: unknown): Progress | null {
         wrong: isCount(v.wrong) ? Math.floor(v.wrong) : 0,
         last: typeof v.last === 'string' ? v.last : '',
       };
+      if (isCount(v.run)) a.run = Math.min(Math.floor(v.run), MAX_RUN);
       if (isValidDay(v.nextReview)) {
         a.nextReview = v.nextReview;
         a.stage = isCount(v.stage) ? Math.min(Math.floor(v.stage), REVIEW_INTERVALS.length - 1) : 0;
@@ -240,6 +263,8 @@ export function recordAnswer(p: Progress, questionId: string, correct: boolean, 
     right: prev.right + (correct ? 1 : 0),
     wrong: prev.wrong + (correct ? 0 : 1),
     last: now.toISOString(),
+    // 続けて正解した数。前の版の記録 (run が無い) は、そこまでの到達から数え始める
+    run: correct ? Math.min((prev.run ?? RUN_OF[masteryOf(p.answers[questionId])]) + 1, MAX_RUN) : 0,
   };
   if (!correct) {
     // 間違えたら (初めてでも、復習の途中でも) 翌日からやり直す
