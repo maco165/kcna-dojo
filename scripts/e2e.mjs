@@ -192,6 +192,36 @@ async function checkStudyFeatures(browser, width) {
   await context.close();
 }
 
+/**
+ * ページごとの OG 画像 (scripts/og-images.mjs) のつなぎ込み: 検索に載るページ (sitemap) の og:image・twitter:image が、
+ * dist/og に実在する 1200×630 の PNG を指す。トップと noindex のページ (進捗) はサイト共通の画像のまま
+ */
+function checkOgImages() {
+  const dist = new URL('../dist/', import.meta.url);
+  const site = 'https://maco165.github.io/kcna-dojo/';
+  const locs = [...readFileSync(new URL('sitemap.xml', dist), 'utf8').matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1].slice(site.length)).filter((p) => p !== '');
+  const bad = [];
+  for (const p of locs) {
+    const html = readFileSync(new URL(`${p}index.html`, dist), 'utf8');
+    const og = html.match(/<meta property="og:image" content="([^"]+)"/)?.[1] ?? '';
+    const tw = html.match(/<meta name="twitter:image" content="([^"]+)"/)?.[1] ?? '';
+    const file = og.startsWith(`${site}og/`) ? new URL(og.slice(site.length), dist) : null;
+    let ok = file !== null && tw === og;
+    if (ok) {
+      try {
+        const png = readFileSync(file);
+        ok = png.subarray(1, 4).toString() === 'PNG' && png.readUInt32BE(16) === 1200 && png.readUInt32BE(20) === 630;
+      } catch {
+        ok = false;
+      }
+    }
+    if (!ok) bad.push(p);
+  }
+  check(locs.length > 200 && bad.length === 0, `検索に載る ${locs.length} ページの og:image・twitter:image は、そのページの 1200×630 の PNG (違うもの ${bad.length}: ${bad.slice(0, 3).join(' ')})`);
+  const shared = (p) => readFileSync(new URL(`${p}index.html`, dist), 'utf8').includes(`<meta property="og:image" content="${site}og-image.png"`);
+  check(shared('') && shared('progress/'), 'トップと noindex のページ (進捗) の og:image はサイト共通の画像のまま');
+}
+
 async function run(browser, name, width, height) {
   const context = await browser.newContext({ viewport: { width, height } });
   const page = await context.newPage();
@@ -1160,6 +1190,7 @@ try {
   browser = await chromium.launch();
   checkFirstLoad();
   checkSpeedBuild();
+  checkOgImages();
   await run(browser, 'phone', 390, 844);
   await run(browser, 'pc', 1280, 860);
   await checkStudyFeatures(browser, 390);

@@ -60,6 +60,7 @@ flowchart LR
   json --> check
   json --> app
   app -->|vite build| dist[dist/]
+  app -->|prerender.mjs<br/>ページの HTML・sitemap<br/>og-images.mjs: OG 画像| dist
   dist -->|GitHub Actions| pages[GitHub Pages]
   pages --> browser[ブラウザ]
   browser <-->|読み書き| ls[(localStorage<br/>kcna.v1)]
@@ -89,6 +90,7 @@ flowchart TD
   ng --> next
   next -->|いいえ| q
   next -->|はい| done[完了画面: 正答数・XP・今日の目標]
+  done -.->|共有: 点数と URL だけ| share[端末の共有 / X / リンクのコピー]
   done -->|一覧へ戻る| home
   home -->|実習| lab[手順を確かめて印を付ける] -->|完了にする| done
   q -.->|AI にヒントを聞く| ai[Claude / ChatGPT]
