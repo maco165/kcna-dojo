@@ -32,6 +32,9 @@ const SLOTS = {
   ogDescription: /(<meta property="og:description" content=")[^"]*(")/,
   twitterTitle: /(<meta name="twitter:title" content=")[^"]*(")/,
   twitterDescription: /(<meta name="twitter:description" content=")[^"]*(")/,
+  ogImage: /(<meta property="og:image" content=")[^"]*(")/,
+  ogImageAlt: /(<meta property="og:image:alt" content=")[^"]*(")/,
+  twitterImage: /(<meta name="twitter:image" content=")[^"]*(")/,
   root: /<div id="root">[\s\S]*?<\/div>\s*(?=<script|<\/body>)/,
   jsonLd: /\s*<script type="application\/ld\+json">[\s\S]*?<\/script>/,
 };
@@ -41,7 +44,7 @@ const SITE_ID = `${ORIGIN}${BASE}#website`;
 const ldJson = (v) => JSON.stringify(v, null, 2).replace(/</g, '\\u003c');
 
 /** dist/index.html を型にして、1 ページ分の HTML を作る。置き換えは関数で渡す ($1 などを置き換えの記号として読ませない) */
-export function renderPage(template, { path: p, title, fullTitle, description, body, noindex = false, canonical, jsonLd }) {
+export function renderPage(template, { path: p, title, fullTitle, description, body, noindex = false, canonical, jsonLd, ogImage, ogAlt }) {
   // fullTitle は buildPages が画面と同じ関数 (src/lib/pageTitle.ts の withSite) で決める。無ければ同じ形で作る
   const full = fullTitle ?? (title ? `${title} | ${SITE_NAME}` : SITE_TITLE);
   const can = url(canonical ?? p);
@@ -55,6 +58,10 @@ export function renderPage(template, { path: p, title, fullTitle, description, b
     ogDescription: attr(esc(description)),
     twitterTitle: attr(esc(full)),
     twitterDescription: attr(esc(description)),
+    // ページごとの OG 画像 (scripts/og-images.mjs)。無いページ (トップ・noindex・404) はサイト共通の画像のまま
+    ogImage: ogImage ? attr(esc(ogImage)) : (m) => m,
+    ogImageAlt: ogImage ? attr(esc(ogAlt ?? full)) : (m) => m,
+    twitterImage: ogImage ? attr(esc(ogImage)) : (m) => m,
     root: () => `<div id="root">\n      <main class="prerender">\n${body}\n      </main>\n    </div>\n    `,
     // WebSite はトップだけが持つ。ほかのページはそのページの構造化データ (無ければ書かない)
     jsonLd: (m) => (p === '' && !noindex ? m : jsonLd ? `\n    <script type="application/ld+json">\n${ldJson({ '@context': 'https://schema.org', '@graph': jsonLd })}\n    </script>` : ''),
@@ -485,6 +492,15 @@ async function main() {
   try {
     const template = await readFile(path.join(DIST, 'index.html'), 'utf8');
     const pages = await buildPages((m) => server.ssrLoadModule(m));
+    // 検索に載るページの OG 画像を描く (字体の読み込みと描画は書き出すときだけ。テストは buildPages と renderPage だけを読む)
+    const { writeOgImages } = await import('./og-images.mjs');
+    const started = Date.now();
+    const og = await writeOgImages(pages.filter(isIndexed), DIST);
+    for (const page of pages) {
+      const name = og.files.get(page.path);
+      if (name) Object.assign(page, { ogImage: url(`og/${name}`), ogAlt: `${page.heading ?? page.title} — クラネイ (KCNA-JP 対策)` });
+    }
+    console.log(`og-images: ${og.files.size} 枚・${Math.round(og.bytes / 1024)}KB・${((Date.now() - started) / 1000).toFixed(1)} 秒`);
     for (const page of pages) {
       const dir = path.join(DIST, page.path);
       await mkdir(dir, { recursive: true });

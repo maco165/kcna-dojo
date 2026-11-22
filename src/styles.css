@@ -3134,6 +3134,21 @@ html[data-loading='true'] body::before {
   background: repeating-linear-gradient(135deg, var(--color-error) 0 3px, var(--color-error-muted) 3px 6px);
 }
 
+/* 結果の画面の「共有」(X の投稿とリンクのコピーは、Web Share API の無い端末で押したときに出す) */
+.result__share {
+  margin-bottom: var(--spacing-3);
+}
+
+/* 進捗の画面: 学習のまとめのカードの見本 (縦 1350 を画面の幅に縮める) */
+.summary-card__img {
+  display: block;
+  width: 100%;
+  max-width: 360px;
+  height: auto;
+  border-radius: var(--radius-container);
+  border: 1px solid var(--color-border);
+}
+
 /* 答えたが何も終えていない日 (縁だけ)、選んでいる日 (太い枠)、マスの並びのフォーカス */
 .cal__cell--partial {
   background: var(--color-background-card);

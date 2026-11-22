@@ -73,6 +73,9 @@ function checkFirstLoad() {
   const kb = Math.round(gz / 1024);
   // 2026-11-22 に週の問題の全文とレッスンの画面を開いたときに読むようにして 326KB → 240KB (gzip -9 で測った値)。ゆとりを 10KB だけ見る
   check(kb <= 250, `最初に読む JS は gzip で 250KB まで (${kb}KB、${files.length} ファイル)`);
+  // 2026-11-23: まとめのカードの部品を React.lazy にしたら、rolldown が本体を切り直して 13 → 15 本になり、Actions の Lighthouse で
+  // どのページも LCP が約 200ms 延びた。量 (KB) が同じでも本数が増えると遅くなるので、本数も見る
+  check(files.length <= 13, `最初に読む JS は 13 本まで (${files.length} 本)`);
   // 名前だけでなく中身でも見る (静的に取り込まれて本体に混ざっても気づけるように)。それぞれのデータにしか無い文字で調べる
   const marks = { ハンドブックのデータ: 'k3s-vs-kubernetes', 用語集のデータ: 'container-image', 説明のページ: '2026-03-22 の版', 模擬試験用の問題: 'のイメージを更新した直後に', 比較表のデータ: 'volumeClaimTemplates:  # Pod ごとに', コマンドの説明: 'リソースの一覧や状態を表で表示します', コマンドのページのデータ: 'Initial install underway', コマンドのページの中身: 'のような種類の名前を、API のグループ・版・資源に引き当てます', 週の問題の解説: 'VM はハイパーバイザーの上でゲスト OS ごと動きます' };
   const text = files.map((f) => readFileSync(new URL(`../dist/assets/${f}`, import.meta.url), 'utf8')).join('\n');
@@ -105,6 +108,25 @@ function checkSpeedBuild() {
   const data = assets.filter((f) => /^(lessons|handbook|glossary|commandPages|examBank)-/.test(f));
   const literal = data.filter((f) => !/JSON\.parse\(/.test(read(f).slice(0, 400)));
   check(data.length >= 5 && literal.length === 0, `大きなデータのチャンクは JSON.parse で読む (${data.length} ファイル、そうでないもの ${literal.join(',')})`);
+}
+
+/**
+ * 結果の「共有」: Web Share API があれば点数と URL だけを渡し、無ければ X の投稿 (文と URL だけ) とリンクのコピーを出す。
+ * 端末の共有の画面は開けないので、navigator.share を差し替えて渡すものを見る
+ */
+async function checkShare(page, tag, text, url) {
+  await page.evaluate(() => {
+    window.__shared = [];
+    Object.defineProperty(navigator, 'share', { configurable: true, value: async (d) => void window.__shared.push(d) });
+  });
+  await page.getByRole('button', { name: '共有', exact: true }).click();
+  const shared = await page.evaluate(() => window.__shared);
+  check(JSON.stringify(shared) === JSON.stringify([{ text, url }]), `${tag} 共有は点数と公開の URL だけを渡す (${JSON.stringify(shared)})`);
+  await page.evaluate(() => Object.defineProperty(navigator, 'share', { configurable: true, value: undefined }));
+  await page.getByRole('button', { name: '共有', exact: true }).click();
+  const x = new URL(await page.getByRole('link', { name: 'X に投稿' }).getAttribute('href'));
+  check(x.origin === 'https://x.com' && x.searchParams.get('text') === text && x.searchParams.get('url') === url && [...x.searchParams.keys()].length === 2, `${tag} Web Share API が無ければ X の投稿 (文と URL だけ) を出す`);
+  check(await page.getByRole('button', { name: 'リンクをコピー' }).isVisible(), `${tag} Web Share API が無ければリンクのコピーを出す`);
 }
 
 /**
@@ -155,6 +177,15 @@ async function checkStudyFeatures(browser, width) {
   check(await page.getByText('選んだ日: 11月17日(火) 学んだ (問題の数の記録なし)').isVisible() && (await cal.getAttribute('aria-activedescendant')) === 'cal-2026-11-17', `${tag} 矢印キーで日を選べる (左は 1 週前)`);
   check(await page.getByRole('img', { name: /11\/26 1 問/ }).isVisible(), `${tag} この先 14 日の復習の件数が出る`);
   check(await page.getByText(/Kubernetes Fundamentals \(\d+ 問\)/).isVisible() && (await page.getByText(/間違えた \(直近\) 1 \(/).count()) === 1, `${tag} 問題ごとの到達を分野ごとに数と割合で出す`);
+  // 学習のまとめのカード: 押すと描き (部品は押したときに読む)、1080×1350 の PNG を保存できる
+  await page.getByRole('button', { name: 'まとめのカードを作る' }).click();
+  const card = page.getByRole('img', { name: /^クラネイの学習のまとめ。/ });
+  await card.waitFor();
+  const alt = await card.getAttribute('alt');
+  check(/2026\/11\/09〜2026\/11\/25 \(17 日\) に 15 日学び、1 問を解いた。連続 15 日/.test(alt) && !/w1-|受験/.test(alt), `${tag} まとめのカードの説明に期間・学んだ日・解いた問題・連続が入り、問題の id は入らない (${alt.slice(0, 60)})`);
+  const [cardFile] = await Promise.all([page.waitForEvent('download'), page.getByRole('link', { name: '画像を保存' }).click()]);
+  const png = readFileSync(await cardFile.path());
+  check(png.subarray(1, 4).toString() === 'PNG' && png.readUInt32BE(16) === 1080 && png.readUInt32BE(20) === 1350 && cardFile.suggestedFilename() === 'kcna-summary-2026-11-25.png', `${tag} まとめのカードを 1080×1350 の PNG で保存できる (${png.readUInt32BE(16)}×${png.readUInt32BE(20)})`);
   await noHorizontalOverflow(page, width, `${tag} 進捗`);
   await page.goto(`${BASE}settings/`);
   await page.getByRole('heading', { name: 'カレンダーに学ぶ予定を入れる' }).waitFor();
@@ -174,6 +205,36 @@ async function checkStudyFeatures(browser, width) {
   check(await page.getByText('0 / 2').first().isVisible(), `${tag} 前の版の記録は休みの札 0 個で読む`);
   check(errors.length === 0, `${tag} 画面のエラーが無い (${errors.join(' / ')})`);
   await context.close();
+}
+
+/**
+ * ページごとの OG 画像 (scripts/og-images.mjs) のつなぎ込み: 検索に載るページ (sitemap) の og:image・twitter:image が、
+ * dist/og に実在する 1200×630 の PNG を指す。トップと noindex のページ (進捗) はサイト共通の画像のまま
+ */
+function checkOgImages() {
+  const dist = new URL('../dist/', import.meta.url);
+  const site = 'https://maco165.github.io/kcna-dojo/';
+  const locs = [...readFileSync(new URL('sitemap.xml', dist), 'utf8').matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1].slice(site.length)).filter((p) => p !== '');
+  const bad = [];
+  for (const p of locs) {
+    const html = readFileSync(new URL(`${p}index.html`, dist), 'utf8');
+    const og = html.match(/<meta property="og:image" content="([^"]+)"/)?.[1] ?? '';
+    const tw = html.match(/<meta name="twitter:image" content="([^"]+)"/)?.[1] ?? '';
+    const file = og.startsWith(`${site}og/`) ? new URL(og.slice(site.length), dist) : null;
+    let ok = file !== null && tw === og;
+    if (ok) {
+      try {
+        const png = readFileSync(file);
+        ok = png.subarray(1, 4).toString() === 'PNG' && png.readUInt32BE(16) === 1200 && png.readUInt32BE(20) === 630;
+      } catch {
+        ok = false;
+      }
+    }
+    if (!ok) bad.push(p);
+  }
+  check(locs.length > 200 && bad.length === 0, `検索に載る ${locs.length} ページの og:image・twitter:image は、そのページの 1200×630 の PNG (違うもの ${bad.length}: ${bad.slice(0, 3).join(' ')})`);
+  const shared = (p) => readFileSync(new URL(`${p}index.html`, dist), 'utf8').includes(`<meta property="og:image" content="${site}og-image.png"`);
+  check(shared('') && shared('progress/'), 'トップと noindex のページ (進捗) の og:image はサイト共通の画像のまま');
 }
 
 async function run(browser, name, width, height) {
@@ -279,6 +340,8 @@ async function run(browser, name, width, height) {
   const total = l1.questions.length;
   check(await page.getByText(`${total - 1} / ${total}`).isVisible(), `${tag} 完了画面の正答数 ${total - 1} / ${total}`);
   await noHorizontalOverflow(page, width, `${tag} 完了画面`);
+  await checkShare(page, `${tag} レッスン完了`, `${total - 1} / ${total} 問正解`, `https://maco165.github.io/kcna-dojo/lesson/${l1.id}/`);
+  await noHorizontalOverflow(page, width, `${tag} 完了画面の共有`);
 
   // 3. ホームへ戻る
   await page.getByRole('link', { name: '一覧へ戻る' }).click();
@@ -594,6 +657,10 @@ async function run(browser, name, width, height) {
   await page.getByRole('button', { name: '採点する' }).last().click();
   await page.getByRole('heading', { name: '結果' }).waitFor();
   const afterExam = await page.evaluate(() => JSON.parse(localStorage.getItem('kcna.v1') ?? 'null'));
+  {
+    const e = afterExam?.exams?.[0];
+    if (e) await checkShare(page, `${tag} 模擬試験の結果`, `${e.correct} / ${e.total} 問 (${Math.round((e.correct / e.total) * 100)}%)`, 'https://maco165.github.io/kcna-dojo/exam/');
+  }
   check(afterExam?.exams?.length === 1 && afterExam.exams[0].total === 60 && afterExam.exams[0].set === 1, `${tag} 模擬試験の結果が回の番号つきで記録に残る`);
   const answersAdded = Object.keys(afterExam?.answers ?? {}).length - answersBefore;
   check(answersAdded <= 1, `${tag} 答えなしの問題は記録しない (増えた記録 ${answersAdded})`);
@@ -1138,6 +1205,7 @@ try {
   browser = await chromium.launch();
   checkFirstLoad();
   checkSpeedBuild();
+  checkOgImages();
   await run(browser, 'phone', 390, 844);
   await run(browser, 'pc', 1280, 860);
   await checkStudyFeatures(browser, 390);
