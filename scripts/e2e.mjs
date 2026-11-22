@@ -775,35 +775,36 @@ async function run(browser, name, width, height) {
     const etcd = page.locator('a.hb-term', { hasText: /^etcd$/ });
     await etcd.first().click();
     await page.waitForURL(/\/glossary\/etcd\/$/);
-    if (width >= 768) {
-      await page.locator('#gloss-pane-term').waitFor();
-      check((await page.locator('#gloss-pane-term').innerText()).trim() === 'etcd', `${tag} 用語集でその語 (etcd) の説明が開く`);
-      check((await page.locator('#gloss-pane .gloss-detail__more').count()) >= 2 && (await page.locator('#gloss-pane a.gloss-term').count()) >= 1, `${tag} 用語集の語に詳しい説明が出て、中のほかの語がリンクになる`);
-      // 説明の中のリンクを押すと、その語の説明に替わる
-      const linked = page.locator('#gloss-pane a.gloss-term').first();
-      const linkedText = (await linked.innerText()).trim();
-      await linked.click();
-      await page.waitForFunction((t) => document.querySelector('#gloss-pane-term')?.textContent?.trim() !== 'etcd', linkedText, { timeout: 5000 }).catch(() => {});
-      check((await page.locator('#gloss-pane-term').innerText()).trim() !== 'etcd', `${tag} 説明の中のリンクを押すと、その語の説明に替わる (${linkedText} → ${(await page.locator('#gloss-pane-term').innerText()).trim()})`);
-      await page.goBack();
-      await page.locator('#gloss-pane-term').waitFor();
-      const ai = await page.locator('#gloss-pane').getByRole('link', { name: 'Claude' }).getAttribute('href');
-      check(ai.startsWith('https://claude.ai/new?q=') && decodeURIComponent(ai.split('?q=')[1]).includes('「etcd」'), `${tag} 用語集の語から、語を入れた AI を開ける`);
-      // 用語の図: 見ている語の箱だけを主役の色にする
-      const fig = page.locator('#gloss-pane .gloss-detail__figure');
-      check(await fig.locator('svg').isVisible(), `${tag} 用語集の語に図が出る`);
-      const lit = await fig.locator('.dg__node--current').evaluateAll((els) => els.map((el) => el.parentElement.querySelector('.dg__label')?.textContent));
-      check(lit.length >= 1 && lit.every((t) => t === 'etcd'), `${tag} 図では見ている語 (etcd) の箱が強調される (${lit.join('・')})`);
-    } else {
-      const head = page.locator('#gloss-row-etcd button[aria-expanded]');
-      await head.waitFor();
-      await page.waitForTimeout(300);
-      const box = await head.boundingBox();
-      const vh = page.viewportSize().height;
-      check((await head.getAttribute('aria-expanded')) === 'true' && box && box.y >= 0 && box.y < vh, `${tag} 用語集でその語 (etcd) が開いて画面の中に見える (y ${box?.y})`);
-      const figW = await page.locator('#gloss-row-etcd .gloss-detail__figure svg').evaluate((el) => el.getBoundingClientRect().width);
-      check(figW > 0 && figW <= page.viewportSize().width, `${tag} 用語の図は画面の幅に収まる (${Math.round(figW)}px)`);
-      // 戻る・進むで来たときは、覚えた位置に戻す (その語へ送り直さない)
+    // 押した語の 1 語のページが開く (h1 は語の名前。書き出す HTML と同じ)
+    const termTitle = page.locator('#gloss-term-title');
+    await termTitle.waitFor();
+    check((await termTitle.innerText()).trim() === 'etcd' && (await page.locator('h1').count()) === 1, `${tag} 用語の 1 語のページが開き、h1 は語の名前 (etcd)`);
+    check((await page.locator('#gloss-term .gloss-detail__more').count()) >= 2 && (await page.locator('#gloss-term a.gloss-term').count()) >= 1, `${tag} 用語集の語に詳しい説明が出て、中のほかの語がリンクになる`);
+    check(JSON.stringify(await page.locator('nav[aria-label="パンくず"] a').evaluateAll((as) => as.map((a) => a.getAttribute('href')))) === JSON.stringify(['/kcna-dojo/', '/kcna-dojo/glossary/']), `${tag} 用語のページのパンくずはトップ・用語集の順`);
+    // 説明の中のリンクを押すと、その語のページに替わる
+    const linked = page.locator('#gloss-term a.gloss-term').first();
+    const linkedText = (await linked.innerText()).trim();
+    await linked.click();
+    await page.waitForFunction(() => document.querySelector('#gloss-term-title')?.textContent?.trim() !== 'etcd', null, { timeout: 5000 }).catch(() => {});
+    check((await termTitle.innerText()).trim() !== 'etcd', `${tag} 説明の中のリンクを押すと、その語のページに替わる (${linkedText} → ${(await termTitle.innerText()).trim()})`);
+    await page.goBack();
+    await page.waitForFunction(() => document.querySelector('#gloss-term-title')?.textContent?.trim() === 'etcd', null, { timeout: 5000 }).catch(() => {});
+    const ai = await page.locator('#gloss-term').getByRole('link', { name: 'Claude' }).getAttribute('href');
+    check(ai.startsWith('https://claude.ai/new?q=') && decodeURIComponent(ai.split('?q=')[1]).includes('「etcd」'), `${tag} 用語集の語から、語を入れた AI を開ける`);
+    // 用語の図: 見ている語の箱だけを主役の色にする。図は画面の幅に収まる
+    const fig = page.locator('#gloss-term .gloss-detail__figure');
+    check(await fig.locator('svg').isVisible(), `${tag} 用語集の語に図が出る`);
+    const lit = await fig.locator('.dg__node--current').evaluateAll((els) => els.map((el) => el.parentElement.querySelector('.dg__label')?.textContent));
+    check(lit.length >= 1 && lit.every((t) => t === 'etcd'), `${tag} 図では見ている語 (etcd) の箱が強調される (${lit.join('・')})`);
+    const figW = await fig.locator('svg').evaluate((el) => el.getBoundingClientRect().width);
+    check(figW > 0 && figW <= page.viewportSize().width, `${tag} 用語の図は画面の幅に収まる (${Math.round(figW)}px)`);
+    await noHorizontalOverflow(page, width, `${tag} 用語のページ`);
+    if (width < 768) {
+      // 一覧で開いた語から、その語のページへ行ける
+      await page.goto(`${BASE}glossary/`);
+      await page.locator('#gloss-row-etcd button[aria-expanded]').click();
+      check((await page.locator('#gloss-row-etcd a.gloss-page-link').getAttribute('href')) === '/kcna-dojo/glossary/etcd/', `${tag} 一覧で開いた語から、その語のページへのリンクがある`);
+      // 戻る・進むで来たときは、覚えた位置に戻す
       const scrollTop = () => page.evaluate(() => (document.querySelector('.astryx-layout-content') ?? document.scrollingElement).scrollTop);
       await page.evaluate(() => ((document.querySelector('.astryx-layout-content') ?? document.scrollingElement).scrollTop = 1500));
       await page.waitForTimeout(200);

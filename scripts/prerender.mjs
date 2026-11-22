@@ -159,13 +159,17 @@ export async function buildPages(load) {
     });
   }
 
-  // 用語集: 一覧を検索に載せ、1 語ずつのページは一覧を正にする (中身が短いため)
+  // 用語集: 一覧と、1 語ずつのページ (画面と同じ中身: 説明・詳しい説明・似た語と比べる・ハンドブック・出てくるレッスン・出典)
   const terms = glossary.terms;
   const { sortTerms, termDomain } = await load('/src/lib/glossary.ts');
   const { findLesson } = await load('/src/content/index.ts');
   const { DOMAINS } = await load('/src/lib/lessonStatus.ts');
+  const { termNames, linkDetail } = await load('/src/lib/termLinks.ts');
+  const { tablesOfTerm } = await load('/src/content/compare.ts');
   const ORDER = DOMAINS.map((d) => d.name);
   const sorted = sortTerms(terms).map((t) => ({ ...t, domain: termDomain(t, (id) => findLesson(id)?.lesson.domain, ORDER) }));
+  const TERM_NAMES = termNames(terms);
+  const SET_ID = url('glossary/#set');
   // 語の出てくるレッスン (画面の「出てくるレッスン」と同じ)
   const termLessons = (t) => {
     const found = (t.lessons ?? []).map((id) => [id, findLesson(id)]).filter(([, f]) => f);
@@ -178,17 +182,45 @@ export async function buildPages(load) {
     description: `KCNA-JP の問題に出る Kubernetes とクラウドネイティブの用語 ${terms.length} 語の短い説明と、公式の文書の出典。`,
     entity: {
       '@type': 'DefinedTermSet',
+      '@id': SET_ID,
       name: 'クラネイの用語集',
-      hasDefinedTerm: terms.map((t) => ({ '@type': 'DefinedTerm', name: t.term, ...(t.aliases?.length ? { alternateName: t.aliases } : {}), description: t.description, url: url(`glossary/#${t.id}`) })),
+      hasDefinedTerm: terms.map((t) => ({ '@type': 'DefinedTerm', name: t.term, ...(t.aliases?.length ? { alternateName: t.aliases } : {}), description: t.description, url: url(`glossary/${t.id}/`) })),
     },
     body: [
       '<h1>用語集</h1>',
-      // 画面の一覧と同じく、語の出てくるレッスンの分野ごとに分け (h2)、どのレッスンにも出ない語は「範囲外」にまとめる
-      ...termGroups.map((g) => `<section><h2>${esc(g.d)} (${g.items.length} 語)</h2><dl>${g.items.map((t) => `<dt id="${esc(t.id)}">${esc(t.term)}${t.aliases?.length ? ` (${esc(t.aliases.join('・'))})` : ''}</dt><dd>${esc(t.description)} <a href="${esc(t.source)}">出典</a>${termLessons(t)}</dd>`).join('')}</dl></section>`),
+      // 画面の一覧と同じく、語の出てくるレッスンの分野ごとに分け (h2)、どのレッスンにも出ない語は「範囲外」にまとめる。語は 1 語ずつのページへのリンク
+      ...termGroups.map((g) => `<section><h2>${esc(g.d)} (${g.items.length} 語)</h2><dl>${g.items.map((t) => `<dt id="${esc(t.id)}">${link(`glossary/${t.id}/`, t.term)}${t.aliases?.length ? ` (${esc(t.aliases.join('・'))})` : ''}</dt><dd>${esc(t.description)} <a href="${esc(t.source)}">出典</a>${termLessons(t)}</dd>`).join('')}</dl></section>`),
     ].join('\n'),
   });
-  for (const t of terms) {
-    pages.push({ path: `glossary/${t.id}/`, canonical: 'glossary/', inSitemap: false, title: `${t.term} (用語集)`, description: clip(t.description), body: `<h1>${esc(t.term)}</h1>\n<p>${esc(t.description)}</p>\n<p>${link('glossary/', '用語集の一覧')}</p>` });
+  const { findTopic } = await load('/src/content/handbook.ts');
+  for (const t of sorted) {
+    const lessons = (t.lessons ?? []).map((id) => [id, findLesson(id)]).filter(([, f]) => f);
+    const topics = (t.topics ?? []).map((id) => findTopic(id)?.topic).filter(Boolean);
+    const tables = tablesOfTerm(t.id);
+    const sources = [{ label: new URL(t.source).host, url: t.source }, ...(t.sources ?? []).filter((x) => x.url !== t.source)];
+    // 詳しい説明の中のほかの語は、その語のページへのリンクにする (画面の linkDetail と同じ)
+    const detail = linkDetail(TERM_NAMES, t).map((pieces) => `<p>${pieces.map((x) => (typeof x === 'string' ? esc(x) : link(`glossary/${x.id}/`, x.text))).join('')}</p>`);
+    pages.push({
+      path: `glossary/${t.id}/`,
+      heading: t.term,
+      description: clip(t.description),
+      entity: { '@type': 'DefinedTerm', name: t.term, ...(t.aliases?.length ? { alternateName: t.aliases } : {}), inDefinedTermSet: { '@type': 'DefinedTermSet', '@id': SET_ID, name: 'クラネイの用語集', url: url('glossary/') } },
+      body: [
+        `<h1>${esc(t.term)}</h1>`,
+        `<p>${esc(t.domain ?? '試験の範囲外 (ハンドブックの範囲外で説明)')}${t.aliases?.length ? ` · 別名: ${esc(t.aliases.join('・'))}` : ''}</p>`,
+        `<p>${esc(t.description)}</p>`,
+        '<h2>詳しい説明</h2>',
+        ...detail,
+        tables.length ? `<h2>似た語と比べる</h2><ul>${tables.map((c) => `<li>${link(`compare/${c.id}/`, c.title)}</li>`).join('')}</ul>` : '',
+        topics.length ? `<h2>ハンドブックで読む</h2><ul>${topics.map((x) => `<li>${link(`handbook/${x.id}/`, x.title)}</li>`).join('')}</ul>` : '',
+        lessons.length ? `<h2>出てくるレッスン</h2><ul>${lessons.map(([id, f]) => `<li>${link(`lesson/${id}/`, `第 ${f.week} 週 ${f.lesson.title}`)}</li>`).join('')}</ul>` : '',
+        '<h2>出典</h2>',
+        `<ul>${sources.map((x) => `<li><a href="${esc(x.url)}">${esc(x.label)}</a></li>`).join('')}</ul>`,
+        `<p>${link('glossary/', `用語集の一覧 (${terms.length} 語)`)}</p>`,
+      ]
+        .filter(Boolean)
+        .join('\n'),
+    });
   }
 
   // コマンド: 一覧と、コマンドごとのページ (中で何が起きるか・API の要求・実行の例・実装の抜粋まで、画面と同じ中身)
@@ -256,7 +288,7 @@ export async function buildPages(load) {
       body: [
         `<h1>${esc(t.title)}</h1>`,
         `<p>${esc(t.lead)}</p>`,
-        `<table><thead><tr><th scope="col">観点</th>${t.columns.map((c) => `<th scope="col">${c.term ? link(`glossary/#${c.term}`, c.name) : esc(c.name)}</th>`).join('')}</tr></thead><tbody>${t.rows.map((r) => `<tr><th scope="row">${esc(r.label)}</th>${r.cells.map((c) => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>`,
+        `<table><thead><tr><th scope="col">観点</th>${t.columns.map((c) => `<th scope="col">${c.term ? link(`glossary/${c.term}/`, c.name) : esc(c.name)}</th>`).join('')}</tr></thead><tbody>${t.rows.map((r) => `<tr><th scope="row">${esc(r.label)}</th>${r.cells.map((c) => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>`,
         '<h2>取り違えやすい点</h2>',
         `<ul>${t.pitfalls.map((p) => `<li>${esc(p)}</li>`).join('')}</ul>`,
         '<h2>違いが見えるコード</h2>',
@@ -292,7 +324,7 @@ export async function buildPages(load) {
     const ts = glossary.terms.filter((t) => t.lessons?.includes(l.id));
     const cs = COMMAND_PAGES.filter((c) => commandPageIds.has(c.id) && lessonsOfCommand.get(c.id)?.includes(l.id));
     return [
-      ts.length ? `<h2>出てくる用語</h2><ul>${ts.map((t) => `<li>${link(`glossary/#${t.id}`, t.term)}</li>`).join('')}</ul>` : '',
+      ts.length ? `<h2>出てくる用語</h2><ul>${ts.map((t) => `<li>${link(`glossary/${t.id}/`, t.term)}</li>`).join('')}</ul>` : '',
       cs.length ? `<h2>出てくるコマンド</h2><ul>${cs.map((c) => `<li>${link(`commands/${c.id}/`, c.command)}</li>`).join('')}</ul>` : '',
     ].join('');
   };

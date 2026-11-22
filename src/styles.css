@@ -2902,3 +2902,16 @@ html[data-loading='true'] body::before {
 .astryx-radio-list-item[data-disabled]:has(.choice-mark) > span {
   opacity: 1;
 }
+
+/* 用語の 1 語のページ (/glossary/<id>/) と、一覧で開いた語からそのページへのリンク (src/screens/Glossary.tsx) */
+.gloss-term-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-4);
+  max-width: 720px;
+}
+.gloss-page-link {
+  display: inline-block;
+  margin-top: var(--spacing-2);
+  font-size: var(--text-supporting-size);
+}

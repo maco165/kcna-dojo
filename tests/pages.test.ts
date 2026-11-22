@@ -57,7 +57,7 @@ const ldOf = (doc: Document): Ld[] => [...doc.querySelectorAll('script[type="app
 });
 /** ページの種類ごとに入れる型 (トップ以外。無いページは BreadcrumbList だけ) */
 const expectedType = (p: string) =>
-  /^(handbook|commands|compare)\/[^/]+\/$/.test(p) ? 'TechArticle' : p === 'glossary/' ? 'DefinedTermSet' : p.startsWith('lesson/') ? 'LearningResource' : undefined;
+  /^(handbook|commands|compare)\/[^/]+\/$/.test(p) ? 'TechArticle' : p === 'glossary/' ? 'DefinedTermSet' : /^glossary\/[^/]+\/$/.test(p) ? 'DefinedTerm' : p.startsWith('lesson/') ? 'LearningResource' : undefined;
 
 describe('構造化データとパンくず', { timeout: 30_000 }, () => {
   it('検索に載るページは BreadcrumbList と種類ごとの型を持ち、JSON として読めて url が canonical と合う。WebSite はトップだけ', () => {
@@ -199,12 +199,33 @@ describe('JS なしの HTML のページどうしのリンク', { timeout: 30_00
     );
     expect(broken).toEqual([]);
   });
-  it('用語集の語とレッスンは両向きにつながる (語 → 出てくるレッスン、レッスン → 出てくる用語)', () => {
+  it('用語集の語とレッスンは両向きにつながる (語 → 出てくるレッスン、レッスン → 出てくる用語の 1 語のページ)', () => {
     const glossary = doc('glossary/');
     const pairs = [...glossary.querySelectorAll('dt[id]')].flatMap((dt) => hrefs(dt.nextElementSibling!, 'lesson/').map((l) => [dt.id, l] as const));
     expect(pairs.length).toBeGreaterThan(100);
-    const missing = pairs.filter(([term, lesson]) => !hrefs(doc(lesson), 'glossary/').includes(`glossary/#${term}`));
+    const missing = pairs.filter(([term, lesson]) => !hrefs(doc(lesson), 'glossary/').includes(`glossary/${term}/`));
     expect(missing).toEqual([]);
+    // 1 語のページからも、同じレッスンへ
+    const fromPage = pairs.filter(([term, lesson]) => !hrefs(doc(`glossary/${term}/`), 'lesson/').includes(lesson));
+    expect(fromPage).toEqual([]);
+  });
+  it('用語の 1 語のページ: 一覧からリンクされ、canonical は自分、sitemap に載り、DefinedTerm は用語集 (DefinedTermSet) を指す', async () => {
+    // @ts-expect-error 書き出しの手順は JS (scripts/prerender.mjs)
+    const { sitemap } = await import('../scripts/prerender.mjs');
+    const map: string = sitemap(pages);
+    const termPages = docs.filter(({ page }) => /^glossary\/[^/]+\/$/.test(page.path));
+    expect(termPages.length).toBeGreaterThan(100);
+    const listed = new Set(hrefs(doc('glossary/'), 'glossary/'));
+    const setLd = ldOf(doc('glossary/')).find((x) => x['@type'] === 'DefinedTermSet') as { '@id'?: string };
+    for (const { page, doc: d } of termPages) {
+      expect(listed.has(page.path), page.path).toBe(true);
+      expect(d.querySelector('link[rel="canonical"]')?.getAttribute('href'), page.path).toBe(`${ORIGIN_BASE}${page.path}`);
+      expect(map, page.path).toContain(`<loc>${ORIGIN_BASE}${page.path}</loc>`);
+      const term = ldOf(d).find((x) => x['@type'] === 'DefinedTerm') as { inDefinedTermSet?: { '@id'?: string } } | undefined;
+      expect(term?.inDefinedTermSet?.['@id'], page.path).toBe(setLd['@id']);
+      // 画面と同じ中身: 詳しい説明と出典の節を持つ
+      expect([...d.querySelectorAll('#root h2')].map((h) => h.textContent), page.path).toEqual(expect.arrayContaining(['詳しい説明', '出典']));
+    }
   });
   it('ハンドブックのトピックとコマンドのページは、問題で練習するレッスンへリンクする', () => {
     const topics = docs.filter(({ page }) => /^handbook\/[^/]+\/$/.test(page.path));
