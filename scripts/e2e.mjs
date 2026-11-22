@@ -859,6 +859,17 @@ async function run(browser, name, width, height) {
     await page.goBack();
     await page.getByRole('heading', { name: '全体の流れ' }).waitFor();
     check(new URL(page.url()).pathname === '/kcna-dojo/handbook/storage/', `${tag} 戻るで前のページに戻る`);
+    // パンくず: 画面 (JS が描いたあと) にも、書き出した HTML (BreadcrumbList) と同じ階層で、トップから出る
+    const crumbHrefs = () => page.locator('nav[aria-label="パンくず"] a').evaluateAll((as) => as.map((a) => a.getAttribute('href')));
+    check(JSON.stringify(await crumbHrefs()) === JSON.stringify(['/kcna-dojo/', '/kcna-dojo/handbook/']), `${tag} ハンドブックのトピックのパンくずはトップ・ハンドブックの順 (${await crumbHrefs()})`);
+    for (const [p, name] of [['glossary/', '用語集'], ['week/2/', 'クラスタの構成']]) {
+      await page.goto(`${BASE}${p}`);
+      await page.getByRole('heading', { name, level: 1 }).first().waitFor();
+      // 書き出した HTML のパンくずではなく、画面が描いたパンくずを見る (React が #root を置き換えるまで待つ)
+      await page.waitForFunction(() => !document.querySelector('#root > main.prerender'));
+      const current = await page.locator('nav[aria-label="パンくず"] [aria-current="page"]').first().textContent();
+      check(JSON.stringify(await crumbHrefs()) === JSON.stringify(['/kcna-dojo/']) && current.includes(name), `${tag} ${p} のパンくずはトップから出る (${await crumbHrefs()} / ${current})`);
+    }
   }
 
   check(errors.length === 0, `${tag} ページのエラーが無い ${errors.length ? errors.join(' / ') : ''}`);

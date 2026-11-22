@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { AppShell } from '@astryxdesign/core/AppShell';
+import Crumbs from '../components/Crumbs';
 import { Link } from '@astryxdesign/core/Link';
 import { Text } from '@astryxdesign/core/Text';
 import AppSideNav from '../components/AppSideNav';
@@ -193,6 +194,9 @@ function Body() {
   const sourceLabel = [...top.map((s) => `${s.host} ${s.count} 問`), `そのほか ${restCount} 問`].join('、');
   return (
     <div className="guide">
+      <div className="guide-crumbs">
+        <Crumbs items={[{ name: 'Kubernetes とこのサイト' }]} />
+      </div>
       <section className="guide-hero" aria-labelledby="guide-title">
         <ClusterAnimation />
         <div className="guide-hero__fg">

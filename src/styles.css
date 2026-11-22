@@ -773,6 +773,11 @@ body {
   max-width: 880px;
 }
 
+/* 説明のページのパンくず (暗い見出しの帯の上に、ほかの画面と同じ小さな文字で置く) */
+.guide-crumbs {
+  padding: 12px 16px;
+}
+
 .guide-hero {
   position: relative;
   overflow: hidden;

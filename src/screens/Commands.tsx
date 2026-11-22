@@ -1,6 +1,7 @@
 // コマンドのページ (/commands/ と /commands/<id>/)。問題に出てくるコマンドごとに、何をするか・書き方・オプション・
 // 中で何が起きるか・API の要求・実行の例・-v で見える要求・実装の抜粋・出てくる問題・公式リファレンスを出す
 import { useMemo } from 'react';
+import Crumbs from '../components/Crumbs';
 import { AppShell } from '@astryxdesign/core/AppShell';
 import { CodeBlock } from '@astryxdesign/core/CodeBlock';
 import { Link } from '@astryxdesign/core/Link';
@@ -35,7 +36,7 @@ function Index() {
   return (
     <div className="hb cmdp">
       <div className="hb-head">
-        <Text type="supporting">{SITE_NAME}</Text>
+        <Crumbs items={[{ name: 'コマンド' }]} />
         <h1 className="week-title">コマンド</h1>
         <p className="hb-lead">
           問題に出てくるコマンドごとに、何をするか・書き方・オプションに加えて、打ってから結果が出るまでに中で何が起きるか (どの API の要求になり、どの部品が動くか) を、実際のコード (実行の例と出力・kubectl -v で見える要求・実装のソースの該当箇所) と一緒に説明します。中身は公式のリファレンスと実装で確かめ、出典を付けています。
@@ -72,15 +73,7 @@ function Page({ p }: { p: CommandPage }) {
   const flags = [...(p.flags ?? []), ...p.globalFlags];
   return (
     <article className="hb cmdp" aria-labelledby="cmdp-title">
-      <nav aria-label="パンくず" className="hb-crumbs">
-        <ol>
-          <li>
-            <a href={commandsHref()}>コマンド</a>
-          </li>
-          <li>{p.tool}</li>
-          <li aria-current="page">{p.command}</li>
-        </ol>
-      </nav>
+      <Crumbs items={[{ name: 'コマンド', href: commandsHref() }, { name: p.tool }, { name: p.command }]} />
       <div className="hb-head">
         <h1 id="cmdp-title" className="week-title">
           <code className="cmdp-title">{p.command}</code>

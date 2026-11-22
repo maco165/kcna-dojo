@@ -1,5 +1,6 @@
 import { AppShell } from '@astryxdesign/core/AppShell';
 import { Button } from '@astryxdesign/core/Button';
+import Crumbs from '../components/Crumbs';
 import { Card } from '@astryxdesign/core/Card';
 import { Link } from '@astryxdesign/core/Link';
 import { List, ListItem } from '@astryxdesign/core/List';
@@ -15,7 +16,7 @@ import { guideHref } from '../lib/route';
 import type { Progress } from '../lib/progress';
 import { dueReviewCount } from '../content';
 import { ABOUT } from '../content/about';
-import { SITE_NAME, SITE_TAGLINE } from '../lib/site';
+import { SITE_NAME } from '../lib/site';
 import { WIDE_QUERY, useMediaQuery } from '../lib/useMediaQuery';
 
 
@@ -25,9 +26,7 @@ function Body() {
   return (
     <VStack gap={6}>
       <VStack gap={1}>
-        <Text type="supporting">
-          {SITE_NAME} · {SITE_TAGLINE}
-        </Text>
+        <Crumbs items={[{ name: 'このサイトについて' }]} />
         <h1 className="week-title">このサイトについて</h1>
         <Text type="supporting">{ABOUT.intro}</Text>
         <Text type="supporting">{ABOUT.notice}</Text>

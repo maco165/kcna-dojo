@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertDialog } from '@astryxdesign/core/AlertDialog';
+import Crumbs from '../components/Crumbs';
 import { AppShell } from '@astryxdesign/core/AppShell';
 import { Banner } from '@astryxdesign/core/Banner';
 import { Button } from '@astryxdesign/core/Button';
@@ -81,7 +82,7 @@ function Intro({ progress, choice: picked, onChoice, onStart }: { progress: Prog
   return (
     <VStack gap={6}>
       <VStack gap={1}>
-        <Text type="supporting">{SITE_NAME}</Text>
+        <Crumbs items={[{ name: '模擬試験' }]} />
         <h1 className="week-title">模擬試験</h1>
         <Text type="supporting">{examIntro(EXAM_SETS.length, FRESH_SETS, bankSize)}</Text>
       </VStack>

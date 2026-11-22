@@ -1,6 +1,7 @@
 // 似た語の比較表 (/compare/ と /compare/<id>/)。試験で取り違えやすい語の組ごとに、観点を並べた表・取り違えやすい点・違いが見えるコード・出典を出す。
 // 中身の正本は src/content/compare.json (公式の文書で確かめて書く)
 import { AppShell } from '@astryxdesign/core/AppShell';
+import Crumbs from '../components/Crumbs';
 import { CodeBlock } from '@astryxdesign/core/CodeBlock';
 import { Link } from '@astryxdesign/core/Link';
 import { Text } from '@astryxdesign/core/Text';
@@ -19,7 +20,7 @@ function Index() {
   return (
     <div className="hb cmp">
       <div className="hb-head">
-        <Text type="supporting">{SITE_NAME}</Text>
+        <Crumbs items={[{ name: '似た語の比較表' }]} />
         <h1 className="week-title">似た語の比較表</h1>
         <p className="hb-lead">{COMPARE_LEAD}</p>
         <p className="hb-lead hb-muted">
@@ -44,14 +45,7 @@ function Index() {
 function Table({ t }: { t: CompareTable }) {
   return (
     <article className="hb cmp" aria-labelledby="cmp-title">
-      <nav aria-label="パンくず" className="hb-crumbs">
-        <ol>
-          <li>
-            <a href={compareHref()}>似た語の比較表</a>
-          </li>
-          <li aria-current="page">{t.title}</li>
-        </ol>
-      </nav>
+      <Crumbs items={[{ name: '似た語の比較表', href: compareHref() }, { name: t.title }]} />
       <div className="hb-head">
         <h1 id="cmp-title" className="week-title">
           {t.title}
