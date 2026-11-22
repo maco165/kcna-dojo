@@ -23,6 +23,7 @@ import {
   examDate,
   goalXp,
   parseProgressText,
+  planStart,
   resetProgress,
   saveProgress,
   setProfile,
@@ -103,9 +104,19 @@ function Body({ progress, updateProgress }: Props) {
           </VStack>
           <DateInput
             label="受験日"
-            description="試験までの日数に使います"
+            description="決めると、ホームと進捗に試験までの日数が出ます"
             value={examDate(progress) as DateInputProps['value']}
-            onChange={(v) => v && updateProgress((p) => setProfile(p, { examDate: v }))}
+            onChange={(v) => updateProgress((p) => setProfile(p, { examDate: v }))}
+            hasClear
+            format="date"
+            width={240}
+          />
+          <DateInput
+            label="学習の開始日"
+            description={progress.profile?.startDate ? '週の日付をこの日から 7 日ずつ数えます。消すと初めて学んだ日から数えます' : '週の日付をこの日から 7 日ずつ数えます。決めていないので、初めて学んだ日 (まだなら今日) から数えています'}
+            value={planStart(progress, new Date()) as DateInputProps['value']}
+            onChange={(v) => updateProgress((p) => setProfile(p, { startDate: v }))}
+            hasClear={progress.profile?.startDate !== undefined}
             format="date"
             width={240}
           />

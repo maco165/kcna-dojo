@@ -104,6 +104,15 @@ async function run(browser, name, width, height) {
   check(await page.getByText('クラネイ', { exact: true }).first().isVisible(), `${tag} サイト名クラネイが出る`);
   const preRead = page.getByRole('navigation', { name: '先に読むハンドブック' });
   check((await preRead.locator('a[href="/kcna-dojo/handbook/containerization/"]').count()) === 1, `${tag} ホームに、その週で先に読むハンドブックのトピックが出る`);
+  // 受験日と週の日付は運営者の予定に固定しない: 受験日を決めるまで日数を出さず設定へ案内し、週の日付は今日 (まだ学んでいない人の開始日) から数える
+  check((await page.getByRole('link', { name: '受験日を決める' }).getAttribute('href')) === '/kcna-dojo/settings/' && (await page.getByText(/試験まで \d+ 日/).count()) === 0, `${tag} 受験日を決めるまで試験までの日数を出さず、設定へのリンクを出す`);
+  const md = (offset) => {
+    const d = new Date();
+    d.setDate(d.getDate() + offset);
+    return `${d.getMonth() + 1}/${d.getDate()}`;
+  };
+  const weekDates = width >= 768 ? `${md(0)}〜${md(6)}` : `${md(7)}〜`;
+  check(await page.getByText(weekDates, { exact: false }).first().isVisible(), `${tag} 週の日付は今日から数える (${weekDates})`);
   await noHorizontalOverflow(page, width, `${tag} ホーム`);
 
   // 2. 4 択のレッスンを解く (1 問目は不正解、残りは正解)

@@ -12,8 +12,8 @@ import SiteLogo from '../components/SiteLogo';
 import { dueReviewCount } from '../content';
 import { WEEKS } from '../content/curriculum';
 import { DOMAINS, domainAccuracy, planStatus, weeklyXp } from '../lib/lessonStatus';
-import { currentStreak, dayKey, daysBetween, examDate, type Progress } from '../lib/progress';
-import { examHref, reviewHref, weekHref } from '../lib/route';
+import { currentStreak, daysToExam, type Progress } from '../lib/progress';
+import { examHref, reviewHref, settingsHref, weekHref } from '../lib/route';
 import { SITE_NAME } from '../lib/site';
 import { WIDE_QUERY, useMediaQuery } from '../lib/useMediaQuery';
 
@@ -21,7 +21,7 @@ const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 
 function Body({ progress }: { progress: Progress }) {
   const now = new Date();
-  const examDays = daysBetween(dayKey(now), examDate(progress));
+  const examDays = daysToExam(progress, now);
   const plan = planStatus(progress, now);
   const accuracy = domainAccuracy(progress);
   const days = weeklyXp(progress, now);
@@ -46,9 +46,9 @@ function Body({ progress }: { progress: Progress }) {
       <dl className="stats stats--card">
         <div className="stats__item">
           <dt>
-            <Text type="supporting">{examDays >= 0 ? '試験まで' : '試験日'}</Text>
+            <Text type="supporting">{examDays === null || examDays >= 0 ? '試験まで' : '試験日'}</Text>
           </dt>
-          <dd>{examDays > 0 ? `${examDays} 日` : examDays === 0 ? '今日' : '過ぎました'}</dd>
+          <dd>{examDays === null ? <a href={settingsHref}>受験日を決める</a> : examDays > 0 ? `${examDays} 日` : examDays === 0 ? '今日' : '過ぎました'}</dd>
         </div>
         <div className="stats__item">
           <dt>

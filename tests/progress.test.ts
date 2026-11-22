@@ -3,7 +3,10 @@ import {
   colorMode,
   markHandbookSeen,
   normalizeProgress,
-  DEFAULT_EXAM_DATE,
+  daysToExam,
+  firstStudyDay,
+  planStart,
+  weekStartDay,
   DEFAULT_GOAL_XP,
   STORAGE_KEY,
   completeReview,
@@ -130,15 +133,41 @@ describe('loadProgress / saveProgress', () => {
 });
 
 describe('設定と記録の書き出し・読み込み・消す', () => {
-  it('目標と受験日は、設定が無ければ既定の値', () => {
+  it('目標は設定が無ければ既定の値。受験日は利用者が決めるまで無い (運営者の予定の日付を出さない)', () => {
     expect(goalXp(emptyProgress())).toBe(DEFAULT_GOAL_XP);
-    expect(examDate(emptyProgress())).toBe(DEFAULT_EXAM_DATE);
+    expect(examDate(emptyProgress())).toBeUndefined();
+    expect(daysToExam(emptyProgress(), at('2026-11-23'))).toBeNull();
   });
 
-  it('setProfile は片方だけ変えても、もう片方を既定の値で埋める', () => {
+  it('setProfile で目標だけ変えても、受験日を勝手に入れない', () => {
     const p = setProfile(emptyProgress(), { dailyGoalXp: 50 });
-    expect(p.profile).toEqual({ dailyGoalXp: 50, examDate: DEFAULT_EXAM_DATE });
+    expect(p.profile).toEqual({ dailyGoalXp: 50 });
     expect(goalXp(p)).toBe(50);
+  });
+
+  it('受験日を決めると試験までの日数が出て、消すと持たない', () => {
+    const p = setProfile(emptyProgress(), { examDate: '2027-04-01' });
+    expect(daysToExam(p, at('2027-03-30'))).toBe(2);
+    const cleared = setProfile(p, { examDate: undefined });
+    expect(cleared.profile && 'examDate' in cleared.profile).toBe(false);
+  });
+
+  it('前の版で受験日を入れた人の記録は、そのまま読む', () => {
+    const p = parseProgressText(JSON.stringify({ v: 1, profile: { dailyGoalXp: 30, examDate: '2027-03-06' } }));
+    expect(examDate(p!)).toBe('2027-03-06');
+  });
+
+  it('週の日付の起点: 決めた開始日 > 初めて学んだ日 > 今日', () => {
+    expect(planStart(emptyProgress(), at('2027-05-03'))).toBe('2027-05-03');
+    let p = completeLesson(emptyProgress(), 'w1-l1', score, 12, at('2027-02-10'));
+    p = recordAnswer(p, 'w1-l1-q1', true, at('2027-02-08'));
+    expect(firstStudyDay(p)).toBe('2027-02-08');
+    expect(planStart(p, at('2027-05-03'))).toBe('2027-02-08');
+    p = setProfile(p, { startDate: '2027-01-04' });
+    expect(planStart(p, at('2027-05-03'))).toBe('2027-01-04');
+    expect(parseProgressText(JSON.stringify(p))?.profile?.startDate).toBe('2027-01-04');
+    expect(weekStartDay('2027-01-04', 1)).toBe('2027-01-04');
+    expect(weekStartDay('2027-01-04', 3)).toBe('2027-01-18');
   });
 
   it('書き出した中身を読み戻すと同じ進捗になる', () => {
@@ -154,8 +183,8 @@ describe('設定と記録の書き出し・読み込み・消す', () => {
   });
 
   it('設定の値がおかしければ既定の値に直す', () => {
-    const p = parseProgressText(JSON.stringify({ v: 1, profile: { dailyGoalXp: -5, examDate: 'あした' } }));
-    expect(p?.profile).toEqual({ dailyGoalXp: DEFAULT_GOAL_XP, examDate: DEFAULT_EXAM_DATE });
+    const p = parseProgressText(JSON.stringify({ v: 1, profile: { dailyGoalXp: -5, examDate: 'あした', startDate: '2027-02-30' } }));
+    expect(p?.profile).toEqual({ dailyGoalXp: DEFAULT_GOAL_XP });
   });
 
   it('記録を消すと進捗は空になり、目標と受験日は残る', () => {
@@ -259,10 +288,10 @@ describe('壊れた・悪意のある記録を読み込んでも落ちない', (
     expect(p?.streak).toEqual({ count: 0, lastDay: null });
   });
 
-  it('実在しない受験日と、選べない目標 XP は既定の値に直す', () => {
+  it('実在しない受験日は捨て、選べない目標 XP は既定の値に直す', () => {
     for (const examDate of ['2027-02-31', '9999-99-99']) {
       const p = parseProgressText(JSON.stringify({ v: 1, profile: { dailyGoalXp: 7, examDate } }));
-      expect(p?.profile).toEqual({ dailyGoalXp: DEFAULT_GOAL_XP, examDate: DEFAULT_EXAM_DATE });
+      expect(p?.profile).toEqual({ dailyGoalXp: DEFAULT_GOAL_XP });
     }
     expect(isValidDay('2028-02-29')).toBe(true);
     expect(isValidDay('2027-02-29')).toBe(false);

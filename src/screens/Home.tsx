@@ -29,8 +29,8 @@ import {
 } from '../lib/lessonStatus';
 import { downloadProgress } from '../lib/download';
 import { SITE_NAME } from '../lib/site';
-import { currentStreak, dayKey, daysBetween, examDate, goalXp, todayXp, type Progress } from '../lib/progress';
-import { aboutHref, compareHref, examHref, glossaryHref, guideHref, handbookHref, lessonHref, reviewHref, weekHref } from '../lib/route';
+import { addDays, currentStreak, daysToExam, goalXp, planStart, todayXp, weekStartDay, type Progress } from '../lib/progress';
+import { aboutHref, compareHref, examHref, glossaryHref, guideHref, handbookHref, lessonHref, reviewHref, settingsHref, weekHref } from '../lib/route';
 import { dueQuestions, dueReviewCount } from '../content';
 import { WIDE_QUERY, useMediaQuery } from '../lib/useMediaQuery';
 
@@ -39,10 +39,6 @@ function formatDate(day: string): string {
   return `${m}/${d}`;
 }
 
-function weekEnd(start: string): string {
-  const [y, m, d] = start.split('-').map(Number);
-  return dayKey(new Date(y, m - 1, d + 6));
-}
 
 function doneCount(w: WeekMeta, progress: Progress): number {
   return (w.content?.lessons ?? []).filter((l) => progress.lessons[l.id]?.done).length;
@@ -54,8 +50,11 @@ type Summary = {
   statuses: LessonStatus[];
   today: number;
   streak: number;
-  examDays: number;
+  /** 試験までの日数。受験日を決めていなければ null */
+  examDays: number | null;
   goal: number;
+  /** 週の日付を数える起点 (利用者の開始日) */
+  start: string;
 };
 
 function summarize(week: number, progress: Progress): Summary {
@@ -68,8 +67,9 @@ function summarize(week: number, progress: Progress): Summary {
     statuses: lessonStatuses(lessons, progress),
     today: todayXp(progress, now),
     streak: currentStreak(progress, now),
-    examDays: daysBetween(dayKey(now), examDate(progress)),
+    examDays: daysToExam(progress, now),
     goal: goalXp(progress),
+    start: planStart(progress, now),
   };
 }
 
@@ -77,6 +77,18 @@ const goalLabel = (today: number, goal: number) => `${today} / ${goal} XP`;
 
 /** 試験までの日数の表示。受験日を過ぎたら日数を出さない */
 const examLabel = (days: number) => (days > 0 ? `試験まで ${days} 日` : days === 0 ? '今日が試験日' : '試験日を過ぎました');
+
+/** 試験までの日数。受験日を決めていなければ、決める画面 (設定) へのリンクを出す */
+function ExamDays({ days }: { days: number | null }) {
+  if (days === null) return <a href={settingsHref}>受験日を決める</a>;
+  return <>{examLabel(days)}</>;
+}
+
+/** 週の日付 (利用者の開始日から数える): "11/30〜12/6" */
+const weekRange = (start: string, week: number) => {
+  const from = weekStartDay(start, week);
+  return `${formatDate(from)}〜${formatDate(addDays(from, 6))}`;
+};
 
 export default function Home({ week, progress }: { week: number; progress: Progress }) {
   const isWide = useMediaQuery(WIDE_QUERY);
@@ -127,7 +139,7 @@ function PhoneHome({ s, progress }: { s: Summary; progress: Progress }) {
         </span>
         <span className="topbar__end">
           <Text type="supporting">
-            {s.streak} 日連続 · {progress.xp.total} XP · {examLabel(s.examDays)}
+            {s.streak} 日連続 · {progress.xp.total} XP · <ExamDays days={s.examDays} />
           </Text>
           <RepoLink />
         </span>
@@ -179,7 +191,7 @@ function PhoneHome({ s, progress }: { s: Summary; progress: Progress }) {
               <ListItem
                 href={weekHref(nextWeek.week)}
                 label={`第 ${nextWeek.week} 週 ${nextWeek.title}`}
-                description={`${nextWeek.area} · ${formatDate(nextWeek.start)}〜`}
+                description={`${nextWeek.area} · ${formatDate(weekStartDay(s.start, nextWeek.week))}〜`}
                 endContent={
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--color-icon-secondary)" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
                     <path d="m9 6 6 6-6 6" />
@@ -381,7 +393,7 @@ function DesktopHome({ s, progress }: { s: Summary; progress: Progress }) {
           <VStack gap={0.5}>
             {meta.week !== 1 && <Crumbs items={[{ name: `第 ${meta.week} 週 ${meta.title}` }]} />}
             <Text type="supporting">
-              第 {meta.week} 週 · {meta.domain} · {meta.area} · {formatDate(meta.start)}〜{formatDate(weekEnd(meta.start))}
+              第 {meta.week} 週 · {meta.domain} · {meta.area} · {weekRange(s.start, meta.week)}
             </Text>
             <Heading level={1}>{meta.title}</Heading>
           </VStack>
@@ -393,7 +405,9 @@ function DesktopHome({ s, progress }: { s: Summary; progress: Progress }) {
               連続 <Text weight="semibold">{s.streak} 日</Text>
             </Text>
             <Text type="supporting">
-              {s.examDays > 0 ? (
+              {s.examDays === null ? (
+                <ExamDays days={null} />
+              ) : s.examDays > 0 ? (
                 <>
                   試験まで <Text weight="semibold">{s.examDays} 日</Text>
                 </>
