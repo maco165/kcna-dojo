@@ -28,7 +28,7 @@ import {
 } from '../lib/lessonStatus';
 import { downloadProgress } from '../lib/download';
 import { SITE_NAME, SITE_TAGLINE } from '../lib/site';
-import { addDays, currentStreak, daysToExam, freezeStatus, freezeText, goalXp, planStart, todayXp, weekStartDay, type Progress } from '../lib/progress';
+import { addDays, currentStreak, daysToExam, freezeStatus, freezeText, goalXp, planStart, todayXp, weekProgress, weekStartDay, type Progress } from '../lib/progress';
 import { aboutHref, compareHref, examHref, glossaryHref, guideHref, handbookHref, lessonHref, reviewHref, settingsHref, weekHref } from '../lib/route';
 import { dueQuestions, dueReviewCount } from '../content';
 import { WIDE_QUERY, useMediaQuery } from '../lib/useMediaQuery';
@@ -56,6 +56,8 @@ type Summary = {
   start: string;
   /** 休みの札 ("休みの札 1 / 2 · 11/20 に使った") */
   freeze: string;
+  /** 週の目標 ("今週 2 / 3 日")。目標を決めていなければ null */
+  week: string | null;
 };
 
 function summarize(week: number, progress: Progress): Summary {
@@ -72,8 +74,12 @@ function summarize(week: number, progress: Progress): Summary {
     goal: goalXp(progress),
     start: planStart(progress, now),
     freeze: freezeText(freezeStatus(progress, now)),
+    week: weekLabel(weekProgress(progress, now)),
   };
 }
+
+/** 週の目標: "今週 2 / 3 日" (月曜から数える)。決めていなければ null */
+const weekLabel = (w: { days: number; goal: number | undefined }) => (w.goal ? `今週 ${w.days} / ${w.goal} 日` : null);
 
 const goalLabel = (today: number, goal: number) => `${today} / ${goal} XP`;
 
@@ -169,7 +175,7 @@ function PhoneHome({ s, progress }: { s: Summary; progress: Progress }) {
           hasValueLabel
           formatValueLabel={() => goalLabel(s.today, s.goal)}
         />
-        <Text type="supporting">{s.freeze}</Text>
+        <Text type="supporting">{s.week ? `${s.week} · ${s.freeze}` : s.freeze}</Text>
       </section>
 
       <main className="page__main">
@@ -423,6 +429,11 @@ function DesktopHome({ s, progress }: { s: Summary; progress: Progress }) {
             <Text type="supporting">
               連続 <Text weight="semibold">{s.streak} 日</Text>
             </Text>
+            {s.week && (
+              <Text type="supporting">
+                {s.week.replace(/ .*/, '')} <Text weight="semibold">{s.week.replace(/^\S+ /, '')}</Text>
+              </Text>
+            )}
             <Text type="supporting">{s.freeze}</Text>
             <Text type="supporting">
               {s.examDays === null ? (

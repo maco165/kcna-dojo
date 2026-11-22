@@ -30,7 +30,10 @@ export const COLOR_MODES: readonly ColorMode[] = ['system', 'light', 'dark'];
  * 受験日 (examDate) は利用者が決めるまで持たない (決めていない人に試験までの日数を出さない)。
  * 学習の開始日 (startDate) は週の日付を数える起点で、決めていなければ初めて学んだ日 (planStart)
  */
-export type Profile = { dailyGoalXp: number; examDate?: string; startDate?: string; colorMode?: ColorMode };
+export type Profile = { dailyGoalXp: number; examDate?: string; startDate?: string; colorMode?: ColorMode; weeklyDays?: number };
+
+/** 週の目標 (週に何日学ぶか) に選べる値。既定は決めない (無ければホームに出さない) */
+export const WEEKLY_DAY_CHOICES = [1, 2, 3, 4, 5, 6, 7] as const;
 
 /** 1 日の目標の XP の既定と選べる値 */
 export const DEFAULT_GOAL_XP = 30;
@@ -183,6 +186,7 @@ export function normalizeProgress(raw: unknown): Progress | null {
     // 受験日と開始日は、実在する日付のときだけ残す (前の版が書いた受験日もそのまま読む)
     if (isValidDay(profile.examDate)) out.profile.examDate = profile.examDate;
     if (isValidDay(profile.startDate)) out.profile.startDate = profile.startDate;
+    if ((WEEKLY_DAY_CHOICES as readonly unknown[]).includes(profile.weeklyDays)) out.profile.weeklyDays = profile.weeklyDays as number;
     if ((COLOR_MODES as readonly unknown[]).includes(profile.colorMode) && profile.colorMode !== 'system') out.profile.colorMode = profile.colorMode as ColorMode;
   }
   return out;
@@ -412,6 +416,17 @@ export function weekStartDay(start: string, week: number): string {
   return addDays(start, (week - 1) * 7);
 }
 
+/**
+ * 今週 (月曜から今日まで) に学んだ日 (レッスン・復習・模擬試験を終えた日。連続日数と同じ数え方) の数と、週の目標。
+ * 目標を決めていなければ goal は undefined
+ */
+export function weekProgress(p: Progress, now: Date): { days: number; goal: number | undefined } {
+  const today = dayKey(now);
+  const monday = addDays(today, -((now.getDay() + 6) % 7));
+  const days = Object.keys(p.xp.byDay).filter((d) => d >= monday && d <= today).length;
+  return { days, goal: p.profile?.weeklyDays };
+}
+
 export function colorMode(p: Progress): ColorMode {
   return p.profile?.colorMode ?? 'system';
 }
@@ -422,6 +437,7 @@ export function setProfile(p: Progress, change: Partial<Profile>): Progress {
   if (next.colorMode === 'system') delete next.colorMode;
   if (!next.examDate) delete next.examDate;
   if (!next.startDate) delete next.startDate;
+  if (!next.weeklyDays) delete next.weeklyDays;
   return { ...p, profile: next };
 }
 

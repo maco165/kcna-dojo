@@ -19,6 +19,7 @@ import { clearExam } from '../lib/examSave';
 import {
   COLOR_MODES,
   GOAL_CHOICES,
+  WEEKLY_DAY_CHOICES,
   colorMode,
   type ColorMode,
   examDate,
@@ -102,6 +103,20 @@ function Body({ progress, updateProgress }: Props) {
               ))}
             </SegmentedControl>
             <Text type="supporting">1 問正解で 3 XP、実習で 10 XP です。</Text>
+          </VStack>
+          <VStack gap={1.5}>
+            <Text weight="medium">週の目標</Text>
+            <SegmentedControl
+              label="週に学ぶ日数"
+              value={String(progress.profile?.weeklyDays ?? 0)}
+              onChange={(v) => updateProgress((p) => setProfile(p, { weeklyDays: Number(v) || undefined }))}
+            >
+              <SegmentedControlItem value="0" label="なし" />
+              {WEEKLY_DAY_CHOICES.map((d) => (
+                <SegmentedControlItem key={d} value={String(d)} label={`${d}`} />
+              ))}
+            </SegmentedControl>
+            <Text type="supporting">週に何日学ぶか (日)。決めると、ホームに今週 (月曜から) の学んだ日の数が出ます。</Text>
           </VStack>
           <DateInput
             label="受験日"
