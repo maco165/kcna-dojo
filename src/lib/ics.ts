@@ -52,26 +52,30 @@ export function foldLine(line: string): string {
   return out.join('\r\n');
 }
 
+const FORMATS = new Map<string, Intl.DateTimeFormat>();
+
 /** その時刻帯での、その時点の UTC からのずれ (分) */
 export function offsetMinutes(timeZone: string, t: Date): number {
-  const parts = Object.fromEntries(
-    new Intl.DateTimeFormat('en-US', { timeZone, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric' })
-      .formatToParts(t)
-      .map((p) => [p.type, Number(p.value)]),
-  );
+  let f = FORMATS.get(timeZone);
+  if (!f) {
+    f = new Intl.DateTimeFormat('en-US', { timeZone, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric' });
+    FORMATS.set(timeZone, f);
+  }
+  const parts: Record<string, number> = {};
+  for (const p of f.formatToParts(t)) parts[p.type] = Number(p.value);
   const asUtc = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
   return Math.round((asUtc - Math.floor(t.getTime() / 1000) * 1000) / 60000);
 }
 
 const fmtOffset = (m: number) => `${m < 0 ? '-' : '+'}${pad(Math.floor(Math.abs(m) / 60))}${pad(Math.abs(m) % 60)}`;
 
-/** year の年に、時刻帯のずれが変わる時点 (変わった直後の時刻) と前後のずれ */
-export function transitions(timeZone: string, year: number): { at: Date; from: number; to: number }[] {
+/** fromYear の 1 月 1 日から toYear の終わりまでに、時刻帯のずれが変わる時点 (変わった直後の時刻) と前後のずれ */
+export function transitions(timeZone: string, fromYear: number, toYear: number = fromYear): { at: Date; from: number; to: number }[] {
   const out: { at: Date; from: number; to: number }[] = [];
   const day = 86_400_000;
-  let t = Date.UTC(year, 0, 1);
+  let t = Date.UTC(fromYear, 0, 1);
   let prev = offsetMinutes(timeZone, new Date(t));
-  for (; t < Date.UTC(year + 1, 0, 1); t += day) {
+  for (; t < Date.UTC(toYear + 1, 0, 1); t += day) {
     const next = offsetMinutes(timeZone, new Date(t + day));
     if (next === prev) continue;
     // 1 日の中を分の単位で二分探索する
@@ -88,31 +92,33 @@ export function transitions(timeZone: string, year: number): { at: Date; from: n
   return out;
 }
 
-/** VTIMEZONE。ずれが変わらない時刻帯は STANDARD だけ。夏時間のある時刻帯は、去年の切り替えを起点に毎年の決まり (n 番目か最後の何曜日) を付ける */
+/** VTIMEZONE に書く年の幅: 去年から 5 年先まで */
+export const TZ_YEARS_BEFORE = 1;
+export const TZ_YEARS_AFTER = 5;
+
+/**
+ * VTIMEZONE。ずれが変わらない時刻帯は STANDARD だけ。変わる時刻帯は、去年から 5 年先までの切り替えを Intl で分まで求め、
+ * 1 つずつ観測 (ずれが増えるものは DAYLIGHT、減るものは STANDARD) として書く。RRULE で毎年の決まりにすると、
+ * 決まりが「n 番目の何曜日」で書けない時刻帯 (エルサレムの「最後の日曜の前の金曜」、モロッコのラマダンなど) でずれるため。
+ * 6 年より先は、最後の観測のずれのまま続く
+ */
 export function vtimezone(timeZone: string, now: Date): string[] {
-  const year = now.getFullYear() - 1;
-  const ts = transitions(timeZone, year);
+  const year = now.getFullYear();
+  const ts = transitions(timeZone, year - TZ_YEARS_BEFORE, year + TZ_YEARS_AFTER);
   const lines = ['BEGIN:VTIMEZONE', `TZID:${timeZone}`];
   if (ts.length === 0) {
     const off = fmtOffset(offsetMinutes(timeZone, now));
     lines.push('BEGIN:STANDARD', 'DTSTART:19700101T000000', `TZOFFSETFROM:${off}`, `TZOFFSETTO:${off}`, 'END:STANDARD');
   } else {
-    const max = Math.max(...ts.map((x) => x.to));
     for (const x of ts) {
       // 切り替えの時刻は、切り替える前の壁時計で書く
       const local = new Date(x.at.getTime() + x.from * 60_000);
-      const y = local.getUTCFullYear();
-      const mo = local.getUTCMonth() + 1;
-      const d = local.getUTCDate();
-      const last = new Date(Date.UTC(y, mo, 0)).getUTCDate();
-      const nth = d + 7 > last ? -1 : Math.ceil(d / 7);
-      const kind = x.to === max && x.to !== x.from && ts.length > 1 ? 'DAYLIGHT' : 'STANDARD';
+      const kind = x.to > x.from ? 'DAYLIGHT' : 'STANDARD';
       lines.push(
         `BEGIN:${kind}`,
-        `DTSTART:${wall(y, mo, d, local.getUTCHours(), local.getUTCMinutes())}`,
+        `DTSTART:${wall(local.getUTCFullYear(), local.getUTCMonth() + 1, local.getUTCDate(), local.getUTCHours(), local.getUTCMinutes())}`,
         `TZOFFSETFROM:${fmtOffset(x.from)}`,
         `TZOFFSETTO:${fmtOffset(x.to)}`,
-        ...(ts.length > 1 ? [`RRULE:FREQ=YEARLY;BYMONTH=${mo};BYDAY=${nth}${BYDAY[local.getUTCDay()]}`] : []),
         `END:${kind}`,
       );
     }
