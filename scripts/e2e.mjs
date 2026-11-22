@@ -121,6 +121,13 @@ async function run(browser, name, width, height) {
       const answerLetter = answerLabel.trim().slice(0, 1);
       check(/^[A-D]$/.test(answerLetter) && (await page.getByText(`不正解 · 正しくは ${answerLetter}`).isVisible()), `${tag} 「正しくは ${answerLetter}」が画面の並びと合う`);
       check(await page.getByText(q.explanation).isVisible(), `${tag} 不正解のとき解説が出る`);
+      // 解説の近くに、問題の id・レッスン・ページの URL を入れた GitHub の新しい Issue へのリンク (答えや記録は入れない)
+      const report = new URL((await page.getByRole('link', { name: /この問題の誤りを報告/ }).getAttribute('href')) ?? 'about:blank');
+      const reportBody = report.searchParams.get('body') ?? '';
+      check(
+        report.href.startsWith('https://github.com/maco165/kcna-dojo/issues/new?') && report.searchParams.get('title')?.includes(q.id) && reportBody.includes(`(${l1.id})`) && reportBody.includes(`https://maco165.github.io/kcna-dojo/lesson/${l1.id}/`) && !reportBody.includes('kcna.v1'),
+        `${tag} 誤りを報告のリンクに問題の id・レッスン・ページの URL が入る`,
+      );
       // 答えたあとに、読み直す先 (ハンドブック・用語集) が出る。答える前には出さない
       const readMore = page.getByRole('navigation', { name: '読み直す' });
       await readMore.waitFor({ timeout: 5000 }).catch(() => {});
