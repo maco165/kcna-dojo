@@ -33,6 +33,9 @@ import { normalizeAnswer } from '../lib/grade';
 import { clearExam, finishExam, isExpired, loadExam, markCount, newExamId, saveExam, type ExamProgress } from '../lib/examSave';
 import type { Progress } from '../lib/progress';
 import { SITE_NAME } from '../lib/site';
+import ShareButton from '../components/ShareButton';
+import { examShareText, shareUrl } from '../lib/share';
+import { examHref } from '../lib/route';
 import { WIDE_QUERY, useMediaQuery } from '../lib/useMediaQuery';
 
 // 弱い分野の読み直す先 (ハンドブックのデータ) は、結果を出すときに読む
@@ -468,7 +471,8 @@ function Result({ items, answers, result, onRestart }: { items: BankItem[]; answ
           })}
         </VStack>
       )}
-      <HStack gap={2} justify="end" wrap="wrap">
+      <HStack gap={2} justify="between" vAlign="start" wrap="wrap">
+        <ShareButton data={{ text: examShareText(result.correct, result.total), url: shareUrl(examHref) }} />
         <Button variant="primary" label="模擬試験の最初へ戻る" onClick={onRestart} />
       </HStack>
     </VStack>

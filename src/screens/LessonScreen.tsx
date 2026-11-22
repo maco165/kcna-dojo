@@ -18,7 +18,9 @@ import { XP_PER_CORRECT, XP_PER_LAB } from '../lib/grade';
 import { answerHistory, completeLesson, currentStreak, goalXp, recordAnswer, todayXp, type Progress } from '../lib/progress';
 import { shuffleChoices } from '../lib/shuffle';
 import { WEEKS } from '../content/curriculum';
-import { handbookHref, weekHref } from '../lib/route';
+import { handbookHref, lessonHref, weekHref } from '../lib/route';
+import ShareButton from '../components/ShareButton';
+import { lessonShareText, shareUrl, type ShareData } from '../lib/share';
 import { WIDE_QUERY, useMediaQuery } from '../lib/useMediaQuery';
 
 type Props = {
@@ -79,6 +81,7 @@ function QuizRun({ lesson, week, progress, updateProgress }: Props & { lesson: Q
       progress={progress}
       updateProgress={updateProgress}
       canRetry
+      shareOf={(correct, total) => ({ text: lessonShareText(correct, total), url: shareUrl(lessonHref(lesson.id)) })}
       onFinish={(p, correct, total) => completeLesson(p, lesson.id, { correct, total }, correct * XP_PER_CORRECT, new Date())}
     />
   );
@@ -99,6 +102,7 @@ export function QuestionRun({
   onClose,
   onCorrect,
   onFinish,
+  shareOf,
 }: {
   title: string;
   resultLabel: string;
@@ -117,6 +121,8 @@ export function QuestionRun({
   onCorrect?: (p: Progress) => Progress;
   /** 最後の問題のあと、進捗に反映する (XP・完了など) */
   onFinish: (p: Progress, correct: number, total: number) => Progress;
+  /** 結果の画面の「共有」に渡す文と URL (点数と URL だけ)。無ければ共有を出さない (復習など) */
+  shareOf?: (correct: number, total: number) => ShareData;
 }) {
   const [index, setIndex] = useState(0);
   const [results, setResults] = useState<boolean[]>([]);
@@ -179,6 +185,7 @@ export function QuestionRun({
         progress={progress}
         rows={questions.map((question, i) => ({ id: question.id, label: question.prompt, correct: results[i], history: answerHistory(progress.answers[question.id]) }))}
         onRetry={canRetry ? restart : undefined}
+        share={shareOf?.(correct, total)}
       />
     );
   }
@@ -225,6 +232,7 @@ function LabRun({ lesson, week, progress, updateProgress }: Props & { lesson: La
         ]}
         progress={progress}
         rows={[]}
+        share={{ text: lessonShareText(total, total).replace('問正解', '手順'), url: shareUrl(lessonHref(lesson.id)) }}
       />
     );
   }
@@ -321,7 +329,9 @@ function ResultView({
   progress,
   rows,
   onRetry,
+  share,
 }: {
+  share?: ShareData;
   backHref: string;
   onBack?: () => void;
   lessonLabel: string;
@@ -383,6 +393,11 @@ function ResultView({
       )}
 
       <div className="result__actions">
+        {share && (
+          <div className="result__share">
+            <ShareButton data={share} />
+          </div>
+        )}
         <HStack gap={2} justify={isWide ? 'end' : 'start'}>
           {onRetry && <Button label="もう一度解く" onClick={onRetry} width={isWide ? undefined : '100%'} size={isWide ? 'md' : 'lg'} />}
           <Button

@@ -108,6 +108,25 @@ function checkSpeedBuild() {
 }
 
 /**
+ * 結果の「共有」: Web Share API があれば点数と URL だけを渡し、無ければ X の投稿 (文と URL だけ) とリンクのコピーを出す。
+ * 端末の共有の画面は開けないので、navigator.share を差し替えて渡すものを見る
+ */
+async function checkShare(page, tag, text, url) {
+  await page.evaluate(() => {
+    window.__shared = [];
+    Object.defineProperty(navigator, 'share', { configurable: true, value: async (d) => void window.__shared.push(d) });
+  });
+  await page.getByRole('button', { name: '共有', exact: true }).click();
+  const shared = await page.evaluate(() => window.__shared);
+  check(JSON.stringify(shared) === JSON.stringify([{ text, url }]), `${tag} 共有は点数と公開の URL だけを渡す (${JSON.stringify(shared)})`);
+  await page.evaluate(() => Object.defineProperty(navigator, 'share', { configurable: true, value: undefined }));
+  await page.getByRole('button', { name: '共有', exact: true }).click();
+  const x = new URL(await page.getByRole('link', { name: 'X に投稿' }).getAttribute('href'));
+  check(x.origin === 'https://x.com' && x.searchParams.get('text') === text && x.searchParams.get('url') === url && [...x.searchParams.keys()].length === 2, `${tag} Web Share API が無ければ X の投稿 (文と URL だけ) を出す`);
+  check(await page.getByRole('button', { name: 'リンクをコピー' }).isVisible(), `${tag} Web Share API が無ければリンクのコピーを出す`);
+}
+
+/**
  * 学びを続ける仕組み (休みの札・週の目標・カレンダー・復習の予測・到達・.ics) を、決まった時刻と記録で見る。
  * 前の版の記録 (札・solved・run の無い形) を読ませても画面が落ちないことも見る
  */
@@ -267,6 +286,8 @@ async function run(browser, name, width, height) {
   const total = l1.questions.length;
   check(await page.getByText(`${total - 1} / ${total}`).isVisible(), `${tag} 完了画面の正答数 ${total - 1} / ${total}`);
   await noHorizontalOverflow(page, width, `${tag} 完了画面`);
+  await checkShare(page, `${tag} レッスン完了`, `${total - 1} / ${total} 問正解`, `https://maco165.github.io/kcna-dojo/lesson/${l1.id}/`);
+  await noHorizontalOverflow(page, width, `${tag} 完了画面の共有`);
 
   // 3. ホームへ戻る
   await page.getByRole('link', { name: '一覧へ戻る' }).click();
@@ -582,6 +603,10 @@ async function run(browser, name, width, height) {
   await page.getByRole('button', { name: '採点する' }).last().click();
   await page.getByRole('heading', { name: '結果' }).waitFor();
   const afterExam = await page.evaluate(() => JSON.parse(localStorage.getItem('kcna.v1') ?? 'null'));
+  {
+    const e = afterExam?.exams?.[0];
+    if (e) await checkShare(page, `${tag} 模擬試験の結果`, `${e.correct} / ${e.total} 問 (${Math.round((e.correct / e.total) * 100)}%)`, 'https://maco165.github.io/kcna-dojo/exam/');
+  }
   check(afterExam?.exams?.length === 1 && afterExam.exams[0].total === 60 && afterExam.exams[0].set === 1, `${tag} 模擬試験の結果が回の番号つきで記録に残る`);
   const answersAdded = Object.keys(afterExam?.answers ?? {}).length - answersBefore;
   check(answersAdded <= 1, `${tag} 答えなしの問題は記録しない (増えた記録 ${answersAdded})`);

@@ -3139,3 +3139,8 @@ html[data-loading='true'] body::before {
 .mastery__seg--wrong {
   background: repeating-linear-gradient(135deg, var(--color-error) 0 3px, var(--color-error-muted) 3px 6px);
 }
+
+/* 結果の画面の「共有」(X の投稿とリンクのコピーは、Web Share API の無い端末で押したときに出す) */
+.result__share {
+  margin-bottom: var(--spacing-3);
+}
