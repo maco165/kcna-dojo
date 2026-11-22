@@ -264,6 +264,8 @@ async function run(browser, name, width, height) {
   await page.goto(BASE);
   const repoLinks = page.locator('a[href="https://github.com/maco165/kcna-dojo"]');
   check((await repoLinks.count()) >= 1, `${tag} ホームにリポジトリへのリンクがある`);
+  const repoSameTab = await repoLinks.evaluateAll((as) => as.filter((a) => a.target !== '_blank' || !/noopener/.test(a.rel)).length);
+  check(repoSameTab === 0, `${tag} リポジトリへのリンクはすべて別タブで開く`);
   await page.goto(`${BASE}about/`);
   await page.getByRole('heading', { name: 'このサイトについて' }).waitFor();
   const repoButton = page.getByRole('link', { name: /GitHub のリポジトリを開く/ }).first();
