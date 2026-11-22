@@ -1,9 +1,10 @@
 // 週の並びと日付。カリキュラムの正本は本人の学習計画の文書で、ここはサイトに出すための写し。
-import type { Domain, WeekContent } from './types';
+import type { Domain, WeekIndex } from './types';
 
-// 問題データは src/content/week<n>.json を置けば、その週に自動でつながる (週ごとの PR が同じファイルを触らないため)
-const CONTENT_FILES = import.meta.glob<WeekContent>('./week*.json', { eager: true, import: 'default' });
-const CONTENT_BY_WEEK = new Map<number, WeekContent>(Object.values(CONTENT_FILES).map((c) => [c.week, c]));
+// 問題データは src/content/week<n>.json を置けば、その週に自動でつながる (週ごとの PR が同じファイルを触らないため)。
+// ここは軽い形 (?light: 問題は id・形・問題文だけ) で読む。問題の全文は lessons.ts (開いたときに読む画面だけが取り込む)
+const CONTENT_FILES = import.meta.glob<WeekIndex>('./week*.json', { eager: true, import: 'default', query: '?light' });
+const CONTENT_BY_WEEK = new Map<number, WeekIndex>(Object.values(CONTENT_FILES).map((c) => [c.week, c]));
 
 export type WeekMeta = {
   week: number;
@@ -19,7 +20,7 @@ export type WeekMeta = {
    * ホームはハンドブックのデータを読まないので、ここに id と呼び名だけを持つ (実在・題名との一致・その週のレッスンとの紐づけは tests/preRead.test.ts が見る)
    */
   read: { topic: string; label: string }[];
-  content?: WeekContent;
+  content?: WeekIndex;
 };
 
 const WEEK_LIST: Omit<WeekMeta, 'content'>[] = [

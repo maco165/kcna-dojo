@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { allQuestions } from '../src/content';
+import { allQuestions } from '../src/content/lessons';
 import commands from '../src/content/commands.json';
 import { EXAM_ONLY } from '../src/content/examBank';
 import { TOOLS, commandLines, commandUses, matchLine, unknownCommands, type CommandData } from '../src/lib/commandRefs';

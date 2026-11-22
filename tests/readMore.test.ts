@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { allQuestions } from '../src/content';
+import { allQuestions } from '../src/content/lessons';
 import glossary from '../src/content/glossary.json';
 import { HANDBOOK_TOPICS } from '../src/content/handbook';
 import { EXAM_ONLY } from '../src/content/examBank';

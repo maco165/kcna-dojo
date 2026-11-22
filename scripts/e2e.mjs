@@ -69,14 +69,15 @@ const choiceLabel = (q, choiceId) => {
 function checkFirstLoad() {
   const html = readFileSync(new URL('../dist/index.html', import.meta.url), 'utf8');
   const files = [...new Set([...html.matchAll(/\/kcna-dojo\/assets\/([^"]+\.js)/g)].map((m) => m[1]))];
-  const gz = files.reduce((n, f) => n + gzipSync(readFileSync(new URL(`../dist/assets/${f}`, import.meta.url))).length, 0);
+  const gz = files.reduce((n, f) => n + gzipSync(readFileSync(new URL(`../dist/assets/${f}`, import.meta.url)), { level: 9 }).length, 0);
   const kb = Math.round(gz / 1024);
-  check(kb <= 380, `最初に読む JS は gzip で 380KB まで (${kb}KB、${files.length} ファイル)`);
+  // 2026-11-22 に週の問題の全文とレッスンの画面を開いたときに読むようにして 326KB → 240KB (gzip -9 で測った値)。ゆとりを 10KB だけ見る
+  check(kb <= 250, `最初に読む JS は gzip で 250KB まで (${kb}KB、${files.length} ファイル)`);
   // 名前だけでなく中身でも見る (静的に取り込まれて本体に混ざっても気づけるように)。それぞれのデータにしか無い文字で調べる
-  const marks = { ハンドブックのデータ: 'k3s-vs-kubernetes', 用語集のデータ: 'container-image', 説明のページ: '2026-03-22 の版', 模擬試験用の問題: 'のイメージを更新した直後に', 比較表のデータ: 'volumeClaimTemplates:  # Pod ごとに', コマンドの説明: 'リソースの一覧や状態を表で表示します', コマンドのページのデータ: 'Initial install underway', コマンドのページの中身: 'のような種類の名前を、API のグループ・版・資源に引き当てます' };
+  const marks = { ハンドブックのデータ: 'k3s-vs-kubernetes', 用語集のデータ: 'container-image', 説明のページ: '2026-03-22 の版', 模擬試験用の問題: 'のイメージを更新した直後に', 比較表のデータ: 'volumeClaimTemplates:  # Pod ごとに', コマンドの説明: 'リソースの一覧や状態を表で表示します', コマンドのページのデータ: 'Initial install underway', コマンドのページの中身: 'のような種類の名前を、API のグループ・版・資源に引き当てます', 週の問題の解説: 'VM はハイパーバイザーの上でゲスト OS ごと動きます' };
   const text = files.map((f) => readFileSync(new URL(`../dist/assets/${f}`, import.meta.url), 'utf8')).join('\n');
   const found = Object.entries(marks).filter(([, m]) => text.includes(m)).map(([k]) => k);
-  check(found.length === 0, `ハンドブック・用語集・説明のページ・模擬試験用の問題・コマンドの説明・比較表・コマンドのページは最初に読まない ${found.join(',')}`);
+  check(found.length === 0, `ハンドブック・用語集・説明のページ・模擬試験用の問題・コマンドの説明・比較表・コマンドのページ・週の問題の全文は最初に読まない ${found.join(',')}`);
   // 書き出したハンドブックの目次も、画面と同じ 2 部 (h2) と段 (h3) の組みにする
   const hbHtml = readFileSync(new URL('../dist/handbook/index.html', import.meta.url), 'utf8');
   const hbHeads = [...hbHtml.matchAll(/<h([23])>([^<]*)<\/h\1>/g)].map((m) => `${m[1]}:${m[2]}`);

@@ -15,7 +15,7 @@ import RepoLink from '../components/RepoLink';
 import SiteLogo from '../components/SiteLogo';
 import StatusIcon from '../components/StatusIcon';
 import { WEEKS, type WeekMeta } from '../content/curriculum';
-import type { Lesson } from '../content/types';
+import type { LessonMeta as Lesson } from '../content/types';
 import {
   DOMAINS,
   domainAccuracy,

@@ -134,9 +134,9 @@ describe('JS なしの本文', () => {
     expect(none).toEqual([]);
   });
   it('レッスンのページに答えと解説を書かない (画面でも答えるまで出ないため)', async () => {
-    const { WEEKS } = await import('../src/content/curriculum');
-    for (const w of WEEKS) {
-      for (const l of w.content?.lessons ?? []) {
+    const { WEEK_CONTENTS } = await import('../src/content/lessons');
+    for (const w of WEEK_CONTENTS) {
+      for (const l of w.lessons) {
         if (l.kind !== 'quiz') continue;
         const html = docs.find((d) => d.page.path === `lesson/${l.id}/`)!.doc.querySelector('#root')!.innerHTML;
         for (const q of l.questions) {

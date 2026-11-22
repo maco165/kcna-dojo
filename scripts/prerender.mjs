@@ -80,7 +80,10 @@ export async function buildPages(load) {
   const { CURRICULUM, DEFINITION } = await load('/src/content/guide.ts');
   const glossary = (await load('/src/content/glossary.json')).default;
   const pages = [];
-  const lessonsOf = (w) => w.content?.lessons ?? [];
+  // レッスンの本文は問題の全文 (lessons.ts) から書く (curriculum.ts の WEEKS は問題を id・形・問題文だけにした軽い形)
+  const { WEEK_CONTENTS, questionBank } = await load('/src/content/lessons.ts');
+  const fullOf = new Map(WEEK_CONTENTS.map((c) => [c.week, c.lessons]));
+  const lessonsOf = (w) => fullOf.get(w.week) ?? [];
   /** 解説の記事 (ハンドブックのトピック・コマンド・比較表)。出典を citation にする */
   const article = (headline, sources) => ({ '@type': 'TechArticle', headline, citation: [...new Map(sources.map((s) => [s.url, s])).values()].map((s) => ({ '@type': 'CreativeWork', name: s.label, url: s.url })) });
 
@@ -286,7 +289,6 @@ export async function buildPages(load) {
 
   // 模擬試験: 始める前の画面と同じ説明 (形式・分野ごとの問題の数・回) と、本番の試験の形式・出題範囲
   const exam = await load('/src/lib/exam.ts');
-  const { questionBank } = await load('/src/content/index.ts');
   const { EXAM_FACTS } = await load('/src/content/guide.ts');
   const examSets = (await load('/src/content/examSets.json')).default.sets;
   const fresh = examSets.filter((s) => s.questions.every((id) => id.startsWith('x-'))).map((s) => s.id);

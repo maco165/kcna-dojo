@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { dueQuestions, dueReviewCount, findQuestion, isKnownQuestion } from '../src/content';
+import { dueQuestions, dueReviewCount, isKnownQuestion } from '../src/content';
+import { findQuestion } from '../src/content/lessons';
 import { EXAM_ONLY, findExamQuestion } from '../src/content/examBank';
 import { emptyProgress, recordAnswer, upcomingReview } from '../src/lib/progress';
 

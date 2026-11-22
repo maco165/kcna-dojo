@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { questionBank } from '../src/content';
+import { questionBank } from '../src/content/lessons';
 import { EXAM_QUESTIONS, domainCounts, formatClock, gradeExam, isCorrect, pickExamQuestions, recordExam } from '../src/lib/exam';
 import { MAX_EXAM_RECORDS, addExamRecord, emptyProgress, normalizeProgress } from '../src/lib/progress';
 

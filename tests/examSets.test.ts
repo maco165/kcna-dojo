@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { questionBank } from '../src/content';
+import { questionBank } from '../src/content/lessons';
 import { EXAM_ONLY } from '../src/content/examBank';
 import examSets from '../src/content/examSets.json';
 import { defaultChoice, examSetItems, lastExamOf, recordExam, startExam, validateExamSets, type ExamSet } from '../src/lib/exam';
