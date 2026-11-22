@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CALENDAR_WEEKS, calendarWeeks, cellLabel, levelOf, mondayOf, reviewForecast } from '../src/lib/calendar';
+import { CALENDAR_WEEKS, calendarWeeks, cellLabel, levelOf, mondayOf, moveDay, reviewForecast } from '../src/lib/calendar';
 import { completeReview, emptyProgress, normalizeProgress, recordAnswer, type Progress } from '../src/lib/progress';
 
 const at = (day: string) => new Date(`${day}T12:00:00`);
@@ -49,6 +49,34 @@ describe('カレンダー', () => {
     expect(cellLabel(byDay.get('2026-11-20')!)).toBe('11月20日(金) 20 問');
     expect(cellLabel(byDay.get('2026-11-10')!)).toBe('11月10日(火) 学んだ (問題の数の記録なし)');
     expect(cellLabel(byDay.get('2026-11-11')!)).toBe('11月11日(水) 学んでいない');
+  });
+});
+
+describe('学んだ日は終えた日 (R-003)', () => {
+  it('答えただけで何も終えていない日は段を付けず、縁だけの印と読み上げで分ける', () => {
+    let p = emptyProgress();
+    for (let i = 0; i < 5; i++) p = recordAnswer(p, `q${i}`, true, at('2026-11-18')); // レッスンを途中でやめた
+    const c = calendarWeeks(p, at('2026-11-25')).flat().find((x) => x.day === '2026-11-18')!;
+    expect(c).toMatchObject({ count: 5, level: 0, partial: true });
+    expect(cellLabel(c)).toBe('11月18日(水) 5 問に答えた (終えたものは無し)');
+    const done = calendarWeeks(completeReview(p, 3, at('2026-11-18')), at('2026-11-25')).flat().find((x) => x.day === '2026-11-18')!;
+    expect(done).toMatchObject({ level: 1, partial: false });
+  });
+});
+
+describe('選んでいる日を動かす', () => {
+  it('左右は週、上下は日。範囲の外と今日より後へは動かない', () => {
+    const first = '2026-06-01';
+    const today = '2026-11-25';
+    expect(moveDay('2026-11-18', 'ArrowRight', first, today)).toBe('2026-11-25');
+    expect(moveDay('2026-11-20', 'ArrowRight', first, today)).toBe('2026-11-20');
+    expect(moveDay('2026-11-20', 'ArrowLeft', first, today)).toBe('2026-11-13');
+    expect(moveDay('2026-11-20', 'ArrowUp', first, today)).toBe('2026-11-19');
+    expect(moveDay('2026-11-25', 'ArrowDown', first, today)).toBe('2026-11-25');
+    expect(moveDay('2026-06-03', 'ArrowLeft', first, today)).toBe('2026-06-03');
+    expect(moveDay('2026-08-01', 'Home', first, today)).toBe(first);
+    expect(moveDay('2026-08-01', 'End', first, today)).toBe(today);
+    expect(moveDay('2026-08-01', 'x', first, today)).toBe('2026-08-01');
   });
 });
 

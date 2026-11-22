@@ -10,8 +10,13 @@ export type CalendarCell = {
   day: string;
   /** 答えた問題の数 (記録の無い前の版の日は 0) */
   count: number;
-  /** 0 は学んでいない日。1〜4 は段。問題の数の記録が無くても学んだ日は 1 */
+  /**
+   * 0 は学んでいない日。1〜4 は段。学んだ日 (レッスン・復習・模擬試験を終えた日。連続日数・週の目標と同じ) だけに段を付け、
+   * 問題の数の記録が無くても学んだ日は 1
+   */
   level: 0 | 1 | 2 | 3 | 4;
+  /** 答えたが、何も終えていない日 (レッスンを途中でやめた日など)。段は 0 で、縁だけで示す */
+  partial: boolean;
   /** 今日より後 (週の残り。マスを描かない) */
   future: boolean;
 };
@@ -36,16 +41,17 @@ export function calendarWeeks(p: Progress, now: Date, weeks: number = CALENDAR_W
     Array.from({ length: 7 }, (_, i) => {
       const day = addDays(first, w * 7 + i);
       const count = p.solved?.[day] ?? 0;
-      return { day, count, level: levelOf(count, p.xp.byDay[day] !== undefined), future: day > today };
+      const finished = p.xp.byDay[day] !== undefined;
+      return { day, count, level: finished ? levelOf(count, true) : 0, partial: !finished && count > 0, future: day > today };
     }),
   );
 }
 
-/** マスの読み上げ: "11月20日(木) 12 問"。学んだが数の記録が無い日は "学んだ (問題の数の記録なし)" */
+/** マスの読み上げ: "11月20日(木) 12 問"。学んだが数の記録が無い日は "学んだ (問題の数の記録なし)"、答えただけの日は "5 問に答えた (終えたものは無し)" */
 export function cellLabel(c: CalendarCell): string {
   const [y, m, d] = c.day.split('-').map(Number);
   const w = '日月火水木金土'[new Date(y, m - 1, d).getDay()];
-  const what = c.count > 0 ? `${c.count} 問` : c.level > 0 ? '学んだ (問題の数の記録なし)' : '学んでいない';
+  const what = c.partial ? `${c.count} 問に答えた (終えたものは無し)` : c.count > 0 ? `${c.count} 問` : c.level > 0 ? '学んだ (問題の数の記録なし)' : '学んでいない';
   return `${m}月${d}日(${w}) ${what}`;
 }
 
@@ -59,4 +65,15 @@ export function reviewForecast(p: Progress, now: Date, isKnown: (id: string) => 
     if (i !== undefined && isKnown(id)) out[i].count++;
   }
   return out;
+}
+
+/** 選んでいる日を矢印キーで動かす。左右は 1 週 (列)、上下は 1 日 (行)。今日より後と、描いた範囲の外へは動かない */
+export function moveDay(day: string, key: string, first: string, today: string): string {
+  const step: Record<string, number> = { ArrowLeft: -7, ArrowRight: 7, ArrowUp: -1, ArrowDown: 1, Home: -Infinity, End: Infinity };
+  const n = step[key];
+  if (n === undefined) return day;
+  if (n === -Infinity) return first;
+  if (n === Infinity) return today;
+  const next = addDays(day, n);
+  return next < first || next > today ? day : next;
 }

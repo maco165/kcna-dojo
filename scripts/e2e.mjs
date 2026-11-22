@@ -129,7 +129,7 @@ async function checkStudyFeatures(browser, width) {
     xp: { total: 135, byDay },
     lessons: {},
     answers: { [q1]: { right: 1, wrong: 1, last: '2026-11-24T00:00:00.000Z', stage: 0, nextReview: day(26), run: 0 } },
-    solved: { [day(24)]: 20 },
+    solved: { [day(24)]: 20, [day(23)]: 4 },
     profile: { dailyGoalXp: 30, weeklyDays: 3 },
   };
   await page.addInitScript((v) => localStorage.getItem('kcna.v1') || localStorage.setItem('kcna.v1', v), JSON.stringify(state));
@@ -138,13 +138,21 @@ async function checkStudyFeatures(browser, width) {
   check(await page.getByText(/休みの札 1 \/ 2 · 11\/23 に使った/).first().isVisible(), `${tag} ホームに休みの札の数と使った日が出る`);
   check(await page.getByText(/今週 1 \/ 3 日/).first().isVisible(), `${tag} ホームに今週の学んだ日 / 週の目標が出る (月曜から)`);
   await page.goto(`${BASE}progress/`);
-  const cal = page.getByRole('list', { name: /過去 26 週の学んだ日/ });
+  const cal = page.getByRole('group', { name: /過去 26 週の学んだ日/ });
   await cal.waitFor();
-  const cells = await cal.getByRole('listitem').count();
+  const cells = await cal.getByRole('img').count();
   // 26 週 (月曜始まり) のうち、今日 (水) より後の 4 日は描かない
   check(cells === 26 * 7 - 4, `${tag} カレンダーは過去 26 週の今日までのマス (${cells})`);
   check((await cal.getByRole('img', { name: '11月24日(火) 20 問' }).count()) === 1 && (await cal.getByRole('img', { name: '11月10日(火) 学んだ (問題の数の記録なし)' }).count()) === 1, `${tag} マスは日付と問題の数を読み上げる (数の記録の無い日も学んだと出す)`);
   check((await cal.locator('[title="11月24日(火) 20 問"]').count()) === 1, `${tag} マスに title がある`);
+  check((await cal.getByRole('img', { name: '11月23日(月) 4 問に答えた (終えたものは無し)' }).count()) === 1, `${tag} 答えただけで終えていない日は、学んだ日と分けて読み上げる`);
+  // マスを押すと、その日の日付と数を文字で出す。矢印キーで日を動かせる
+  check(await page.getByText('選んだ日: 11月25日(水) 学んでいない').isVisible(), `${tag} はじめは今日を選んでいる`);
+  await cal.getByRole('img', { name: '11月24日(火) 20 問' }).click();
+  check(await page.getByText('選んだ日: 11月24日(火) 20 問').isVisible(), `${tag} マスを押すとその日の日付と数が見える`);
+  await cal.focus();
+  await page.keyboard.press('ArrowLeft');
+  check(await page.getByText('選んだ日: 11月17日(火) 学んだ (問題の数の記録なし)').isVisible() && (await cal.getAttribute('aria-activedescendant')) === 'cal-2026-11-17', `${tag} 矢印キーで日を選べる (左は 1 週前)`);
   check(await page.getByRole('img', { name: /11\/26 1 問/ }).isVisible(), `${tag} この先 14 日の復習の件数が出る`);
   check(await page.getByText(/Kubernetes Fundamentals \(\d+ 問\)/).isVisible() && (await page.getByText(/間違えた \(直近\) 1 \(/).count()) === 1, `${tag} 問題ごとの到達を分野ごとに数と割合で出す`);
   await noHorizontalOverflow(page, width, `${tag} 進捗`);
@@ -162,7 +170,7 @@ async function checkStudyFeatures(browser, width) {
   // 前の版の記録 (札・solved・run・週の目標の無い形) を読ませても落ちない
   await page.evaluate(() => localStorage.setItem('kcna.v1', JSON.stringify({ v: 1, streak: { count: 2, lastDay: '2026-11-24' }, xp: { total: 6, byDay: { '2026-11-24': 6 } }, lessons: {}, answers: { x: { right: 1, wrong: 0, last: '' } } })));
   await page.goto(`${BASE}progress/`);
-  await page.getByRole('list', { name: /過去 26 週の学んだ日/ }).waitFor();
+  await page.getByRole('group', { name: /過去 26 週の学んだ日/ }).waitFor();
   check(await page.getByText('0 / 2').first().isVisible(), `${tag} 前の版の記録は休みの札 0 個で読む`);
   check(errors.length === 0, `${tag} 画面のエラーが無い (${errors.join(' / ')})`);
   await context.close();

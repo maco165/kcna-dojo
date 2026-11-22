@@ -3015,12 +3015,6 @@ html[data-loading='true'] body::before {
   box-shadow: inset 0 0 0 1px var(--color-border);
 }
 
-.cal__mark {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-
 .cal__cell--key {
   width: 12px;
 }
@@ -3138,4 +3132,25 @@ html[data-loading='true'] body::before {
 
 .mastery__seg--wrong {
   background: repeating-linear-gradient(135deg, var(--color-error) 0 3px, var(--color-error-muted) 3px 6px);
+}
+
+/* 答えたが何も終えていない日 (縁だけ)、選んでいる日 (太い枠)、マスの並びのフォーカス */
+.cal__cell--partial {
+  background: var(--color-background-card);
+  box-shadow: inset 0 0 0 2px var(--color-accent);
+}
+
+.cal__cell--picked {
+  outline: 2px solid var(--color-text-primary);
+  outline-offset: 1px;
+}
+
+.cal:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 4px;
+  border-radius: var(--radius-inner);
+}
+
+.cal__cell[data-day] {
+  cursor: pointer;
 }
