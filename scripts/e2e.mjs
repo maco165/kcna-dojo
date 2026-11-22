@@ -107,6 +107,75 @@ function checkSpeedBuild() {
   check(data.length >= 5 && literal.length === 0, `大きなデータのチャンクは JSON.parse で読む (${data.length} ファイル、そうでないもの ${literal.join(',')})`);
 }
 
+/**
+ * 学びを続ける仕組み (休みの札・週の目標・カレンダー・復習の予測・到達・.ics) を、決まった時刻と記録で見る。
+ * 前の版の記録 (札・solved・run の無い形) を読ませても画面が落ちないことも見る
+ */
+async function checkStudyFeatures(browser, width) {
+  const tag = `[学びの仕組み ${width}]`;
+  const context = await browser.newContext({ viewport: { width, height: 900 }, acceptDownloads: true });
+  const page = await context.newPage();
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  // 2026-11-25 (水) 21:00。11/09〜11/22 に学び (札 2 個)、11/23 は休み、11/24 に学んだ。週の目標は 3 日
+  await page.clock.setFixedTime(new Date(2026, 10, 25, 21, 0));
+  const q1 = l1.questions[0].id;
+  const day = (d) => `2026-11-${String(d).padStart(2, '0')}`;
+  const byDay = Object.fromEntries(Array.from({ length: 14 }, (_, i) => [day(9 + i), 9]));
+  byDay[day(24)] = 9;
+  const state = {
+    v: 1,
+    streak: { count: 15, lastDay: day(24), freezes: 1, toNext: 1, used: [day(23)] },
+    xp: { total: 135, byDay },
+    lessons: {},
+    answers: { [q1]: { right: 1, wrong: 1, last: '2026-11-24T00:00:00.000Z', stage: 0, nextReview: day(26), run: 0 } },
+    solved: { [day(24)]: 20, [day(23)]: 4 },
+    profile: { dailyGoalXp: 30, weeklyDays: 3 },
+  };
+  await page.addInitScript((v) => localStorage.getItem('kcna.v1') || localStorage.setItem('kcna.v1', v), JSON.stringify(state));
+  await page.goto(BASE);
+  await page.getByRole('heading', { name: 'コンテナの基礎' }).waitFor();
+  check(await page.getByText(/休みの札 1 \/ 2 · 11\/23 に使った/).first().isVisible(), `${tag} ホームに休みの札の数と使った日が出る`);
+  check(await page.getByText(/今週 1 \/ 3 日/).first().isVisible(), `${tag} ホームに今週の学んだ日 / 週の目標が出る (月曜から)`);
+  await page.goto(`${BASE}progress/`);
+  const cal = page.getByRole('group', { name: /過去 26 週の学んだ日/ });
+  await cal.waitFor();
+  const cells = await cal.getByRole('img').count();
+  // 26 週 (月曜始まり) のうち、今日 (水) より後の 4 日は描かない
+  check(cells === 26 * 7 - 4, `${tag} カレンダーは過去 26 週の今日までのマス (${cells})`);
+  check((await cal.getByRole('img', { name: '11月24日(火) 20 問' }).count()) === 1 && (await cal.getByRole('img', { name: '11月10日(火) 学んだ (問題の数の記録なし)' }).count()) === 1, `${tag} マスは日付と問題の数を読み上げる (数の記録の無い日も学んだと出す)`);
+  check((await cal.locator('[title="11月24日(火) 20 問"]').count()) === 1, `${tag} マスに title がある`);
+  check((await cal.getByRole('img', { name: '11月23日(月) 4 問に答えた (終えたものは無し)' }).count()) === 1, `${tag} 答えただけで終えていない日は、学んだ日と分けて読み上げる`);
+  // マスを押すと、その日の日付と数を文字で出す。矢印キーで日を動かせる
+  check(await page.getByText('選んだ日: 11月25日(水) 学んでいない').isVisible(), `${tag} はじめは今日を選んでいる`);
+  await cal.getByRole('img', { name: '11月24日(火) 20 問' }).click();
+  check(await page.getByText('選んだ日: 11月24日(火) 20 問').isVisible(), `${tag} マスを押すとその日の日付と数が見える`);
+  await cal.focus();
+  await page.keyboard.press('ArrowLeft');
+  check(await page.getByText('選んだ日: 11月17日(火) 学んだ (問題の数の記録なし)').isVisible() && (await cal.getAttribute('aria-activedescendant')) === 'cal-2026-11-17', `${tag} 矢印キーで日を選べる (左は 1 週前)`);
+  check(await page.getByRole('img', { name: /11\/26 1 問/ }).isVisible(), `${tag} この先 14 日の復習の件数が出る`);
+  check(await page.getByText(/Kubernetes Fundamentals \(\d+ 問\)/).isVisible() && (await page.getByText(/間違えた \(直近\) 1 \(/).count()) === 1, `${tag} 問題ごとの到達を分野ごとに数と割合で出す`);
+  await noHorizontalOverflow(page, width, `${tag} 進捗`);
+  await page.goto(`${BASE}settings/`);
+  await page.getByRole('heading', { name: 'カレンダーに学ぶ予定を入れる' }).waitFor();
+  // 入力欄は押したときに読む (設定の画面を軽くするため)
+  check((await page.getByRole('textbox', { name: '時刻' }).count()) === 0, `${tag} 予定の入力欄は押すまで読まない`);
+  await page.getByRole('button', { name: '予定を作る' }).click();
+  await page.getByRole('textbox', { name: '時刻' }).waitFor();
+  check((await page.getByRole('checkbox', { checked: true }).count()) === 3, `${tag} 週の目標 3 日なら、曜日を 3 つ選んでおく`);
+  const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: '予定をダウンロード (.ics)' }).click()]);
+  const ics = readFileSync(await download.path(), 'utf8');
+  check(download.suggestedFilename().endsWith('.ics') && ics.startsWith('BEGIN:VCALENDAR\r\n') && ics.endsWith('END:VCALENDAR\r\n') && /RRULE:FREQ=WEEKLY;BYDAY=MO,WE,FR/.test(ics) && /BEGIN:VTIMEZONE/.test(ics), `${tag} 設定から学ぶ予定の .ics を保存できる`);
+  await noHorizontalOverflow(page, width, `${tag} 設定`);
+  // 前の版の記録 (札・solved・run・週の目標の無い形) を読ませても落ちない
+  await page.evaluate(() => localStorage.setItem('kcna.v1', JSON.stringify({ v: 1, streak: { count: 2, lastDay: '2026-11-24' }, xp: { total: 6, byDay: { '2026-11-24': 6 } }, lessons: {}, answers: { x: { right: 1, wrong: 0, last: '' } } })));
+  await page.goto(`${BASE}progress/`);
+  await page.getByRole('group', { name: /過去 26 週の学んだ日/ }).waitFor();
+  check(await page.getByText('0 / 2').first().isVisible(), `${tag} 前の版の記録は休みの札 0 個で読む`);
+  check(errors.length === 0, `${tag} 画面のエラーが無い (${errors.join(' / ')})`);
+  await context.close();
+}
+
 async function run(browser, name, width, height) {
   const context = await browser.newContext({ viewport: { width, height } });
   const page = await context.newPage();
@@ -497,6 +566,9 @@ async function run(browser, name, width, height) {
   else await page.getByRole('textbox', { name: '空欄' }).fill('x');
   await page.getByRole('button', { name: '次へ' }).click();
   check(await page.getByText(/模擬試験 · 2 \/ 60 問 · 答えた 1/).isVisible(), `${tag} 次へで 2 問目に進み、答えた数が数えられる`);
+  // 2 問目に「あとで見直す」の印を付ける。印は途中の保存にも入る
+  await page.getByRole('button', { name: 'あとで見直す' }).click();
+  check(await page.waitForFunction(() => JSON.stringify(JSON.parse(localStorage.getItem('kcna.exam.v1') ?? '{}').marks) === '[1]').then(() => true, () => false), `${tag} 見直す印を途中の保存に入れる`);
   // 途中で再読み込みしても、続きから解ける (回・答え・いまの問題・期限を保存する)
   const secondPrompt = await page.locator('main h1, main h2').first().textContent();
   const savedEndsAt = await page.evaluate(() => JSON.parse(localStorage.getItem('kcna.exam.v1') ?? '{}').endsAt);
@@ -507,8 +579,18 @@ async function run(browser, name, width, height) {
   check(await page.getByText(/模擬試験 · 2 \/ 60 問 · 答えた 1/).isVisible(), `${tag} 続きから解くと、同じ問題・同じ答えた数から始まる`);
   check(typeof savedEndsAt === 'number' && (await page.evaluate(() => JSON.parse(localStorage.getItem('kcna.exam.v1') ?? '{}').endsAt)) === savedEndsAt, `${tag} 続きから解いても残り時間の期限は最初のまま`);
   check((await page.locator('main h1, main h2').first().textContent()) === secondPrompt, `${tag} 続きから解くと、閉じる前と同じ問題が出る`);
+  check((await page.getByRole('button', { name: 'あとで見直す' }).getAttribute('aria-pressed')) === 'true', `${tag} 続きから解くと見直す印も戻る`);
+  // 問題の一覧: 60 問のボタンが状態を読み上げ、押すとその問題へ移る
+  await page.getByRole('button', { name: /^問題の一覧 \(未回答 59 · 印 1\)$/ }).click();
+  const nav = page.getByRole('navigation', { name: '問題の一覧' });
+  check((await nav.getByRole('button').count()) === 60, `${tag} 問題の一覧に 60 問のボタンがある`);
+  check((await nav.getByRole('button', { name: '1 問目 回答済み' }).count()) === 1 && (await nav.getByRole('button', { name: '2 問目 未回答・見直す印あり・表示中' }).count()) === 1, `${tag} 問題の一覧は回答済み・未回答・印を文字で読み上げる`);
+  await noHorizontalOverflow(page, width, `${tag} 模擬試験の問題の一覧`);
+  await nav.getByRole('button', { name: /^1 問目/ }).click();
+  check(await page.getByText(/模擬試験 · 1 \/ 60 問/).isVisible(), `${tag} 問題の一覧から好きな問題へ移れる`);
   await page.getByRole('button', { name: '採点する' }).first().click();
   check(await page.getByText(/まだ答えていない問題が 59 問あります/).isVisible(), `${tag} 採点の前に答えていない数を知らせる`);
+  check(await page.getByText(/「あとで見直す」の印が 1 問に付いています/).isVisible(), `${tag} 採点の前に見直す印の数を知らせる`);
   await page.getByRole('button', { name: '採点する' }).last().click();
   await page.getByRole('heading', { name: '結果' }).waitFor();
   const afterExam = await page.evaluate(() => JSON.parse(localStorage.getItem('kcna.v1') ?? 'null'));
@@ -1058,6 +1140,8 @@ try {
   checkSpeedBuild();
   await run(browser, 'phone', 390, 844);
   await run(browser, 'pc', 1280, 860);
+  await checkStudyFeatures(browser, 390);
+  await checkStudyFeatures(browser, 1280);
 } catch (e) {
   console.log(`FAIL 実行中に止まりました: ${e.message}`);
   failures++;

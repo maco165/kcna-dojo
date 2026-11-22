@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { questionBank } from '../src/content/lessons';
 import { EXAM_ONLY } from '../src/content/examBank';
 import { startExam } from '../src/lib/exam';
-import { EXAM_SAVE_KEY, clearExam, finishExam, isExpired, isFinished, loadExam, newExamId, saveExam } from '../src/lib/examSave';
+import { EXAM_SAVE_KEY, clearExam, finishExam, isExpired, isFinished, loadExam, markCount, newExamId, saveExam } from '../src/lib/examSave';
 import { STORAGE_KEY } from '../src/lib/progress';
 import examSets from '../src/content/examSets.json';
 
@@ -107,5 +107,38 @@ describe('2 つのタブで同じ回を開いたとき (記録を 2 回付けな
   it('回の id は回ごとに違う', () => {
     expect(newExamId(1, () => 0.1)).not.toBe(newExamId(1, () => 0.2));
     expect(newExamId(1, () => 0.1)).not.toBe(newExamId(2, () => 0.1));
+  });
+  it('「あとで見直す」の印を保存し、戻せる。印が無ければ書かない', () => {
+    const s = memoryStorage();
+    const { items, set } = startExam(2, sets, bank);
+    const marks = items.map((_, i) => i === 3 || i === 59);
+    saveExam({ id: 'm1', set, items, answers: [], index: 3, endsAt: 9e15, marks }, s);
+    expect(JSON.parse(s.data[EXAM_SAVE_KEY]).marks).toEqual([3, 59]);
+    const back = loadExam(bank, s)!;
+    expect(back.marks).toEqual(marks);
+    expect(markCount(back.marks)).toBe(2);
+    saveExam({ id: 'm1', set, items, answers: [], index: 3, endsAt: 9e15, marks: items.map((_, i) => i === 0) }, s);
+    expect(loadExam(bank, s)!.marks![0]).toBe(true);
+    saveExam({ id: 'm1', set, items, answers: [], index: 3, endsAt: 9e15, marks: items.map(() => false) }, s);
+    expect(JSON.parse(s.data[EXAM_SAVE_KEY])).not.toHaveProperty('marks');
+  });
+
+  it('印の無い前の版の保存も続きから解け、印は無し。形の違う印は捨てる', () => {
+    const { items } = startExam(1, sets, bank);
+    const old = { v: 1, id: 'old', items: items.map((x) => ({ id: x.question.id, order: x.question.type === 'choice' ? x.question.choices.map((c) => c.id) : x.question.candidates })), answers: items.map(() => null), index: 2, endsAt: 9e15 };
+    const back = loadExam(bank, memoryStorage({ [EXAM_SAVE_KEY]: JSON.stringify(old) }))!;
+    expect(back.index).toBe(2);
+    expect(markCount(back.marks)).toBe(0);
+    const bad = loadExam(bank, memoryStorage({ [EXAM_SAVE_KEY]: JSON.stringify({ ...old, marks: [1, 'x', -1, 60, 1.5, 4] }) }))!;
+    expect(bad.marks!.flatMap((m, i) => (m ? [i] : []))).toEqual([1, 4]);
+  });
+
+  it('採点した回は印を付け直しても書き戻さない (2 つのタブ)', () => {
+    const shared = memoryStorage();
+    const { items, set } = startExam(1, sets, bank);
+    saveExam({ id: 't2', set, items, answers: [], index: 0, endsAt: 9e15 }, shared);
+    expect(finishExam('t2', shared)).toBe(true);
+    expect(saveExam({ id: 't2', set, items, answers: [], index: 0, endsAt: 9e15, marks: [true] }, shared, { onlyIfCurrent: true })).toBe(false);
+    expect(shared.data[EXAM_SAVE_KEY]).toBeUndefined();
   });
 });

@@ -467,6 +467,19 @@ body {
   overflow: hidden;
 }
 
+/* 4 つの数 (試験まで・連続・休みの札・計画) は 2 列 2 段 */
+.stats--four {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.stats--four .stats__item:nth-child(2n) {
+  border-right: 0;
+}
+
+.stats--four .stats__item:nth-child(-n + 2) {
+  border-bottom: 1px solid var(--color-border);
+}
+
 .text-warning {
   color: var(--color-text-warning);
 }
@@ -2982,4 +2995,162 @@ html[data-loading='true'] body::before {
 .gloss-row {
   content-visibility: auto;
   contain-intrinsic-size: auto 76px;
+}
+
+/* 進捗の画面: 過去 26 週の学んだ日のマス (縦に月〜日、左が古い)。段は色の濃さと、マスごとの読み上げ・title で伝える */
+.cal {
+  display: grid;
+  grid-template-rows: repeat(7, auto);
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 2px;
+}
+
+.cal__cell {
+  display: block;
+  aspect-ratio: 1;
+  border-radius: 2px;
+  background: var(--color-background-muted);
+  /* 地 (カード) と見分けるための枠。段の差は濃さで、地との差は枠で出す */
+  box-shadow: inset 0 0 0 1px var(--color-border);
+}
+
+.cal__cell--key {
+  width: 12px;
+}
+
+.cal__cell--future {
+  background: transparent;
+  box-shadow: none;
+}
+
+.cal__cell--l1 {
+  background: color-mix(in srgb, var(--color-accent) 30%, var(--color-background-card));
+}
+
+.cal__cell--l2 {
+  background: color-mix(in srgb, var(--color-accent) 55%, var(--color-background-card));
+}
+
+.cal__cell--l3 {
+  background: color-mix(in srgb, var(--color-accent) 80%, var(--color-background-card));
+}
+
+.cal__cell--l4 {
+  background: var(--color-accent);
+  box-shadow: inset 0 0 0 1px var(--color-text-primary);
+}
+
+.xp-chart--forecast {
+  grid-template-columns: repeat(14, minmax(0, 1fr));
+  gap: var(--spacing-1);
+}
+
+.xp-chart__value {
+  text-align: center;
+  font-size: var(--text-supporting-size);
+  color: var(--color-text-primary);
+}
+
+/* 模擬試験の問題の一覧: 回答済みは塗り、未回答は枠だけ、見直す印は旗 (色だけに頼らない) */
+.exam-nav__grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+  gap: var(--spacing-1);
+}
+
+.exam-nav__item {
+  position: relative;
+  width: 100%;
+  min-height: 44px;
+  border-radius: var(--radius-inner);
+  border: 1px solid var(--color-border-emphasized);
+  background: var(--color-background-card);
+  color: var(--color-text-primary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.exam-nav__item--done {
+  background: var(--color-accent-muted);
+  border-color: var(--color-accent);
+}
+
+.exam-nav__item[aria-current='step'] {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+  font-weight: 600;
+}
+
+.exam-nav__item:focus-visible {
+  outline: 2px solid var(--color-text-primary);
+  outline-offset: 2px;
+}
+
+.exam-nav__flag {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  color: var(--color-text-warning);
+}
+
+/* 進捗の画面: 問題ごとの到達の帯 (数と割合は文で出す。帯は濃さと模様で分ける) */
+.mastery {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+}
+
+.mastery__row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-1);
+}
+
+.mastery__bar {
+  display: flex;
+  height: 10px;
+  border-radius: var(--radius-inner);
+  overflow: hidden;
+  background: var(--color-background-muted);
+  box-shadow: inset 0 0 0 1px var(--color-border);
+}
+
+.mastery__seg--twice {
+  background: var(--color-accent);
+}
+
+.mastery__seg--once {
+  background: color-mix(in srgb, var(--color-accent) 45%, var(--color-background-card));
+}
+
+.mastery__seg--wrong {
+  background: repeating-linear-gradient(135deg, var(--color-error) 0 3px, var(--color-error-muted) 3px 6px);
+}
+
+/* 答えたが何も終えていない日 (縁だけ)、選んでいる日 (太い枠)、マスの並びのフォーカス */
+.cal__cell--partial {
+  background: var(--color-background-card);
+  box-shadow: inset 0 0 0 2px var(--color-accent);
+}
+
+.cal__cell--picked {
+  outline: 2px solid var(--color-text-primary);
+  outline-offset: 1px;
+}
+
+.cal:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 4px;
+  border-radius: var(--radius-inner);
+}
+
+.cal__cell[data-day] {
+  cursor: pointer;
 }

@@ -55,7 +55,7 @@ describe('completeLesson', () => {
   it('同じ日に続けても連続日数は増えない', () => {
     let p = completeLesson(emptyProgress(), 'w1-l1', score, 12, at('2026-11-23', 9));
     p = completeLesson(p, 'w1-l2', score, 12, at('2026-11-23', 21));
-    expect(p.streak).toEqual({ count: 1, lastDay: '2026-11-23' });
+    expect(p.streak).toEqual({ count: 1, lastDay: '2026-11-23', toNext: 1 });
   });
 
   it('翌日に解くと 1 増え、1 日空くと 1 に戻る', () => {
@@ -270,7 +270,7 @@ describe('復習の予定 (1・3・7 日後)', () => {
   it('復習を終えると XP が入り連続日数が進むが、レッスンの完了は付かない', () => {
     const p = completeReview(emptyProgress(), 6, at('2026-11-24'));
     expect(p.xp.total).toBe(6);
-    expect(p.streak).toEqual({ count: 1, lastDay: '2026-11-24' });
+    expect(p.streak).toEqual({ count: 1, lastDay: '2026-11-24', toNext: 1 });
     expect(p.lessons).toEqual({});
   });
 });
@@ -325,5 +325,34 @@ describe('画面の色', () => {
     const base = { ...emptyProgress(), profile: { dailyGoalXp: 30, examDate: '2027-03-06' } };
     expect(normalizeProgress({ ...base, profile: { ...base.profile, colorMode: 'dark' } })?.profile?.colorMode).toBe('dark');
     expect(normalizeProgress({ ...base, profile: { ...base.profile, colorMode: 'pink' } })?.profile?.colorMode).toBeUndefined();
+  });
+});
+
+describe('知らない欄 (新しい版が足した欄) を残す (R-005)', () => {
+  it('読み込み・答え・連続の更新・設定の変更で消さない', () => {
+    const raw = {
+      v: 1,
+      future: { a: 1 },
+      streak: { count: 1, lastDay: '2026-11-20', later: 'x' },
+      xp: { total: 0, byDay: {} },
+      lessons: {},
+      answers: { q: { right: 1, wrong: 0, last: '', extra: 7 } },
+      profile: { dailyGoalXp: 30, theme2: 'y' },
+    };
+    let p = normalizeProgress(raw)!;
+    p = recordAnswer(p, 'q', false, new Date('2026-11-21T12:00:00'));
+    p = completeReview(p, 3, new Date('2026-11-21T12:00:00'));
+    p = setProfile(p, { examDate: '2027-01-01' });
+    const back = JSON.parse(JSON.stringify(p));
+    expect(back.future).toEqual({ a: 1 });
+    expect(back.streak.later).toBe('x');
+    expect(back.answers.q.extra).toBe(7);
+    expect(back.profile.theme2).toBe('y');
+    expect(normalizeProgress(back)!).toMatchObject({ future: { a: 1 } });
+  });
+  it('__proto__ などは写さない', () => {
+    const p = normalizeProgress(JSON.parse('{"v":1,"__proto__":{"polluted":1},"streak":{},"xp":{},"lessons":{},"answers":{}}'))!;
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+    expect(Object.prototype.hasOwnProperty.call(p, '__proto__')).toBe(false);
   });
 });

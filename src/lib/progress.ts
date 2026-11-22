@@ -8,7 +8,29 @@ export type LessonRecord = { done: boolean; best: number; at: string };
  * 問題ごとの記録。復習の予定 (nextReview) があるものが復習の対象。
  * stage は復習で続けて正解した回数 (0〜2)。
  */
-export type AnswerRecord = { right: number; wrong: number; last: string; stage?: number; nextReview?: string };
+export type AnswerRecord = { right: number; wrong: number; last: string; stage?: number; nextReview?: string; run?: number };
+
+/** 続けて正解した数の上限 (それより先は数えない) */
+export const MAX_RUN = 9;
+
+/** 問題ごとの到達: まだ解いていない・直近で間違えた・1 回正解・2 回続けて正解 */
+export type Mastery = 'new' | 'wrong' | 'once' | 'twice';
+
+/**
+ * 問題の到達。run (続けて正解した数) があればそれで決める。run の無い前の版の記録は、正誤の数と復習の段階から推す:
+ * 正解が無ければ間違えた、間違いが無ければ正解の数 (2 回からは続けて正解)、両方あれば復習の段階
+ * (予定が無い = 復習を終えた、段階 2 = 2 回続けて正解、段階 1 = 1 回正解、段階 0 = 間違えた)
+ */
+export function masteryOf(rec: AnswerRecord | undefined): Mastery {
+  if (!rec || rec.right + rec.wrong === 0) return 'new';
+  if (rec.run !== undefined) return rec.run === 0 ? 'wrong' : rec.run === 1 ? 'once' : 'twice';
+  if (rec.right === 0) return 'wrong';
+  if (rec.wrong === 0) return rec.right >= 2 ? 'twice' : 'once';
+  if (rec.nextReview === undefined || (rec.stage ?? 0) >= 2) return 'twice';
+  return (rec.stage ?? 0) >= 1 ? 'once' : 'wrong';
+}
+
+const RUN_OF: Record<Mastery, number> = { new: 0, wrong: 0, once: 1, twice: 2 };
 
 /** 問題ごとの記録を 1 行の文にする (例: これまで 3 回 (正解 2・不正解 1) · 最後 11/18)。記録が無ければ「はじめて」 */
 export function answerHistory(rec: AnswerRecord | undefined): string {
@@ -30,7 +52,10 @@ export const COLOR_MODES: readonly ColorMode[] = ['system', 'light', 'dark'];
  * 受験日 (examDate) は利用者が決めるまで持たない (決めていない人に試験までの日数を出さない)。
  * 学習の開始日 (startDate) は週の日付を数える起点で、決めていなければ初めて学んだ日 (planStart)
  */
-export type Profile = { dailyGoalXp: number; examDate?: string; startDate?: string; colorMode?: ColorMode };
+export type Profile = { dailyGoalXp: number; examDate?: string; startDate?: string; colorMode?: ColorMode; weeklyDays?: number };
+
+/** 週の目標 (週に何日学ぶか) に選べる値。既定は決めない (無ければホームに出さない) */
+export const WEEKLY_DAY_CHOICES = [1, 2, 3, 4, 5, 6, 7] as const;
 
 /** 1 日の目標の XP の既定と選べる値 */
 export const DEFAULT_GOAL_XP = 30;
@@ -44,15 +69,29 @@ export const MAX_EXAM_RECORDS = 20;
 /** ハンドブックのトピックごとの読んだ記録。seen は「全体の流れ」の何段目までを画面に出したか、done は確認済み */
 export type HandbookRecord = { seen: number; done?: boolean; at: string };
 
+/**
+ * 連続日数。freezes は休みの札の数 (0〜MAX_FREEZES)、toNext は次の札まで学んだ日の数 (0〜6)、
+ * used は札を使った日 (古い順に最大 MAX_USED 件)。札の欄が無い前の版の記録は 0 個から数える
+ */
+export type Streak = { count: number; lastDay: string | null; freezes?: number; toNext?: number; used?: string[] };
+
+/** 休みの札の上限と、1 個たまるまでに学ぶ日の数 */
+export const MAX_FREEZES = 2;
+export const FREEZE_EVERY = 7;
+/** 札を使った日を残す数 */
+export const MAX_USED = 14;
+
 export type Progress = {
   v: 1;
   handbook?: Record<string, HandbookRecord>;
   profile?: Profile;
   exams?: ExamRecord[];
-  streak: { count: number; lastDay: string | null };
+  streak: Streak;
   xp: { total: number; byDay: Record<string, number> };
   lessons: Record<string, LessonRecord>;
   answers: Record<string, AnswerRecord>;
+  /** 日ごとの答えた問題の数 (レッスン・復習・模擬試験)。前の版の記録には無い */
+  solved?: Record<string, number>;
 };
 
 type KeyValueStorage = Pick<Storage, 'getItem' | 'setItem'>;
@@ -94,6 +133,23 @@ export function isValidDay(v: unknown): v is string {
   return dayKey(new Date(y, m - 1, d)) === v;
 }
 
+/**
+ * 知らない欄 (この版の後で足された欄) をそのまま写す。古い版の画面が開いたままのタブで保存しても、
+ * 新しい版が足した欄を消さないため (知っている欄は呼ぶ側が確かめて書く)
+ */
+function unknownFields(raw: Record<string, unknown>, known: readonly string[]): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(raw)) if (!known.includes(k) && k !== '__proto__' && k !== 'constructor' && k !== 'prototype') out[k] = v;
+  return out;
+}
+
+const KNOWN = {
+  top: ['v', 'handbook', 'profile', 'exams', 'streak', 'xp', 'lessons', 'answers', 'solved'],
+  streak: ['count', 'lastDay', 'freezes', 'toNext', 'used'],
+  profile: ['dailyGoalXp', 'examDate', 'startDate', 'colorMode', 'weeklyDays'],
+  answer: ['right', 'wrong', 'last', 'stage', 'nextReview', 'run'],
+} as const;
+
 /** 値を 1 つずつ確かめ、形の合うものだけ残す (読み込んだファイルや壊れた localStorage で画面が落ちないように) */
 function cleanRecords<T>(raw: unknown, clean: (v: Record<string, unknown>) => T | null): Record<string, T> {
   const out: Record<string, T> = {};
@@ -117,8 +173,10 @@ export function normalizeProgress(raw: unknown): Progress | null {
     for (const [day, v] of Object.entries(xp.byDay)) if (isValidDay(day) && isCount(v)) byDay[day] = v;
   }
   const out: Progress = {
+    ...(unknownFields(raw, KNOWN.top) as object),
     v: 1,
     streak: {
+      ...(unknownFields(streak, KNOWN.streak) as object),
       count: isCount(streak.count) ? Math.floor(streak.count) : 0,
       lastDay: isValidDay(streak.lastDay) ? streak.lastDay : null,
     },
@@ -128,10 +186,12 @@ export function normalizeProgress(raw: unknown): Progress | null {
     ),
     answers: cleanRecords(raw.answers, (v) => {
       const a: AnswerRecord = {
+        ...(unknownFields(v, KNOWN.answer) as object),
         right: isCount(v.right) ? Math.floor(v.right) : 0,
         wrong: isCount(v.wrong) ? Math.floor(v.wrong) : 0,
         last: typeof v.last === 'string' ? v.last : '',
       };
+      if (isCount(v.run)) a.run = Math.min(Math.floor(v.run), MAX_RUN);
       if (isValidDay(v.nextReview)) {
         a.nextReview = v.nextReview;
         a.stage = isCount(v.stage) ? Math.min(Math.floor(v.stage), REVIEW_INTERVALS.length - 1) : 0;
@@ -139,6 +199,18 @@ export function normalizeProgress(raw: unknown): Progress | null {
       return a;
     }),
   };
+  if (isObject(raw.solved)) {
+    const solved: Record<string, number> = {};
+    for (const [day, v] of Object.entries(raw.solved)) if (isValidDay(day) && isCount(v) && v >= 1) solved[day] = Math.floor(v);
+    if (Object.keys(solved).length > 0) out.solved = solved;
+  }
+  // 休みの札 (前の版の記録には無い。無ければ書かない)
+  if (isCount(streak.freezes) && streak.freezes >= 1) out.streak.freezes = Math.min(Math.floor(streak.freezes), MAX_FREEZES);
+  if (isCount(streak.toNext) && streak.toNext >= 1) out.streak.toNext = Math.min(Math.floor(streak.toNext), FREEZE_EVERY - 1);
+  if (Array.isArray(streak.used)) {
+    const used = [...new Set(streak.used.filter(isValidDay))].sort().slice(-MAX_USED);
+    if (used.length > 0) out.streak.used = used;
+  }
   if (Array.isArray(raw.exams)) {
     out.exams = raw.exams
       .filter((e): e is Record<string, unknown> => isObject(e) && typeof e.at === 'string' && !Number.isNaN(Date.parse(e.at)) && isCount(e.correct) && isCount(e.total) && (e.total as number) > 0 && (e.correct as number) <= (e.total as number))
@@ -152,11 +224,13 @@ export function normalizeProgress(raw: unknown): Progress | null {
   if (Object.keys(handbook).length > 0) out.handbook = handbook;
   if (profile) {
     out.profile = {
+      ...(unknownFields(profile, KNOWN.profile) as object),
       dailyGoalXp: (GOAL_CHOICES as readonly number[]).includes(profile.dailyGoalXp as number) ? (profile.dailyGoalXp as number) : DEFAULT_GOAL_XP,
     };
     // 受験日と開始日は、実在する日付のときだけ残す (前の版が書いた受験日もそのまま読む)
     if (isValidDay(profile.examDate)) out.profile.examDate = profile.examDate;
     if (isValidDay(profile.startDate)) out.profile.startDate = profile.startDate;
+    if ((WEEKLY_DAY_CHOICES as readonly unknown[]).includes(profile.weeklyDays)) out.profile.weeklyDays = profile.weeklyDays as number;
     if ((COLOR_MODES as readonly unknown[]).includes(profile.colorMode) && profile.colorMode !== 'system') out.profile.colorMode = profile.colorMode as ColorMode;
   }
   return out;
@@ -206,10 +280,15 @@ function safeLocalStorage(): Storage | undefined {
 export function recordAnswer(p: Progress, questionId: string, correct: boolean, now: Date): Progress {
   const today = dayKey(now);
   const prev = p.answers[questionId] ?? { right: 0, wrong: 0, last: '' };
+  // 知らない欄 (新しい版が足した欄) は残し、復習の予定は下で決め直す
+  const { stage: _stage, nextReview: _next, ...kept } = prev;
   const next: AnswerRecord = {
+    ...kept,
     right: prev.right + (correct ? 1 : 0),
     wrong: prev.wrong + (correct ? 0 : 1),
     last: now.toISOString(),
+    // 続けて正解した数。前の版の記録 (run が無い) は、そこまでの到達から数え始める
+    run: correct ? Math.min((prev.run ?? RUN_OF[masteryOf(p.answers[questionId])]) + 1, MAX_RUN) : 0,
   };
   if (!correct) {
     // 間違えたら (初めてでも、復習の途中でも) 翌日からやり直す
@@ -227,7 +306,7 @@ export function recordAnswer(p: Progress, questionId: string, correct: boolean, 
     next.stage = prev.stage ?? 0;
     next.nextReview = prev.nextReview;
   }
-  return { ...p, answers: { ...p.answers, [questionId]: next } };
+  return { ...p, answers: { ...p.answers, [questionId]: next }, solved: { ...p.solved, [today]: (p.solved?.[today] ?? 0) + 1 } };
 }
 
 /** 今日までに予定が来ている復習の問題の id (予定の早い順) */
@@ -251,16 +330,53 @@ export function upcomingReview(p: Progress, now: Date, isKnown: (id: string) => 
   return { day: days[0], count: days.filter((d) => d === days[0]).length };
 }
 
+/** 前に学んだ日と今日の間で、学ばなかった日の数 (前に学んでいない・日付が戻ったときは null) */
+function missedDays(lastDay: string | null, today: string): number | null {
+  if (!lastDay) return null;
+  const gap = daysBetween(lastDay, today) - 1;
+  return gap >= 0 ? gap : null;
+}
+
+/**
+ * 今日学んだときの連続日数と休みの札。順番は「使う → たまる」:
+ * 1. 学ばなかった日があり、その日数ぶんの札があれば、札を使って連続を保つ (今日の分の 1 だけ増える。休んだ日は数えない)。
+ *    足りなければ札は使わずに 1 から数え直す
+ * 2. 今日が新しく学んだ日なら、次の札までの日を 1 進め、7 日で札を 1 個足す (上限 2 個。上限でも日は数え、7 日で 0 に戻す)
+ */
+export function advanceStreak(s: Streak, today: string): Streak {
+  // 前に学んだ日が今日より後 (時刻帯を西へ移った・端末の時計を戻した) なら、同じ日とみなす。
+  // 学んだ日は新しいほうを保ち、連続も札も数え直さない (翌日にもう一度数えないため)
+  if (s.lastDay !== null && s.lastDay >= today) return { ...s, count: Math.max(s.count, 1) };
+  let freezes = s.freezes ?? 0;
+  let used = s.used ?? [];
+  let count: number;
+  const missed = missedDays(s.lastDay, today);
+  if (missed === 0) count = s.count + 1;
+  else if (missed !== null && s.count > 0 && missed <= freezes) {
+    freezes -= missed;
+    used = [...used, ...Array.from({ length: missed }, (_, i) => addDays(s.lastDay!, i + 1))].slice(-MAX_USED);
+    count = s.count + 1;
+  } else count = 1;
+  let toNext = (s.toNext ?? 0) + 1;
+  if (toNext >= FREEZE_EVERY) {
+    toNext = 0;
+    freezes = Math.min(MAX_FREEZES, freezes + 1);
+  }
+  // 知らない欄は残す
+  const { freezes: _f, toNext: _t, used: _u, ...kept } = s;
+  const out: Streak = { ...kept, count, lastDay: today };
+  if (freezes > 0) out.freezes = freezes;
+  if (toNext > 0) out.toNext = toNext;
+  if (used.length > 0) out.used = used;
+  return out;
+}
+
 /** 学んだ日の XP を足し、連続日数を進める (レッスンと復習で共通) */
 function addActivity(p: Progress, xpGained: number, now: Date): Progress {
   const today = dayKey(now);
-  let count: number;
-  if (p.streak.lastDay === today) count = Math.max(p.streak.count, 1);
-  else if (p.streak.lastDay === addDays(today, -1)) count = p.streak.count + 1;
-  else count = 1;
   return {
     ...p,
-    streak: { count, lastDay: today },
+    streak: advanceStreak(p.streak, today),
     xp: { total: p.xp.total + xpGained, byDay: { ...p.xp.byDay, [today]: (p.xp.byDay[today] ?? 0) + xpGained } },
   };
 }
@@ -289,11 +405,29 @@ export function todayXp(p: Progress, now: Date): number {
   return p.xp.byDay[dayKey(now)] ?? 0;
 }
 
-/** 今日か昨日に学んでいれば続いている。2 日以上空いたら 0 */
+/**
+ * 今日か昨日に学んでいれば続いている。空いた日 (昨日まで) を休みの札で埋められるうちも続いている
+ * (今日学べば札を使う)。埋められなければ 0
+ */
 export function currentStreak(p: Progress, now: Date): number {
   const today = dayKey(now);
-  if (p.streak.lastDay === today || p.streak.lastDay === addDays(today, -1)) return p.streak.count;
-  return 0;
+  if (p.streak.lastDay !== null && p.streak.lastDay >= addDays(today, -1)) return p.streak.count;
+  const missed = missedDays(p.streak.lastDay, today);
+  return missed !== null && missed <= (p.streak.freezes ?? 0) ? p.streak.count : 0;
+}
+
+/** 札の表示: "休みの札 1 / 2"。使った日は新しいものから 3 つまで "· 11/20・11/21 に使った"、今日学ぶと使うなら "· 今日学ぶと 1 個使う" */
+export function freezeText(f: { have: number; used: string[]; pending: number }): string {
+  const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
+  const used = f.used.slice(-3).map(md).join('・');
+  return `休みの札 ${f.have} / ${MAX_FREEZES}${f.pending > 0 ? ` · 今日学ぶと ${f.pending} 個使う` : ''}${used ? ` · ${used} に使った` : ''}`;
+}
+
+/** 休みの札の数と、使った日 (古い順)。pending は今日学ぶと札を使う日の数 (0 なら使わない) */
+export function freezeStatus(p: Progress, now: Date): { have: number; used: string[]; pending: number } {
+  const missed = missedDays(p.streak.lastDay, dayKey(now));
+  const have = p.streak.freezes ?? 0;
+  return { have, used: p.streak.used ?? [], pending: missed !== null && missed >= 1 && missed <= have && p.streak.count > 0 ? missed : 0 };
 }
 
 export function goalXp(p: Progress): number {
@@ -335,6 +469,17 @@ export function weekStartDay(start: string, week: number): string {
   return addDays(start, (week - 1) * 7);
 }
 
+/**
+ * 今週 (月曜から今日まで) に学んだ日 (レッスン・復習・模擬試験を終えた日。連続日数と同じ数え方) の数と、週の目標。
+ * 目標を決めていなければ goal は undefined
+ */
+export function weekProgress(p: Progress, now: Date): { days: number; goal: number | undefined } {
+  const today = dayKey(now);
+  const monday = addDays(today, -((now.getDay() + 6) % 7));
+  const days = Object.keys(p.xp.byDay).filter((d) => d >= monday && d <= today).length;
+  return { days, goal: p.profile?.weeklyDays };
+}
+
 export function colorMode(p: Progress): ColorMode {
   return p.profile?.colorMode ?? 'system';
 }
@@ -345,6 +490,7 @@ export function setProfile(p: Progress, change: Partial<Profile>): Progress {
   if (next.colorMode === 'system') delete next.colorMode;
   if (!next.examDate) delete next.examDate;
   if (!next.startDate) delete next.startDate;
+  if (!next.weeklyDays) delete next.weeklyDays;
   return { ...p, profile: next };
 }
 

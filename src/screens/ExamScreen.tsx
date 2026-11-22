@@ -14,7 +14,9 @@ import { HStack, VStack } from '@astryxdesign/core/Stack';
 import { StatusDot } from '@astryxdesign/core/StatusDot';
 import { Text } from '@astryxdesign/core/Text';
 import { TextInput } from '@astryxdesign/core/TextInput';
-import { XMarkIcon } from '@heroicons/react/24/outline';
+import { FlagIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { FlagIcon as FlagSolidIcon } from '@heroicons/react/24/solid';
+import { ToggleButton } from '@astryxdesign/core/ToggleButton';
 import AppSideNav from '../components/AppSideNav';
 import AskAi from '../components/AskAi';
 import BottomTabs from '../components/BottomTabs';
@@ -24,11 +26,11 @@ import SiteLogo from '../components/SiteLogo';
 import { dueReviewCount } from '../content';
 import { questionBank } from '../content/lessons';
 import type { Domain, Question } from '../content/types';
-import { EXAM_MINUTES, EXAM_WEIGHTS, PASS_MARK, PASS_NOTE, domainCounts, examIntro, formatClock, gradeExam, isAnswered, isCorrect, defaultChoice, lastExamOf, recordExam, startExam, type ExamChoice, type ExamSet, type BankItem, type ExamAnswer, type ExamResult, weakDomains } from '../lib/exam';
+import { EXAM_MINUTES, EXAM_WEIGHTS, PASS_MARK, PASS_NOTE, confirmText, domainCounts, questionNavLabel, examIntro, formatClock, gradeExam, isAnswered, isCorrect, defaultChoice, lastExamOf, recordExam, startExam, type ExamChoice, type ExamSet, type BankItem, type ExamAnswer, type ExamResult, weakDomains } from '../lib/exam';
 import examSets from '../content/examSets.json';
 import { EXAM_ONLY } from '../content/examBank';
 import { normalizeAnswer } from '../lib/grade';
-import { clearExam, finishExam, isExpired, loadExam, newExamId, saveExam, type ExamProgress } from '../lib/examSave';
+import { clearExam, finishExam, isExpired, loadExam, markCount, newExamId, saveExam, type ExamProgress } from '../lib/examSave';
 import type { Progress } from '../lib/progress';
 import { SITE_NAME } from '../lib/site';
 import { WIDE_QUERY, useMediaQuery } from '../lib/useMediaQuery';
@@ -238,17 +240,20 @@ function Running({
 }) {
   const [index, setIndex] = useState(() => resume?.index ?? 0);
   const [answers, setAnswers] = useState<ExamAnswer[]>(() => resume?.answers ?? items.map(() => undefined));
+  const [marks, setMarks] = useState<boolean[]>(() => items.map((_, i) => resume?.marks?.[i] ?? false));
+  const [showList, setShowList] = useState(false);
   const [endsAt] = useState(() => resume?.endsAt ?? Date.now() + EXAM_MINUTES * 60 * 1000);
   const [left, setLeft] = useState(() => (endsAt - Date.now()) / 1000);
   // 答えるたび・問題を移るたびに保存する (再読み込みや開き直しで続きから解けるように)。
   // 一度書いたあとは、保存がまだ自分の回のときだけ書き直す (ほかのタブが採点して消した保存を戻さない)
   const wrote = useRef(false);
   useEffect(() => {
-    if (saveExam({ id: examId, set, items, answers, index, endsAt }, undefined, { onlyIfCurrent: wrote.current })) wrote.current = true;
-  }, [examId, set, items, answers, index, endsAt]);
+    if (saveExam({ id: examId, set, items, answers, index, endsAt, marks }, undefined, { onlyIfCurrent: wrote.current })) wrote.current = true;
+  }, [examId, set, items, answers, index, endsAt, marks]);
   const [confirm, setConfirm] = useState(false);
   const [confirmQuit, setConfirmQuit] = useState(false);
   const answered = answers.filter(isAnswered).length;
+  const marked = markCount(marks);
   // 時計は答えの変化で張り直さない。時間切れのときは最新の答えで採点する
   const latest = useRef({ answers, onFinish });
   latest.current = { answers, onFinish };
@@ -268,6 +273,11 @@ function Running({
   const item = items[index];
   const setAnswer = (a: string) => setAnswers((prev) => prev.map((x, i) => (i === index ? a : x)));
   const isLast = index === items.length - 1;
+  const goTo = (i: number) => {
+    setIndex(i);
+    setShowList(false);
+    window.scrollTo(0, 0);
+  };
 
   return (
     <div className="lesson">
@@ -287,7 +297,17 @@ function Running({
       </header>
       <main className="lesson__main">
         <VStack gap={5}>
-          <Text type="supporting">{item.domain}</Text>
+          <HStack justify="between" vAlign="center" wrap="wrap" gap={2}>
+            <Text type="supporting">{item.domain}</Text>
+            <ToggleButton
+              size="sm"
+              label="あとで見直す"
+              icon={<FlagIcon width={16} height={16} />}
+              pressedIcon={<FlagSolidIcon width={16} height={16} />}
+              isPressed={marks[index]}
+              onPressedChange={(v) => setMarks((prev) => prev.map((m, i) => (i === index ? v : m)))}
+            />
+          </HStack>
           <ExamQuestion key={item.question.id} question={item.question} answer={answers[index]} onAnswer={setAnswer} />
           <HStack gap={2} justify="between" wrap="wrap">
             <Button label="前へ" isDisabled={index === 0} onClick={() => setIndex((i) => i - 1)} />
@@ -300,13 +320,51 @@ function Running({
               </HStack>
             )}
           </HStack>
+          <VStack gap={3}>
+            <div>
+              <Button
+                variant="ghost"
+                label={`${showList ? '問題の一覧を閉じる' : '問題の一覧'} (未回答 ${items.length - answered} · 印 ${marked})`}
+                onClick={() => setShowList((v) => !v)}
+              />
+            </div>
+            {showList && (
+              <nav aria-label="問題の一覧" className="exam-nav">
+                <ol className="exam-nav__grid">
+                  {items.map((_, i) => {
+                    const done = isAnswered(answers[i]);
+                    return (
+                      <li key={i}>
+                        <button
+                          type="button"
+                          className={`exam-nav__item${done ? ' exam-nav__item--done' : ''}${marks[i] ? ' exam-nav__item--marked' : ''}`}
+                          aria-label={questionNavLabel(i, done, marks[i], i === index)}
+                          aria-current={i === index ? 'step' : undefined}
+                          title={questionNavLabel(i, done, marks[i], i === index)}
+                          onClick={() => goTo(i)}
+                        >
+                          {i + 1}
+                          {marks[i] && <FlagSolidIcon width={10} height={10} aria-hidden="true" className="exam-nav__flag" />}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ol>
+                <Text type="supporting">塗りは回答済み、枠だけは未回答、旗は見直す印。押すとその問題へ移ります。</Text>
+              </nav>
+            )}
+          </VStack>
         </VStack>
       </main>
       <AlertDialog
         isOpen={confirm}
-        onOpenChange={setConfirm}
+        onOpenChange={(open) => {
+          setConfirm(open);
+          // 「続ける」で戻ったら、未回答か印があれば一覧を開いておく
+          if (!open && (answered < items.length || marked > 0)) setShowList(true);
+        }}
         title="採点しますか?"
-        description={answered < items.length ? `まだ答えていない問題が ${items.length - answered} 問あります。答えていない問題は不正解になります。` : 'すべての問題に答えました。'}
+        description={confirmText(items.length, answered, marked)}
         actionLabel="採点する"
         actionVariant="primary"
         cancelLabel="続ける"

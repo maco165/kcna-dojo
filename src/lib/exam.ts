@@ -117,6 +117,18 @@ export function defaultChoice(exams: ExamRecord[] | undefined, sets: ExamSet[]):
 
 export type ExamAnswer = string | undefined;
 
+/** 問題の一覧のボタンの読み上げ: "3 問目 回答済み・見直す印あり" */
+export const questionNavLabel = (i: number, answered: boolean, marked: boolean, current: boolean) =>
+  `${i + 1} 問目 ${answered ? '回答済み' : '未回答'}${marked ? '・見直す印あり' : ''}${current ? '・表示中' : ''}`;
+
+/** 採点の前の確かめの文 (未回答と印の数) */
+export function confirmText(total: number, answered: number, marked: number): string {
+  const rest = total - answered;
+  const parts = [rest > 0 ? `まだ答えていない問題が ${rest} 問あります (不正解になります)。` : 'すべての問題に答えました。', marked > 0 ? `「あとで見直す」の印が ${marked} 問に付いています。` : '見直す印の付いた問題はありません。'];
+  if (rest > 0 || marked > 0) parts.push('「続ける」で問題の一覧に戻れます。');
+  return parts.join('');
+}
+
 /** 答えたか (空白だけは答えなしとみなす) */
 export const isAnswered = (answer: ExamAnswer): answer is string => answer !== undefined && answer.trim() !== '';
 

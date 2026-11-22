@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { lazy, useState } from 'react';
 import { AlertDialog } from '@astryxdesign/core/AlertDialog';
 import { AppShell } from '@astryxdesign/core/AppShell';
 import { Banner } from '@astryxdesign/core/Banner';
@@ -13,12 +13,14 @@ import AppSideNav from '../components/AppSideNav';
 import BottomTabs from '../components/BottomTabs';
 import RepoLink from '../components/RepoLink';
 import SiteLogo from '../components/SiteLogo';
+import { LazyPart } from '../components/LoadBoundary';
 import { dueReviewCount } from '../content';
 import { downloadProgress } from '../lib/download';
 import { clearExam } from '../lib/examSave';
 import {
   COLOR_MODES,
   GOAL_CHOICES,
+  WEEKLY_DAY_CHOICES,
   colorMode,
   type ColorMode,
   examDate,
@@ -33,12 +35,39 @@ import {
 import { SITE_NAME } from '../lib/site';
 import { WIDE_QUERY, useMediaQuery } from '../lib/useMediaQuery';
 
+// 学ぶ予定の入力欄は押したときに読む
+const CalendarPlanForm = lazy(() => import('../components/CalendarPlanForm'));
+
 const COLOR_MODE_LABEL: Record<ColorMode, string> = { system: '端末に合わせる', light: 'ライト', dark: 'ダーク' };
 
 /** 読み込むファイルの大きさの上限 */
 const MAX_IMPORT_BYTES = 1024 * 1024;
 
 type Props = { progress: Progress; updateProgress: (fn: (p: Progress) => Progress) => void };
+
+/** 学ぶ予定を .ics でカレンダーに入れる。入力欄は「予定を作る」を押したときに読む */
+function CalendarPlan({ weeklyDays }: { weeklyDays: number | undefined }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Card padding={4}>
+      <VStack gap={4}>
+        <VStack gap={1}>
+          <h2 className="h-sm">カレンダーに学ぶ予定を入れる</h2>
+          <Text type="supporting">決まった時刻に 30 分の予定を繰り返す .ics のファイルを作ります。カレンダーのアプリで開くと予定に入ります。中身はこのサイトの URL と短い文だけで、記録は入れません。</Text>
+        </VStack>
+        {open ? (
+          <LazyPart>
+            <CalendarPlanForm weeklyDays={weeklyDays} />
+          </LazyPart>
+        ) : (
+          <div>
+            <Button label="予定を作る" onClick={() => setOpen(true)} />
+          </div>
+        )}
+      </VStack>
+    </Card>
+  );
+}
 
 function summary(p: Progress) {
   const lessons = Object.values(p.lessons).filter((l) => l.done).length;
@@ -103,6 +132,20 @@ function Body({ progress, updateProgress }: Props) {
             </SegmentedControl>
             <Text type="supporting">1 問正解で 3 XP、実習で 10 XP です。</Text>
           </VStack>
+          <VStack gap={1.5}>
+            <Text weight="medium">週の目標</Text>
+            <SegmentedControl
+              label="週に学ぶ日数"
+              value={String(progress.profile?.weeklyDays ?? 0)}
+              onChange={(v) => updateProgress((p) => setProfile(p, { weeklyDays: Number(v) || undefined }))}
+            >
+              <SegmentedControlItem value="0" label="なし" />
+              {WEEKLY_DAY_CHOICES.map((d) => (
+                <SegmentedControlItem key={d} value={String(d)} label={`${d}`} />
+              ))}
+            </SegmentedControl>
+            <Text type="supporting">週に何日学ぶか (日)。決めると、ホームに今週 (月曜から) の学んだ日の数が出ます。</Text>
+          </VStack>
           <DateInput
             label="受験日"
             description="決めると、ホームと進捗に試験までの日数が出ます"
@@ -123,6 +166,8 @@ function Body({ progress, updateProgress }: Props) {
           />
         </VStack>
       </Card>
+
+      <CalendarPlan weeklyDays={progress.profile?.weeklyDays} />
 
       <Card padding={4}>
         <VStack gap={1.5}>
@@ -190,7 +235,7 @@ function Body({ progress, updateProgress }: Props) {
         isOpen={confirmReset}
         onOpenChange={setConfirmReset}
         title="記録を消しますか?"
-        description="完了したレッスン・XP・連続日数・問題ごとの正誤・模擬試験の結果・ハンドブックの読んだ記録を消します。目標・受験日・画面の色の設定は残ります。消す前に書き出しておくと、あとで読み込んで戻せます。"
+        description="完了したレッスン・XP・連続日数と休みの札・日ごとの答えた数・問題ごとの正誤・模擬試験の結果・ハンドブックの読んだ記録を消します。目標・受験日・画面の色の設定は残ります。消す前に書き出しておくと、あとで読み込んで戻せます。"
         actionLabel="消す"
         cancelLabel="やめる"
         onAction={() => {
