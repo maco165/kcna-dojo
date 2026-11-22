@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import type { Lesson } from '../src/content/types';
+import type { LessonMeta } from '../src/content/types';
 import { WEEKS } from '../src/content/curriculum';
 import { domainAccuracy, lessonCaption, lessonCorrect, lessonStatuses, planStatus, weeklyXp } from '../src/lib/lessonStatus';
 import { emptyProgress, type Progress } from '../src/lib/progress';
 
-const lessons = WEEKS[0].content!.lessons as Lesson[];
+const lessons: LessonMeta[] = WEEKS[0].content!.lessons;
 const quiz = lessons[0];
 const lab = lessons.find((l) => l.kind === 'lab')!;
 
