@@ -2876,3 +2876,110 @@ html[data-loading='true'] body::before {
   gap: 12px;
   padding: 24px 16px;
 }
+
+/* 誤答のあとの選択肢の札 (src/components/ChoiceQuestionView.tsx の ChoiceMark)。印と文字で示し、色は補い */
+.choice-mark {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  padding: 0 var(--spacing-2);
+  border: 1px solid currentColor;
+  border-radius: var(--radius-full);
+  font-size: var(--text-supporting-size);
+  font-weight: 600;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+.choice-mark--answer {
+  color: var(--color-text-success);
+  background: var(--color-success-muted);
+}
+.choice-mark--picked {
+  color: var(--color-text-error);
+  background: var(--color-error-muted);
+}
+/* 答えたあとの選択肢は押せなくなって薄く描かれる。札の付いた 2 つ (正解と選んだ答え) は薄くしない (札の文字のコントラストを保ち、2 つを目立たせる) */
+.astryx-radio-list-item[data-disabled]:has(.choice-mark) > span {
+  opacity: 1;
+}
+
+/* レッスンの上の帯: レッスン名がこの画面の h1 (書き出す HTML の h1 と同じ)。見た目は補足の字のまま */
+.lesson-bar__label {
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
+  color: var(--color-text-secondary);
+}
+.lesson-bar__title {
+  display: inline;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+}
+
+/* ホームの見出し (src/screens/Home.tsx)。トップの h1 はサイト名と副題で、補足の字の大きさで週の名前 (h2) の上に置く */
+.home-site-title {
+  margin: 0;
+  font-size: var(--text-supporting-size);
+  font-weight: 600;
+  line-height: var(--text-supporting-leading);
+  color: var(--color-text-secondary);
+}
+/* PC のホームの週の名前は、ほかの PC の見出しと同じ大きさ (前は Astryx の Heading level 1) */
+.week-title--desk {
+  font-size: var(--text-heading-1-size);
+  font-weight: var(--text-heading-1-weight);
+  line-height: var(--text-heading-1-leading);
+}
+
+/* 用語の 1 語のページ (/glossary/<id>/) と、一覧で開いた語からそのページへのリンク (src/screens/Glossary.tsx) */
+.gloss-term-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-4);
+  max-width: 720px;
+}
+.gloss-page-link {
+  display: inline-block;
+  margin-top: var(--spacing-2);
+  font-size: var(--text-supporting-size);
+}
+
+/* 画面の外のコードの軽い表示 (src/components/LazyCodeBlock.tsx)。Astryx の CodeBlock (size sm・コピーのボタンつき) と同じ枠・字・行の高さにし、替わるときに位置がずれないようにする */
+.code-lite {
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-element);
+  background: var(--color-syntax-background);
+  font-family: var(--font-family-code);
+}
+.code-lite__head {
+  box-sizing: border-box;
+  height: 44px;
+  padding: var(--spacing-2) var(--spacing-4);
+  font-size: 12px;
+  line-height: 28px;
+  color: var(--color-text-secondary);
+}
+.code-lite__body {
+  margin: 0;
+  /* CodeBlock は本文の上の余白 12px のうち 8px を帯に重ねるので、上は 4px にして高さをそろえる */
+  padding: 4px 16px 12px;
+  overflow-x: auto;
+  font-size: 12px;
+  line-height: 1.4286;
+  white-space: pre;
+}
+.code-lite__body code {
+  font: inherit;
+}
+
+/*
+ * 長いページの画面の外の区切りは、描くまで配置と描画を省く (Lighthouse のスマホで用語集の Layout が 1 秒ほどあった)。
+ * 高さは描いたことのある大きさを覚え (auto)、描く前は見積もりの高さを使う。
+ * ハンドブックの流れの段には付けない (見積もりの高さで「続きから」の送り先がずれるため。重いコードは LazyCodeBlock で後から描く)
+ */
+.gloss-row {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 76px;
+}

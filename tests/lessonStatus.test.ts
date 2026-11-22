@@ -80,15 +80,30 @@ describe('進捗の画面の数字', () => {
     expect(weeklyXp(p, at('2027-01-02')).map((d) => d.day)).toEqual(['2026-12-27', '2026-12-28', '2026-12-29', '2026-12-30', '2026-12-31', '2027-01-01', '2027-01-02']);
   });
 
-  it('計画: 週の終わり (日曜) を過ぎた週のレッスンだけを、終わっているはずの数に入れる', () => {
+  /** 開始日を 2026-11-23 に決めた人の記録 */
+  const startedOn = (p: Progress, day = '2026-11-23'): Progress => ({ ...p, profile: { dailyGoalXp: 30, startDate: day } });
+
+  it('計画: 開始日から数えて 7 日目を過ぎた週のレッスンだけを、終わっているはずの数に入れる', () => {
     const week1Quiz = lessons.filter((l) => l.kind === 'quiz');
     const week1Labs = lessons.length - week1Quiz.length;
-    expect(planStatus(emptyProgress(), at('2026-11-29'))).toEqual({ expected: 0, done: 0, labsLeft: 0 });
-    expect(planStatus(withDone(['w1-l1', 'w1-l2']), at('2026-11-30'))).toEqual({ expected: week1Quiz.length, done: 2, labsLeft: week1Labs });
+    expect(planStatus(startedOn(emptyProgress()), at('2026-11-29'))).toEqual({ expected: 0, done: 0, labsLeft: 0 });
+    expect(planStatus(startedOn(withDone(['w1-l1', 'w1-l2'])), at('2026-11-30'))).toEqual({ expected: week1Quiz.length, done: 2, labsLeft: week1Labs });
+    // 開始日を 1 週あとにした人は、同じ日でもまだ遅れていない
+    expect(planStatus(startedOn(withDone(['w1-l1', 'w1-l2']), '2026-11-30'), at('2026-11-30')).expected).toBe(0);
+  });
+
+  it('計画: 開始日を決めていなければ初めて学んだ日から、まだ学んでいなければ今日から数える (運営者の予定の日付に固定しない)', () => {
+    // 学んだ記録が無い人は、いつ開いても遅れていない
+    expect(planStatus(emptyProgress(), at('2027-06-01')).expected).toBe(0);
+    // 2027-05-03 に初めて学んだ人は、5/10 に第 1 週が終わっているはず
+    const p = withDone(['w1-l1']);
+    p.lessons['w1-l1'].at = '2027-05-03T03:00:00.000Z';
+    expect(planStatus(p, at('2027-05-09')).expected).toBe(0);
+    expect(planStatus(p, at('2027-05-10')).expected).toBe(lessons.filter((l) => l.kind === 'quiz').length);
   });
 
   it('計画: 問題を全部終えて実習だけ残るなら遅れにしない', () => {
-    const s = planStatus(withDone(lessons.filter((l) => l.kind === 'quiz').map((l) => l.id)), at('2026-11-30'));
+    const s = planStatus(startedOn(withDone(lessons.filter((l) => l.kind === 'quiz').map((l) => l.id))), at('2026-11-30'));
     expect(s.done).toBe(s.expected);
     expect(s.labsLeft).toBeGreaterThan(0);
   });

@@ -5,6 +5,8 @@ import { Link } from '@astryxdesign/core/Link';
 import { VStack } from '@astryxdesign/core/Stack';
 import { Text } from '@astryxdesign/core/Text';
 import type { Question } from '../content/types';
+import { findLesson } from '../content';
+import { reportIssueUrl } from '../lib/links';
 
 // コマンドの説明のデータは最初に読む JS に入れない (問題を開いたときに src/lib/preloadNotes.ts が先に読む)
 const CommandNotes = lazy(() => import('./CommandNotes'));
@@ -48,6 +50,7 @@ export default function Feedback({
                 {new URL(source).hostname}
               </Link>
             </Text>
+            {question && <ReportLink question={question} />}
           </VStack>
         }
       />
@@ -58,5 +61,19 @@ export default function Feedback({
         </LazyPart>
       )}
     </>
+  );
+}
+
+/** 問題の誤りを GitHub の Issue で知らせるリンク (問題の id・レッスン・ページの URL を入れて開く) */
+function ReportLink({ question }: { question: Question }) {
+  const lessonId = question.id.match(/^(w\d+-[a-z0-9]+)-q\d+$/)?.[1];
+  const found = lessonId ? findLesson(lessonId) : undefined;
+  const lesson = found ? `第 ${found.week} 週 ${found.lesson.title} (${lessonId})` : undefined;
+  return (
+    <Text type="supporting">
+      <Link href={reportIssueUrl(question, lesson, window.location.pathname)} isExternalLink newTabLabel="(新しいタブで開きます)">
+        この問題の誤りを報告 (GitHub の Issue)
+      </Link>
+    </Text>
   );
 }

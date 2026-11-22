@@ -11,7 +11,7 @@ import { XMarkIcon } from '@heroicons/react/24/outline';
 import { AskAiLinks } from '../components/AskAi';
 import ChoiceQuestionView from '../components/ChoiceQuestionView';
 import FillQuestionView from '../components/FillQuestionView';
-import { ActionArea, PrimaryAction, QuestionHead } from '../components/QuestionFrame';
+import { ActionArea, PrimaryAction, QuestionHead, QuestionHeadingLevel } from '../components/QuestionFrame';
 import type { LabLesson, Lesson, Question, QuizLesson } from '../content/types';
 import { labStepText } from '../lib/askAi';
 import { XP_PER_CORRECT, XP_PER_LAB } from '../lib/grade';
@@ -48,9 +48,10 @@ function LessonBar({
     <header className="lesson-bar">
       <Button variant="ghost" label="レッスンを閉じる" isIconOnly icon={<XMarkIcon width={20} height={20} />} href={onClose ? undefined : closeHref} onClick={onClose} />
       <div className="lesson-bar__progress">
-        <Text type="supporting">
-          {title} · {current} / {total} {unit}
-        </Text>
+        {/* レッスン名がこの画面の h1 (書き出す HTML の h1 と同じ)。見た目は補足の字のまま。問題文はその下の h2 */}
+        <div className="lesson-bar__label">
+          <h1 className="lesson-bar__title">{title}</h1> · {current} / {total} {unit}
+        </div>
         <ProgressBar label="レッスンの進み具合" isLabelHidden value={current} max={total} />
       </div>
     </header>
@@ -187,11 +188,13 @@ export function QuestionRun({
     <div className="lesson">
       <LessonBar title={title} closeHref={closeHref} onClose={onClose} current={index + 1} total={total} unit="問" />
       <main className="lesson__main">
+        <QuestionHeadingLevel.Provider value={2}>
         {q.type === 'fill' ? (
           <FillQuestionView key={`${attempt}-${q.id}`} question={q} domain={domainOf(q)} onChecked={onChecked} nextLabel={nextLabel} onNext={onNext} history={answerHistory(before[q.id])} />
         ) : (
           <ChoiceQuestionView key={`${attempt}-${q.id}`} question={q} domain={domainOf(q)} onChecked={onChecked} nextLabel={nextLabel} onNext={onNext} history={answerHistory(before[q.id])} />
         )}
+        </QuestionHeadingLevel.Provider>
       </main>
     </div>
   );
@@ -231,7 +234,9 @@ function LabRun({ lesson, week, progress, updateProgress }: Props & { lesson: La
       <LessonBar title={lesson.title} closeHref={weekHref(week)} current={checked.length} total={total} unit="手順" />
       <main className="lesson__main">
         <VStack gap={5}>
-          <QuestionHead kind="実習 · 家のクラスタ (k3s) で動かす" domain={lesson.domain} prompt={lesson.title} />
+          <QuestionHeadingLevel.Provider value={2}>
+            <QuestionHead kind="実習 · 家のクラスタ (k3s) で動かす" domain={lesson.domain} prompt={lesson.title} />
+          </QuestionHeadingLevel.Provider>
           <section className="lab-prep" aria-labelledby="lab-prep-title">
             <h2 id="lab-prep-title" className="h-sm">
               始める前に

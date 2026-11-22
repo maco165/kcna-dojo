@@ -1,5 +1,5 @@
 import { AppShell } from '@astryxdesign/core/AppShell';
-import { CodeBlock } from '@astryxdesign/core/CodeBlock';
+import LazyCodeBlock from '../components/LazyCodeBlock';
 import Crumbs from '../components/Crumbs';
 import { Link } from '@astryxdesign/core/Link';
 import { Text } from '@astryxdesign/core/Text';
@@ -52,7 +52,7 @@ function Step({ step, text }: { step: HandbookStep; text: TermPiece[] }) {
         <Prose pieces={text} />
       </p>
       {step.code && <StepVisual code={step.code.text} language={step.code.language} result={step.result} />}
-      {step.code && <CodeBlock code={step.code.text} language={step.code.language} width="100%" size="sm" hasCopyButton />}
+      {step.code && <LazyCodeBlock code={step.code.text} language={step.code.language} hasCopyButton />}
       {step.output && (
         <figure className="hb-output">
           <figcaption>出力の例 (名前・時刻などは環境で変わります)</figcaption>

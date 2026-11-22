@@ -84,6 +84,29 @@ function checkFirstLoad() {
   check(hbHeads.filter((h) => h.startsWith('2:')).join('|') === '2:試験の範囲|2:範囲外: 一緒に知っておくと役立つこと' && hbHeads.filter((h) => h.startsWith('3:')).length === 9 && hbHtml.includes('<section id="hb-part-extra">'), `書き出したハンドブックの目次は 2 部 (h2) と 9 段 (h3) (${hbHeads.length})`);
 }
 
+/**
+ * 速さの見張り (Lighthouse のスマホで遅かった所): Astryx の CSS から使わないクラスを除き (vite.config.ts の purgeStylex)、
+ * 除きすぎていないこと。大きなデータは JSON.parse の形で読むこと (vite.config.ts の jsonParse)
+ */
+function checkSpeedBuild() {
+  const assets = readdirSync(new URL('../dist/assets/', import.meta.url));
+  const read = (f) => readFileSync(new URL(`../dist/assets/${f}`, import.meta.url), 'utf8');
+  const cssFiles = assets.filter((f) => f.endsWith('.css'));
+  const css = cssFiles.map(read).join('\n');
+  const cssGz = Math.round(cssFiles.reduce((n, f) => n + gzipSync(readFileSync(new URL(`../dist/assets/${f}`, import.meta.url)), { level: 9 }).length, 0) / 1024);
+  // 2026-11-23: 除く前は gzip -9 で 45KB (Astryx の CSS をそのまま入れていた)。除いたあと 37KB
+  check(cssGz <= 40, `描画を止める CSS は gzip で 40KB まで (${cssGz}KB)`);
+  const classes = (t) => new Set([...t.matchAll(/\.(x[a-z0-9]{4,10})(?![\w-])/g)].map((m) => m[1]));
+  const all = classes(readFileSync(new URL('../node_modules/@astryxdesign/core/dist/astryx.css', import.meta.url), 'utf8'));
+  const kept = classes(css);
+  const js = assets.filter((f) => f.endsWith('.js')).map(read).join('\n');
+  const missing = [...new Set(js.match(/\bx[a-z0-9]{4,10}\b/g))].filter((c) => all.has(c) && !kept.has(c));
+  check(missing.length === 0, `JS が付ける Astryx のクラスは、CSS から除いていない (落ちたもの ${missing.length}: ${missing.slice(0, 5).join(' ')})`);
+  const data = assets.filter((f) => /^(lessons|handbook|glossary|commandPages|examBank)-/.test(f));
+  const literal = data.filter((f) => !/JSON\.parse\(/.test(read(f).slice(0, 400)));
+  check(data.length >= 5 && literal.length === 0, `大きなデータのチャンクは JSON.parse で読む (${data.length} ファイル、そうでないもの ${literal.join(',')})`);
+}
+
 async function run(browser, name, width, height) {
   const context = await browser.newContext({ viewport: { width, height } });
   const page = await context.newPage();
@@ -104,6 +127,15 @@ async function run(browser, name, width, height) {
   check(await page.getByText('クラネイ', { exact: true }).first().isVisible(), `${tag} サイト名クラネイが出る`);
   const preRead = page.getByRole('navigation', { name: '先に読むハンドブック' });
   check((await preRead.locator('a[href="/kcna-dojo/handbook/containerization/"]').count()) === 1, `${tag} ホームに、その週で先に読むハンドブックのトピックが出る`);
+  // 受験日と週の日付は運営者の予定に固定しない: 受験日を決めるまで日数を出さず設定へ案内し、週の日付は今日 (まだ学んでいない人の開始日) から数える
+  check((await page.getByRole('link', { name: '受験日を決める' }).getAttribute('href')) === '/kcna-dojo/settings/' && (await page.getByText(/試験まで \d+ 日/).count()) === 0, `${tag} 受験日を決めるまで試験までの日数を出さず、設定へのリンクを出す`);
+  const md = (offset) => {
+    const d = new Date();
+    d.setDate(d.getDate() + offset);
+    return `${d.getMonth() + 1}/${d.getDate()}`;
+  };
+  const weekDates = width >= 768 ? `${md(0)}〜${md(6)}` : `${md(7)}〜`;
+  check(await page.getByText(weekDates, { exact: false }).first().isVisible(), `${tag} 週の日付は今日から数える (${weekDates})`);
   await noHorizontalOverflow(page, width, `${tag} ホーム`);
 
   // 2. 4 択のレッスンを解く (1 問目は不正解、残りは正解)
@@ -121,6 +153,46 @@ async function run(browser, name, width, height) {
       const answerLetter = answerLabel.trim().slice(0, 1);
       check(/^[A-D]$/.test(answerLetter) && (await page.getByText(`不正解 · 正しくは ${answerLetter}`).isVisible()), `${tag} 「正しくは ${answerLetter}」が画面の並びと合う`);
       check(await page.getByText(q.explanation).isVisible(), `${tag} 不正解のとき解説が出る`);
+      // 誤答のあと、選択肢の上に正解と選んだ答えを印と文字で示す (色だけに頼らない)。押せなくなって薄く描かれても、札の文字のコントラストは 4.5 以上
+      const marks = await page.evaluate(() => {
+        const toRgb = (c) => {
+          const cv = document.createElement('canvas');
+          cv.width = cv.height = 1;
+          const x = cv.getContext('2d');
+          x.fillStyle = c;
+          x.fillRect(0, 0, 1, 1);
+          const [r, g, b, a] = x.getImageData(0, 0, 1, 1).data;
+          return [r, g, b, a / 255];
+        };
+        const lum = ([r, g, b]) => [r, g, b].map((v) => ((v /= 255) <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)).reduce((s, v, i) => s + v * [0.2126, 0.7152, 0.0722][i], 0);
+        const mix = (a, b, t) => a.map((v, i) => v * t + b[i] * (1 - t));
+        const page = toRgb(getComputedStyle(document.body).backgroundColor);
+        return [...document.querySelectorAll('.choice-mark')].map((el) => {
+          let alpha = 1;
+          for (let n = el; n; n = n.parentElement) alpha *= Number(getComputedStyle(n).opacity);
+          const st = getComputedStyle(el);
+          const bgRaw = toRgb(st.backgroundColor);
+          const bg = mix(mix(bgRaw, page, bgRaw[3]), page, alpha);
+          const fg = mix(toRgb(st.color), page, alpha);
+          const [l1, l2] = [lum(fg), lum(bg)].sort((a, b) => b - a);
+          // 札の付いた選択肢 (radio を持ついちばん近い祖先) の文
+          let row = el.parentElement;
+          while (row && !row.querySelector('input[type="radio"]')) row = row.parentElement;
+          return { text: el.textContent, row: row?.textContent ?? '', ratio: (l1 + 0.05) / (l2 + 0.05) };
+        });
+      });
+      const answerText = q.choices.find((c) => c.id === q.answer).text;
+      const pickedText = q.choices.find((c) => c.id === wrong).text;
+      check(marks.length === 2 && marks.some((m) => m.text === '○ 正解') && marks.some((m) => m.text === '× 選んだ答え'), `${tag} 誤答のあと、正解と選んだ答えに印と文字の札が付く (${marks.map((m) => m.text).join('・')})`);
+      check(marks.every((m) => m.ratio >= 4.5), `${tag} 札の文字のコントラストが 4.5 以上 (${marks.map((m) => m.ratio.toFixed(2)).join('・')})`);
+      check(marks.find((m) => m.text === '○ 正解')?.row.includes(answerText) && marks.find((m) => m.text === '× 選んだ答え')?.row.includes(pickedText), `${tag} 札は正解の選択肢と選んだ選択肢に付く`);
+      // 解説の近くに、問題の id・レッスン・ページの URL を入れた GitHub の新しい Issue へのリンク (答えや記録は入れない)
+      const report = new URL((await page.getByRole('link', { name: /この問題の誤りを報告/ }).getAttribute('href')) ?? 'about:blank');
+      const reportBody = report.searchParams.get('body') ?? '';
+      check(
+        report.href.startsWith('https://github.com/maco165/kcna-dojo/issues/new?') && report.searchParams.get('title')?.includes(q.id) && reportBody.includes(`(${l1.id})`) && reportBody.includes(`https://maco165.github.io/kcna-dojo/lesson/${l1.id}/`) && !reportBody.includes('kcna.v1'),
+        `${tag} 誤りを報告のリンクに問題の id・レッスン・ページの URL が入る`,
+      );
       // 答えたあとに、読み直す先 (ハンドブック・用語集) が出る。答える前には出さない
       const readMore = page.getByRole('navigation', { name: '読み直す' });
       await readMore.waitFor({ timeout: 5000 }).catch(() => {});
@@ -371,8 +443,11 @@ async function run(browser, name, width, height) {
   check(/^kcna-progress-\d{4}-\d{2}-\d{2}\.json$/.test(download.suggestedFilename()), `${tag} 記録を書き出すと日付入りの JSON が保存される`);
   const exported = JSON.parse(await (await import('node:fs/promises')).readFile(await download.path(), 'utf8'));
   check(exported.v === 1 && exported.profile?.dailyGoalXp === 10, `${tag} 書き出した中身が今の記録と同じ`);
+  // 途中の模擬試験の保存も、記録を消すと消える
+  await page.evaluate(() => localStorage.setItem('kcna.exam.v1', '{"v":1,"id":"e2e"}'));
   await page.getByRole('button', { name: '記録を消す' }).click();
   await page.getByRole('button', { name: '消す', exact: true }).click();
+  check(await page.evaluate(() => localStorage.getItem('kcna.exam.v1') === null), `${tag} 記録を消すと途中の模擬試験の保存も消える`);
   const cleared = await page.evaluate(() => JSON.parse(localStorage.getItem('kcna.v1') ?? 'null'));
   check(Object.keys(cleared?.lessons ?? {}).length === 0 && cleared?.profile?.dailyGoalXp === 10, `${tag} 記録を消すと進捗は空で、目標は残る`);
   await page.locator('input[type="file"]').setInputFiles({ name: 'back.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(exported)) });
@@ -422,6 +497,16 @@ async function run(browser, name, width, height) {
   else await page.getByRole('textbox', { name: '空欄' }).fill('x');
   await page.getByRole('button', { name: '次へ' }).click();
   check(await page.getByText(/模擬試験 · 2 \/ 60 問 · 答えた 1/).isVisible(), `${tag} 次へで 2 問目に進み、答えた数が数えられる`);
+  // 途中で再読み込みしても、続きから解ける (回・答え・いまの問題・期限を保存する)
+  const secondPrompt = await page.locator('main h1, main h2').first().textContent();
+  const savedEndsAt = await page.evaluate(() => JSON.parse(localStorage.getItem('kcna.exam.v1') ?? '{}').endsAt);
+  await page.reload();
+  await page.getByText('途中の第 1 回があります').waitFor();
+  check(await page.getByText(/60 問のうち 1 問に答えています/).isVisible(), `${tag} 再読み込みすると、途中の模擬試験の答えた数を出す`);
+  await page.getByRole('button', { name: '続きから解く' }).click();
+  check(await page.getByText(/模擬試験 · 2 \/ 60 問 · 答えた 1/).isVisible(), `${tag} 続きから解くと、同じ問題・同じ答えた数から始まる`);
+  check(typeof savedEndsAt === 'number' && (await page.evaluate(() => JSON.parse(localStorage.getItem('kcna.exam.v1') ?? '{}').endsAt)) === savedEndsAt, `${tag} 続きから解いても残り時間の期限は最初のまま`);
+  check((await page.locator('main h1, main h2').first().textContent()) === secondPrompt, `${tag} 続きから解くと、閉じる前と同じ問題が出る`);
   await page.getByRole('button', { name: '採点する' }).first().click();
   check(await page.getByText(/まだ答えていない問題が 59 問あります/).isVisible(), `${tag} 採点の前に答えていない数を知らせる`);
   await page.getByRole('button', { name: '採点する' }).last().click();
@@ -447,6 +532,12 @@ async function run(browser, name, width, height) {
   await page.getByRole('button', { name: '模擬試験をやめる' }).click();
   await page.getByRole('button', { name: 'やめる', exact: true }).click();
   await page.getByRole('button', { name: /を始める$/ }).waitFor();
+  check(await page.evaluate(() => localStorage.getItem('kcna.exam.v1') === null), `${tag} 模擬試験をやめたら途中の保存を消す`);
+  // 途中で再読み込みして「やめて最初から」を選ぶと、保存を消して回の選択に戻る
+  await page.getByRole('button', { name: /を始める$/ }).click();
+  await page.reload();
+  await page.getByRole('button', { name: 'やめて最初から' }).click();
+  check((await page.getByRole('button', { name: '続きから解く' }).count()) === 0 && (await page.evaluate(() => localStorage.getItem('kcna.exam.v1') === null)), `${tag} やめて最初からで途中の保存を消す`);
   check(await page.getByText(/第 1 回 · \d+ \/ 60 \(\d+%\)/).first().isVisible(), `${tag} 模擬試験の画面にこれまでの結果が回の名前つきで出る`);
   await page.goto(`${BASE}progress/`);
   await page.getByRole('heading', { name: '進捗' }).waitFor();
@@ -467,6 +558,29 @@ async function run(browser, name, width, height) {
     check(after === before + 1, `${tag} 時間切れで 1 回だけ自動で採点する (${before} → ${after})`);
     const lastSet = await tp.evaluate(() => JSON.parse(localStorage.getItem('kcna.v1') ?? '{}').exams?.[0]?.set);
     check(lastSet === 2, `${tag} 時間切れの採点にも回の番号が残る (第 1 回を解いたあとは第 2 回が選ばれている: ${lastSet})`);
+    check(await tp.evaluate(() => localStorage.getItem('kcna.exam.v1') === null), `${tag} 採点したら途中の保存を消す`);
+    // 途中で閉じて、期限を過ぎてから開くと、続きからではなく時間切れの結果にする
+    await tp.goto(`${BASE}exam/`);
+    await tp.getByRole('button', { name: /を始める$/ }).click();
+    await tp.getByText(/模擬試験 · 1 \/ 60 問/).waitFor();
+    const before2 = await tp.evaluate(() => JSON.parse(localStorage.getItem('kcna.v1') ?? '{}').exams?.length ?? 0);
+    await tp.goto('about:blank');
+    await tp.clock.fastForward('01:31:00');
+    await tp.goto(`${BASE}exam/`);
+    await tp.getByRole('heading', { name: '結果' }).waitFor();
+    const after2 = await tp.evaluate(() => JSON.parse(localStorage.getItem('kcna.v1') ?? '{}').exams?.length ?? 0);
+    check(after2 === before2 + 1 && (await tp.evaluate(() => localStorage.getItem('kcna.exam.v1') === null)), `${tag} 期限を過ぎてから開くと時間切れの結果になり、保存を消す (${before2} → ${after2})`);
+    // 「続きから解く」の案内を開いたまま期限が来たら、その場で時間切れの結果にする (前の回を記録せずに上書きしない)
+    await tp.getByRole('button', { name: '模擬試験の最初へ戻る' }).click();
+    await tp.getByRole('button', { name: /を始める$/ }).click();
+    await tp.getByText(/模擬試験 · 1 \/ 60 問/).waitFor();
+    await tp.reload();
+    await tp.getByRole('button', { name: '続きから解く' }).waitFor();
+    const before3 = await tp.evaluate(() => JSON.parse(localStorage.getItem('kcna.v1') ?? '{}').exams?.length ?? 0);
+    await tp.clock.fastForward('01:31:00');
+    await tp.getByRole('heading', { name: '結果' }).waitFor({ timeout: 10000 }).catch(() => {});
+    const after3 = await tp.evaluate(() => JSON.parse(localStorage.getItem('kcna.v1') ?? '{}').exams?.length ?? 0);
+    check(after3 === before3 + 1 && (await tp.evaluate(() => localStorage.getItem('kcna.exam.v1') === null)), `${tag} 案内を開いたまま期限が来ると、時間切れの結果を 1 回記録する (${before3} → ${after3})`);
     await tp.close();
   }
 
@@ -482,7 +596,8 @@ async function run(browser, name, width, height) {
     // 範囲外の札で、試験の範囲の外の語 (レッスンに出ない語) だけに絞れる
     await page.getByRole('button', { name: /^範囲外/ }).click();
     const outCount = await termButtons.count();
-    check(outCount >= 20 && (await page.getByText('Linux の namespaces').first().isVisible()), `${tag} 範囲外の札で、範囲外の語に絞れる (${outCount} 語)`);
+    // スマホの一覧の行は content-visibility: auto で、画面の外の行は描かれない (見えるかではなく、一覧にあるかを見る)
+    check(outCount >= 20 && (await termButtons.filter({ hasText: 'Linux の namespaces' }).count()) >= 1, `${tag} 範囲外の札で、範囲外の語に絞れる (${outCount} 語)`);
     await page.getByRole('button', { name: /^すべて/ }).click();
   }
   await page.getByRole('button', { name: /^設計 \d+/ }).click();
@@ -659,6 +774,14 @@ async function run(browser, name, width, height) {
     await page.getByRole('heading', { name: '全体の流れ' }).waitFor();
     const steps = await page.locator('[data-flow-step]').count();
     await page.waitForTimeout(300);
+    // 画面の外のコードは軽い表示で先に出し (最初の描画を止めない)、画面に近づくと CodeBlock (色分け・コピー) に替わる
+    const lazyBefore = await page.locator('[data-lazy-code]').count();
+    const blocksBefore = await page.locator('.hb-step .astryx-code-block').count();
+    check(lazyBefore >= 3 && blocksBefore < lazyBefore, `${tag} 開いた直後、画面の外のハンドブックのコードは軽い表示 (CodeBlock ${blocksBefore}・軽い表示 ${lazyBefore})`);
+    // 軽い表示と CodeBlock は同じ高さ (替わるときに位置がずれない)。いちばん下の段の軽い表示の高さを覚え、最後の段まで出したあとに比べる
+    const lastLazy = await page.locator('.hb-flow > li[data-flow-step]:has([data-lazy-code])').last().getAttribute('data-flow-step');
+    const lastCode = page.locator(`li[data-flow-step="${lastLazy}"] .hb-step`).first().locator(':scope > :is(.code-lite, .astryx-code-block)').first();
+    const liteH = await lastCode.evaluate((el) => el.getBoundingClientRect().height);
     check(((await hb()).storage?.seen ?? 0) < steps, `${tag} 開いた直後は全部を読んだことにならない`);
     await page.locator('[data-flow-step="2"]').scrollIntoViewIfNeeded();
     await page.evaluate(() => document.querySelector('[data-flow-step="2"]').scrollIntoView({ block: 'start' }));
@@ -679,6 +802,10 @@ async function run(browser, name, width, height) {
     await page.evaluate((n) => document.querySelector(`[data-flow-step="${n}"]`).scrollIntoView({ block: 'start' }), steps - 1);
     await page.waitForTimeout(400);
     check((await hb()).storage?.seen === steps, `${tag} 最後の段まで出すと、全部の段を読んだことになる (${steps})`);
+    check((await page.locator('.hb-flow [data-lazy-code]').evaluateAll((els) => els.filter((el) => { const r = el.getBoundingClientRect(); return r.bottom > 0 && r.top < innerHeight; }).length)) === 0 && (await page.locator('.hb-step .astryx-code-block').count()) > blocksBefore, `${tag} 画面に入ったコードは CodeBlock に替わる`);
+    const blockH = await lastCode.evaluate((el) => (el.classList.contains('astryx-code-block') ? el.getBoundingClientRect().height : -1)).catch(() => -1);
+    const blockH2 = blockH > 0 ? blockH : await page.locator(`li[data-flow-step="${lastLazy}"] .hb-step .astryx-code-block`).first().evaluate((el) => el.getBoundingClientRect().height);
+    check(Math.abs(blockH2 - liteH) <= 1, `${tag} 軽い表示と CodeBlock の高さが同じ (${liteH.toFixed(1)} → ${blockH2.toFixed(1)})`);
     const toggle = page.getByRole('button', { name: '確認済みにする' });
     await toggle.focus();
     await page.keyboard.press('Enter');
@@ -700,35 +827,36 @@ async function run(browser, name, width, height) {
     const etcd = page.locator('a.hb-term', { hasText: /^etcd$/ });
     await etcd.first().click();
     await page.waitForURL(/\/glossary\/etcd\/$/);
-    if (width >= 768) {
-      await page.locator('#gloss-pane-term').waitFor();
-      check((await page.locator('#gloss-pane-term').innerText()).trim() === 'etcd', `${tag} 用語集でその語 (etcd) の説明が開く`);
-      check((await page.locator('#gloss-pane .gloss-detail__more').count()) >= 2 && (await page.locator('#gloss-pane a.gloss-term').count()) >= 1, `${tag} 用語集の語に詳しい説明が出て、中のほかの語がリンクになる`);
-      // 説明の中のリンクを押すと、その語の説明に替わる
-      const linked = page.locator('#gloss-pane a.gloss-term').first();
-      const linkedText = (await linked.innerText()).trim();
-      await linked.click();
-      await page.waitForFunction((t) => document.querySelector('#gloss-pane-term')?.textContent?.trim() !== 'etcd', linkedText, { timeout: 5000 }).catch(() => {});
-      check((await page.locator('#gloss-pane-term').innerText()).trim() !== 'etcd', `${tag} 説明の中のリンクを押すと、その語の説明に替わる (${linkedText} → ${(await page.locator('#gloss-pane-term').innerText()).trim()})`);
-      await page.goBack();
-      await page.locator('#gloss-pane-term').waitFor();
-      const ai = await page.locator('#gloss-pane').getByRole('link', { name: 'Claude' }).getAttribute('href');
-      check(ai.startsWith('https://claude.ai/new?q=') && decodeURIComponent(ai.split('?q=')[1]).includes('「etcd」'), `${tag} 用語集の語から、語を入れた AI を開ける`);
-      // 用語の図: 見ている語の箱だけを主役の色にする
-      const fig = page.locator('#gloss-pane .gloss-detail__figure');
-      check(await fig.locator('svg').isVisible(), `${tag} 用語集の語に図が出る`);
-      const lit = await fig.locator('.dg__node--current').evaluateAll((els) => els.map((el) => el.parentElement.querySelector('.dg__label')?.textContent));
-      check(lit.length >= 1 && lit.every((t) => t === 'etcd'), `${tag} 図では見ている語 (etcd) の箱が強調される (${lit.join('・')})`);
-    } else {
-      const head = page.locator('#gloss-row-etcd button[aria-expanded]');
-      await head.waitFor();
-      await page.waitForTimeout(300);
-      const box = await head.boundingBox();
-      const vh = page.viewportSize().height;
-      check((await head.getAttribute('aria-expanded')) === 'true' && box && box.y >= 0 && box.y < vh, `${tag} 用語集でその語 (etcd) が開いて画面の中に見える (y ${box?.y})`);
-      const figW = await page.locator('#gloss-row-etcd .gloss-detail__figure svg').evaluate((el) => el.getBoundingClientRect().width);
-      check(figW > 0 && figW <= page.viewportSize().width, `${tag} 用語の図は画面の幅に収まる (${Math.round(figW)}px)`);
-      // 戻る・進むで来たときは、覚えた位置に戻す (その語へ送り直さない)
+    // 押した語の 1 語のページが開く (h1 は語の名前。書き出す HTML と同じ)
+    const termTitle = page.locator('#gloss-term-title');
+    await termTitle.waitFor();
+    check((await termTitle.innerText()).trim() === 'etcd' && (await page.locator('h1').count()) === 1, `${tag} 用語の 1 語のページが開き、h1 は語の名前 (etcd)`);
+    check((await page.locator('#gloss-term .gloss-detail__more').count()) >= 2 && (await page.locator('#gloss-term a.gloss-term').count()) >= 1, `${tag} 用語集の語に詳しい説明が出て、中のほかの語がリンクになる`);
+    check(JSON.stringify(await page.locator('nav[aria-label="パンくず"] a').evaluateAll((as) => as.map((a) => a.getAttribute('href')))) === JSON.stringify(['/kcna-dojo/', '/kcna-dojo/glossary/']), `${tag} 用語のページのパンくずはトップ・用語集の順`);
+    // 説明の中のリンクを押すと、その語のページに替わる
+    const linked = page.locator('#gloss-term a.gloss-term').first();
+    const linkedText = (await linked.innerText()).trim();
+    await linked.click();
+    await page.waitForFunction(() => document.querySelector('#gloss-term-title')?.textContent?.trim() !== 'etcd', null, { timeout: 5000 }).catch(() => {});
+    check((await termTitle.innerText()).trim() !== 'etcd', `${tag} 説明の中のリンクを押すと、その語のページに替わる (${linkedText} → ${(await termTitle.innerText()).trim()})`);
+    await page.goBack();
+    await page.waitForFunction(() => document.querySelector('#gloss-term-title')?.textContent?.trim() === 'etcd', null, { timeout: 5000 }).catch(() => {});
+    const ai = await page.locator('#gloss-term').getByRole('link', { name: 'Claude' }).getAttribute('href');
+    check(ai.startsWith('https://claude.ai/new?q=') && decodeURIComponent(ai.split('?q=')[1]).includes('「etcd」'), `${tag} 用語集の語から、語を入れた AI を開ける`);
+    // 用語の図: 見ている語の箱だけを主役の色にする。図は画面の幅に収まる
+    const fig = page.locator('#gloss-term .gloss-detail__figure');
+    check(await fig.locator('svg').isVisible(), `${tag} 用語集の語に図が出る`);
+    const lit = await fig.locator('.dg__node--current').evaluateAll((els) => els.map((el) => el.parentElement.querySelector('.dg__label')?.textContent));
+    check(lit.length >= 1 && lit.every((t) => t === 'etcd'), `${tag} 図では見ている語 (etcd) の箱が強調される (${lit.join('・')})`);
+    const figW = await fig.locator('svg').evaluate((el) => el.getBoundingClientRect().width);
+    check(figW > 0 && figW <= page.viewportSize().width, `${tag} 用語の図は画面の幅に収まる (${Math.round(figW)}px)`);
+    await noHorizontalOverflow(page, width, `${tag} 用語のページ`);
+    if (width < 768) {
+      // 一覧で開いた語から、その語のページへ行ける
+      await page.goto(`${BASE}glossary/`);
+      await page.locator('#gloss-row-etcd button[aria-expanded]').click();
+      check((await page.locator('#gloss-row-etcd a.gloss-page-link').getAttribute('href')) === '/kcna-dojo/glossary/etcd/', `${tag} 一覧で開いた語から、その語のページへのリンクがある`);
+      // 戻る・進むで来たときは、覚えた位置に戻す
       const scrollTop = () => page.evaluate(() => (document.querySelector('.astryx-layout-content') ?? document.scrollingElement).scrollTop);
       await page.evaluate(() => ((document.querySelector('.astryx-layout-content') ?? document.scrollingElement).scrollTop = 1500));
       await page.waitForTimeout(200);
@@ -874,6 +1002,18 @@ async function run(browser, name, width, height) {
     }
   }
 
+  // 描画後の h1 は、書き出した HTML の h1 と同じ (ホームはサイト名、週は「第 n 週 …」、レッスンはレッスン名、用語のページは語の名前)。h1 は 1 つだけ
+  for (const p of ['', 'week/1/', 'week/2/', 'lesson/w2-l1/', 'glossary/etcd/']) {
+    const html = await (await fetch(`${BASE}${p}`)).text();
+    const written = html.match(/<h1>([^<]*)<\/h1>/)?.[1].replace(/&amp;/g, '&') ?? '(無し)';
+    await page.goto(`${BASE}${p}`);
+    await page.waitForFunction(() => !document.querySelector('#root > main.prerender') && !document.querySelector('#root > main[style]'));
+    await page.locator('h1, h2').first().waitFor();
+    const shown = (await page.locator('h1').allInnerTexts()).map((t) => t.trim());
+    check(shown.length === 1 && shown[0] === written, `${tag} /${p} の描画後の h1 は書き出した h1 と同じ (${written} / ${shown.join(' · ')})`);
+    if (p.startsWith('lesson/')) check((await page.getByRole('heading', { level: 2 }).first().innerText()).length > 10, `${tag} レッスンの問題文は h2`);
+  }
+
   // 後から読むチャンクを読めない (新しい版を出したあとの開いたままのタブなど) ときも白紙にしない。
   // 別のページで調べ、ここで出るエラーは上のエラーの検査に入れない
   {
@@ -915,6 +1055,7 @@ try {
   await waitForServer();
   browser = await chromium.launch();
   checkFirstLoad();
+  checkSpeedBuild();
   await run(browser, 'phone', 390, 844);
   await run(browser, 'pc', 1280, 860);
 } catch (e) {

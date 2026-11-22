@@ -25,14 +25,16 @@ export const REVIEW_INTERVALS = [1, 3, 7] as const;
 /** 画面の色。system は端末の設定に合わせる */
 export type ColorMode = 'system' | 'light' | 'dark';
 export const COLOR_MODES: readonly ColorMode[] = ['system', 'light', 'dark'];
-/** 設定 (目標・受験日・画面の色)。無ければ既定の値を使う */
-export type Profile = { dailyGoalXp: number; examDate: string; colorMode?: ColorMode };
+/**
+ * 設定 (目標・受験日・学習の開始日・画面の色)。目標は無ければ既定の値を使う。
+ * 受験日 (examDate) は利用者が決めるまで持たない (決めていない人に試験までの日数を出さない)。
+ * 学習の開始日 (startDate) は週の日付を数える起点で、決めていなければ初めて学んだ日 (planStart)
+ */
+export type Profile = { dailyGoalXp: number; examDate?: string; startDate?: string; colorMode?: ColorMode };
 
 /** 1 日の目標の XP の既定と選べる値 */
 export const DEFAULT_GOAL_XP = 30;
 export const GOAL_CHOICES = [10, 20, 30, 50] as const;
-/** 受験日の既定 (学習計画の「2027-03 上旬」) */
-export const DEFAULT_EXAM_DATE = '2027-03-06';
 
 /** 模擬試験の結果 (新しい順に最大 20 件) */
 /** set は決まった回 (第 n 回) の番号。ランダムに選んだ回には付けない */
@@ -151,8 +153,10 @@ export function normalizeProgress(raw: unknown): Progress | null {
   if (profile) {
     out.profile = {
       dailyGoalXp: (GOAL_CHOICES as readonly number[]).includes(profile.dailyGoalXp as number) ? (profile.dailyGoalXp as number) : DEFAULT_GOAL_XP,
-      examDate: isValidDay(profile.examDate) ? profile.examDate : DEFAULT_EXAM_DATE,
     };
+    // 受験日と開始日は、実在する日付のときだけ残す (前の版が書いた受験日もそのまま読む)
+    if (isValidDay(profile.examDate)) out.profile.examDate = profile.examDate;
+    if (isValidDay(profile.startDate)) out.profile.startDate = profile.startDate;
     if ((COLOR_MODES as readonly unknown[]).includes(profile.colorMode) && profile.colorMode !== 'system') out.profile.colorMode = profile.colorMode as ColorMode;
   }
   return out;
@@ -296,8 +300,39 @@ export function goalXp(p: Progress): number {
   return p.profile?.dailyGoalXp ?? DEFAULT_GOAL_XP;
 }
 
-export function examDate(p: Progress): string {
-  return p.profile?.examDate ?? DEFAULT_EXAM_DATE;
+/** 受験日。決めていなければ undefined (試験までの日数を出さず、決める画面へ案内する) */
+export function examDate(p: Progress): string | undefined {
+  return p.profile?.examDate;
+}
+
+/** 試験までの日数。受験日を決めていなければ null */
+export function daysToExam(p: Progress, now: Date): number | null {
+  const d = examDate(p);
+  return d ? daysBetween(dayKey(now), d) : null;
+}
+
+/** 初めて学んだ日 (XP・レッスン・答え・模擬試験・ハンドブックの記録のいちばん古い日)。記録が無ければ null */
+export function firstStudyDay(p: Progress): string | null {
+  const days: string[] = Object.keys(p.xp.byDay);
+  const fromIso = (iso: string) => {
+    const t = Date.parse(iso);
+    if (!Number.isNaN(t)) days.push(dayKey(new Date(t)));
+  };
+  for (const l of Object.values(p.lessons)) fromIso(l.at);
+  for (const a of Object.values(p.answers)) fromIso(a.last);
+  for (const e of p.exams ?? []) fromIso(e.at);
+  for (const h of Object.values(p.handbook ?? {})) fromIso(h.at);
+  return days.length > 0 ? days.sort()[0] : null;
+}
+
+/** 週の日付を数える起点: 設定で決めた開始日、無ければ初めて学んだ日、まだ学んでいなければ今日 */
+export function planStart(p: Progress, now: Date): string {
+  return p.profile?.startDate ?? firstStudyDay(p) ?? dayKey(now);
+}
+
+/** 第 week 週の始まりの日 (起点から 7 日ずつ) */
+export function weekStartDay(start: string, week: number): string {
+  return addDays(start, (week - 1) * 7);
 }
 
 export function colorMode(p: Progress): ColorMode {
@@ -305,9 +340,11 @@ export function colorMode(p: Progress): ColorMode {
 }
 
 export function setProfile(p: Progress, change: Partial<Profile>): Progress {
-  const next: Profile = { ...p.profile, dailyGoalXp: goalXp(p), examDate: examDate(p), ...change };
-  // 既定 (端末に合わせる) は持たない
+  const next: Profile = { ...p.profile, dailyGoalXp: goalXp(p), ...change };
+  // 既定 (端末に合わせる) と、消した受験日・開始日は持たない
   if (next.colorMode === 'system') delete next.colorMode;
+  if (!next.examDate) delete next.examDate;
+  if (!next.startDate) delete next.startDate;
   return { ...p, profile: next };
 }
 
@@ -326,7 +363,7 @@ export function setHandbookDone(p: Progress, topicId: string, done: boolean, now
   return { ...p, handbook: { ...p.handbook, [topicId]: next } };
 }
 
-/** 記録を消す。目標・受験日・画面の色の設定は残す */
+/** 記録を消す。目標・受験日・開始日・画面の色の設定は残す */
 export function resetProgress(p: Progress): Progress {
   const next = emptyProgress();
   if (p.profile) next.profile = { ...p.profile };
