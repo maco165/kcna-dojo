@@ -54,3 +54,56 @@ describe('書き出す全ページ', () => {
     expect(long).toEqual([]);
   });
 });
+
+const ORIGIN_BASE = 'https://maco165.github.io/kcna-dojo/';
+type Ld = { '@type': string; url?: string; itemListElement?: { position: number; name: string; item: string }[]; hasDefinedTerm?: unknown[] };
+const ldOf = (doc: Document): Ld[] => [...doc.querySelectorAll('script[type="application/ld+json"]')].flatMap((s) => {
+  const v = JSON.parse(s.textContent ?? '');
+  return v['@graph'] ?? [v];
+});
+/** ページの種類ごとに入れる型 (トップ以外。無いページは BreadcrumbList だけ) */
+const expectedType = (p: string) =>
+  /^(handbook|commands|compare)\/[^/]+\/$/.test(p) ? 'TechArticle' : p === 'glossary/' ? 'DefinedTermSet' : p.startsWith('lesson/') ? 'LearningResource' : undefined;
+
+describe('構造化データとパンくず', () => {
+  it('検索に載るページは BreadcrumbList と種類ごとの型を持ち、JSON として読めて url が canonical と合う。WebSite はトップだけ', () => {
+    for (const { page, doc } of indexed()) {
+      const canonical = doc.querySelector('link[rel="canonical"]')?.getAttribute('href');
+      const ld = ldOf(doc);
+      expect(ld.map((x) => x['@type']), page.path).not.toContain('WebSite');
+      const crumbs = ld.find((x) => x['@type'] === 'BreadcrumbList');
+      expect(crumbs, page.path).toBeDefined();
+      const items = crumbs!.itemListElement!;
+      expect(items[0].item).toBe(ORIGIN_BASE);
+      expect(items.at(-1)!.item, page.path).toBe(canonical);
+      expect(items.map((x) => x.position)).toEqual(items.map((_, i) => i + 1));
+      const type = expectedType(page.path);
+      const main = ld.filter((x) => x['@type'] !== 'BreadcrumbList');
+      expect(main.map((x) => x['@type']), page.path).toEqual(type ? [type] : []);
+      if (type) expect(main[0].url, page.path).toBe(canonical);
+    }
+    const glossary = ldOf(docs.find((d) => d.page.path === 'glossary/')!.doc).find((x) => x['@type'] === 'DefinedTermSet')!;
+    expect(glossary.hasDefinedTerm!.length).toBeGreaterThan(100);
+  });
+  it('検索に載らないページには構造化データを書かない (WebSite も)', () => {
+    for (const { page, doc } of docs.filter((d) => !indexed().includes(d))) expect(ldOf(doc), page.path).toEqual([]);
+  });
+  it('検索に載るページは、JS なしの本文の頭に、BreadcrumbList と同じ階層の見えるパンくずを持つ', () => {
+    for (const { page, doc } of indexed()) {
+      const nav = doc.querySelector('#root main > nav[aria-label="パンくず"]:first-child');
+      expect(nav, page.path).not.toBeNull();
+      const li = [...nav!.querySelectorAll('li')];
+      const items = ldOf(doc).find((x) => x['@type'] === 'BreadcrumbList')!.itemListElement!;
+      expect(li.map((x) => x.textContent), page.path).toEqual(items.map((x) => x.name));
+      // 自分の前までをリンクにし、リンク先は BreadcrumbList の item と同じ
+      expect(li.slice(0, -1).map((x) => new URL(x.querySelector('a')!.getAttribute('href')!, ORIGIN_BASE).href)).toEqual(items.slice(0, -1).map((x) => x.item));
+      expect(li.at(-1)!.getAttribute('aria-current')).toBe('page');
+    }
+  });
+  it('第 1 週のレッスンのパンくずは、トップと同じ画面の week/1/ を通らない', () => {
+    const l = docs.find((d) => d.page.path === 'lesson/w1-l1/')!;
+    expect([...l.doc.querySelectorAll('#root nav a')].map((a) => a.getAttribute('href'))).toEqual(['/kcna-dojo/']);
+    const l2 = docs.find((d) => d.page.path.startsWith('lesson/w2-'))!;
+    expect([...l2.doc.querySelectorAll('#root nav a')].map((a) => a.getAttribute('href'))).toEqual(['/kcna-dojo/', '/kcna-dojo/week/2/']);
+  });
+});

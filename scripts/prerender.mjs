@@ -33,10 +33,15 @@ const SLOTS = {
   twitterTitle: /(<meta name="twitter:title" content=")[^"]*(")/,
   twitterDescription: /(<meta name="twitter:description" content=")[^"]*(")/,
   root: /<div id="root">[\s\S]*?<\/div>\s*(?=<script|<\/body>)/,
+  jsonLd: /\s*<script type="application\/ld\+json">[\s\S]*?<\/script>/,
 };
 
+const SITE_ID = `${ORIGIN}${BASE}#website`;
+/** JSON-LD を script の中に書ける形にする (</script> などで閉じられないよう < を \u003c にする) */
+const ldJson = (v) => JSON.stringify(v, null, 2).replace(/</g, '\\u003c');
+
 /** dist/index.html を型にして、1 ページ分の HTML を作る。置き換えは関数で渡す ($1 などを置き換えの記号として読ませない) */
-export function renderPage(template, { path: p, title, fullTitle, description, body, noindex = false, canonical }) {
+export function renderPage(template, { path: p, title, fullTitle, description, body, noindex = false, canonical, jsonLd }) {
   // fullTitle は buildPages が画面と同じ関数 (src/lib/pageTitle.ts の withSite) で決める。無ければ同じ形で作る
   const full = fullTitle ?? (title ? `${title} | ${SITE_NAME}` : SITE_TITLE);
   const can = url(canonical ?? p);
@@ -51,6 +56,8 @@ export function renderPage(template, { path: p, title, fullTitle, description, b
     twitterTitle: attr(esc(full)),
     twitterDescription: attr(esc(description)),
     root: () => `<div id="root">\n      <main class="prerender">\n${body}\n      </main>\n    </div>\n    `,
+    // WebSite はトップだけが持つ。ほかのページはそのページの構造化データ (無ければ書かない)
+    jsonLd: (m) => (p === '' && !noindex ? m : jsonLd ? `\n    <script type="application/ld+json">\n${ldJson({ '@context': 'https://schema.org', '@graph': jsonLd })}\n    </script>` : ''),
   };
   let html = template;
   for (const [k, re] of Object.entries(SLOTS)) {
@@ -74,6 +81,8 @@ export async function buildPages(load) {
   const glossary = (await load('/src/content/glossary.json')).default;
   const pages = [];
   const lessonsOf = (w) => w.content?.lessons ?? [];
+  /** 解説の記事 (ハンドブックのトピック・コマンド・比較表)。出典を citation にする */
+  const article = (headline, sources) => ({ '@type': 'TechArticle', headline, citation: [...new Map(sources.map((s) => [s.url, s])).values()].map((s) => ({ '@type': 'CreativeWork', name: s.label, url: s.url })) });
 
   // 説明のページ
   pages.push({
@@ -113,9 +122,10 @@ export async function buildPages(load) {
       path: `handbook/${t.id}/`,
       title: t.title,
       description: clip(t.summary),
+      entity: article(t.title, t.sources),
       body: [
-        `<p>${link('handbook/', 'ハンドブック')} / ${esc(sectionName(t.domain))}</p>`,
         `<h1>${esc(t.title)}</h1>`,
+        `<p>${esc(sectionName(t.domain))}</p>`,
         `<p>${esc(t.summary)}</p>`,
         '<h2>全体の流れ</h2>',
         `<ol>${t.flow.map(step).join('')}</ol>`,
@@ -133,6 +143,11 @@ export async function buildPages(load) {
     path: 'glossary/',
     title: '用語集',
     description: `KCNA-JP の問題に出る Kubernetes とクラウドネイティブの用語 ${terms.length} 語の短い説明と、公式の文書の出典。`,
+    entity: {
+      '@type': 'DefinedTermSet',
+      name: 'クラネイの用語集',
+      hasDefinedTerm: terms.map((t) => ({ '@type': 'DefinedTerm', name: t.term, ...(t.aliases?.length ? { alternateName: t.aliases } : {}), description: t.description, url: url(`glossary/#${t.id}`) })),
+    },
     body: ['<h1>用語集</h1>', `<dl>${terms.map((t) => `<dt id="${esc(t.id)}">${esc(t.term)}${t.aliases?.length ? ` (${esc(t.aliases.join('・'))})` : ''}</dt><dd>${esc(t.description)} <a href="${esc(t.source)}">出典</a></dd>`).join('')}</dl>`].join('\n'),
   });
   for (const t of terms) {
@@ -153,8 +168,8 @@ export async function buildPages(load) {
       path: `commands/${c.id}/`,
       title: commandPageTitle(c.id),
       description: clip(`${c.summary} ${c.detail ?? ''}`),
+      entity: article(c.command, [{ label: `${c.command} の公式リファレンス`, url: c.source }, ...c.sources]),
       body: [
-        `<p>${link('commands/', 'コマンド')}</p>`,
         `<h1>${esc(c.command)}</h1>`,
         `<p>${esc(c.summary)}</p>`,
         c.detail ? `<p>${esc(c.detail)}</p>` : '',
@@ -189,8 +204,8 @@ export async function buildPages(load) {
       path: `compare/${t.id}/`,
       title: t.short ?? t.title,
       description: clip(t.lead),
+      entity: article(t.title, t.sources),
       body: [
-        `<p>${link('compare/', '似た語の比較表')}</p>`,
         `<h1>${esc(t.title)}</h1>`,
         `<p>${esc(t.lead)}</p>`,
         `<table><thead><tr><th scope="col">観点</th>${t.columns.map((c) => `<th scope="col">${esc(c.name)}</th>`).join('')}</tr></thead><tbody>${t.rows.map((r) => `<tr><th scope="row">${esc(r.label)}</th>${r.cells.map((c) => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>`,
@@ -218,8 +233,10 @@ export async function buildPages(load) {
       pages.push({
         path: `lesson/${l.id}/`,
         title: l.title,
+        parent: w.week === 1 ? '' : `week/${w.week}/`,
+        entity: { '@type': 'LearningResource', name: l.title, learningResourceType: l.kind === 'lab' ? '実習' : '練習問題', isAccessibleForFree: true },
         description: clip(`第 ${w.week} 週 ${w.title} のレッスン「${l.title}」。${l.summary}。${qs[0]?.prompt ?? ''}`),
-        body: [`<p>${link(`week/${w.week}/`, `第 ${w.week} 週 ${w.title}`)}</p>`, `<h1>${esc(l.title)}</h1>`, `<p>${esc(l.summary)}</p>`, l.kind === 'lab' ? `<h2>この実習で分かること</h2><p>${esc(l.goal)}</p><h2>用意するもの</h2><ul>${l.needs.map((n) => `<li>${esc(n)}</li>`).join('')}</ul><h2>手順</h2><ol>${l.steps.map((s) => `<li>${esc(s.text)}</li>`).join('')}</ol>` : '', qs.length ? `<ol>${qs.map((q) => `<li>${esc(q.prompt)}</li>`).join('')}</ol>` : ''].join('\n'),
+        body: [`<h1>${esc(l.title)}</h1>`, `<p>${esc(l.summary)}</p>`, l.kind === 'lab' ? `<h2>この実習で分かること</h2><p>${esc(l.goal)}</p><h2>用意するもの</h2><ul>${l.needs.map((n) => `<li>${esc(n)}</li>`).join('')}</ul><h2>手順</h2><ol>${l.steps.map((s) => `<li>${esc(s.text)}</li>`).join('')}</ol>` : '', qs.length ? `<ol>${qs.map((q) => `<li>${esc(q.prompt)}</li>`).join('')}</ol>` : ''].join('\n'),
       });
     }
   }
@@ -237,7 +254,33 @@ export async function buildPages(load) {
   // 第 1 週はトップと同じ画面なので、トップを正にして sitemap から外す
   const week1 = pages.find((x) => x.path === 'week/1/');
   if (week1) Object.assign(week1, { canonical: '', inSitemap: false });
+  // 検索に載るページに、見えるパンくずと構造化データ (BreadcrumbList と、ページの種類ごとの型) を付ける。2 つは同じ階層 (crumbsOf)
+  const byPath = new Map(pages.map((x) => [x.path, x]));
+  for (const page of pages) {
+    if (!isIndexed(page)) continue;
+    const crumbs = crumbsOf(page.path, page.parent).map((p) => ({ path: p, name: p === '' ? SITE_NAME : byPath.get(p).title }));
+    const last = crumbs.length - 1;
+    const nav = `<nav aria-label="パンくず" class="hb-crumbs"><ol>${crumbs.map((c, i) => (i === last ? `<li aria-current="page">${esc(c.name)}</li>` : `<li>${link(c.path, c.name)}</li>`)).join('')}</ol></nav>`;
+    page.body = `${nav}\n${page.body}`;
+    const breadcrumb = { '@type': 'BreadcrumbList', itemListElement: crumbs.map((c, i) => ({ '@type': 'ListItem', position: i + 1, name: c.name, item: url(c.path) })) };
+    const main = page.entity ? { ...page.entity, url: url(page.path), description: page.description, inLanguage: 'ja', isPartOf: { '@id': SITE_ID } } : null;
+    page.jsonLd = main ? [main, breadcrumb] : [breadcrumb];
+  }
   return pages;
+}
+
+/** 検索に載るページか (noindex でなく、canonical を別のページに向けていない) */
+export const isIndexed = (page) => !page.noindex && (page.canonical === undefined || page.canonical === page.path);
+
+/**
+ * パンくずの階層 (トップから自分まで)。一覧の下のページは一覧を親にし、レッスンは週 (parent) を親にする。
+ * 第 1 週はトップと同じ画面なので、第 1 週のレッスンの parent はトップにする
+ */
+export function crumbsOf(p, parent) {
+  if (p === '') return [''];
+  const list = p.match(/^(handbook|commands|compare|glossary)\/[^/]+\/$/);
+  const up = parent ?? (list ? `${list[1]}/` : '');
+  return up === '' ? ['', p] : ['', up, p];
 }
 
 /** lastmod は付けない (作るたびの日付では正しくなく、Google はいつも正しいときだけ使うため) */
