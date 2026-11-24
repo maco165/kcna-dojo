@@ -124,7 +124,7 @@
             "language": "bash",
             "text": "helm install web ./mychart -n try-kcna\nhelm upgrade web ./mychart -n try-kcna -f values-prod.yaml\nhelm history web -n try-kcna\nhelm rollback web 1 -n try-kcna"
           },
-          "output": "REVISION  UPDATED                   STATUS      CHART          APP VERSION  DESCRIPTION\n1         Mon Jan 11 10:27:17 2027  superseded  mychart-0.1.0  1.28       Install complete\n2         Mon Jan 11 10:28:40 2027  superseded  mychart-0.1.0  1.28       Upgrade complete\n3         Mon Jan 11 10:29:05 2027  deployed    mychart-0.1.0  1.28       Rollback to 1"
+          "output": "REVISION  UPDATED                   STATUS      CHART          APP VERSION  DESCRIPTION\n1         Mon Jan 11 10:27:17 2027  superseded  mychart-0.1.0  1.28         Install complete\n2         Mon Jan 11 10:28:40 2027  superseded  mychart-0.1.0  1.28         Upgrade complete\n3         Mon Jan 11 10:29:05 2027  deployed    mychart-0.1.0  1.28         Rollback to 1"
         },
         {
           "text": "チャートの中身を見ます。mychart フォルダの Chart.yaml は、チャートの名札です。",
@@ -409,7 +409,7 @@
                 "language": "bash",
                 "text": "helm upgrade hello ./hello -n try-kcna --set replicaCount=2\nhelm rollback hello 1 -n try-kcna\nhelm history hello -n try-kcna"
               },
-              "output": "REVISION  UPDATED                   STATUS      CHART        APP VERSION  DESCRIPTION\n1         Mon Jan 11 10:27:17 2027  superseded  hello-0.1.0  1.28       Install complete\n2         Mon Jan 11 10:28:40 2027  superseded  hello-0.1.0  1.28       Upgrade complete\n3         Mon Jan 11 10:29:05 2027  deployed    hello-0.1.0  1.28       Rollback to 1",
+              "output": "REVISION  UPDATED                   STATUS      CHART        APP VERSION  DESCRIPTION\n1         Mon Jan 11 10:27:17 2027  superseded  hello-0.1.0  1.16.0       Install complete\n2         Mon Jan 11 10:28:40 2027  superseded  hello-0.1.0  1.16.0       Upgrade complete\n3         Mon Jan 11 10:29:05 2027  deployed    hello-0.1.0  1.16.0       Rollback to 1",
               "result": {
                 "text": "rollback も新しいリビジョンになり、履歴は 3 まで",
                 "tone": "ok"
