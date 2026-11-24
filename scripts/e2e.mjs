@@ -970,7 +970,7 @@ async function run(browser, name, width, height) {
     await page.goto(`${BASE}handbook/infrastructure-as-code/`);
     await page.getByRole('heading', { name: '全体の流れ' }).waitFor();
     const notes = page.locator('.hb-fields');
-    check((await notes.count()) === 2 && (await page.getByText('main.tf', { exact: true }).count()) >= 1, `${tag} IaC にファイルのサンプルと項目の意味が出る (${await notes.count()})`);
+    check((await notes.count()) === 2 && (await page.getByText(/^main\.tf( — hcl)?$/).count()) >= 1, `${tag} IaC にファイルのサンプルと項目の意味が出る (${await notes.count()})`);
     check((await notes.first().locator('dt').count()) >= 10 && (await notes.first().locator('a[href^="https://developer.hashicorp.com/"]').count()) >= 1, `${tag} 項目ごとの意味と公式の出典が並ぶ`);
     await noHorizontalOverflow(page, width, `${tag} ファイルのサンプル`);
   }
