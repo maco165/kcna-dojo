@@ -965,6 +965,68 @@ async function run(browser, name, width, height) {
     check((await card.locator('.hb-topic__read').innerText()) === '確認済み' && (await page.getByRole('navigation', { name: 'ハンドブックの部' }).getByText(/13 トピック · 確認済み 1/).isVisible()), `${tag} 目次に確認済みと、確認済みの数が出る`);
   }
 
+  // 15a. 用語の短い意味の吹き出し: カーソルとフォーカスで出る・Esc で消える・吹き出しへカーソルを移せる・はみ出さない
+  {
+    await page.goto(`${BASE}handbook/core-concepts/`);
+    await page.getByRole('heading', { name: '全体の流れ' }).waitFor();
+    const tip = page.locator('.term-tip');
+    const etcd = page.locator('a.hb-term', { hasText: /^etcd$/ }).first();
+    const meaning = JSON.parse(readFileSync(new URL('../src/content/glossary.json', import.meta.url), 'utf8')).terms.find((t) => t.id === 'etcd').description;
+    check((await tip.count()) === 0, `${tag} 吹き出しは、出すまで描かない`);
+    await etcd.hover();
+    await tip.waitFor();
+    check((await tip.innerText()).includes(meaning) && (await etcd.getAttribute('aria-describedby')) === (await tip.getByRole('tooltip').getAttribute('id')), `${tag} 用語にカーソルを乗せると短い意味が出て、読み上げにも結ぶ`);
+    await tip.hover();
+    await page.waitForTimeout(400);
+    check(await tip.isVisible(), `${tag} カーソルを吹き出しへ移しても消えない`);
+    await page.keyboard.press('Escape');
+    check((await tip.count()) === 0, `${tag} Esc で消える`);
+    await page.mouse.move(0, 0);
+    await etcd.focus();
+    await page.keyboard.press('Shift+Tab');
+    await page.keyboard.press('Tab');
+    check((await tip.count()) === 1, `${tag} キーボードのフォーカスでも出る`);
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(400);
+    check((await tip.count()) === 0, `${tag} フォーカスが残っていても、Esc で消したら戻らない`);
+    await page.evaluate(() => document.activeElement?.blur());
+    // どの語でも、本文の幅と画面の中に収まる
+    const bad = [];
+    for (const t of await page.locator('a.hb-term:visible').all()) {
+      await page.mouse.move(0, 0);
+      await page.keyboard.press('Escape');
+      await t.scrollIntoViewIfNeeded();
+      await t.hover();
+      await tip.waitFor();
+      const b = await tip.boundingBox();
+      // スマホは下のタブの帯に隠れない
+      const bar = await page.locator('nav.tabs').boundingBox().catch(() => null);
+      const covered = await tip.evaluate((el) => {
+        const r = el.getBoundingClientRect();
+        return [[r.left + 3, r.top + 3], [r.right - 3, r.bottom - 3]].some(([x, y]) => !el.contains(document.elementFromPoint(x, y)));
+      });
+      if (b.x < 0 || b.x + b.width > width || covered || (bar && b.y + b.height > bar.y)) bad.push(await t.innerText());
+    }
+    check(bad.length === 0, `${tag} どの用語の吹き出しも画面に収まり、隠れない (${bad.join('・')})`);
+    await noHorizontalOverflow(page, width, `${tag} 吹き出し`);
+    // タッチ: 1 回目のタップで意味、出た意味のタップで用語集へ。外を押すと消える
+    const touch = await browser.newContext({ viewport: { width, height }, hasTouch: true, isMobile: width < 768 });
+    const tp = await touch.newPage();
+    await tp.goto(`${BASE}handbook/core-concepts/`);
+    await tp.getByRole('heading', { name: '全体の流れ' }).waitFor();
+    const tEtcd = tp.locator('a.hb-term', { hasText: /^etcd$/ }).first();
+    await tEtcd.tap();
+    await tp.locator('.term-tip').waitFor();
+    check(tp.url().endsWith('/handbook/core-concepts/'), `${tag} タップでは移らずに意味が出る`);
+    await tp.locator('#hb-flow').tap();
+    check((await tp.locator('.term-tip').count()) === 0, `${tag} 外を押すと消える`);
+    await tEtcd.tap();
+    await tp.locator('.term-tip').tap();
+    await tp.waitForURL(/\/glossary\/etcd\/$/);
+    check(tp.url().endsWith('/glossary/etcd/'), `${tag} 出た意味をタップすると用語集のその語へ移る`);
+    await touch.close();
+  }
+
   // 15b. ハンドブックの本文の用語: 強調され、押すと用語集のその語が開く
   {
     await page.goto(`${BASE}handbook/core-concepts/`);
