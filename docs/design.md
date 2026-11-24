@@ -120,3 +120,16 @@ flowchart TD
 - ファビコンの正本は `public/favicon.svg` (強調色の青の角丸の四角に `>_`)。直したら `node scripts/favicons.mjs` で PNG (32px と apple-touch-icon の 180px) を作り直し、一緒にコミットする
 - Astryx の部品の使い方は `npm run astryx -- component <名前>` で、入っている版の文書を読む
 - main へのマージで GitHub Actions が検査・テスト・組み立てを通し、Pages に配る。PR では配らずに検査だけ走る。e2e と画像の作り直しはブラウザが要るので手元で走らせる
+
+## 開発のコマンド
+
+```bash
+npm ci
+npm run dev            # 手元で開く
+npm run check:content  # 問題データの検査
+npm test               # 採点・進捗・AI のリンク・データ検査・ファビコンのテスト (vitest)
+npm run e2e            # 組み立ててブラウザで通しの検査 (Playwright。390 幅と 1280 幅)
+npm run build          # 型検査と本番の組み立て
+npm run readme:images  # README の見出しと画面の画像を作り直す
+```
+
