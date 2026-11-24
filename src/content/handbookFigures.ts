@@ -349,13 +349,13 @@ export const HANDBOOK_FIGURES: Record<string, DiagramSpec> = {
     ],
   },
   'setup-k3s': {
-    caption: 'Linux のマシン 1 台にインストールスクリプトで k3s の server を入れ、管理者の kubeconfig を自分の ~/.kube/config に写して KUBECONFIG で指します。ノードが Ready なら、名前空間 try-kcna を作って試し、名前空間ごと消して片付けます。k3s そのものを消すときはアンインストールのスクリプトを使い、クラスターのデータも消えます。',
+    caption: 'k3s を入れ、kubeconfig を写して kubectl を使えるようにし、ノードが Ready になれば準備完了です。トピックは名前空間 try-kcna で試して消します。k3s を消すと、クラスターのデータも消えます。',
     width: 720,
     height: 290,
     nodes: [
       { id: 'prep', x: 20, y: 30, w: 200, h: 64, label: '用意する', sub: 'Linux 1 台・2 コア 2 GB から' },
       { id: 'install', x: 260, y: 30, w: 200, h: 64, label: 'k3s を入れる', sub: 'get.k3s.io のスクリプト', tone: 'accent' },
-      { id: 'kc', x: 500, y: 30, w: 200, h: 64, label: 'kubeconfig を写す', sub: '~/.kube/config と KUBECONFIG' },
+      { id: 'kc', x: 500, y: 30, w: 200, h: 64, label: 'kubeconfig を写す', sub: '~/.kube/k3s.yaml と KUBECONFIG' },
       { id: 'check', x: 500, y: 196, w: 200, h: 64, label: '確かめる', sub: 'ノードが Ready になる' },
       { id: 'try', x: 260, y: 196, w: 200, h: 64, label: 'トピックを試す', sub: '名前空間 try-kcna で試して消す', tone: 'accent' },
       { id: 'un', x: 20, y: 196, w: 200, h: 64, label: 'k3s を消す', sub: 'k3s-uninstall.sh (データも消える)', tone: 'warn' },

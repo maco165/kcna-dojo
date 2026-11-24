@@ -39,7 +39,7 @@ describe('書き出す全ページ', { timeout: 30_000 }, () => {
     expect(seen.size).toBeGreaterThan(140);
   });
   it('設定ファイルのサンプルの名前・全項目・出典を、書き出した本文にも書く', () => {
-    const steps = HANDBOOK_TOPICS.flatMap((t) => t.flow.filter((s) => s.fields).map((s) => ({ t, s })));
+    const steps = HANDBOOK_TOPICS.flatMap((t) => [...t.flow, ...t.try.flatMap((x) => x.steps)].filter((s) => s.fields).map((s) => ({ t, s })));
     expect(steps.length).toBeGreaterThan(10);
     for (const { t, s } of steps) {
       const { doc } = docs.find(({ page }) => page.path === `handbook/${t.id}/`)!;
