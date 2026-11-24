@@ -930,11 +930,11 @@
           "output": "[+] Building 3.2s (7/7) FINISHED\n => [1/2] FROM docker.io/library/nginx:1.27-alpine\n => [2/2] COPY index.html /usr/share/nginx/html/index.html\n => naming to docker.io/library/hello:0.1"
         },
         {
-          "text": "プログラムを組み立てるときは、マルチステージビルドを使います。FROM を 2 回書くと段 (ステージ) が 2 つになり、1 つめで組み立て、2 つめには出来たファイルだけを写します。組み立ての道具は最後のイメージに残りません。この例は公式の例を元に、Go の main.go を組み立てるものです。同じフォルダに .dockerignore を置き、node_modules や .git のような名前を並べると、ビルドに送るファイルから外せます。",
+          "text": "プログラムを組み立てるときは、マルチステージビルドを使います。FROM を 2 回書くと段 (ステージ) が 2 つになり、1 つめで組み立て、2 つめには出来たファイルだけを写します。組み立ての道具は最後のイメージに残りません。この例は公式の例を元に、Go の main.go を組み立てるもので、CGO_ENABLED=0 と USER はこのサイトで足しました。同じフォルダに .dockerignore を置き、node_modules や .git のような名前を並べると、ビルドに送るファイルから外せます。",
           "code": {
             "language": "dockerfile",
             "title": "Dockerfile",
-            "text": "FROM golang:1.26 AS build\nWORKDIR /src\nCOPY main.go .\nRUN CGO_ENABLED=0 go build -o /bin/hello ./main.go\n\nFROM scratch\nCOPY --from=build /bin/hello /bin/hello\nUSER 1000\nCMD [\"/bin/hello\"]"
+            "text": "FROM golang:1.26 AS build\nWORKDIR /src\nCOPY main.go .\nRUN CGO_ENABLED=0 go build -o /bin/hello ./main.go\n\nFROM scratch\nCOPY --from=build /bin/hello /bin/hello\nUSER 1000:1000\nCMD [\"/bin/hello\"]"
           },
           "fields": {
             "items": [
@@ -972,7 +972,7 @@
                 "keys": [
                   "USER"
                 ],
-                "text": "このあとの RUN・CMD・ENTRYPOINT を動かすユーザーです。1000 のような番号でも書け、root 以外で動かせます。"
+                "text": "このあとの RUN・CMD・ENTRYPOINT を動かすユーザーとグループです。番号でも書け、root 以外で動かせます。"
               },
               {
                 "keys": [
@@ -984,7 +984,8 @@
             "sources": [
               "https://docs.docker.com/reference/dockerfile/",
               "https://docs.docker.com/build/building/multi-stage/",
-              "https://docs.docker.com/build/concepts/context/"
+              "https://docs.docker.com/build/concepts/context/",
+              "https://pkg.go.dev/cmd/cgo"
             ]
           }
         },
@@ -1263,6 +1264,10 @@
         {
           "label": "docs.docker.com の Build context (.dockerignore)",
           "url": "https://docs.docker.com/build/concepts/context/"
+        },
+        {
+          "label": "pkg.go.dev の cmd/cgo",
+          "url": "https://pkg.go.dev/cmd/cgo"
         }
       ]
     }
