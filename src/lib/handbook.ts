@@ -2,7 +2,7 @@
 import { codeKeys, unreadable } from './codeKeys';
 
 const TOPIC_KEYS = new Set(['id', 'competency', 'title', 'summary', 'flow', 'try', 'lessons', 'sources', 'noTermLinks', 'short']);
-const STEP_KEYS = new Set(['text', 'code', 'output', 'result', 'fields']);
+const STEP_KEYS = new Set(['text', 'code', 'output', 'result', 'fields', 'lines']);
 const RESULT_KEYS = new Set(['text', 'tone']);
 /** 結果の文の長さの上限 (絵の 1 行に収める) */
 export const RESULT_MAX = 40;
@@ -68,6 +68,11 @@ function checkSteps(steps: unknown, where: string, errors: string[], min: number
     if (s.fields !== undefined && s.result !== undefined) errors.push(`${w}: fields のある段に result は付けません (画面に出ないため)`);
     if (s.fields !== undefined) checkFields(s.fields, s.code, w, errors, topicUrls);
     else if (isObj(s.code) && (s.code.title !== undefined || s.code.language === 'hcl' || s.code.language === 'dockerfile')) errors.push(`${w}: ファイルのサンプル (title のあるコード) には fields が要ります`);
+    if (s.lines !== undefined) {
+      const want = isObj(s.code) && s.code.language === 'bash' && isText(s.code.text) ? s.code.text.split('\n').filter((l) => l.trim() && !l.trim().startsWith('#')) : [];
+      const got: unknown[] = Array.isArray(s.lines) ? s.lines : [];
+      if (want.length === 0 || got.some((l) => !isObj(l) || !isText(l.text)) || JSON.stringify(got.map((l) => (l as { code?: unknown }).code)) !== JSON.stringify(want)) errors.push(`${w}: lines は bash のコードの全部の行に、並びのとおり code と text を持ちます`);
+    }
     if (s.output !== undefined && !isText(s.output)) errors.push(`${w}: output は文字列にします`);
   });
 }

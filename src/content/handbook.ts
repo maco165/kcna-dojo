@@ -10,7 +10,9 @@ export type HandbookCode = { language: 'bash' | 'yaml' | 'hcl' | 'dockerfile'; t
 export type HandbookFields = { items: { keys: string[]; text: string }[]; sources: string[] };
 /** 手順のあとクラスタの中で起きること (本文に書いてある結果を短く)。ok は思いどおり、warn は失敗・止まる */
 export type HandbookResult = { text: string; tone: 'ok' | 'warn' };
-export type HandbookStep = { text: string; code?: HandbookCode; output?: string; result?: HandbookResult; fields?: HandbookFields };
+export type HandbookStep = { text: string; code?: HandbookCode; output?: string; result?: HandbookResult; fields?: HandbookFields; lines?: HandbookLine[] };
+/** コードの 1 行と、その意味 (コマンドの行をすべて、並びのとおりに持つ) */
+export type HandbookLine = { code: string; text: string };
 export type HandbookTry = { goal: string; steps: HandbookStep[] };
 export type HandbookTopic = {
   id: string;

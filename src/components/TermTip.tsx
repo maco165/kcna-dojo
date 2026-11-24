@@ -4,7 +4,6 @@
 // 出た吹き出し (または同じ語のもう 1 回のタップ) で用語集へ移る。
 // WCAG 1.4.13: Esc で消せる・カーソルを吹き出しへ移せる・カーソルやフォーカスが離れるまで消えない
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { glossaryTermHref } from '../lib/route';
 
 const TIP_ID = 'term-tip';
 const TIP_WIDTH = 320;
@@ -163,12 +162,12 @@ export default function TermTipArea({ as: Tag = 'article', meanings, children, .
       </span>
       {anchor && id && (
         // 中のリンクは語と同じ行き先なので、Tab の順には入れない
-        <a ref={tip} key={id} className="term-tip" href={glossaryTermHref(id)} tabIndex={-1}>
+        <a ref={tip} key={id} className="term-tip" href={anchor.getAttribute('href') ?? undefined} tabIndex={-1}>
           <span id={TIP_ID} role="tooltip" className="term-tip__text">
             {meanings.get(id)}
           </span>
           <span className="term-tip__more" aria-hidden="true">
-            用語集で詳しく →
+            {id.startsWith('cmd:') ? 'コマンドを詳しく →' : '用語集で詳しく →'}
           </span>
         </a>
       )}

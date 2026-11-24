@@ -2384,6 +2384,15 @@ body {
   color: var(--color-text-secondary);
 }
 
+.hb a.hb-cmd {
+  color: var(--color-text-blue);
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+.hb a.hb-cmd:hover {
+  text-decoration-style: solid;
+}
+
 /* ハンドブックの読んだ記録: 目次のカードの末尾と、トピックの続きからの案内 */
 .hb-topic__read {
   margin-top: auto;
