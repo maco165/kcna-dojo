@@ -21,11 +21,15 @@ import { StatusDot } from '@astryxdesign/core/StatusDot';
 import { compareHref, glossaryTermHref, guideHref, handbookHref, lessonHref } from '../lib/route';
 import glossary from '../content/glossary.json';
 import type { GlossaryTerm } from '../lib/glossary';
+import TermTipArea from '../components/TermTip';
 import { makeTermLinker, termNames, type TermPiece } from '../lib/termLinks';
 import { SITE_NAME } from '../lib/site';
 import { WIDE_QUERY, useMediaQuery } from '../lib/useMediaQuery';
 
-const TERM_NAMES = termNames((glossary as { terms: GlossaryTerm[] }).terms);
+const TERMS = (glossary as { terms: GlossaryTerm[] }).terms;
+const TERM_NAMES = termNames(TERMS);
+/** 語の id → 短い意味 (吹き出しに出す) */
+const MEANINGS = new Map(TERMS.map((t) => [t.id, t.description]));
 
 /** 本文。用語集にある語 (ページの中で最初の 1 回) を強調し、用語集のその語へのリンクにする */
 function Prose({ pieces }: { pieces: TermPiece[] }) {
@@ -35,7 +39,7 @@ function Prose({ pieces }: { pieces: TermPiece[] }) {
         typeof p === 'string' ? (
           p
         ) : (
-          <a key={i} className="hb-term" href={glossaryTermHref(p.id)}>
+          <a key={i} className="hb-term" data-term={p.id} href={glossaryTermHref(p.id)}>
             {p.text}
           </a>
         ),
@@ -228,7 +232,7 @@ function Topic({ id, progress, updateProgress }: { id: string; progress: Progres
   const opened = openedRecord;
   const prose = { summary: link(t.summary), flow: t.flow.map((s) => link(s.text)), tries: t.try.map((x) => x.steps.map((s) => link(s.text))) };
   return (
-    <article className="hb" aria-labelledby="hb-title">
+    <TermTipArea key={t.id} meanings={MEANINGS} className="hb" aria-labelledby="hb-title">
       <Crumbs items={[{ name: 'ハンドブック', href: handbookHref() }, { name: sectionName(t.domain) }, { name: t.title }]} />
       <div className="hb-head">
         <span className="hb-topic__kicker">
@@ -356,7 +360,7 @@ function Topic({ id, progress, updateProgress }: { id: string; progress: Progres
           </a>
         )}
       </nav>
-    </article>
+    </TermTipArea>
   );
 }
 
