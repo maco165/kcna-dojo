@@ -191,16 +191,13 @@
       "id": "setup-k3s",
       "competency": "付録: ハンドブックを試す準備",
       "title": "ハンドブックを試すための k3s の入れ方",
-      "summary": "ハンドブックの「試したいなら」の手順の多くは、kubectl で話しかけられる Kubernetes のクラスターが 1 つあれば試せます (一部は k3s のノードで sudo を使い、helm や docker を別に入れます)。ここでは、Linux のマシン 1 台に k3s の公式のインストールスクリプトで server を入れ、一般ユーザーの kubectl から使えるようにし、名前空間 try-kcna で手順を試せることを確かめ、最後に片付けるまでをまとめます。",
+      "summary": "Linux のマシン 1 台に、練習用の Kubernetes (k3s) を入れる手順です。入れる・kubectl を使えるようにする・動いているか確かめる、の順に進めます。いらなくなったら消せます。",
       "flow": [
         {
-          "text": "用意するのは Linux のマシン 1 台です。k3s の文書の最低の要件は server が 2 コア・2 GB で、アーキテクチャは x86_64・armhf・arm64/aarch64 です。この数は k3s と同梱の部品の分で、動かすワークロードの分は含みません。OS によっては追加の準備が要ります (Raspberry Pi OS では cgroups を有効にするなど。Requirements の Operating Systems を見ます)。server を 1 台入れるだけで、データストア・コントロールプレーン・kubelet・コンテナランタイムがそろった、Pod を動かせるクラスターになります (agent は足さなくてもかまいません)。ノードを足すときは、ホスト名が重ならないようにします。"
+          "text": "まず、Linux のマシンを 1 台用意します。2 コア・メモリ 2 GB 以上が目安です。家の中など、インターネットから直接届かないマシンを使ってください。"
         },
         {
-          "text": "ファイアウォールの ufw が有効なら、文書は ufw を止めることを勧めています。有効のまま使うときは、既定では API サーバーの 6443/tcp と、Pod の 10.42.0.0/16・Service の 10.43.0.0/16 からの通信を許す設定 (ufw allow 6443/tcp など) が要ります。firewalld も同じで、止めることが勧められています。ただし文書は、Flannel の VXLAN の 8472/udp を外に開けず、ファイアウォールの内側でノードを動かすよう求めています。インターネットから直接届くマシン (VPS など) では ufw を止めず、上の許可を足して使います。"
-        },
-        {
-          "text": "公式のインストールスクリプトで server を入れます。k3s は systemd か openrc のサービスとして入り、再起動やプロセスが落ちたときに自動で起き直します。kubectl・crictl・ctr・k3s-killall.sh・k3s-uninstall.sh も入り、管理者の kubeconfig が /etc/rancher/k3s/k3s.yaml に書かれます。スクリプトに渡した設定は、入れ直すときにもう一度渡さないと消えます。",
+          "text": "次のコマンドを打つと、k3s が入って動き出します。kubectl も一緒に入り、マシンを再起動しても自動で立ち上がります。",
           "code": {
             "language": "bash",
             "text": "curl -sfL https://get.k3s.io | sh -"
@@ -211,77 +208,22 @@
           }
         },
         {
-          "text": "k3s.yaml は root の持ち物で、既定では root だけが読める設定 (mode 600) で書かれます。一般ユーザーの kubectl から使うには、このファイルを自分のホームの ~/.kube/config に写して自分だけが読める持ち物にし、KUBECONFIG の環境変数で指します。すでに ~/.kube/config があると上書きされるので、先に .bak に残します。k3s が入れた kubectl は、KUBECONFIG も --kubeconfig も無いと ~/.kube/config ではなく /etc/rancher/k3s/k3s.yaml を読みに行き、読めずに止まります。そのため KUBECONFIG は端末ごとに要るので、~/.bashrc にも書いておきます。この写しを使うなら、ほかのトピックで k3s.yaml を KUBECONFIG に指す場面があっても打たずに飛ばします (打つと読めずに permission denied で止まります)。このファイルは system:masters のグループとして何でもできる管理者の資格なので、人に渡さないようにします。k3s は起動のたびに k3s.yaml の中の証明書を更新しますが、写しは更新されません。証明書が切れないよう、ときどき写し直します。写し直すときは、sudo cp・sudo chown・chmod の 3 行だけを打ちます (2 行目をもう一度打つと、残した .bak が k3s の写しで上書きされます)。",
+          "text": "kubectl を、いつものユーザーで使えるようにします。k3s への接続の情報は /etc/rancher/k3s/k3s.yaml にありますが、ふだんは root しか読めません。そこで自分用に写して、KUBECONFIG で場所を教えます。このファイルがあればクラスターで何でもできるので、人に渡さないでください。",
           "code": {
             "language": "bash",
-            "text": "mkdir -p ~/.kube\n[ -e ~/.kube/config ] && [ ! -e ~/.kube/config.bak ] && cp ~/.kube/config ~/.kube/config.bak\nsudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config\nsudo chown \"$(id -u):$(id -g)\" ~/.kube/config\nchmod 600 ~/.kube/config\nexport KUBECONFIG=~/.kube/config\ngrep -qs 'KUBECONFIG=~/.kube/config' ~/.bashrc || echo 'export KUBECONFIG=~/.kube/config' >> ~/.bashrc"
+            "text": "mkdir -p ~/.kube\nsudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/k3s.yaml\nsudo chown \"$(id -u):$(id -g)\" ~/.kube/k3s.yaml\nchmod 600 ~/.kube/k3s.yaml\nexport KUBECONFIG=~/.kube/k3s.yaml\necho 'export KUBECONFIG=~/.kube/k3s.yaml' >> ~/.bashrc"
           }
         },
         {
-          "text": "代わりに、インストールのときに K3S_KUBECONFIG_MODE=\"644\" を渡して、k3s.yaml を誰でも読めるように書かせる方法もあります。手軽ですが、そのマシンのほかの利用者にも管理者の資格が読めてしまうので、自分だけが使う練習用のマシンに限ります。この方法では写しは作りません。k3s が入れた kubectl はそのまま k3s.yaml を読み、別に入れた kubectl や helm は export KUBECONFIG=/etc/rancher/k3s/k3s.yaml で指します。ファイルは root のものなので、kubeconfig を書き換える手順 (kubectl config set-context など) は失敗します。",
+          "text": "動いているか確かめます。STATUS が Ready なら準備完了です。",
           "code": {
             "language": "bash",
-            "text": "curl -sfL https://get.k3s.io | K3S_KUBECONFIG_MODE=\"644\" sh -"
-          }
-        },
-        {
-          "text": "設定は、インストールの前に設定ファイルに書いておくこともできます。k3s は起動のときに /etc/rancher/k3s/config.yaml を読みます。キーは k3s server のフラグの名前と同じで、何度も書けるフラグは YAML の一覧にします。同じ項目をフラグでも書くと、フラグが優先されます。ただし node-label や disable のように何度も書けるものは、ファイルの値に足されます。下の値は例なので、自分の環境に合わせて要る行だけを書きます。",
-          "code": {
-            "language": "yaml",
-            "title": "/etc/rancher/k3s/config.yaml",
-            "text": "write-kubeconfig-mode: \"0600\"\ntls-san:\n  - \"k3s.example.com\"\nnode-label:\n  - \"disktype=ssd\"\ndisable:\n  - traefik"
-          },
-          "fields": {
-            "items": [
-              {
-                "keys": [
-                  "write-kubeconfig-mode"
-                ],
-                "text": "k3s.yaml を書くときのファイルの権限です。既定は 600 (root だけが読める) で、0644 にするとほかの利用者も読めます。"
-              },
-              {
-                "keys": [
-                  "tls-san"
-                ],
-                "text": "API サーバーの証明書に足す名前か IP アドレスです。ここに書いた名前でも、証明書の確認を通して接続できます。"
-              },
-              {
-                "keys": [
-                  "node-label"
-                ],
-                "text": "このノードに付けるラベルです。nodeSelector などで Pod を置くノードを選ぶときに使えます。"
-              },
-              {
-                "keys": [
-                  "disable"
-                ],
-                "text": "入れない同梱の部品です。入っていれば消されます。traefik を書くと、同梱の Ingress コントローラーが無くなるので、Ingress の手順を試すなら書きません。"
-              }
-            ],
-            "sources": [
-              "https://docs.k3s.io/installation/configuration",
-              "https://docs.k3s.io/cli/server",
-              "https://docs.k3s.io/installation/packaged-components"
-            ]
-          }
-        },
-        {
-          "text": "ノードが Ready になり、kube-system に CoreDNS などの Pod が動いていれば準備ができています。helm-install- で始まる Pod は、同梱の部品を入れ終えると Completed のままになるもので、正常です。",
-          "code": {
-            "language": "bash",
-            "text": "kubectl get nodes\nkubectl get pods -n kube-system"
+            "text": "kubectl get nodes"
           },
           "output": "NAME    STATUS   ROLES           AGE   VERSION\nnode1   Ready    control-plane   90s   v1.34.1+k3s1"
         },
         {
-          "text": "ハンドブックの「試したいなら」の手順は、名前空間 try-kcna を作り、その中で試し、最後に名前空間ごと消して片付けます。名前空間を消すと、その中の Deployment や Service などはまとめて消えます。StorageClass・Node・PersistentVolume のようなクラスター全体のものは名前空間に入らないので、消しても残ります。手順の途中でやめたときも、最後の kubectl delete namespace try-kcna だけは打っておきます。",
-          "code": {
-            "language": "bash",
-            "text": "kubectl create namespace try-kcna\n# ここでトピックの手順を試す\nkubectl delete namespace try-kcna"
-          }
-        },
-        {
-          "text": "k3s そのものを消すときは、インストールのときに作られたアンインストールのスクリプトを流します。k3s と動いている Pod を止め、手元のデータストア・Local Storage の PV のデータ・ノードの設定・スクリプトと道具を消すので、データが失われます。外部のデータストアや外部の PV のデータは消しません。自分で写した ~/.kube/config と ~/.bashrc に足した行は残るので、要らなければ自分で消します。agent のノードでは k3s-agent-uninstall.sh を使います。",
+          "text": "もういらなくなったら、k3s を消します。クラスターの中のデータも一緒に消えます。自分で写した ~/.kube/k3s.yaml と、~/.bashrc に足した 1 行は残るので、自分で消します。",
           "code": {
             "language": "bash",
             "text": "/usr/local/bin/k3s-uninstall.sh"
@@ -294,10 +236,10 @@
       ],
       "try": [
         {
-          "goal": "入れたクラスターでハンドブックの手順を試せるかを確かめたいなら",
+          "goal": "入れたクラスターで、ハンドブックの手順を試してみたいなら",
           "steps": [
             {
-              "text": "名前空間 try-kcna を作り、その中に Deployment を作る権限があるかを聞きます。yes と出れば試せます。",
+              "text": "練習用の名前空間 try-kcna を作り、その中に Deployment を作れるかを聞きます。yes と出れば試せます。",
               "code": {
                 "language": "bash",
                 "text": "kubectl create namespace try-kcna\nkubectl auth can-i create deployments -n try-kcna"
@@ -317,10 +259,74 @@
               }
             },
             {
-              "text": "名前空間ごと消して片付けます。",
+              "text": "名前空間ごと消して片付けます。中に作ったものもまとめて消えます。ほかのトピックの手順を途中でやめたときも、これだけは打っておきます。",
               "code": {
                 "language": "bash",
                 "text": "kubectl delete namespace try-kcna"
+              }
+            }
+          ]
+        },
+        {
+          "goal": "うまく動かないなら",
+          "steps": [
+            {
+              "text": "ノードが Ready にならないときは、k3s の部品の様子を見ます。helm-install- で始まる Pod が Completed なのは正常です。",
+              "code": {
+                "language": "bash",
+                "text": "kubectl get pods -n kube-system"
+              }
+            },
+            {
+              "text": "permission denied と出るときは、KUBECONFIG が設定されていないか、/etc/rancher/k3s/k3s.yaml を指しています。「kubectl を使えるようにする」の手順の export の行をもう一度打ちます。前はつながったのに証明書のエラーが出るときは、写しが古くなっています。同じ手順の sudo cp・sudo chown・chmod の 3 行を打って写し直します。"
+            },
+            {
+              "text": "ファイアウォール (ufw や firewalld) が動いていると、通信が止まることがあります。k3s の文書は止めることを勧めています。ufw を止めないなら、6443/tcp と、10.42.0.0/16・10.43.0.0/16 からの通信を許します。インターネットから直接届くマシンでは止めず、8472/udp を外に開けないでください。OS ごとの準備 (Raspberry Pi の cgroups など) は、出典の Requirements にあります。"
+            }
+          ]
+        },
+        {
+          "goal": "設定ファイルで細かく決めたいなら (上級)",
+          "steps": [
+            {
+              "text": "k3s は起動のときに /etc/rancher/k3s/config.yaml を読みます。この手順では名前空間を作りません。下は例なので、要る行だけを書きます。キーは k3s server のフラグと同じ名前です。",
+              "code": {
+                "language": "yaml",
+                "title": "/etc/rancher/k3s/config.yaml",
+                "text": "write-kubeconfig-mode: \"0600\"\ntls-san:\n  - \"k3s.example.com\"\nnode-label:\n  - \"disktype=ssd\"\ndisable:\n  - traefik"
+              },
+              "fields": {
+                "items": [
+                  {
+                    "keys": [
+                      "write-kubeconfig-mode"
+                    ],
+                    "text": "k3s.yaml を書くときのファイルの権限です。既定は 600 (root だけが読める) で、0644 にするとほかの利用者も読めます。"
+                  },
+                  {
+                    "keys": [
+                      "tls-san"
+                    ],
+                    "text": "API サーバーの証明書に足す名前か IP アドレスです。ここに書いた名前でも、証明書の確認を通して接続できます。"
+                  },
+                  {
+                    "keys": [
+                      "node-label"
+                    ],
+                    "text": "このノードに付けるラベルです。nodeSelector などで Pod を置くノードを選ぶときに使えます。"
+                  },
+                  {
+                    "keys": [
+                      "disable"
+                    ],
+                    "text": "入れない同梱の部品です。入っていれば消されます。traefik を書くと、同梱の Ingress コントローラーが無くなるので、Ingress の手順を試すなら書きません。"
+                  }
+                ],
+                "sources": [
+                  "https://docs.k3s.io/installation/configuration",
+                  "https://docs.k3s.io/cli/server",
+                  "https://docs.k3s.io/installation/packaged-components"
+                ]
               }
             }
           ]

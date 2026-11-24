@@ -388,7 +388,7 @@
           "goal": "Helm のリリースとリビジョンを確かめたいなら",
           "steps": [
             {
-              "text": "helm を入れておきます (入れ方は helm.sh の Installing Helm にあります)。別に入れた helm は、kubectl と同じく KUBECONFIG で指した kubeconfig を読みます。付録の「ハンドブックを試すための k3s の入れ方」のとおり ~/.kube/config に写して KUBECONFIG で指していれば、そのまま使えます。見本のチャートのひな形を作ります。",
+              "text": "helm を入れておきます (入れ方は helm.sh の Installing Helm にあります)。別に入れた helm は、kubectl と同じく KUBECONFIG で指した kubeconfig を読みます。付録の「ハンドブックを試すための k3s の入れ方」のとおり ~/.kube/k3s.yaml に写して KUBECONFIG で指していれば、そのまま使えます。見本のチャートのひな形を作ります。",
               "code": {
                 "language": "bash",
                 "text": "helm create hello"
