@@ -209,12 +209,12 @@
           "lines": [
             {
               "code": "curl -sfL https://get.k3s.io | sh -",
-              "text": "k3s の公式のインストールスクリプトを取ってきて (curl)、そのままシェルに渡して動かします (| sh -)。-sfL は「余計な表示をしない・取れなければ失敗にする・移転先へたどる」の 3 つをまとめた書き方です。"
+              "text": "k3s の公式のインストールスクリプトを取ってきて (curl)、そのままシェルに渡して動かします (| sh -)。-sfL は「余計な表示をしない・取れなければ失敗にする・移転先へたどる」の 3 つをまとめた書き方です。途中で自分のパスワードを聞かれることがあります (スクリプトが sudo を使うため)。"
             }
           ]
         },
         {
-          "text": "kubectl を、いつものユーザーで使えるようにします。k3s への接続の情報は /etc/rancher/k3s/k3s.yaml にありますが、ふだんは root しか読めません。そこで自分用に写して、KUBECONFIG で場所を教えます。このファイルがあればクラスターで何でもできるので、人に渡さないでください。",
+          "text": "kubectl を、いつものユーザーで使えるようにします。k3s への接続の情報は /etc/rancher/k3s/k3s.yaml にありますが、ふだんは root しか読めません。そこで自分用に写して、KUBECONFIG で場所を教えます。このファイルがあればクラスターで何でもできるので、人に渡さないでください。写しは自動では新しくならないので、証明書の期限が切れたら、cp・chown・chmod の 3 行をもう一度打ちます。",
           "code": {
             "language": "bash",
             "text": "mkdir -p ~/.kube\nsudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/k3s.yaml\nsudo chown \"$(id -u):$(id -g)\" ~/.kube/k3s.yaml\nchmod 600 ~/.kube/k3s.yaml\nexport KUBECONFIG=~/.kube/k3s.yaml\necho 'export KUBECONFIG=~/.kube/k3s.yaml' >> ~/.bashrc"
@@ -242,7 +242,7 @@
             },
             {
               "code": "echo 'export KUBECONFIG=~/.kube/k3s.yaml' >> ~/.bashrc",
-              "text": "上の 1 行を ~/.bashrc の最後に足します。~/.bashrc は端末 (bash) を開くたびに読まれるので、次からは打たなくて済みます。"
+              "text": "上の 1 行を ~/.bashrc の最後に足します。bash の端末を開くと、ふつう ~/.bashrc が読まれるので、次からは打たなくて済みます。"
             }
           ]
         },

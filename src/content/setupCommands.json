@@ -4,7 +4,7 @@
     "command": "sudo",
     "tool": "Linux",
     "summary": "管理者 (root) の権限で、後ろに書いたコマンドを動かします。",
-    "detail": "Linux では、システムのファイルを読んだり変えたりできるのは、ふつう root という管理者だけです。sudo は、許されたユーザーに、1 つのコマンドだけを root として動かさせます。何でもできてしまうので、意味の分かったコマンドにだけ付けます。",
+    "detail": "Linux では、システムのファイルを変えたり、秘密のファイルを読んだりできるのは、ふつう root という管理者だけです。sudo は、許されたユーザーに、1 つのコマンドだけを root として動かさせます。何でもできてしまうので、意味の分かったコマンドにだけ付けます。",
     "usage": "sudo <コマンド> [引数]",
     "flags": [
       {
@@ -17,7 +17,7 @@
     "source": "https://man7.org/linux/man-pages/man8/sudo.8.html",
     "inside": [
       "sudo は、決まりのファイル (ふつう /etc/sudoers) を見て、このユーザーがそのコマンドを動かしてよいかを確かめます。",
-      "許されていれば、本人かを確かめるために、ふつうは自分のパスワードを聞きます (root のパスワードではありません)。しばらくの間は、もう一度打っても聞かれません。",
+      "許されていれば、本人かを確かめるために、ふつうは自分のパスワードを聞きます (root のパスワードではありません)。同じ端末では、既定で 5 分ほど、もう一度打っても聞かれません。",
       "確かめられたら、後ろのコマンドを root として動かし、終わったらその終了コードを返します。元のシェルは自分のままです。"
     ],
     "api": [],
@@ -26,13 +26,17 @@
         "title": "パスワードを聞かずに試し、断られる例 (このページのために打った例)",
         "code": "$ sudo -n true",
         "output": "sudo: interactive authentication is required",
-        "note": "-n は「聞かずに試す」です。本人の確認がまだなので、何も動かさずに断られました。文言は版で変わります。"
+        "note": "-n は「聞かずに試す」です。本人の確認がまだなので、何も動かさずに断られました。文言は sudo の種類や版で変わります (この例は sudo-rs)。"
       }
     ],
     "sources": [
       {
         "label": "sudo.ws の sudo の説明",
         "url": "https://www.sudo.ws/docs/man/sudo.man/"
+      },
+      {
+        "label": "sudo.ws の sudoers (聞かれるのは自分のパスワード)",
+        "url": "https://www.sudo.ws/docs/man/sudoers.man/"
       }
     ]
   },
@@ -111,6 +115,7 @@
     "inside": [
       "cp は元のファイルを読む用に開き、写した先を新しく作って開きます。新しいファイルの権限は、元のファイルの権限から umask の分を引いたものです。",
       "中身を写します。この例の機械では、まず中身を共有する写し方を試し、できなければカーネルに写させます (copy_file_range)。",
+      "すでにあるファイルに上書きするときは、ふつう権限と持ち主はそのままで、中身だけが入れ替わります。",
       "新しいファイルの持ち主は、cp を動かした人です。sudo cp で写すと root の持ち物になるので、自分で使うには chown で持ち主を変えます。"
     ],
     "api": [],
@@ -119,13 +124,17 @@
         "title": "cp がカーネルに頼んだこと (一部) (このページのために打った例)",
         "code": "$ strace -e trace=openat,ioctl,copy_file_range cp f g",
         "output": "openat(AT_FDCWD, \"f\", O_RDONLY)         = 3\nopenat(AT_FDCWD, \"g\", O_WRONLY|O_CREAT|O_EXCL, 0600) = 4\nioctl(4, BTRFS_IOC_CLONE or FICLONE, 3) = -1 EOPNOTSUPP (Operation not supported)\ncopy_file_range(3, NULL, 4, NULL, 9223372035781033984, 0) = 0",
-        "note": "f を読む用に、g を新しく作って書く用に開いています。f の権限が 600 なので、g も 0600 で作られました。f は空のファイルなので、写した大きさは 0 です。"
+        "note": "f を読む用に、g を新しく作って書く用に開いています。この機械の cp (uutils) は、写している間にほかの人に読まれないよう、まず 0600 で作り、写し終えてから権限を合わせます。f は空のファイルなので、写した大きさは 0 です。"
       }
     ],
     "sources": [
       {
-        "label": "GNU coreutils の cp",
-        "url": "https://www.gnu.org/software/coreutils/manual/html_node/cp-invocation.html"
+        "label": "GNU coreutils の文書の元原稿 (cp)",
+        "url": "https://github.com/coreutils/coreutils/blob/master/doc/coreutils.texi"
+      },
+      {
+        "label": "uutils coreutils 0.10.0: safe_copy.rs (まず 0600 で作る)",
+        "url": "https://github.com/uutils/coreutils/blob/0.10.0/src/uucore/src/lib/features/safe_copy.rs"
       }
     ]
   },
@@ -134,7 +143,7 @@
     "command": "chown",
     "tool": "Linux",
     "summary": "ファイルの持ち主を変えます。",
-    "detail": "change owner の略です。「ユーザー:グループ」の形で新しい持ち主を書きます。持ち主を変えられるのはふつう root だけなので、sudo と一緒に使います。",
+    "detail": "change owner の略です。「ユーザー:グループ」の形で新しい持ち主を書きます。持ち主を変えられるのはふつう root だけなので、sudo と一緒に使います (グループだけなら、自分の入っているグループには自分でも変えられます)。",
     "usage": "chown [オプション] <ユーザー>[:<グループ>] <ファイル>",
     "flags": [
       {
@@ -170,7 +179,7 @@
     "command": "chmod",
     "tool": "Linux",
     "summary": "ファイルの権限 (だれが読める・書ける・動かせるか) を変えます。",
-    "detail": "change mode の略です。600 のような 3 桁の数は、左から持ち主・グループ・そのほかの人の権限です。読む 4・書く 2・動かす 1 を足します。600 は「持ち主だけが読み書きでき、ほかの人は何もできない」です。",
+    "detail": "change mode の略です。600 のような 3 桁の数は、左から持ち主・グループ・そのほかの人の権限です。読む 4・書く 2・動かす 1 を足します。600 は「持ち主だけが読み書きでき、ほかの人は何もできない」です。フォルダでは「動かす」が「中に入る」の意味になるので、フォルダに 600 を付けると自分も入れなくなります。",
     "usage": "chmod [オプション] <権限> <ファイル>",
     "flags": [
       {
@@ -257,7 +266,7 @@
     "command": "export",
     "tool": "Linux",
     "summary": "環境変数を決めて、これから動かすコマンドに渡します。",
-    "detail": "環境変数は、コマンドが読む「名前=値」の設定です。export しない変数はそのシェルの中だけのもので、ほかのコマンドには渡りません。開いている端末の中だけで効くので、次に開いたときも使うなら ~/.bashrc に書きます。",
+    "detail": "環境変数は、コマンドが読む「名前=値」の設定です。export しない変数はそのシェルの中だけのもので、ほかのコマンドには渡りません。開いている端末の中だけで効くので、次に開いたときも使うなら、bash では ~/.bashrc に書きます。",
     "usage": "export <名前>=<値>",
     "flags": [
       {
@@ -320,8 +329,8 @@
     ],
     "sources": [
       {
-        "label": "GNU Bash の Redirections",
-        "url": "https://www.gnu.org/software/bash/manual/html_node/Redirections.html"
+        "label": "man7.org の bash(1) (REDIRECTION)",
+        "url": "https://man7.org/linux/man-pages/man1/bash.1.html"
       }
     ]
   },
@@ -330,7 +339,7 @@
     "command": "sh",
     "tool": "Linux",
     "summary": "シェル (コマンドを読んで動かすプログラム) を動かします。",
-    "detail": "sh - と書くと、シェルは標準入力から届いた文字を、コマンドとして 1 行ずつ動かします。curl で取ったスクリプトをパイプ (|) で渡すと、保存せずにそのまま実行されます。中身をそのまま動かすので、信用できる配り元のものだけに使います。",
+    "detail": "sh - と書くと、シェルは標準入力から届いた文字を、コマンドのまとまりごとに読んで動かします。curl で取ったスクリプトをパイプ (|) で渡すと、保存せずにそのまま実行されます。中身をそのまま動かすので、信用できる配り元のものだけに使います。",
     "usage": "sh [オプション] [- | <スクリプト>]",
     "flags": [
       {
@@ -384,8 +393,8 @@
     "inside": [
       "root でなければ、sudo で自分を動かし直します。",
       "k3s-killall.sh を動かし、k3s のサービスとコンテナを止めます。",
-      "systemd (か openrc) のサービスの登録を外し、サービスのファイルを消します。ほかの k3s のサービスが残っていれば、ここで止めて、残りは消しません。",
-      "kubectl・crictl・ctr のリンク、/etc/rancher/k3s、データのフォルダ (ふつう /var/lib/rancher/k3s)、/var/lib/kubelet、k3s のバイナリを消します。最後に、このスクリプト自身も消えます。"
+      "systemd (か openrc) のサービスの登録を外し、サービスのファイルを消します。ほかの k3s のサービスが残っていれば、ここで止めて、残りは消しません (このときも、このスクリプト自身は消えます)。",
+      "kubectl・crictl・ctr のリンク、/etc/rancher/k3s、データのフォルダ (ふつう /var/lib/rancher/k3s)、/var/lib/kubelet、k3s のバイナリなどを消します。Local Storage の PV のデータも消えますが、外部のデータストアは消えません。最後に、このスクリプト自身も消えます。"
     ],
     "api": [],
     "examples": [
@@ -422,7 +431,7 @@
     "inside": [
       "kubectl が、名前だけを書いた Namespace を手元で組み立てます。ファイルは要りません。",
       "API サーバーに POST で送ります。API サーバーは、認証・認可・検査を通してから保存先に書きます。",
-      "名前空間ができると、コントローラーが default という名前の ServiceAccount をその中に作ります。"
+      "名前空間ができると、Kubernetes が default という名前の ServiceAccount をその中に作ります。"
     ],
     "api": [
       {
