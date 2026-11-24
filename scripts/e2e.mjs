@@ -990,6 +990,38 @@ async function run(browser, name, width, height) {
     await page.waitForTimeout(400);
     check((await tip.count()) === 0, `${tag} フォーカスが残っていても、Esc で消したら戻らない`);
     await page.evaluate(() => document.activeElement?.blur());
+    // 吹き出しへゆっくり移す途中に別の語があっても替わらない。吹き出しの上で Esc を押しても、下の語は出ない
+    const sched = page.locator('a.hb-term', { hasText: /^kube-scheduler$/ }).first();
+    await page.mouse.move(0, 0);
+    await page.waitForTimeout(300);
+    await sched.scrollIntoViewIfNeeded();
+    await sched.hover();
+    await tip.waitFor();
+    const to = await tip.boundingBox();
+    const from = await sched.evaluate((el) => el.getClientRects()[0].top);
+    const cx = await sched.evaluate((el) => el.getClientRects()[0].left + 15);
+    await page.mouse.move(cx, to.y > from ? to.y + 12 : to.y + to.height - 12, { steps: 15 });
+    await page.waitForTimeout(400);
+    check((await tip.count()) === 1 && (await tip.getAttribute('href'))?.endsWith('/glossary/kube-scheduler/'), `${tag} 吹き出しへ移す途中で別の語に替わらない`);
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(400);
+    check((await tip.count()) === 0, `${tag} 吹き出しの上で Esc を押しても、下にあった語の意味は出ない`);
+    // Tab で移った語と吹き出しが、下のタブの帯に隠れない
+    await page.evaluate(() => window.scrollTo(0, 0));
+    const hidden = [];
+    for (let i = 0; i < 60; i++) {
+      await page.keyboard.press('Tab');
+      const bad = await page.evaluate(() => {
+        const a = document.activeElement;
+        if (!a?.matches('a.hb-term')) return null;
+        const bar = document.querySelector('nav.tabs')?.getBoundingClientRect().top ?? innerHeight;
+        const r = document.querySelector('.term-tip')?.getBoundingClientRect();
+        return !r || a.getBoundingClientRect().bottom > bar || r.bottom > bar ? a.textContent : null;
+      });
+      if (bad) hidden.push(bad);
+    }
+    check(hidden.length === 0, `${tag} Tab で移った用語と吹き出しが隠れない (${hidden.join('・')})`);
+    await page.evaluate(() => document.activeElement?.blur());
     // どの語でも、本文の幅と画面の中に収まる
     const bad = [];
     for (const t of await page.locator('a.hb-term:visible').all()) {

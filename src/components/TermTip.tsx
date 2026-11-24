@@ -21,8 +21,15 @@ export default function TermTipArea({ meanings, children, ...rest }: { meanings:
   const tip = useRef<HTMLAnchorElement>(null);
   const timer = useRef<number | undefined>(undefined);
   const touched = useRef(false);
+  /** 吹き出しを押しているあいだのフォーカスの移動では閉じない (Safari は押したリンクにフォーカスを移さない) */
+  const pressed = useRef(false);
+  /** カーソルの位置と、Esc を押したときの位置 (動かすまでは、吹き出しの下にあった語を出さない) */
+  const pointer = useRef('');
+  const frozen = useRef('');
   /** Esc で消した、フォーカスの残っている語 (カーソルの出入りで勝手に戻さない) */
   const dismissed = useRef<HTMLElement | null>(null);
+  /** タッチで出した意味 (読み上げで知らせる) */
+  const [said, setSaid] = useState('');
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
 
   const after = (ms: number, el: HTMLElement | null) => {
@@ -30,7 +37,18 @@ export default function TermTipArea({ meanings, children, ...rest }: { meanings:
     if (ms === 0) setAnchor(el);
     else timer.current = window.setTimeout(() => setAnchor(el), ms);
   };
-  useEffect(() => () => window.clearTimeout(timer.current), []);
+  useEffect(() => {
+    // タッチのあとにキーボードを使ったら、タッチの扱いをやめる
+    const onKey = () => {
+      touched.current = false;
+      pressed.current = false;
+    };
+    document.addEventListener('keydown', onKey, true);
+    return () => {
+      document.removeEventListener('keydown', onKey, true);
+      window.clearTimeout(timer.current);
+    };
+  }, []);
 
   // 語の下に置く。下に入らなければ上。左右は本文の幅に収める
   useLayoutEffect(() => {
@@ -40,8 +58,11 @@ export default function TermTipArea({ meanings, children, ...rest }: { meanings:
     const box = a.getBoundingClientRect();
     const rects = anchor.getClientRects();
     if (rects.length === 0) return;
-    const first = rects[0];
-    const last = rects[rects.length - 1];
+    // 折り返した語は、カーソルのある行のそばに出す (遠いと、移る途中で消える)
+    const [px, py] = pointer.current.split(',').map(Number);
+    const under = [...rects].find((r) => px >= r.left && px <= r.right && py >= r.top && py <= r.bottom);
+    const first = under ?? rects[0];
+    const last = under ?? rects[rects.length - 1];
     const style = getComputedStyle(a);
     const padL = parseFloat(style.paddingLeft);
     const inner = box.width - padL - parseFloat(style.paddingRight);
@@ -67,6 +88,7 @@ export default function TermTipArea({ meanings, children, ...rest }: { meanings:
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
       dismissed.current = termOf(document.activeElement);
+      frozen.current = pointer.current;
       close();
     };
     const onDown = (e: PointerEvent) => {
@@ -74,11 +96,13 @@ export default function TermTipArea({ meanings, children, ...rest }: { meanings:
     };
     document.addEventListener('keydown', onKey);
     document.addEventListener('pointerdown', onDown);
-    window.addEventListener('resize', close);
+    const opened = window.innerWidth;
+    const onResize = () => window.innerWidth !== opened && close();
+    window.addEventListener('resize', onResize);
     return () => {
       document.removeEventListener('keydown', onKey);
       document.removeEventListener('pointerdown', onDown);
-      window.removeEventListener('resize', close);
+      window.removeEventListener('resize', onResize);
     };
   }, [anchor]);
 
@@ -89,9 +113,15 @@ export default function TermTipArea({ meanings, children, ...rest }: { meanings:
       ref={area}
       onPointerOver={(e) => {
         if (e.pointerType === 'touch') return;
+        pointer.current = `${e.clientX},${e.clientY}`;
+        if (pointer.current === frozen.current) return;
         const t = termOf(e.target);
-        if (t) after(anchor ? 0 : SHOW_MS, t);
+        // 別の語へは、出ているときも少し待つ (吹き出しへ移る途中に通る語へ替えない)
+        if (t) after(t === anchor ? 0 : SHOW_MS, t);
         else if (inTip(e.target)) window.clearTimeout(timer.current);
+      }}
+      onPointerMove={(e) => {
+        pointer.current = `${e.clientX},${e.clientY}`;
       }}
       onPointerOut={(e) => {
         if (e.pointerType === 'touch' || !(termOf(e.target) || inTip(e.target))) return;
@@ -101,6 +131,7 @@ export default function TermTipArea({ meanings, children, ...rest }: { meanings:
       }}
       onPointerDown={(e) => {
         touched.current = e.pointerType === 'touch';
+        pressed.current = inTip(e.target);
       }}
       onFocus={(e) => {
         const t = termOf(e.target);
@@ -109,16 +140,20 @@ export default function TermTipArea({ meanings, children, ...rest }: { meanings:
       }}
       onBlur={(e) => {
         dismissed.current = null;
-        if (termOf(e.target) && !inTip(e.relatedTarget) && !touched.current) after(0, null);
+        if (termOf(e.target) && !inTip(e.relatedTarget) && !touched.current && !pressed.current) after(0, null);
       }}
       onClick={(e) => {
         const t = termOf(e.target);
         if (!t || !touched.current || e.detail === 0 || t === anchor) return;
         e.preventDefault();
         after(0, t);
+        setSaid(meanings.get(t.dataset.term ?? '') ?? '');
       }}
     >
       {children}
+      <span className="visually-hidden" aria-live="polite">
+        {said}
+      </span>
       {anchor && id && (
         // 中のリンクは語と同じ行き先なので、Tab の順には入れない
         <a ref={tip} key={id} className="term-tip" href={glossaryTermHref(id)} tabIndex={-1}>
