@@ -106,6 +106,11 @@ export default function TermTipArea({ meanings, children, ...rest }: { meanings:
     };
   }, [anchor]);
 
+  // 閉じたら消す (同じ語をもう一度タップしたときも読み上げるため)
+  useEffect(() => {
+    if (!anchor) setSaid('');
+  }, [anchor]);
+
   const id = anchor?.dataset.term;
   return (
     <article
@@ -115,6 +120,7 @@ export default function TermTipArea({ meanings, children, ...rest }: { meanings:
         if (e.pointerType === 'touch') return;
         pointer.current = `${e.clientX},${e.clientY}`;
         if (pointer.current === frozen.current) return;
+        frozen.current = '';
         const t = termOf(e.target);
         // 別の語へは、出ているときも少し待つ (吹き出しへ移る途中に通る語へ替えない)
         if (t) after(t === anchor ? 0 : SHOW_MS, t);
@@ -122,6 +128,7 @@ export default function TermTipArea({ meanings, children, ...rest }: { meanings:
       }}
       onPointerMove={(e) => {
         pointer.current = `${e.clientX},${e.clientY}`;
+        if (pointer.current !== frozen.current) frozen.current = '';
       }}
       onPointerOut={(e) => {
         if (e.pointerType === 'touch' || !(termOf(e.target) || inTip(e.target))) return;
