@@ -122,19 +122,15 @@
     "examples": [
       {
         "title": "cp がカーネルに頼んだこと (一部) (このページのために打った例)",
-        "code": "$ strace -e trace=openat,ioctl,copy_file_range cp f g",
-        "output": "openat(AT_FDCWD, \"f\", O_RDONLY)         = 3\nopenat(AT_FDCWD, \"g\", O_WRONLY|O_CREAT|O_EXCL, 0600) = 4\nioctl(4, BTRFS_IOC_CLONE or FICLONE, 3) = -1 EOPNOTSUPP (Operation not supported)\ncopy_file_range(3, NULL, 4, NULL, 9223372035781033984, 0) = 0",
-        "note": "f を読む用に、g を新しく作って書く用に開いています。この機械の cp (uutils) は、写している間にほかの人に読まれないよう、まず 0600 で作り、写し終えてから権限を合わせます。f は空のファイルなので、写した大きさは 0 です。"
+        "code": "$ strace -e trace=openat,copy_file_range cp f g",
+        "output": "openat(AT_FDCWD, \"f\", O_RDONLY)         = 3\nopenat(AT_FDCWD, \"g\", O_WRONLY|O_CREAT|O_EXCL, 0644) = 4\ncopy_file_range(3, NULL, 4, NULL, 9223372035781033984, 0) = 6\ncopy_file_range(3, NULL, 4, NULL, 9223372035781033984, 0) = 0",
+        "note": "f (権限 644、6 バイト) を読む用に、g を新しく作って書く用に開き、6 バイトを写しています。権限 600 の f で試すと、g は 0600 で作られました。作り方は cp の種類や版で変わります (この例は uutils の cp 0.10.0)。"
       }
     ],
     "sources": [
       {
         "label": "GNU coreutils の文書の元原稿 (cp)",
         "url": "https://github.com/coreutils/coreutils/blob/master/doc/coreutils.texi"
-      },
-      {
-        "label": "uutils coreutils 0.10.0: safe_copy.rs (まず 0600 で作る)",
-        "url": "https://github.com/uutils/coreutils/blob/0.10.0/src/uucore/src/lib/features/safe_copy.rs"
       }
     ]
   },
