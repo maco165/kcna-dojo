@@ -1010,7 +1010,7 @@ async function run(browser, name, width, height) {
       await tip.waitFor();
       const b = await tip.boundingBox();
       // スマホは下のタブの帯に隠れない
-      const bar = await page.locator('nav.tabs').boundingBox().catch(() => null);
+      const bar = (await page.locator('nav.tabs').count()) ? await page.locator('nav.tabs').boundingBox() : null;
       const covered = await tip.evaluate((el) => {
         const r = el.getBoundingClientRect();
         return [[r.left + 3, r.top + 3], [r.right - 3, r.bottom - 3]].some(([x, y]) => !el.contains(document.elementFromPoint(x, y)));
