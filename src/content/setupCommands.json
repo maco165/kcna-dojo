@@ -1,0 +1,518 @@
+[
+  {
+    "id": "sudo",
+    "command": "sudo",
+    "tool": "Linux",
+    "summary": "管理者 (root) の権限で、後ろに書いたコマンドを動かします。",
+    "detail": "Linux では、システムのファイルを読んだり変えたりできるのは、ふつう root という管理者だけです。sudo は、許されたユーザーに、1 つのコマンドだけを root として動かさせます。何でもできてしまうので、意味の分かったコマンドにだけ付けます。",
+    "usage": "sudo <コマンド> [引数]",
+    "flags": [
+      {
+        "flags": [
+          "-u"
+        ],
+        "text": "root ではなく、指定したユーザーとして動かす"
+      }
+    ],
+    "source": "https://man7.org/linux/man-pages/man8/sudo.8.html",
+    "inside": [
+      "sudo は、決まりのファイル (ふつう /etc/sudoers) を見て、このユーザーがそのコマンドを動かしてよいかを確かめます。",
+      "許されていれば、本人かを確かめるために、ふつうは自分のパスワードを聞きます (root のパスワードではありません)。しばらくの間は、もう一度打っても聞かれません。",
+      "確かめられたら、後ろのコマンドを root として動かし、終わったらその終了コードを返します。元のシェルは自分のままです。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "パスワードを聞かずに試し、断られる例 (このページのために打った例)",
+        "code": "$ sudo -n true",
+        "output": "sudo: interactive authentication is required",
+        "note": "-n は「聞かずに試す」です。本人の確認がまだなので、何も動かさずに断られました。文言は版で変わります。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "sudo.ws の sudo の説明",
+        "url": "https://www.sudo.ws/docs/man/sudo.man/"
+      }
+    ]
+  },
+  {
+    "id": "mkdir",
+    "command": "mkdir",
+    "tool": "Linux",
+    "summary": "新しいフォルダ (ディレクトリ) を作ります。",
+    "detail": "make directory の略です。-p を付けると、途中のフォルダもまとめて作り、すでにあってもエラーにしません。手順の中で何度打っても困らないので、-p がよく付きます。",
+    "usage": "mkdir [オプション] <フォルダの名前>",
+    "flags": [
+      {
+        "flags": [
+          "-p",
+          "--parents"
+        ],
+        "text": "途中のフォルダもまとめて作る。すでにあってもエラーにしない"
+      }
+    ],
+    "source": "https://man7.org/linux/man-pages/man1/mkdir.1.html",
+    "inside": [
+      "mkdir は、mkdir というシステムコール (カーネルへの頼みごと) で、名前と権限を渡してフォルダを作ります。権限は、渡した値から umask (はじめに外しておく権限の設定) の分を引いたものになります。",
+      "-p を付けると、手前のフォルダから順に 1 つずつ作ります。すでにあるフォルダは飛ばします。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "-p で途中のフォルダも作る様子を、カーネルへの頼みごとで見る (このページのために打った例)",
+        "code": "$ strace -f -e trace=mkdir mkdir -p a/b",
+        "output": "mkdir(\"a\", 0777)                        = 0\nmkdir(\"a/b\", 0777)                      = 0",
+        "note": "a を作ってから a/b を作っています。= 0 は成功です。strace は、プログラムがカーネルに頼んだことを見る道具です。"
+      },
+      {
+        "title": "もう一度打ってもエラーにならない (このページのために打った例)",
+        "code": "$ mkdir -p a; echo \"rc=$?\"",
+        "output": "rc=0",
+        "note": "$? は直前のコマンドの終了コードで、0 は成功です。-p が無いと、すでにあるというエラーになります。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "man7.org の mkdir(2)",
+        "url": "https://man7.org/linux/man-pages/man2/mkdir.2.html"
+      }
+    ]
+  },
+  {
+    "id": "cp",
+    "command": "cp",
+    "tool": "Linux",
+    "summary": "ファイルを写します (コピーします)。",
+    "detail": "copy の略です。元のファイルはそのまま残ります。写した先に同じ名前のファイルがあると、上書きします。",
+    "usage": "cp [オプション] <元> <写した先>",
+    "flags": [
+      {
+        "flags": [
+          "-p"
+        ],
+        "text": "権限・持ち主・時刻もそのまま写す (できる範囲で)"
+      },
+      {
+        "flags": [
+          "-r",
+          "-R"
+        ],
+        "text": "フォルダを中身ごと写す"
+      },
+      {
+        "flags": [
+          "-i"
+        ],
+        "text": "上書きの前に聞く"
+      }
+    ],
+    "source": "https://man7.org/linux/man-pages/man1/cp.1.html",
+    "inside": [
+      "cp は元のファイルを読む用に開き、写した先を新しく作って開きます。新しいファイルの権限は、元のファイルの権限から umask の分を引いたものです。",
+      "中身を写します。この例の機械では、まず中身を共有する写し方を試し、できなければカーネルに写させます (copy_file_range)。",
+      "新しいファイルの持ち主は、cp を動かした人です。sudo cp で写すと root の持ち物になるので、自分で使うには chown で持ち主を変えます。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "cp がカーネルに頼んだこと (一部) (このページのために打った例)",
+        "code": "$ strace -e trace=openat,ioctl,copy_file_range cp f g",
+        "output": "openat(AT_FDCWD, \"f\", O_RDONLY)         = 3\nopenat(AT_FDCWD, \"g\", O_WRONLY|O_CREAT|O_EXCL, 0600) = 4\nioctl(4, BTRFS_IOC_CLONE or FICLONE, 3) = -1 EOPNOTSUPP (Operation not supported)\ncopy_file_range(3, NULL, 4, NULL, 9223372035781033984, 0) = 0",
+        "note": "f を読む用に、g を新しく作って書く用に開いています。f の権限が 600 なので、g も 0600 で作られました。f は空のファイルなので、写した大きさは 0 です。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "GNU coreutils の cp",
+        "url": "https://www.gnu.org/software/coreutils/manual/html_node/cp-invocation.html"
+      }
+    ]
+  },
+  {
+    "id": "chown",
+    "command": "chown",
+    "tool": "Linux",
+    "summary": "ファイルの持ち主を変えます。",
+    "detail": "change owner の略です。「ユーザー:グループ」の形で新しい持ち主を書きます。持ち主を変えられるのはふつう root だけなので、sudo と一緒に使います。",
+    "usage": "chown [オプション] <ユーザー>[:<グループ>] <ファイル>",
+    "flags": [
+      {
+        "flags": [
+          "-R"
+        ],
+        "text": "フォルダの中身も全部変える"
+      }
+    ],
+    "source": "https://man7.org/linux/man-pages/man1/chown.1.html",
+    "inside": [
+      "名前で書かれたユーザーとグループを、番号 (UID と GID) に直します。番号で書けば、そのまま使います。",
+      "chown などのシステムコールで、ファイルに記録された持ち主の番号を書き換えます。中身は変わりません。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "番号を渡している様子 (このページのために打った例)",
+        "code": "$ strace -e trace=chown chown \"$(id -u):$(id -g)\" f",
+        "output": "chown(\"f\", 1000, 1000)                  = 0",
+        "note": "$(id -u) と $(id -g) が 1000 に置き換わってから、chown に渡っています。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "man7.org の chown(2)",
+        "url": "https://man7.org/linux/man-pages/man2/chown.2.html"
+      }
+    ]
+  },
+  {
+    "id": "chmod",
+    "command": "chmod",
+    "tool": "Linux",
+    "summary": "ファイルの権限 (だれが読める・書ける・動かせるか) を変えます。",
+    "detail": "change mode の略です。600 のような 3 桁の数は、左から持ち主・グループ・そのほかの人の権限です。読む 4・書く 2・動かす 1 を足します。600 は「持ち主だけが読み書きでき、ほかの人は何もできない」です。",
+    "usage": "chmod [オプション] <権限> <ファイル>",
+    "flags": [
+      {
+        "flags": [
+          "-R"
+        ],
+        "text": "フォルダの中身も全部変える"
+      }
+    ],
+    "source": "https://man7.org/linux/man-pages/man1/chmod.1.html",
+    "inside": [
+      "600 を 8 進数 (0〜7 で数える数) として読み、持ち主は読み書き (4+2)、グループとそのほかの人は無し、という権限にします。",
+      "chmod などのシステムコールで、ファイルの権限を書き換えます。変えられるのは、持ち主と root です。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "600 にして確かめる (このページのために打った例)",
+        "code": "$ chmod 600 f\n$ ls -l f | cut -c1-10",
+        "output": "-rw-------",
+        "note": "左端の - はふつうのファイルの印で、rw- が持ち主、次の --- がグループ、最後の --- がそのほかの人です。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "man7.org の chmod(2)",
+        "url": "https://man7.org/linux/man-pages/man2/chmod.2.html"
+      }
+    ]
+  },
+  {
+    "id": "id",
+    "command": "id",
+    "tool": "Linux",
+    "summary": "自分 (や指定したユーザー) の番号と、入っているグループを出します。",
+    "detail": "Linux は、ユーザーを名前ではなく番号 (UID) で見分けます。id -u はユーザーの番号、id -g はグループの番号だけを出します。",
+    "usage": "id [オプション] [ユーザー]",
+    "flags": [
+      {
+        "flags": [
+          "-u",
+          "--user"
+        ],
+        "text": "ユーザーの番号だけを出す"
+      },
+      {
+        "flags": [
+          "-g",
+          "--group"
+        ],
+        "text": "グループの番号だけを出す"
+      },
+      {
+        "flags": [
+          "-n",
+          "--name"
+        ],
+        "text": "番号ではなく名前で出す (-u や -g と一緒に使う)"
+      }
+    ],
+    "source": "https://man7.org/linux/man-pages/man1/id.1.html",
+    "inside": [
+      "id は、いま動いているプロセスのユーザーの番号を、カーネルに聞きます (geteuid など)。",
+      "オプションが無ければ、番号に当たる名前も調べて、入っているグループと一緒に出します。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "自分の番号を出す (このページのために打った例)",
+        "code": "$ id -u\n$ id -g",
+        "output": "1000\n1000",
+        "note": "番号は環境で変わります。$(id -u) と書くと、この結果がその場所に入ります。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "man7.org の geteuid(2)",
+        "url": "https://man7.org/linux/man-pages/man2/geteuid.2.html"
+      }
+    ]
+  },
+  {
+    "id": "export",
+    "command": "export",
+    "tool": "Linux",
+    "summary": "環境変数を決めて、これから動かすコマンドに渡します。",
+    "detail": "環境変数は、コマンドが読む「名前=値」の設定です。export しない変数はそのシェルの中だけのもので、ほかのコマンドには渡りません。開いている端末の中だけで効くので、次に開いたときも使うなら ~/.bashrc に書きます。",
+    "usage": "export <名前>=<値>",
+    "flags": [
+      {
+        "flags": [
+          "-p"
+        ],
+        "text": "今 export されている変数を一覧する"
+      }
+    ],
+    "source": "https://man7.org/linux/man-pages/man1/export.1p.html",
+    "inside": [
+      "export は別のプログラムではなく、シェルの中の命令です。シェルが、その変数に「外にも渡す」という印を付けます。",
+      "そのあとシェルがコマンドを動かすとき、印の付いた変数がまとめて渡ります。kubectl は、渡された KUBECONFIG を見て、読むファイルを決めます。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "export したものだけが渡る (このページのために打った例)",
+        "code": "$ export X=1\n$ Y=2\n$ sh -c 'echo X=$X Y=$Y'",
+        "output": "X=1 Y=",
+        "note": "別のシェル (sh) を動かして、渡った変数を出しています。export していない Y は渡っていません。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "kubernetes.io の kubeconfig によるクラスターアクセスの設定",
+        "url": "https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/"
+      }
+    ]
+  },
+  {
+    "id": "echo",
+    "command": "echo",
+    "tool": "Linux",
+    "summary": "後ろに書いた文字を、そのまま画面に出します。",
+    "detail": "文字を出すだけのコマンドですが、>> と組み合わせると、ファイルの最後に 1 行足せます。> が 1 つだと、ファイルの中身を全部消して書き直すので、足すときは必ず 2 つにします。",
+    "usage": "echo [オプション] <文字>",
+    "flags": [
+      {
+        "flags": [
+          "-n"
+        ],
+        "text": "最後に改行を付けない"
+      }
+    ],
+    "source": "https://man7.org/linux/man-pages/man1/echo.1.html",
+    "inside": [
+      "echo の引数を空白でつなぎ、改行を付けて標準出力 (ふつうは画面) に書きます。",
+      "後ろに >> ファイル と書くと、シェルが先にそのファイルを「最後に足す」形で開き、出力の行き先をそこに変えてから echo を動かします。",
+      "一重の引用符 '...' で囲んだ文字は、シェルが中を読み替えません。$ や ~ もそのままの文字で書かれます。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": ">> で 1 行ずつ足す (このページのために打った例)",
+        "code": "$ echo a >> g\n$ echo b >> g\n$ cat g",
+        "output": "a\nb",
+        "note": "2 回打つと 2 行になります。cat はファイルの中身を出すコマンドです。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "GNU Bash の Redirections",
+        "url": "https://www.gnu.org/software/bash/manual/html_node/Redirections.html"
+      }
+    ]
+  },
+  {
+    "id": "sh",
+    "command": "sh",
+    "tool": "Linux",
+    "summary": "シェル (コマンドを読んで動かすプログラム) を動かします。",
+    "detail": "sh - と書くと、シェルは標準入力から届いた文字を、コマンドとして 1 行ずつ動かします。curl で取ったスクリプトをパイプ (|) で渡すと、保存せずにそのまま実行されます。中身をそのまま動かすので、信用できる配り元のものだけに使います。",
+    "usage": "sh [オプション] [- | <スクリプト>]",
+    "flags": [
+      {
+        "flags": [
+          "-c"
+        ],
+        "text": "後ろの文字を、コマンドとして動かす"
+      }
+    ],
+    "source": "https://man7.org/linux/man-pages/man1/sh.1p.html",
+    "inside": [
+      "パイプ (|) は、左のコマンドの出力を、右のコマンドの標準入力につなぎます。2 つは同時に動きます。",
+      "sh は、届いた文字をコマンドとして読み、echo のような中の命令は自分で、mkdir のような別のプログラムは新しいプロセスを起こして動かします。",
+      "k3s のインストールスクリプトは、最後の { ... } のかたまりで本番の処理を順に呼びます。シェルはかたまりを終わりまで読んでから動かすので、途中までしか届かなかったときに本番の処理が始まりません。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "文字をパイプで渡して動かす (このページのために打った例)",
+        "code": "$ printf 'echo hello\\n' | sh -",
+        "output": "hello",
+        "note": "渡した「echo hello」がコマンドとして動きました。"
+      },
+      {
+        "title": "別のプログラムを起こす様子 (このページのために打った例)",
+        "code": "$ strace -f -e trace=execve sh -c 'mkdir x; echo hi'",
+        "output": "execve(\"/usr/bin/sh\", [\"sh\", \"-c\", \"mkdir x; echo hi\"], ...) = 0\n[pid ...] execve(\"/usr/bin/mkdir\", [\"mkdir\", \"x\"], ...) = 0\nhi",
+        "note": "mkdir は別のプログラムとして起こされ、echo はシェルが自分で出しています。番号や住所は省いてあります。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "k3s v1.36.6+k3s1: install.sh",
+        "url": "https://github.com/k3s-io/k3s/blob/v1.36.6%2Bk3s1/install.sh"
+      },
+      {
+        "label": "K3s: Quick-Start Guide",
+        "url": "https://docs.k3s.io/quick-start"
+      }
+    ]
+  },
+  {
+    "id": "k3s-uninstall",
+    "command": "k3s-uninstall.sh",
+    "tool": "k3s",
+    "summary": "k3s と、そのマシンにあるクラスターのデータを消します。",
+    "detail": "k3s を入れたときに /usr/local/bin に置かれるスクリプトです。消したデータは戻りません。実行するとすぐに消し始め、確認は出ません。",
+    "usage": "k3s-uninstall.sh",
+    "flags": [],
+    "source": "https://docs.k3s.io/installation/uninstall",
+    "inside": [
+      "root でなければ、sudo で自分を動かし直します。",
+      "k3s-killall.sh を動かし、k3s のサービスとコンテナを止めます。",
+      "systemd (か openrc) のサービスの登録を外し、サービスのファイルを消します。ほかの k3s のサービスが残っていれば、ここで止めて、残りは消しません。",
+      "kubectl・crictl・ctr のリンク、/etc/rancher/k3s、データのフォルダ (ふつう /var/lib/rancher/k3s)、/var/lib/kubelet、k3s のバイナリを消します。最後に、このスクリプト自身も消えます。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "root でなければ sudo で動かし直す行 (スクリプトの中身。動かしてはいません)",
+        "code": "$ grep \"exec sudo\" /usr/local/bin/k3s-uninstall.sh",
+        "output": "[ $(id -u) -eq 0 ] || exec sudo --preserve-env=K3S_DATA_DIR $0 $@",
+        "note": "k3s の install.sh が書き出す行から取った形の例です。id -u が 0 (root) でなければ、sudo で同じスクリプトを動かし直します。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "k3s v1.36.6+k3s1: install.sh (create_uninstall)",
+        "url": "https://github.com/k3s-io/k3s/blob/v1.36.6%2Bk3s1/install.sh#L898"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-create-namespace",
+    "command": "kubectl create namespace",
+    "tool": "kubectl",
+    "summary": "新しい名前空間を作ります。",
+    "detail": "名前空間は、クラスターの中を区切る入れ物です。練習用に 1 つ作っておくと、名前空間を消すだけで、その中のものをまとめて片付けられます。namespace は ns と短く書けます。",
+    "usage": "kubectl create namespace <名前> [オプション]",
+    "flags": [
+      {
+        "flags": [
+          "--dry-run"
+        ],
+        "text": "作らずに試す (client は手元だけ、server は API サーバーで確かめるところまで)"
+      }
+    ],
+    "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_create/kubectl_create_namespace/",
+    "inside": [
+      "kubectl が、名前だけを書いた Namespace を手元で組み立てます。ファイルは要りません。",
+      "API サーバーに POST で送ります。API サーバーは、認証・認可・検査を通してから保存先に書きます。",
+      "名前空間ができると、コントローラーが default という名前の ServiceAccount をその中に作ります。"
+    ],
+    "api": [
+      {
+        "method": "POST",
+        "path": "/api/v1/namespaces",
+        "note": "名前空間を作る"
+      }
+    ],
+    "examples": [
+      {
+        "title": "名前空間を作る (形の例)",
+        "code": "$ kubectl create namespace try-kcna",
+        "output": "namespace/try-kcna created"
+      }
+    ],
+    "sources": [
+      {
+        "label": "kubectl v0.37.2: pkg/cmd/create/create_namespace.go",
+        "url": "https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/cmd/create/create_namespace.go"
+      },
+      {
+        "label": "Kubernetes: Namespaces",
+        "url": "https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/"
+      },
+      {
+        "label": "Kubernetes: Service Accounts",
+        "url": "https://kubernetes.io/docs/concepts/security/service-accounts/"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-create-deployment",
+    "command": "kubectl create deployment",
+    "tool": "kubectl",
+    "summary": "Deployment を作り、指定したイメージの Pod を動かします。",
+    "detail": "YAML のファイルを書かずに、名前とイメージだけで作れます。数を書かなければ Pod は 1 つです。",
+    "usage": "kubectl create deployment <名前> --image=<イメージ> [オプション]",
+    "flags": [
+      {
+        "flags": [
+          "--image"
+        ],
+        "text": "動かすイメージ (必須)"
+      },
+      {
+        "flags": [
+          "--replicas"
+        ],
+        "text": "Pod の数 (既定は 1)"
+      },
+      {
+        "flags": [
+          "--dry-run"
+        ],
+        "text": "作らずに試す (client は手元だけ、server は API サーバーで確かめるところまで)"
+      },
+      {
+        "flags": [
+          "-o",
+          "--output"
+        ],
+        "text": "出力の形 (yaml など)"
+      }
+    ],
+    "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_create/kubectl_create_deployment/",
+    "inside": [
+      "kubectl が、名前とイメージから Deployment を手元で組み立てます。app=<名前> というラベルと、それを選ぶセレクターも付けます。コンテナの名前はイメージの名前から取ります。",
+      "API サーバーに POST で送り、保存されます。ここで kubectl の仕事は終わりです。",
+      "あとはコントローラーが ReplicaSet を作り、ReplicaSet が Pod を作り、スケジューラーがノードを選び、kubelet がイメージを取って動かします。kubectl rollout status で、動き出すまで待てます。"
+    ],
+    "api": [
+      {
+        "method": "POST",
+        "path": "/apis/apps/v1/namespaces/<名前空間>/deployments",
+        "note": "Deployment を作る"
+      }
+    ],
+    "examples": [
+      {
+        "title": "何が作られるかを、作らずに見る (このページのために打った例)",
+        "code": "$ kubectl create deployment hello --image=nginx:1.27-alpine -n try-kcna --dry-run=client -o yaml",
+        "output": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  labels:\n    app: hello\n  name: hello\n  namespace: try-kcna\nspec:\n  replicas: 1\n  selector:\n    matchLabels:\n      app: hello\n  strategy: {}\n  template:\n    metadata:\n      labels:\n        app: hello\n    spec:\n      containers:\n      - image: nginx:1.27-alpine\n        name: nginx\n        resources: {}\nstatus: {}",
+        "note": "名前とイメージだけで、ラベルやセレクターまで書かれた Deployment ができています。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "Kubernetes: Deployments",
+        "url": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"
+      }
+    ]
+  }
+]

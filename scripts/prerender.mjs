@@ -82,6 +82,8 @@ export async function buildPages(load) {
   const { parseRoute } = await load('/src/lib/route.ts');
   const titleOf = (p) => pageTitle(parseRoute(`${BASE}${p}`));
   const { WEEKS } = await load('/src/content/curriculum.ts');
+  const { linkShell } = await load('/src/lib/shellLinks.ts');
+  const { COMMAND_BRIEFS } = await load('/src/content/commandBriefs.ts');
   const { HANDBOOK_PARTS, HANDBOOK_TOPICS, isAppendixDomain, sectionName: shortName } = await load('/src/content/handbook.ts');
   const sectionName = (d) => (isAppendixDomain(d) ? `${shortName(d)} (資格の範囲の外)` : d);
   const { CURRICULUM, DEFINITION } = await load('/src/content/guide.ts');
@@ -142,8 +144,9 @@ export async function buildPages(load) {
     ].join('\n'),
   });
   for (const t of HANDBOOK_TOPICS) {
+    const linesHtml = (ls) => `<p>コマンドの意味</p><dl>${ls.map((l) => `<dt><code>${linkShell(l.code, COMMAND_BRIEFS).pieces.map((p) => (typeof p === 'string' ? esc(p) : link(`commands/${p.id}/`, p.text))).join('')}</code></dt><dd>${esc(l.text)}</dd>`).join('')}</dl>`;
     const fieldsHtml = (f) => `<p>設定項目の意味</p><dl>${f.items.map((x) => `<dt>${x.keys.map((k) => `<code>${esc(k)}</code>`).join('、')}</dt><dd>${esc(x.text)}</dd>`).join('')}</dl><p>出典: ${f.sources.map((u) => `<a href="${esc(u)}">${esc(t.sources.find((s) => s.url === u)?.label ?? u)}</a>`).join('、')}</p>`;
-    const step = (s) => `<li><p>${esc(s.text)}</p>${s.code?.title ? `<p><code>${esc(s.code.title)}</code></p>` : ''}${s.code ? `<pre><code>${esc(s.code.text)}</code></pre>` : ''}${s.fields ? fieldsHtml(s.fields) : ''}${s.output ? `<pre>${esc(s.output)}</pre>` : ''}</li>`;
+    const step = (s) => `<li><p>${esc(s.text)}</p>${s.code?.title ? `<p><code>${esc(s.code.title)}</code></p>` : ''}${s.code ? `<pre><code>${esc(s.code.text)}</code></pre>` : ''}${s.lines ? linesHtml(s.lines) : ''}${s.fields ? fieldsHtml(s.fields) : ''}${s.output ? `<pre>${esc(s.output)}</pre>` : ''}</li>`;
     pages.push({
       path: `handbook/${t.id}/`,
       title: t.title,
@@ -236,7 +239,7 @@ export async function buildPages(load) {
   pages.push({
     path: 'commands/',
     title: 'コマンド',
-    description: `kubectl・helm など、KCNA の問題に出てくる ${COMMAND_PAGES.length} のコマンドが中で何をしているか (API の要求・動く部品) を、実行の例と実装のソースと一緒に、公式リファレンスに沿って説明する。`,
+    description: `kubectl・helm など、KCNA の問題とハンドブックに出てくる ${COMMAND_PAGES.length} のコマンドが中で何をしているか (API の要求・動く部品) を、実行の例と実装のソースと一緒に、公式リファレンスに沿って説明する。`,
     // 画面の一覧と同じく、道具ごとに分ける (h2)
     body: ['<h1>コマンド</h1>', ...TOOL_ORDER.map((tool) => ({ tool, cs: COMMAND_PAGES.filter((c) => c.tool === tool) })).filter((g) => g.cs.length > 0).map((g) => `<section><h2>${esc(g.tool)}</h2><ul>${g.cs.map((c) => `<li>${link(`commands/${c.id}/`, c.command)}: ${esc(c.summary)}</li>`).join('')}</ul></section>`)].join('\n'),
   });
@@ -262,6 +265,7 @@ export async function buildPages(load) {
         ...c.examples.map((e) => `<h3>${esc(e.title)}</h3><pre><code>${esc(e.output ? `${e.code}\n${e.output}` : e.code)}</code></pre>${e.note ? `<p>${esc(e.note)}</p>` : ''}`),
         c.verbose ? `<h3>-v で見える要求</h3><pre><code>${esc(`${c.verbose.code}\n${c.verbose.output}`)}</code></pre>` : '',
         c.impl ? `<h2>実装を読む</h2><p><a href="${esc(implUrl(c.impl))}">${esc(`${c.impl.repo} ${c.impl.ref} の ${c.impl.path}`)}</a></p><pre><code>${esc(c.impl.excerpt)}</code></pre>` : '',
+        c.setup ? `<p>ハンドブックの${link('handbook/setup-k3s/', '「k3s の入れ方」')}の手順で使います。</p>` : '',
         lessonsOfCommand.has(c.id) ? `<h2>出てくるレッスン</h2>${lessonLinks(lessonsOfCommand.get(c.id))}` : '',
         '<h2>出典</h2>',
         `<ul>${[{ label: `${c.command} の公式リファレンス`, url: c.source }, ...c.sources.filter((x) => x.url !== c.source)].map((x) => `<li><a href="${esc(x.url)}">${esc(x.label)}</a></li>`).join('')}</ul>`,

@@ -5,6 +5,7 @@ import { Link } from '@astryxdesign/core/Link';
 import { Text } from '@astryxdesign/core/Text';
 import AppSideNav from '../components/AppSideNav';
 import Diagram, { DiagramThumb } from '../components/Diagram';
+import CommandLines from '../components/CommandLines';
 import FieldNotes from '../components/FieldNotes';
 import StepVisual from '../components/StepVisual';
 import BottomTabs from '../components/BottomTabs';
@@ -20,6 +21,7 @@ import { Button } from '@astryxdesign/core/Button';
 import { HStack } from '@astryxdesign/core/Stack';
 import { StatusDot } from '@astryxdesign/core/StatusDot';
 import { compareHref, glossaryTermHref, guideHref, handbookHref, lessonHref } from '../lib/route';
+import { COMMAND_BRIEFS } from '../content/commandBriefs';
 import glossary from '../content/glossary.json';
 import type { GlossaryTerm } from '../lib/glossary';
 import TermTipArea from '../components/TermTip';
@@ -30,7 +32,7 @@ import { WIDE_QUERY, useMediaQuery } from '../lib/useMediaQuery';
 const TERMS = (glossary as { terms: GlossaryTerm[] }).terms;
 const TERM_NAMES = termNames(TERMS);
 /** 語の id → 短い意味 (吹き出しに出す) */
-const MEANINGS = new Map(TERMS.map((t) => [t.id, t.description]));
+const MEANINGS = new Map([...TERMS.map((t) => [t.id, t.description] as const), ...COMMAND_BRIEFS.map((c) => [`cmd:${c.id}`, c.summary] as const)]);
 
 /** 本文。用語集にある語 (ページの中で最初の 1 回) を強調し、用語集のその語へのリンクにする */
 function Prose({ pieces }: { pieces: TermPiece[] }) {
@@ -59,6 +61,7 @@ function Step({ step, text, sources }: { step: HandbookStep; text: TermPiece[]; 
       {/* 設定ファイルのサンプルは、打つコマンドではないので手順の絵を出さない */}
       {step.code && !step.fields && (step.code.language === 'bash' || step.code.language === 'yaml') && <StepVisual code={step.code.text} language={step.code.language} result={step.result} />}
       {step.code && <LazyCodeBlock code={step.code.text} language={step.code.language} title={step.code.title} hasCopyButton />}
+      {step.lines && <CommandLines lines={step.lines} />}
       {step.fields && <FieldNotes title={step.code?.title} fields={step.fields} sources={sources} />}
       {step.output && (
         <figure className="hb-output">

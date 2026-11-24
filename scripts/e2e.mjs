@@ -975,6 +975,22 @@ async function run(browser, name, width, height) {
     await noHorizontalOverflow(page, width, `${tag} ファイルのサンプル`);
   }
 
+  // 15. コマンドの意味: 1 行ずつの説明が出て、コマンド名にも吹き出しが出て、押すとコマンドのページへ移る
+  {
+    await page.goto(`${BASE}handbook/setup-k3s/`);
+    await page.locator('.hb-lines').first().waitFor();
+    check((await page.locator('.hb-lines').count()) >= 8, `${tag} k3s の入れ方の全部のコマンドに意味が出る (${await page.locator('.hb-lines').count()})`);
+    const cmd = page.locator('a.hb-cmd', { hasText: /^chmod$/ }).first();
+    await cmd.scrollIntoViewIfNeeded();
+    await cmd.hover();
+    await page.locator('.term-tip').waitFor();
+    check(/権限/.test(await page.locator('.term-tip').innerText()) && /コマンドを詳しく/.test(await page.locator('.term-tip').innerText()), `${tag} コマンド名にカーソルを乗せると意味が出る`);
+    await noHorizontalOverflow(page, width, `${tag} コマンドの意味`);
+    await page.locator('.term-tip').click();
+    await page.waitForURL(/\/commands\/chmod\/$/);
+    check((await page.locator('h1').innerText()).trim() === 'chmod' && (await page.locator('a[href="/kcna-dojo/handbook/setup-k3s/"]').count()) >= 1, `${tag} コマンドのページへ移り、k3s の入れ方へ戻れる`);
+  }
+
   // 15a. 用語の短い意味の吹き出し: カーソルとフォーカスで出る・Esc で消える・吹き出しへカーソルを移せる・はみ出さない
   {
     await page.goto(`${BASE}handbook/core-concepts/`);

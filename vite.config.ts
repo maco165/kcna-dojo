@@ -20,6 +20,13 @@ function lightLessons(): Plugin {
     enforce: 'pre',
     async load(id) {
       const [file, query] = id.split('?');
+      // ?brief はコマンドの id・名前・短い意味だけ (ハンドブックの「コマンドの意味」が使う。無いコマンドは除く)
+      if (query === 'brief' && file.endsWith('.json')) {
+        this.addWatchFile(file);
+        const data = JSON.parse(await readFile(file, 'utf8'));
+        const list: { id: string; command: string; summary: string; absent?: boolean }[] = Array.isArray(data) ? data : data.commands;
+        return { code: jsonModule(list.filter((c) => !c.absent).map(({ id: cid, command, summary }) => ({ id: cid, command, summary }))), moduleType: 'js' };
+      }
       if ((query !== 'light' && query !== 'ids') || !file.endsWith('.json')) return null;
       this.addWatchFile(file);
       const week = JSON.parse(await readFile(file, 'utf8')) as { week: number; lessons: Lesson[] & { domain?: string }[] };

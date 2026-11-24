@@ -54,6 +54,14 @@ describe('書き出す全ページ', { timeout: 30_000 }, () => {
       expect(hrefs).toEqual(expect.arrayContaining(s.fields!.sources));
     }
   });
+  it('コマンドの意味と、コマンドのページへのリンクを、書き出した本文にも書く', () => {
+    const { doc } = docs.find(({ page }) => page.path === 'handbook/setup-k3s/')!;
+    const t = HANDBOOK_TOPICS.find((x) => x.id === 'setup-k3s')!;
+    const dds = [...doc.querySelectorAll('dd')].map((e) => e.textContent);
+    for (const l of [...t.flow, ...t.try.flatMap((x) => x.steps)].flatMap((s) => s.lines ?? [])) expect(dds).toContain(l.text);
+    const hrefs = [...doc.querySelectorAll('dt a')].map((a) => a.getAttribute('href'));
+    expect(hrefs).toEqual(expect.arrayContaining(['curl', 'sh', 'sudo', 'cp', 'kubectl-get'].map((id) => `${BASE}commands/${id}/`)));
+  });
   it('書き出した題名は、サイトの中で移ったときの document.title (src/lib/route.ts が使う resolveTitle) と同じ', async () => {
     // week/1/ はトップと同じ画面で、サイトの中のリンクはトップを指す (canonical もトップ) ので除く
     const rows = await Promise.all(docs.filter(({ page }) => page.path !== 'week/1/').map(async ({ page, titles }) => [page.path, titles.title, await resolveTitle(parseRoute(`${BASE}${page.path}`))]));
