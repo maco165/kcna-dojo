@@ -5,7 +5,7 @@ import { CURRICULUM } from '../src/content/guide';
 import { HANDBOOK, HANDBOOK_TOPICS, findTopic, isAppendixDomain, sectionName, topicByCompetency } from '../src/content/handbook';
 import glossary from '../src/content/glossary.json';
 import { appendixGroup } from '../src/lib/handbook';
-import { codeKeys } from '../src/lib/codeKeys';
+import { codeKeys, unreadable } from '../src/lib/codeKeys';
 import { validateHandbook } from '../src/lib/handbook';
 
 const domains = new Map(CURRICULUM.map((c) => [c.domain as string, c.competencies.map((x) => x.en)]));
@@ -133,12 +133,22 @@ describe('設定ファイルのサンプルと項目の意味', () => {
     expect(mutate((s) => void s.fields!.items[0].keys.push('nothing'))).toMatch(/nothing という項目はサンプルにありません/);
     expect(mutate((s) => void s.fields!.sources.push('https://example.com/'))).toMatch(/トピックの sources にありません/);
     expect(mutate((s) => void delete s.fields)).toMatch(/fields が要ります/);
+    expect(mutate((s) => void (delete s.fields, delete s.code!.title))).toMatch(/fields が要ります/);
+    expect(mutate((s) => void (s.code!.title = ''))).toMatch(/title のあるコード/);
+    expect(mutate((s) => void (s.result = { text: 'x', tone: 'ok' }))).toMatch(/result は付けません/);
+    expect(mutate((s) => void (s.code!.text += '\nhost-x = 1'))).toMatch(/読み取れない書き方/);
     expect(mutate((s) => void (s.code!.text += '\nlocals {\n  a = 1\n}'))).toMatch(/locals の意味がありません.*locals\.a の意味がありません/);
   });
   it('項目の道を取り出す (YAML の一覧は親と同じ字下げでも親の中)', () => {
     expect(codeKeys('yaml', 'a:\n- b: 1\n  c:\n    d: x\n- b: 2\ne: "f: g"')).toEqual(['a', 'a[].b', 'a[].c', 'a[].c.d', 'e']);
     expect(codeKeys('yaml', 'a:\n  - b: 1\n    c: 2\nd: 3')).toEqual(['a', 'a[].b', 'a[].c', 'd']);
     expect(codeKeys('dockerfile', 'FROM a AS b\nCOPY --from=b /x /y')).toEqual(['FROM', 'COPY', 'COPY --from']);
+  });
+  it('読めない書き方の行を見つける', () => {
+    expect(unreadable('yaml', 'a: {b: 1}\nc: |\n  x\nd: {}\ne: {{ .V.x }}\nf: [1, 2]\n- g')).toEqual(['a: {b: 1}', 'c: |', '  x']);
+    expect(unreadable('hcl', 'b = { c = 1 }\nd = "x"\ne {\n}\nf {}\ng = [1]\nh = [\n"i" = 1')).toEqual(['b = { c = 1 }', 'h = [', '"i" = 1']);
+    expect(unreadable('dockerfile', 'RUN a \\\n  b\nCMD ["x"]')).toEqual(['RUN a \\', '  b']);
+    expect(codeKeys('dockerfile', 'RUN foo --bar=1\nHEALTHCHECK --start-period=5s --retries=2 CMD x')).toEqual(['RUN', 'HEALTHCHECK', 'HEALTHCHECK --start-period', 'HEALTHCHECK --retries']);
   });
   it('CI/CD のサンプルは、このリポジトリのワークフローと同じ', () => {
     const s = samples.find((x) => x.s.code!.title === '.github/workflows/deploy.yml')!.s;

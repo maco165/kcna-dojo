@@ -1,6 +1,6 @@
 // 設定ファイルのサンプルから、設定項目 (キー) の道を取り出す。「項目の意味」の表に抜けや余りが無いかを見るために使う。
 // YAML は a.b[].c、HCL は resource.docker_image.nginx.name、Dockerfile は命令 (COPY) とフラグ (COPY --from) の形。
-// このサイトのサンプルの書き方 (字下げした YAML・1 行に 1 項目の HCL) だけを読む簡単なもの
+// このサイトのサンプルの書き方 (字下げした YAML・1 行に 1 項目の HCL) だけを読む簡単なもの。読めない書き方は unreadable() が返し、検査が落とす
 
 function yamlKeys(text: string): string[] {
   const out: string[] = [];
@@ -50,7 +50,7 @@ function dockerfileKeys(text: string): string[] {
   for (const line of text.split('\n')) {
     const m = line.match(/^([A-Z]+)\s(.*)$/);
     if (!m) continue;
-    out.push(m[1], ...[...m[2].matchAll(/(?:^|\s)(--[a-z]+)=/g)].map((x) => `${m[1]} ${x[1]}`));
+    out.push(m[1], ...[...m[2].matchAll(/(--[a-z-]+)(?:=\S+)?\s+/gy)].map((x) => `${m[1]} ${x[1]}`));
   }
   return out;
 }
@@ -58,4 +58,17 @@ function dockerfileKeys(text: string): string[] {
 export function codeKeys(language: string, text: string): string[] {
   const keys = language === 'yaml' ? yamlKeys(text) : language === 'hcl' ? hclKeys(text) : language === 'dockerfile' ? dockerfileKeys(text) : [];
   return [...new Set(keys)];
+}
+
+/** 項目を取り出せない書き方の行 (黙って飛ばすと、意味の抜けに気づけないため) */
+export function unreadable(language: string, text: string): string[] {
+  return text.split('\n').filter((line) => {
+    if (/^\s*(#|$)/.test(line)) return false;
+    // YAML: 中身のある { } のマップ ({{ }} のテンプレートは除く)・複数行の文字列・key: の形でも一覧でもない行
+    if (language === 'yaml') return /(:|-)\s+\{(?!\{)\s*[^}\s]/.test(line) || /:\s+[|>][+-]?\d*\s*$/.test(line) || /^\s*(- +)*\?\s/.test(line) || !/^(---\s*$|\s*- |\s*(?:"[^"]+"|'[^']+'|[\w./-]+):(\s|$))/.test(line);
+    // HCL: 閉じ括弧・ブロックの始まり・name = 値 のどれでもない行、1 行に閉じる中身のある { }、複数行の一覧
+    if (language === 'hcl') return !/^\s*(\}\s*$|\w+(\s+"[^"]+")*\s*(=\s*)?\{\s*(\}\s*)?$|\w+\s*=\s*[^\s{[]|\w+\s*=\s*\[.*\]\s*$)/.test(line);
+    if (language === 'dockerfile') return !/^[A-Z]+\s/.test(line) || /\\\s*$|<</.test(line);
+    return false;
+  });
 }

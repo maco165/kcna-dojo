@@ -2369,6 +2369,9 @@ body {
 .hb-fields dd {
   max-width: 40em;
 }
+.hb-fields__source span {
+  display: block;
+}
 .hb-fields__source {
   padding-top: 8px;
   font-size: 12px;

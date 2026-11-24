@@ -3,6 +3,7 @@ import path from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
 // @ts-expect-error 書き出しの手順は JS (scripts/prerender.mjs)
 import { buildPages, renderPage } from '../scripts/prerender.mjs';
+import { HANDBOOK_TOPICS } from '../src/content/handbook';
 import { resolveTitle } from '../src/lib/pageTitle';
 import { BASE, parseRoute } from '../src/lib/route';
 
@@ -36,6 +37,22 @@ describe('書き出す全ページ', { timeout: 30_000 }, () => {
       expect(titles.twitter, page.path).toBe(t);
     }
     expect(seen.size).toBeGreaterThan(140);
+  });
+  it('設定ファイルのサンプルの名前・全項目・出典を、書き出した本文にも書く', () => {
+    const steps = HANDBOOK_TOPICS.flatMap((t) => t.flow.filter((s) => s.fields).map((s) => ({ t, s })));
+    expect(steps.length).toBeGreaterThan(10);
+    for (const { t, s } of steps) {
+      const { doc } = docs.find(({ page }) => page.path === `handbook/${t.id}/`)!;
+      const codes = [...doc.querySelectorAll('dt code, p > code')].map((e) => e.textContent);
+      const dds = [...doc.querySelectorAll('dd')].map((e) => e.textContent);
+      const hrefs = [...doc.querySelectorAll('dl + p a')].map((a) => a.getAttribute('href'));
+      expect(codes).toContain(s.code!.title);
+      for (const f of s.fields!.items) {
+        expect(codes).toEqual(expect.arrayContaining(f.keys));
+        expect(dds).toContain(f.text);
+      }
+      expect(hrefs).toEqual(expect.arrayContaining(s.fields!.sources));
+    }
   });
   it('書き出した題名は、サイトの中で移ったときの document.title (src/lib/route.ts が使う resolveTitle) と同じ', async () => {
     // week/1/ はトップと同じ画面で、サイトの中のリンクはトップを指す (canonical もトップ) ので除く

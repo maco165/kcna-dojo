@@ -1,5 +1,5 @@
 // ハンドブックのデータの検査。違反を文で返す (空なら OK)
-import { codeKeys } from './codeKeys';
+import { codeKeys, unreadable } from './codeKeys';
 
 const TOPIC_KEYS = new Set(['id', 'competency', 'title', 'summary', 'flow', 'try', 'lessons', 'sources', 'noTermLinks', 'short']);
 const STEP_KEYS = new Set(['text', 'code', 'output', 'result', 'fields']);
@@ -30,11 +30,16 @@ function checkFields(f: unknown, code: unknown, w: string, errors: string[], top
   if (!isObj(code) || !isText(code.text) || !isText(code.title)) return void errors.push(`${w}: fields は title のあるコードに付けます`);
   unknownKeys(f, new Set(['items', 'sources']), `${w}.fields`, errors);
   for (const u of f.sources) if (!topicUrls.includes(u)) errors.push(`${w}: fields の出典 ${String(u)} が、トピックの sources にありません`);
+  if (f.items.length === 0) errors.push(`${w}: fields の items が空です`);
+  for (const l of unreadable(code.language as string, code.text)) errors.push(`${w}: 項目を読み取れない書き方です: ${l.trim()}`);
   const want = codeKeys(code.language as string, code.text);
   const got: string[] = [];
   for (const it of f.items) {
     if (!isObj(it) || !isText(it.text) || !Array.isArray(it.keys) || it.keys.length === 0) errors.push(`${w}: fields の項目は keys と text を持ちます`);
-    else got.push(...(it.keys as string[]));
+    else {
+      unknownKeys(it, new Set(['keys', 'text']), `${w}.fields`, errors);
+      got.push(...(it.keys as string[]));
+    }
   }
   for (const k of want) if (!got.includes(k)) errors.push(`${w}: サンプルの項目 ${k} の意味がありません`);
   for (const k of got) if (!want.includes(k)) errors.push(`${w}: ${k} という項目はサンプルにありません`);
@@ -60,8 +65,9 @@ function checkSteps(steps: unknown, where: string, errors: string[], min: number
       }
     }
     if (s.code !== undefined && !(isObj(s.code) && LANGS.has(s.code.language as string) && isText(s.code.text))) errors.push(`${w}: code は language (bash か yaml か hcl か dockerfile) と text を持ちます`);
+    if (s.fields !== undefined && s.result !== undefined) errors.push(`${w}: fields のある段に result は付けません (画面に出ないため)`);
     if (s.fields !== undefined) checkFields(s.fields, s.code, w, errors, topicUrls);
-    else if (isObj(s.code) && isText(s.code.title)) errors.push(`${w}: ファイルのサンプル (title のあるコード) には fields が要ります`);
+    else if (isObj(s.code) && (s.code.title !== undefined || s.code.language === 'hcl' || s.code.language === 'dockerfile')) errors.push(`${w}: ファイルのサンプル (title のあるコード) には fields が要ります`);
     if (s.output !== undefined && !isText(s.output)) errors.push(`${w}: output は文字列にします`);
   });
 }

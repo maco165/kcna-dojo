@@ -2,9 +2,9 @@
 import { Link } from '@astryxdesign/core/Link';
 import type { HandbookFields, HandbookTopic } from '../content/handbook';
 
-export default function FieldNotes({ fields, sources }: { fields: HandbookFields; sources: HandbookTopic['sources'] }) {
+export default function FieldNotes({ title, fields, sources }: { title?: string; fields: HandbookFields; sources: HandbookTopic['sources'] }) {
   return (
-    <section className="hb-fields" aria-label="設定項目の意味">
+    <section className="hb-fields" aria-label={`${title ?? ''} の設定項目の意味`}>
       <p className="hb-fields__title">設定項目の意味</p>
       <dl>
         {fields.items.map((f) => (
@@ -20,9 +20,8 @@ export default function FieldNotes({ fields, sources }: { fields: HandbookFields
       </dl>
       <p className="hb-fields__source">
         出典:{' '}
-        {fields.sources.map((u, i) => (
+        {fields.sources.map((u) => (
           <span key={u}>
-            {i > 0 && '、'}
             <Link href={u} isExternalLink newTabLabel="(新しいタブで開きます)">
               {sources.find((s) => s.url === u)?.label ?? u}
             </Link>

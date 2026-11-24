@@ -59,7 +59,7 @@ function Step({ step, text, sources }: { step: HandbookStep; text: TermPiece[]; 
       {/* 設定ファイルのサンプルは、打つコマンドではないので手順の絵を出さない */}
       {step.code && !step.fields && (step.code.language === 'bash' || step.code.language === 'yaml') && <StepVisual code={step.code.text} language={step.code.language} result={step.result} />}
       {step.code && <LazyCodeBlock code={step.code.text} language={step.code.language} title={step.code.title} hasCopyButton />}
-      {step.fields && <FieldNotes fields={step.fields} sources={sources} />}
+      {step.fields && <FieldNotes title={step.code?.title} fields={step.fields} sources={sources} />}
       {step.output && (
         <figure className="hb-output">
           <figcaption>出力の例 (名前・時刻などは環境で変わります)</figcaption>
