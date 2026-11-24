@@ -16,8 +16,8 @@ const HIDE_MS = 200;
 const termOf = (t: EventTarget | null) => (t instanceof Element ? t.closest<HTMLElement>('a[data-term]') : null);
 const inTip = (t: EventTarget | null) => t instanceof Element && t.closest('.term-tip') !== null;
 
-export default function TermTipArea({ meanings, children, ...rest }: { meanings: ReadonlyMap<string, string>; children: ReactNode; className?: string; 'aria-labelledby'?: string }) {
-  const area = useRef<HTMLElement>(null);
+export default function TermTipArea({ as: Tag = 'article', meanings, children, ...rest }: { as?: 'article' | 'div'; meanings: ReadonlyMap<string, string>; children: ReactNode; className?: string; 'aria-labelledby'?: string }) {
+  const area = useRef<HTMLDivElement>(null);
   const tip = useRef<HTMLAnchorElement>(null);
   const timer = useRef<number | undefined>(undefined);
   const touched = useRef(false);
@@ -113,7 +113,7 @@ export default function TermTipArea({ meanings, children, ...rest }: { meanings:
 
   const id = anchor?.dataset.term;
   return (
-    <article
+    <Tag
       {...rest}
       ref={area}
       onPointerOver={(e) => {
@@ -172,6 +172,6 @@ export default function TermTipArea({ meanings, children, ...rest }: { meanings:
           </span>
         </a>
       )}
-    </article>
+    </Tag>
   );
 }
