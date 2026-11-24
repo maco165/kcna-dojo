@@ -170,12 +170,145 @@
           "text": "GitHub Actions の文書は、これを CI/CD のプラットフォームと呼び、部品を次のように説明しています。ワークフローは 1 つ以上のジョブを動かす自動の手順で、リポジトリの .github/workflows に置く YAML で書きます。イベント (push や pull request など) がワークフローを起こします。ジョブは同じランナー (ワークフローを動かすサーバー) で動くステップの集まりで、ステップはシェルの命令かアクション (再利用できる部品) です。ジョブは、依存を書かなければ並んで動きます。"
         },
         {
-          "text": "このサイトのリポジトリのワークフローを読むと、build のジョブで npm ci・内容の検査・テスト・ビルドを順に流し、main への push のときだけ、できたファイルをアップロードします。deploy のジョブは needs: build で build の後に動き、if で push のときだけに絞っています。pull request ではテストまで流れて、公開はされません。",
+          "text": "このサイトのリポジトリで実際に動いているワークフローです。build のジョブで npm ci・内容の検査・テスト・ビルドを順に流し、main への push のときだけ、できたファイルをアップロードします。deploy のジョブは needs: build で build の後に動き、if で push のときだけに絞っています。pull request ではテストまで流れて、公開はされません。",
           "code": {
-            "language": "bash",
-            "text": "cat .github/workflows/deploy.yml"
+            "language": "yaml",
+            "title": ".github/workflows/deploy.yml",
+            "text": "name: Deploy to GitHub Pages\n\non:\n  push:\n    branches: [main]\n  pull_request:\n\npermissions:\n  contents: read\n\nconcurrency:\n  group: pages-${{ github.ref }}\n  cancel-in-progress: true\n\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n\n      - uses: actions/setup-node@v4\n        with:\n          node-version: 22\n          cache: npm\n\n      - run: npm ci\n      - run: npm run check:content\n      - run: npm test\n      - run: npm run build\n\n      - if: github.event_name == 'push'\n        uses: actions/upload-pages-artifact@v3\n        with:\n          path: dist\n\n  deploy:\n    if: github.event_name == 'push'\n    needs: build\n    runs-on: ubuntu-latest\n    permissions:\n      pages: write\n      id-token: write\n    environment:\n      name: github-pages\n      url: ${{ steps.deployment.outputs.page_url }}\n    steps:\n      - id: deployment\n        uses: actions/deploy-pages@v4"
           },
-          "output": "name: Deploy to GitHub Pages\non:\n  push:\n    branches: [main]\n  pull_request:\npermissions:\n  contents: read\n...\n  deploy:\n    if: github.event_name == 'push'\n    needs: build\n    permissions:\n      pages: write\n      id-token: write"
+          "fields": {
+            "items": [
+              {
+                "keys": [
+                  "name"
+                ],
+                "text": "ワークフローの名前です。リポジトリの Actions のタブに出ます。"
+              },
+              {
+                "keys": [
+                  "on"
+                ],
+                "text": "ワークフローを起こすイベントです。いくつか書くと、どれか 1 つが起きれば動きます。"
+              },
+              {
+                "keys": [
+                  "on.push",
+                  "on.push.branches"
+                ],
+                "text": "push で動かします。branches を main にしたので、main への push だけです。"
+              },
+              {
+                "keys": [
+                  "on.pull_request"
+                ],
+                "text": "pull request で動かします。値が空なら既定の場面 (開いた・更新した・開き直した) です。"
+              },
+              {
+                "keys": [
+                  "permissions",
+                  "permissions.contents"
+                ],
+                "text": "ジョブに渡す GITHUB_TOKEN の権限です。contents: read はリポジトリの中身を読む権限で、権限を 1 つでも書くと、書かなかった権限は無しになります。"
+              },
+              {
+                "keys": [
+                  "concurrency",
+                  "concurrency.group"
+                ],
+                "text": "同じ group の実行を同時に 1 つまでにします。github.ref (ブランチなど) を入れて、ブランチごとに分けています。"
+              },
+              {
+                "keys": [
+                  "concurrency.cancel-in-progress"
+                ],
+                "text": "true なら、同じ group で実行中のものを取り消して、新しい方を動かします。"
+              },
+              {
+                "keys": [
+                  "jobs",
+                  "jobs.build",
+                  "jobs.deploy"
+                ],
+                "text": "ジョブの一覧です。build と deploy はジョブの ID で、自由に付けます。"
+              },
+              {
+                "keys": [
+                  "jobs.build.runs-on",
+                  "jobs.deploy.runs-on"
+                ],
+                "text": "ジョブを動かす機械 (ランナー) の種類です。"
+              },
+              {
+                "keys": [
+                  "jobs.build.steps",
+                  "jobs.deploy.steps"
+                ],
+                "text": "ジョブの中で順に動かすステップです。"
+              },
+              {
+                "keys": [
+                  "jobs.build.steps[].uses",
+                  "jobs.deploy.steps[].uses"
+                ],
+                "text": "使うアクション (再利用できる部品) です。@ の後ろは版で、公式は版を書くことを強く勧め、コミットの SHA が最も安全としています。"
+              },
+              {
+                "keys": [
+                  "jobs.build.steps[].with",
+                  "jobs.build.steps[].with.node-version",
+                  "jobs.build.steps[].with.cache",
+                  "jobs.build.steps[].with.path"
+                ],
+                "text": "アクションに渡す値です。setup-node には Node.js の版 (node-version) とキャッシュする対象 (cache)、upload-pages-artifact にはアップロードするフォルダ (path) を渡しています。"
+              },
+              {
+                "keys": [
+                  "jobs.build.steps[].run"
+                ],
+                "text": "ランナーのシェルで動かすコマンドです。"
+              },
+              {
+                "keys": [
+                  "jobs.build.steps[].if",
+                  "jobs.deploy.if"
+                ],
+                "text": "条件です。満たすときだけ、そのステップやジョブを動かします。"
+              },
+              {
+                "keys": [
+                  "jobs.deploy.needs"
+                ],
+                "text": "先に成功していなければならないジョブです。build が失敗するか飛ばされると、deploy も飛ばされます。"
+              },
+              {
+                "keys": [
+                  "jobs.deploy.permissions",
+                  "jobs.deploy.permissions.pages",
+                  "jobs.deploy.permissions.id-token"
+                ],
+                "text": "このジョブだけの権限です。pages: write は Pages への公開、id-token: write は OIDC のトークンを取るためのものです。"
+              },
+              {
+                "keys": [
+                  "jobs.deploy.environment",
+                  "jobs.deploy.environment.name",
+                  "jobs.deploy.environment.url"
+                ],
+                "text": "デプロイ先の環境の名前と、公開した URL です。保護の規則があれば、すべて通ってからジョブが動きます。"
+              },
+              {
+                "keys": [
+                  "jobs.deploy.steps[].id"
+                ],
+                "text": "ステップの ID です。steps.deployment.outputs.page_url のように、ほかの所から結果を参照できます。"
+              }
+            ],
+            "sources": [
+              "https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax",
+              "https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages",
+              "https://github.com/actions/setup-node"
+            ]
+          }
         },
         {
           "text": "権限は必要な分だけにします。このワークフローは全体を contents: read にし、deploy のジョブだけに pages: write と id-token: write を足しています。GitHub Pages の文書は、デプロイのジョブに少なくともこの 2 つが要ると書いています。id-token: write は、GitHub の OIDC (付録の「認証と認可の基本」) の短い期限のトークンを取るための権限で、ほかの資源への書き込みは許しません。クラウドへのデプロイでも、長く使える鍵を秘密として置かずに、このトークンをクラウドのロールと交換する方法があります。"
@@ -197,6 +330,115 @@
         },
         {
           "text": "GitOps の原則 (OpenGitOps 1.0.0。CNCF の GitOps の作業部会がまとめたもの) は 4 つです。望ましい状態を宣言で書く・変えられない形で版を残す・エージェントが自動で取りに行く・実際の状態を見続けて望ましい状態に寄せる。Argo CD の自動同期は、Git のマニフェストとクラスターの状態がずれると同期します。ただし既定では、Git から消した資源を消す prune と、クラスターを直接変えたずれを戻す self-heal は切ってあり、Git を見に行く間隔は既定で 120 秒 (最大 3 分) です。"
+        },
+        {
+          "text": "GitOps の設定も 1 つのマニフェストです。Argo CD の Application は、「どの Git のどのフォルダを、どのクラスターのどの名前空間に合わせるか」を書きます。公式の仕様の例から、要るところを抜いたものです。",
+          "code": {
+            "language": "yaml",
+            "title": "application.yaml",
+            "text": "apiVersion: argoproj.io/v1alpha1\nkind: Application\nmetadata:\n  name: guestbook\n  namespace: argocd\nspec:\n  project: default\n  source:\n    repoURL: https://github.com/argoproj/argocd-example-apps.git\n    targetRevision: HEAD\n    path: guestbook\n  destination:\n    server: https://kubernetes.default.svc\n    namespace: guestbook\n  syncPolicy:\n    automated:\n      prune: true\n      selfHeal: true"
+          },
+          "fields": {
+            "items": [
+              {
+                "keys": [
+                  "apiVersion",
+                  "kind"
+                ],
+                "text": "Argo CD がクラスターに足す種類 (カスタムリソース) の Application であることを示します。"
+              },
+              {
+                "keys": [
+                  "metadata",
+                  "metadata.name"
+                ],
+                "text": "Application の名前です。"
+              },
+              {
+                "keys": [
+                  "metadata.namespace"
+                ],
+                "text": "Application を置く名前空間です。ふつうは Argo CD のある argocd にします。"
+              },
+              {
+                "keys": [
+                  "spec"
+                ],
+                "text": "望ましい状態の中身です。"
+              },
+              {
+                "keys": [
+                  "spec.project"
+                ],
+                "text": "属する AppProject (Argo CD の中のまとまり) です。"
+              },
+              {
+                "keys": [
+                  "spec.source"
+                ],
+                "text": "マニフェストの取り先 (正本) です。"
+              },
+              {
+                "keys": [
+                  "spec.source.repoURL"
+                ],
+                "text": "Git か Helm チャートのリポジトリの URL です。"
+              },
+              {
+                "keys": [
+                  "spec.source.targetRevision"
+                ],
+                "text": "使う版です。Git ならブランチ・タグ・コミット、Helm ならチャートの版を書きます。"
+              },
+              {
+                "keys": [
+                  "spec.source.path"
+                ],
+                "text": "リポジトリの中の、マニフェストのあるフォルダです。"
+              },
+              {
+                "keys": [
+                  "spec.destination"
+                ],
+                "text": "届け先です。"
+              },
+              {
+                "keys": [
+                  "spec.destination.server"
+                ],
+                "text": "届け先のクラスターの API サーバーです。https://kubernetes.default.svc は、Argo CD が動いているクラスターの中の API サーバーの住所です。"
+              },
+              {
+                "keys": [
+                  "spec.destination.namespace"
+                ],
+                "text": "届け先の名前空間です。マニフェストに名前空間が書いていない資源に使われます。"
+              },
+              {
+                "keys": [
+                  "spec.syncPolicy",
+                  "spec.syncPolicy.automated"
+                ],
+                "text": "同期のしかたです。automated を書くと、ずれたときに自動で同期します。"
+              },
+              {
+                "keys": [
+                  "spec.syncPolicy.automated.prune"
+                ],
+                "text": "true なら、Git から消した資源をクラスターからも消します。既定は false です。"
+              },
+              {
+                "keys": [
+                  "spec.syncPolicy.automated.selfHeal"
+                ],
+                "text": "true なら、クラスターの側だけが変えられたときも Git の状態に戻します。既定は false です。"
+              }
+            ],
+            "sources": [
+              "https://argo-cd.readthedocs.io/en/stable/user-guide/application-specification/",
+              "https://argo-cd.readthedocs.io/en/stable/operator-manual/declarative-setup/"
+            ]
+          }
         },
         {
           "text": "イメージの更新を Git に戻す仕組みもあります。Flux の image-reflector-controller はイメージのリポジトリを見てその情報をクラスターの資源に写し、image-automation-controller は新しいイメージに合わせて YAML を書き換え、Git にコミットします。こうすると「何が動いているか」の正本が Git に残ります。CI がイメージを作り、GitOps のエージェントがそれを届ける、という分担です。"
@@ -274,6 +516,22 @@
         {
           "label": "Flux の Image reflector and automation controllers",
           "url": "https://fluxcd.io/flux/components/image/"
+        },
+        {
+          "label": "docs.github.com の Workflow syntax for GitHub Actions",
+          "url": "https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax"
+        },
+        {
+          "label": "actions/setup-node の README",
+          "url": "https://github.com/actions/setup-node"
+        },
+        {
+          "label": "Argo CD の Application Specification",
+          "url": "https://argo-cd.readthedocs.io/en/stable/user-guide/application-specification/"
+        },
+        {
+          "label": "Argo CD の Declarative Setup",
+          "url": "https://argo-cd.readthedocs.io/en/stable/operator-manual/declarative-setup/"
         }
       ],
       "noTermLinks": [
@@ -292,6 +550,169 @@
         },
         {
           "text": "Terraform の基本の流れは 3 段です。Write で資源を定義し、Plan で今のインフラと設定を比べて「何を作り・変え・消すか」の実行計画を出し、Apply で承認された計画を、資源どうしの依存を守った順に実行します。terraform plan だけでは実物は変わりません。-out で計画をファイルに保存し、それを terraform apply に渡す 2 段の使い方は、主に自動化のためのものです。保存した計画には秘密の値が平文で入ることがあります。"
+        },
+        {
+          "text": "実際の設定ファイルで見ます。HashiCorp のチュートリアルにある main.tf で、nginx のイメージを取り、そのイメージでコンテナを 1 つ動かします。書き方は「種類 名前 { 項目 = 値 }」の形 (HCL という言語) です。docker_container は docker_image.nginx.image_id を参照しているので、Terraform はイメージを先に作ります。手順を書かなくても、参照から順番が決まります。出力は、同じチュートリアルの実行計画の抜粋です。",
+          "code": {
+            "language": "hcl",
+            "title": "main.tf",
+            "text": "terraform {\n  required_providers {\n    docker = {\n      source  = \"kreuzwerker/docker\"\n      version = \"~> 4.2.0\"\n    }\n  }\n}\n\nprovider \"docker\" {}\n\nresource \"docker_image\" \"nginx\" {\n  name         = \"nginx:latest\"\n  keep_locally = false\n}\n\nresource \"docker_container\" \"nginx\" {\n  image = docker_image.nginx.image_id\n  name  = \"tutorial\"\n\n  ports {\n    internal = 80\n    external = 8000\n  }\n}"
+          },
+          "output": "Terraform will perform the following actions:\n  # docker_container.nginx will be created\n  + resource \"docker_container\" \"nginx\" {\n...\n  # docker_image.nginx will be created\n  + resource \"docker_image\" \"nginx\" {\n...\nPlan: 2 to add, 0 to change, 0 to destroy.",
+          "fields": {
+            "items": [
+              {
+                "keys": [
+                  "terraform"
+                ],
+                "text": "Terraform 自身の設定を書くブロックです。使うプロバイダーもここに書きます。"
+              },
+              {
+                "keys": [
+                  "terraform.required_providers",
+                  "terraform.required_providers.docker"
+                ],
+                "text": "この設定で使うプロバイダー (API を持つサービスとやりとりする部品) の一覧です。docker は、このファイルの中で使う名前です。"
+              },
+              {
+                "keys": [
+                  "terraform.required_providers.docker.source"
+                ],
+                "text": "プロバイダーの置き場所です。ホストを省くと Terraform Registry と見なされ、registry.terraform.io/kreuzwerker/docker の短い書き方になります。"
+              },
+              {
+                "keys": [
+                  "terraform.required_providers.docker.version"
+                ],
+                "text": "使ってよい版です。~> は、書いた最後の桁だけ上がってよいという意味で、~> 4.2.0 は 4.2.1 を許し、4.3.0 は許しません。省くと init のときに最新の版が入ります。"
+              },
+              {
+                "keys": [
+                  "provider.docker"
+                ],
+                "text": "プロバイダーの設定です。中が空なら既定の設定のままです。"
+              },
+              {
+                "keys": [
+                  "resource.docker_image.nginx"
+                ],
+                "text": "管理する資源です。1 つめの文字列が種類、2 つめがこの設定の中の名前で、合わせた docker_image.nginx が資源を指す ID になります。"
+              },
+              {
+                "keys": [
+                  "resource.docker_image.nginx.name"
+                ],
+                "text": "取ってくるイメージの名前とタグです。チュートリアルの値のままですが、本番では latest を避けます。"
+              },
+              {
+                "keys": [
+                  "resource.docker_image.nginx.keep_locally"
+                ],
+                "text": "true なら destroy のときにイメージを手元に残し、false なら消します。"
+              },
+              {
+                "keys": [
+                  "resource.docker_container.nginx"
+                ],
+                "text": "管理するコンテナです。"
+              },
+              {
+                "keys": [
+                  "resource.docker_container.nginx.image"
+                ],
+                "text": "コンテナの元になるイメージの ID です。docker_image の image_id を参照しています。"
+              },
+              {
+                "keys": [
+                  "resource.docker_container.nginx.name"
+                ],
+                "text": "作るコンテナの名前です。"
+              },
+              {
+                "keys": [
+                  "resource.docker_container.nginx.ports"
+                ],
+                "text": "コンテナのポートを外に出す設定のブロックです。"
+              },
+              {
+                "keys": [
+                  "resource.docker_container.nginx.ports.internal"
+                ],
+                "text": "コンテナの中のポートです。"
+              },
+              {
+                "keys": [
+                  "resource.docker_container.nginx.ports.external"
+                ],
+                "text": "外に出すポートです。省くと 32768 以上の空いたポートが使われます。"
+              }
+            ],
+            "sources": [
+              "https://developer.hashicorp.com/terraform/tutorials/docker-get-started/docker-build",
+              "https://developer.hashicorp.com/terraform/language/expressions/version-constraints",
+              "https://github.com/kreuzwerker/terraform-provider-docker/blob/master/docs/resources/image.md",
+              "https://github.com/kreuzwerker/terraform-provider-docker/blob/master/docs/resources/container.md"
+            ]
+          }
+        },
+        {
+          "text": "値を変えて使い回すときは、変数 (variable) に出します。main.tf の name = \"tutorial\" を name = var.container_name に替えると、terraform apply -var 'container_name=web' のように外から値を渡せます。作ったあとに見たい値は出力 (output) に書きます。",
+          "code": {
+            "language": "hcl",
+            "title": "variables.tf と outputs.tf",
+            "text": "# variables.tf\nvariable \"container_name\" {\n  type        = string\n  description = \"コンテナの名前\"\n  default     = \"tutorial\"\n}\n\n# outputs.tf\noutput \"container_id\" {\n  description = \"作ったコンテナの ID\"\n  value       = docker_container.nginx.id\n  sensitive   = false\n}"
+          },
+          "fields": {
+            "items": [
+              {
+                "keys": [
+                  "variable.container_name"
+                ],
+                "text": "外から渡せる値です。設定の中では var.container_name と書いて使います。"
+              },
+              {
+                "keys": [
+                  "variable.container_name.type"
+                ],
+                "text": "受け付ける値の型です。string は文字列です。"
+              },
+              {
+                "keys": [
+                  "variable.container_name.description",
+                  "output.container_id.description"
+                ],
+                "text": "何のための値かの説明です。"
+              },
+              {
+                "keys": [
+                  "variable.container_name.default"
+                ],
+                "text": "値を渡さなかったときの値です。default の無い変数は、値を渡すことが必須になります。"
+              },
+              {
+                "keys": [
+                  "output.container_id"
+                ],
+                "text": "外に見せる値です。"
+              },
+              {
+                "keys": [
+                  "output.container_id.value"
+                ],
+                "text": "出す値です。ここでは、作ったコンテナの ID を参照しています。"
+              },
+              {
+                "keys": [
+                  "output.container_id.sensitive"
+                ],
+                "text": "true にすると CLI の出力でこの値を隠します。省くと隠しません。"
+              }
+            ],
+            "sources": [
+              "https://developer.hashicorp.com/terraform/language/block/variable",
+              "https://developer.hashicorp.com/terraform/language/block/output"
+            ]
+          }
         },
         {
           "text": "Terraform は、実物の資源と設定をつなぐために状態 (state) を保存します。既定では、ワークスペース (Terraform で状態を分ける単位) ごとに terraform.tfstate というローカルのファイルに置き、Terraform は操作の前に refresh をして、状態を実物に合わせます。チームで使うときは、ロックと権限のある遠隔の保存先 (remote backend) が勧められています。状態のファイルには秘密が入ることがあるので、そのまま Git に入れないようにします。"
@@ -396,6 +817,34 @@
         {
           "label": "cncf.io: OpenTofu (CNCF のプロジェクト)",
           "url": "https://www.cncf.io/projects/opentofu/"
+        },
+        {
+          "label": "developer.hashicorp.com の Build infrastructure (Docker)",
+          "url": "https://developer.hashicorp.com/terraform/tutorials/docker-get-started/docker-build"
+        },
+        {
+          "label": "developer.hashicorp.com の variable block",
+          "url": "https://developer.hashicorp.com/terraform/language/block/variable"
+        },
+        {
+          "label": "developer.hashicorp.com の output block",
+          "url": "https://developer.hashicorp.com/terraform/language/block/output"
+        },
+        {
+          "label": "developer.hashicorp.com の terraform block",
+          "url": "https://developer.hashicorp.com/terraform/language/block/terraform"
+        },
+        {
+          "label": "developer.hashicorp.com の Version Constraints",
+          "url": "https://developer.hashicorp.com/terraform/language/expressions/version-constraints"
+        },
+        {
+          "label": "Docker provider の docker_image",
+          "url": "https://github.com/kreuzwerker/terraform-provider-docker/blob/master/docs/resources/image.md"
+        },
+        {
+          "label": "Docker provider の docker_container",
+          "url": "https://github.com/kreuzwerker/terraform-provider-docker/blob/master/docs/resources/container.md"
         }
       ]
     }

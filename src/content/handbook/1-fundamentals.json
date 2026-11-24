@@ -256,6 +256,95 @@
           "output": "CURRENT   NAME      CLUSTER   AUTHINFO   NAMESPACE\n*         default   default   default\ndefault"
         },
         {
+          "text": "kubeconfig の中身です。clusters (接続先)・users (認証)・contexts (その組) の 3 つの一覧と、今使う current-context からできています。証明書の値は長いので <...> に替えてあります。本物は秘密なので、人に見せたり Git に入れたりしません。",
+          "code": {
+            "language": "yaml",
+            "title": "~/.kube/config",
+            "text": "apiVersion: v1\nkind: Config\nclusters:\n  - name: default\n    cluster:\n      server: https://127.0.0.1:6443\n      certificate-authority-data: <CA の証明書>\nusers:\n  - name: default\n    user:\n      client-certificate-data: <ユーザーの証明書>\n      client-key-data: <ユーザーの秘密鍵>\ncontexts:\n  - name: default\n    context:\n      cluster: default\n      user: default\n      namespace: default\ncurrent-context: default"
+          },
+          "fields": {
+            "items": [
+              {
+                "keys": [
+                  "apiVersion",
+                  "kind"
+                ],
+                "text": "kubeconfig の形式の版と種類です。"
+              },
+              {
+                "keys": [
+                  "clusters",
+                  "clusters[].name",
+                  "clusters[].cluster"
+                ],
+                "text": "接続先のクラスタの一覧で、それぞれに名前を付けます。"
+              },
+              {
+                "keys": [
+                  "clusters[].cluster.server"
+                ],
+                "text": "API サーバーの住所 (https://ホスト名:ポート) です。"
+              },
+              {
+                "keys": [
+                  "clusters[].cluster.certificate-authority-data"
+                ],
+                "text": "API サーバーの証明書を確かめるための、認証局 (CA) の証明書です (PEM を base64 にしたもの)。"
+              },
+              {
+                "keys": [
+                  "users",
+                  "users[].name",
+                  "users[].user"
+                ],
+                "text": "認証の情報の一覧です。"
+              },
+              {
+                "keys": [
+                  "users[].user.client-certificate-data"
+                ],
+                "text": "自分を示すクライアント証明書です。"
+              },
+              {
+                "keys": [
+                  "users[].user.client-key-data"
+                ],
+                "text": "その証明書の秘密鍵です。"
+              },
+              {
+                "keys": [
+                  "contexts",
+                  "contexts[].name",
+                  "contexts[].context"
+                ],
+                "text": "接続先と認証の組に名前を付けた一覧です。"
+              },
+              {
+                "keys": [
+                  "contexts[].context.cluster",
+                  "contexts[].context.user"
+                ],
+                "text": "組にするクラスタとユーザーの名前です。上の一覧の name を指します。"
+              },
+              {
+                "keys": [
+                  "contexts[].context.namespace"
+                ],
+                "text": "名前空間を省いたときに使う名前空間です。"
+              },
+              {
+                "keys": [
+                  "current-context"
+                ],
+                "text": "既定で使うコンテキストの名前です。"
+              }
+            ],
+            "sources": [
+              "https://kubernetes.io/docs/reference/config-api/kubeconfig.v1/"
+            ]
+          }
+        },
+        {
           "text": "コンテキスト (context) は、cluster・user・namespace の 3 つに名前を付けた組です。kubectl は current-context の組を使って通信するので、use-context で切り替えると、接続先と既定の名前空間が一度に変わります。今のコンテキストの既定の名前空間だけを変えるには set-context --current を使います。試したら default に戻します。",
           "code": {
             "language": "bash",
@@ -549,6 +638,14 @@
         {
           "label": "docs.k3s.io: Packaged Components",
           "url": "https://docs.k3s.io/installation/packaged-components"
+        },
+        {
+          "label": "kubernetes.io の kubeconfig (v1) の項目",
+          "url": "https://kubernetes.io/docs/reference/config-api/kubeconfig.v1/"
+        },
+        {
+          "label": "kubernetes.io の Configure Access to Multiple Clusters",
+          "url": "https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/"
         }
       ]
     },
@@ -833,6 +930,65 @@
           "output": "[+] Building 3.2s (7/7) FINISHED\n => [1/2] FROM docker.io/library/nginx:1.27-alpine\n => [2/2] COPY index.html /usr/share/nginx/html/index.html\n => naming to docker.io/library/hello:0.1"
         },
         {
+          "text": "プログラムを組み立てるときは、マルチステージビルドを使います。FROM を 2 回書くと段 (ステージ) が 2 つになり、1 つめで組み立て、2 つめには出来たファイルだけを写します。組み立ての道具は最後のイメージに残りません。この例は公式の例を元に、Go の main.go を組み立てるものです。同じフォルダに .dockerignore を置き、node_modules や .git のような名前を並べると、ビルドに送るファイルから外せます。",
+          "code": {
+            "language": "dockerfile",
+            "title": "Dockerfile",
+            "text": "FROM golang:1.26 AS build\nWORKDIR /src\nCOPY main.go .\nRUN CGO_ENABLED=0 go build -o /bin/hello ./main.go\n\nFROM scratch\nCOPY --from=build /bin/hello /bin/hello\nUSER 1000\nCMD [\"/bin/hello\"]"
+          },
+          "fields": {
+            "items": [
+              {
+                "keys": [
+                  "FROM"
+                ],
+                "text": "元になるイメージで、新しいステージを始めます。AS build はステージの名前です。scratch は何も入っていない土台です。"
+              },
+              {
+                "keys": [
+                  "WORKDIR"
+                ],
+                "text": "このあとの命令の作業フォルダです。"
+              },
+              {
+                "keys": [
+                  "COPY"
+                ],
+                "text": "ビルドに送ったファイルをイメージに写します。"
+              },
+              {
+                "keys": [
+                  "RUN"
+                ],
+                "text": "ビルドのときにコマンドを動かします。CGO_ENABLED=0 は Go への指定で、C のライブラリを使わない実行ファイルを作ります (scratch にはライブラリが無いため)。"
+              },
+              {
+                "keys": [
+                  "COPY --from"
+                ],
+                "text": "ほかのステージからファイルを写します。ここでは build のステージの実行ファイルです。"
+              },
+              {
+                "keys": [
+                  "USER"
+                ],
+                "text": "このあとの RUN・CMD・ENTRYPOINT を動かすユーザーです。1000 のような番号でも書け、root 以外で動かせます。"
+              },
+              {
+                "keys": [
+                  "CMD"
+                ],
+                "text": "コンテナを起動したときに動かす既定のコマンドです。"
+              }
+            ],
+            "sources": [
+              "https://docs.docker.com/reference/dockerfile/",
+              "https://docs.docker.com/build/building/multi-stage/",
+              "https://docs.docker.com/build/concepts/context/"
+            ]
+          }
+        },
+        {
           "text": "イメージは レジストリ/名前:タグ の形で指します。タグを省くと latest として扱われ、レジストリを省くと Docker の公開レジストリになります (nginx は docker.io/library/nginx と同じです)。latest は中身が変わりうるので本番では避け、v1.42.0 のような意味のあるタグか、ダイジェスト (sha256:... の一意の識別子) を書きます。",
           "code": {
             "language": "yaml",
@@ -1099,6 +1255,14 @@
         {
           "label": "Docker: Storage drivers (読み取り専用の層と書き込みの層)",
           "url": "https://docs.docker.com/engine/storage/drivers/"
+        },
+        {
+          "label": "docs.docker.com の Multi-stage builds",
+          "url": "https://docs.docker.com/build/building/multi-stage/"
+        },
+        {
+          "label": "docs.docker.com の Build context (.dockerignore)",
+          "url": "https://docs.docker.com/build/concepts/context/"
         }
       ]
     }

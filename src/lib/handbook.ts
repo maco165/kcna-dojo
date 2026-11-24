@@ -1,10 +1,12 @@
 // ハンドブックのデータの検査。違反を文で返す (空なら OK)
+import { codeKeys } from './codeKeys';
+
 const TOPIC_KEYS = new Set(['id', 'competency', 'title', 'summary', 'flow', 'try', 'lessons', 'sources', 'noTermLinks', 'short']);
-const STEP_KEYS = new Set(['text', 'code', 'output', 'result']);
+const STEP_KEYS = new Set(['text', 'code', 'output', 'result', 'fields']);
 const RESULT_KEYS = new Set(['text', 'tone']);
 /** 結果の文の長さの上限 (絵の 1 行に収める) */
 export const RESULT_MAX = 40;
-const CODE_KEYS = new Set(['language', 'text']);
+const CODE_KEYS = new Set(['language', 'text', 'title']);
 const TRY_KEYS = new Set(['goal', 'steps']);
 const FILE_KEYS = new Set(['domain', 'topics']);
 /** 学習要領の外のトピックを置くファイルの domain (細目の原文とは照らさない)。「付録: Linux とコンテナ」のように段の名前を付けられる */
@@ -17,12 +19,29 @@ export const appendixGroup = (d: AppendixDomain) => (d === APPENDIX_DOMAIN ? '' 
 function unknownKeys(obj: Record<string, unknown>, allowed: Set<string>, where: string, errors: string[]) {
   for (const k of Object.keys(obj)) if (!allowed.has(k)) errors.push(`${where}: ${k} という欄は使いません`);
 }
-const LANGS = new Set(['bash', 'yaml']);
+const LANGS = new Set(['bash', 'yaml', 'hcl', 'dockerfile']);
 
 const isText = (v: unknown): v is string => typeof v === 'string' && v.trim() !== '';
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 
-function checkSteps(steps: unknown, where: string, errors: string[], min: number) {
+/** 設定項目の意味: サンプルの項目すべてに 1 つずつあり、サンプルに無い項目や、トピックに無い出典を書かない */
+function checkFields(f: unknown, code: unknown, w: string, errors: string[], topicUrls: unknown[]) {
+  if (!isObj(f) || !Array.isArray(f.items) || !Array.isArray(f.sources) || f.sources.length === 0) return void errors.push(`${w}: fields は items と sources を持ちます`);
+  if (!isObj(code) || !isText(code.text) || !isText(code.title)) return void errors.push(`${w}: fields は title のあるコードに付けます`);
+  unknownKeys(f, new Set(['items', 'sources']), `${w}.fields`, errors);
+  for (const u of f.sources) if (!topicUrls.includes(u)) errors.push(`${w}: fields の出典 ${String(u)} が、トピックの sources にありません`);
+  const want = codeKeys(code.language as string, code.text);
+  const got: string[] = [];
+  for (const it of f.items) {
+    if (!isObj(it) || !isText(it.text) || !Array.isArray(it.keys) || it.keys.length === 0) errors.push(`${w}: fields の項目は keys と text を持ちます`);
+    else got.push(...(it.keys as string[]));
+  }
+  for (const k of want) if (!got.includes(k)) errors.push(`${w}: サンプルの項目 ${k} の意味がありません`);
+  for (const k of got) if (!want.includes(k)) errors.push(`${w}: ${k} という項目はサンプルにありません`);
+  if (new Set(got).size !== got.length) errors.push(`${w}: fields に同じ項目が重なっています`);
+}
+
+function checkSteps(steps: unknown, where: string, errors: string[], min: number, topicUrls: unknown[]) {
   if (!Array.isArray(steps) || steps.length < min) {
     errors.push(`${where}: ${min} 段以上が要ります`);
     return;
@@ -40,7 +59,9 @@ function checkSteps(steps: unknown, where: string, errors: string[], min: number
         if (!s.code) errors.push(`${w}: result はコードのある手順にだけ付けます`);
       }
     }
-    if (s.code !== undefined && !(isObj(s.code) && LANGS.has(s.code.language as string) && isText(s.code.text))) errors.push(`${w}: code は language (bash か yaml) と text を持ちます`);
+    if (s.code !== undefined && !(isObj(s.code) && LANGS.has(s.code.language as string) && isText(s.code.text))) errors.push(`${w}: code は language (bash か yaml か hcl か dockerfile) と text を持ちます`);
+    if (s.fields !== undefined) checkFields(s.fields, s.code, w, errors, topicUrls);
+    else if (isObj(s.code) && isText(s.code.title)) errors.push(`${w}: ファイルのサンプル (title のあるコード) には fields が要ります`);
     if (s.output !== undefined && !isText(s.output)) errors.push(`${w}: output は文字列にします`);
   });
 }
@@ -85,13 +106,14 @@ export function validateHandbook(data: unknown[], domains: Map<string, string[]>
       else if (covered.has(t.competency as string)) errors.push(`${id}: 細目 ${t.competency} のトピックが 2 つあります`);
       else covered.add(t.competency as string);
       if (!isText(t.title) || !isText(t.summary)) errors.push(`${id}: title と summary が要ります`);
-      checkSteps(t.flow, `${id}.flow`, errors, 3);
+      const topicUrls = Array.isArray(t.sources) ? t.sources.map((s) => (isObj(s) ? s.url : undefined)) : [];
+      checkSteps(t.flow, `${id}.flow`, errors, 3, topicUrls);
       if (!Array.isArray(t.try) || t.try.length === 0) errors.push(`${id}: try (試す手順) が 1 つ以上要ります`);
       else
         t.try.forEach((x, i) => {
           if (!isObj(x) || !isText(x.goal)) return void errors.push(`${id}.try[${i}]: goal がありません`);
           unknownKeys(x, TRY_KEYS, `${id}.try[${i}]`, errors);
-          checkSteps(x.steps, `${id}.try[${i}].steps`, errors, 1);
+          checkSteps(x.steps, `${id}.try[${i}].steps`, errors, 1, topicUrls);
         });
       if (!Array.isArray(t.lessons)) errors.push(`${id}: lessons の配列が要ります`);
       else {

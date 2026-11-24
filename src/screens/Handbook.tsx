@@ -5,12 +5,13 @@ import { Link } from '@astryxdesign/core/Link';
 import { Text } from '@astryxdesign/core/Text';
 import AppSideNav from '../components/AppSideNav';
 import Diagram, { DiagramThumb } from '../components/Diagram';
+import FieldNotes from '../components/FieldNotes';
 import StepVisual from '../components/StepVisual';
 import BottomTabs from '../components/BottomTabs';
 import RepoLink from '../components/RepoLink';
 import SiteLogo from '../components/SiteLogo';
 import { dueReviewCount, findLesson } from '../content';
-import { HANDBOOK, HANDBOOK_PARTS, isAppendixDomain, sectionName, findTopic, type HandbookStep } from '../content/handbook';
+import { HANDBOOK, HANDBOOK_PARTS, isAppendixDomain, sectionName, findTopic, type HandbookStep, type HandbookTopic } from '../content/handbook';
 import { HANDBOOK_FIGURES } from '../content/handbookFigures';
 import { EXAM_WEIGHTS } from '../lib/exam';
 import { markHandbookSeen, setHandbookDone, type HandbookRecord, type Progress } from '../lib/progress';
@@ -49,14 +50,16 @@ function Prose({ pieces }: { pieces: TermPiece[] }) {
 }
 
 /** 1 段: 説明、コマンドかマニフェスト、出力の例 */
-function Step({ step, text }: { step: HandbookStep; text: TermPiece[] }) {
+function Step({ step, text, sources }: { step: HandbookStep; text: TermPiece[]; sources: HandbookTopic['sources'] }) {
   return (
     <div className="hb-step">
       <p className="hb-step__text">
         <Prose pieces={text} />
       </p>
-      {step.code && <StepVisual code={step.code.text} language={step.code.language} result={step.result} />}
-      {step.code && <LazyCodeBlock code={step.code.text} language={step.code.language} hasCopyButton />}
+      {/* 設定ファイルのサンプルは、打つコマンドではないので手順の絵を出さない */}
+      {step.code && !step.fields && (step.code.language === 'bash' || step.code.language === 'yaml') && <StepVisual code={step.code.text} language={step.code.language} result={step.result} />}
+      {step.code && <LazyCodeBlock code={step.code.text} language={step.code.language} title={step.code.title} hasCopyButton />}
+      {step.fields && <FieldNotes fields={step.fields} sources={sources} />}
       {step.output && (
         <figure className="hb-output">
           <figcaption>出力の例 (名前・時刻などは環境で変わります)</figcaption>
@@ -269,7 +272,7 @@ function Topic({ id, progress, updateProgress }: { id: string; progress: Progres
         <ol className="hb-flow">
           {t.flow.map((s, i) => (
             <li key={i} data-flow-step={i}>
-              <Step step={s} text={prose.flow[i]} />
+              <Step step={s} text={prose.flow[i]} sources={t.sources} />
             </li>
           ))}
         </ol>
@@ -286,7 +289,7 @@ function Topic({ id, progress, updateProgress }: { id: string; progress: Progres
             <ol className="hb-flow">
               {x.steps.map((s, j) => (
                 <li key={j}>
-                  <Step step={s} text={prose.tries[i][j]} />
+                  <Step step={s} text={prose.tries[i][j]} sources={t.sources} />
                 </li>
               ))}
             </ol>

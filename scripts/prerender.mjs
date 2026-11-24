@@ -142,7 +142,8 @@ export async function buildPages(load) {
     ].join('\n'),
   });
   for (const t of HANDBOOK_TOPICS) {
-    const step = (s) => `<li><p>${esc(s.text)}</p>${s.code ? `<pre><code>${esc(s.code.text)}</code></pre>` : ''}${s.output ? `<pre>${esc(s.output)}</pre>` : ''}</li>`;
+    const fieldsHtml = (f) => `<p>設定項目の意味</p><dl>${f.items.map((x) => `<dt>${x.keys.map((k) => `<code>${esc(k)}</code>`).join('、')}</dt><dd>${esc(x.text)}</dd>`).join('')}</dl><p>出典: ${f.sources.map((u) => `<a href="${esc(u)}">${esc(t.sources.find((s) => s.url === u)?.label ?? u)}</a>`).join('、')}</p>`;
+    const step = (s) => `<li><p>${esc(s.text)}</p>${s.code?.title ? `<p><code>${esc(s.code.title)}</code></p>` : ''}${s.code ? `<pre><code>${esc(s.code.text)}</code></pre>` : ''}${s.fields ? fieldsHtml(s.fields) : ''}${s.output ? `<pre>${esc(s.output)}</pre>` : ''}</li>`;
     pages.push({
       path: `handbook/${t.id}/`,
       title: t.title,

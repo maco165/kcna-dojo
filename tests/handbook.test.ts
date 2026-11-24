@@ -1,9 +1,11 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { WEEKS } from '../src/content/curriculum';
 import { CURRICULUM } from '../src/content/guide';
 import { HANDBOOK, HANDBOOK_TOPICS, findTopic, isAppendixDomain, sectionName, topicByCompetency } from '../src/content/handbook';
 import glossary from '../src/content/glossary.json';
 import { appendixGroup } from '../src/lib/handbook';
+import { codeKeys } from '../src/lib/codeKeys';
 import { validateHandbook } from '../src/lib/handbook';
 
 const domains = new Map(CURRICULUM.map((c) => [c.domain as string, c.competencies.map((x) => x.en)]));
@@ -114,5 +116,32 @@ describe('validateHandbook', () => {
   it('リンクにしない語 (noTermLinks) は、用語集に実在する語の id', () => {
     const ids = new Set((glossary as { terms: { id: string }[] }).terms.map((t) => t.id));
     for (const t of HANDBOOK_TOPICS) for (const id of t.noTermLinks ?? []) expect(ids.has(id), `${t.id}: ${id}`).toBe(true);
+  });
+});
+
+describe('設定ファイルのサンプルと項目の意味', () => {
+  const samples = HANDBOOK_TOPICS.flatMap((t) => [...t.flow, ...t.try.flatMap((x) => x.steps)].filter((s) => s.fields).map((s) => ({ t, s })));
+  const mutate = (fn: (s: (typeof samples)[number]['s'], t: (typeof samples)[number]['t']) => void) => {
+    const data = structuredClone(HANDBOOK);
+    const t = data.flatMap((d) => d.topics).find((x) => x.id === 'infrastructure-as-code')!;
+    fn(t.flow.find((s) => s.fields)!, t as (typeof samples)[number]['t']);
+    return validateHandbook(data, domains, lessonIds).join();
+  };
+  it('項目の抜け・余り・トピックに無い出典・fields の無いファイルを見つける', () => {
+    expect(samples.length).toBeGreaterThanOrEqual(13);
+    expect(mutate((s) => void s.fields!.items.pop())).toMatch(/resource\.docker_container\.nginx\.ports\.external の意味がありません/);
+    expect(mutate((s) => void s.fields!.items[0].keys.push('nothing'))).toMatch(/nothing という項目はサンプルにありません/);
+    expect(mutate((s) => void s.fields!.sources.push('https://example.com/'))).toMatch(/トピックの sources にありません/);
+    expect(mutate((s) => void delete s.fields)).toMatch(/fields が要ります/);
+    expect(mutate((s) => void (s.code!.text += '\nlocals {\n  a = 1\n}'))).toMatch(/locals の意味がありません.*locals\.a の意味がありません/);
+  });
+  it('項目の道を取り出す (YAML の一覧は親と同じ字下げでも親の中)', () => {
+    expect(codeKeys('yaml', 'a:\n- b: 1\n  c:\n    d: x\n- b: 2\ne: "f: g"')).toEqual(['a', 'a[].b', 'a[].c', 'a[].c.d', 'e']);
+    expect(codeKeys('yaml', 'a:\n  - b: 1\n    c: 2\nd: 3')).toEqual(['a', 'a[].b', 'a[].c', 'd']);
+    expect(codeKeys('dockerfile', 'FROM a AS b\nCOPY --from=b /x /y')).toEqual(['FROM', 'COPY', 'COPY --from']);
+  });
+  it('CI/CD のサンプルは、このリポジトリのワークフローと同じ', () => {
+    const s = samples.find((x) => x.s.code!.title === '.github/workflows/deploy.yml')!.s;
+    expect(s.code!.text).toBe(readFileSync('.github/workflows/deploy.yml', 'utf8').trim());
   });
 });
