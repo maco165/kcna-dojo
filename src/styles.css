@@ -2305,11 +2305,11 @@ body {
   text-decoration-style: solid;
 }
 
-.hb:has(> .term-tip) {
+:is(.hb, .gloss-detail):has(> .term-tip) {
   position: relative;
 }
 /* 用語の短い意味の吹き出し (TermTip.tsx が位置と幅を決める) */
-.hb a.term-tip {
+:is(.hb, .gloss-detail) a.term-tip {
   position: absolute;
   z-index: 5;
   visibility: hidden;

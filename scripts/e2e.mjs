@@ -1067,6 +1067,51 @@ async function run(browser, name, width, height) {
     await tp.waitForURL(/\/glossary\/etcd\/$/);
     check(tp.url().endsWith('/glossary/etcd/'), `${tag} 出た意味をタップすると用語集のその語へ移る`);
     await touch.close();
+    // 用語集の説明の中の用語も同じ: カーソル・Esc・タップ。1 語のページと一覧で開いた語の両方
+    const shown = async (p, links, t) => {
+      const out = [];
+      for (const a of await links.all()) {
+        await p.mouse.move(0, 0);
+        await p.keyboard.press('Escape');
+        await a.scrollIntoViewIfNeeded();
+        await a.hover();
+        await p.locator('.term-tip').waitFor();
+        const clipped = await p.locator('.term-tip').evaluate((el, w) => {
+          const r = el.getBoundingClientRect();
+          return r.left < 0 || r.right > w || [[r.left + 3, r.top + 3], [r.right - 3, r.bottom - 3]].some(([x, y]) => !el.contains(document.elementFromPoint(x, y)));
+        }, width);
+        if (clipped) out.push(`${t}: ${await a.innerText()}`);
+      }
+      return out;
+    };
+    const cut = [];
+    for (const gid of ['etcd', 'pod', 'argo-cd']) {
+      await page.goto(`${BASE}glossary/${gid}/`);
+      await page.locator('#gloss-term-title').waitFor();
+      cut.push(...(await shown(page, page.locator('a.gloss-term'), gid)));
+    }
+    await page.keyboard.press('Escape');
+    check(cut.length === 0 && (await tip.count()) === 0, `${tag} 用語集の 1 語のページの用語にも意味が出て、隠れず、Esc で消える (${cut.join('・')})`);
+    await page.goto(`${BASE}glossary/`);
+    if (width < 768) await page.locator('.gloss-row__head').first().click();
+    else await page.locator('.gloss-pane').waitFor();
+    const listLinks = page.locator('a.gloss-term');
+    await listLinks.first().waitFor();
+    const cutList = await shown(page, listLinks, '一覧');
+    check(cutList.length === 0, `${tag} 用語集の一覧で開いた語の用語にも意味が出て、隠れない (${cutList.join('・')})`);
+    await noHorizontalOverflow(page, width, `${tag} 用語集の吹き出し`);
+    const gctx = await browser.newContext({ viewport: { width, height }, hasTouch: true, isMobile: width < 768 });
+    const gp = await gctx.newPage();
+    await gp.goto(`${BASE}glossary/etcd/`);
+    const gl = gp.locator('a.gloss-term').first();
+    const ghref = await gl.getAttribute('href');
+    await gl.tap();
+    await gp.locator('.term-tip').waitFor();
+    const stayed = gp.url().endsWith('/glossary/etcd/');
+    await gp.locator('.term-tip').tap();
+    await gp.waitForURL((u) => u.pathname === ghref);
+    check(stayed && (await gp.locator('.term-tip').count()) === 0, `${tag} 用語集でもタップで意味、意味のタップでその語へ移り、吹き出しは消える`);
+    await gctx.close();
   }
 
   // 15b. ハンドブックの本文の用語: 強調され、押すと用語集のその語が開く

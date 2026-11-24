@@ -15,6 +15,7 @@ import glossary from '../content/glossary.json';
 import type { Domain } from '../content/types';
 import { searchTerms, sortTerms, termDomain, termQuestion, type GlossaryTerm } from '../lib/glossary';
 import { AskAiLinks } from '../components/AskAi';
+import TermTipArea from '../components/TermTip';
 import Diagram from '../components/Diagram';
 import { figureOf } from '../content/glossaryFigures';
 import { findTopic } from '../content/handbook';
@@ -50,6 +51,8 @@ function hostOf(url: string) {
 }
 
 const NAMES = termNames(TERMS);
+/** 語の id → 短い意味 (説明の中の用語の吹き出しに出す) */
+const MEANINGS = new Map(TERMS.map((t) => [t.id, t.description]));
 
 /** 説明・詳しい説明・出てくるレッスンとハンドブック・出典・AI に聞く (開いた語の中身。スマホと PC で共通) */
 function Detail({ t, large }: { t: Entry; large?: boolean }) {
@@ -58,7 +61,8 @@ function Detail({ t, large }: { t: Entry; large?: boolean }) {
   const sources = [{ label: hostOf(t.source), url: t.source }, ...(t.sources ?? []).filter((x) => x.url !== t.source)];
   const figure = figureOf(t.id);
   return (
-    <div className="gloss-detail">
+    // 語が替わったら、出ている吹き出しも一緒に消す
+    <TermTipArea as="div" key={t.id} meanings={MEANINGS} className="gloss-detail">
       <p className={large ? 'gloss-detail__desc gloss-detail__desc--lg' : 'gloss-detail__desc'}>{t.description}</p>
       {linkDetail(NAMES, t).map((pieces, i) => (
         <p key={i} className="gloss-detail__more">
@@ -66,7 +70,7 @@ function Detail({ t, large }: { t: Entry; large?: boolean }) {
             typeof p === 'string' ? (
               p
             ) : (
-              <a key={j} className="gloss-term" href={glossaryTermHref(p.id)}>
+              <a key={j} className="gloss-term" data-term={p.id} href={glossaryTermHref(p.id)}>
                 {p.text}
               </a>
             ),
@@ -131,7 +135,7 @@ function Detail({ t, large }: { t: Entry; large?: boolean }) {
         ))}
       </Text>
       <AskAiLinks text={termQuestion(t)} lead="まだ分からなければ AI に聞く" />
-    </div>
+    </TermTipArea>
   );
 }
 
