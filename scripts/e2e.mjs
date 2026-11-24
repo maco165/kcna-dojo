@@ -988,6 +988,7 @@ async function run(browser, name, width, height) {
     await noHorizontalOverflow(page, width, `${tag} コマンドの意味`);
     await page.locator('.term-tip').click();
     await page.waitForURL(/\/commands\/chmod\/$/);
+    await page.locator('#cmdp-title').waitFor();
     check((await page.locator('h1').innerText()).trim() === 'chmod' && (await page.locator('a[href="/kcna-dojo/handbook/setup-k3s/"]').count()) >= 1, `${tag} コマンドのページへ移り、k3s の入れ方へ戻れる`);
   }
 
