@@ -35,10 +35,87 @@
           "output": "deployment.apps/web\nREVISION  CHANGE-CAUSE\n1         <none>\n2         <none>\n\ndeployment.apps/web rolled back"
         },
         {
+          "text": "設定を使い回す道具の 1 つが Kustomize です。まず、共通のベースを見ます。ベースの kustomization.yaml は、同じフォルダのマニフェストを並べ、足すラベルなどを書きます。",
+          "code": {
+            "language": "yaml",
+            "title": "base/kustomization.yaml",
+            "text": "resources:\n  - deployment.yaml\n  - service.yaml\nlabels:\n  - pairs:\n      app.kubernetes.io/part-of: shop"
+          },
+          "fields": {
+            "items": [
+              {
+                "keys": [
+                  "resources"
+                ],
+                "text": "まとめるマニフェストのファイルの一覧です。"
+              },
+              {
+                "keys": [
+                  "labels",
+                  "labels[].pairs",
+                  "labels[].pairs.app.kubernetes.io/part-of"
+                ],
+                "text": "全部の資源に足すラベルです。既定ではセレクターを書き換えません (includeSelectors: true でセレクターにも足します。古い commonLabels はセレクターにも足し、5.0.0 から非推奨です)。"
+              }
+            ],
+            "sources": [
+              "https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/",
+              "https://kubectl.docs.kubernetes.io/references/kustomize/kustomization/",
+              "https://kubectl.docs.kubernetes.io/references/kustomize/kustomization/labels/",
+              "https://kubectl.docs.kubernetes.io/references/kustomize/kustomization/commonlabels/"
+            ]
+          }
+        },
+        {
           "text": "Kustomize は、kustomization.yaml というファイルでマニフェストに設定を足したり変えたりする道具で、kubectl にも組み込まれています (1.14 以降)。リソースと設定を持つフォルダをベース (base)、ベースを指して違いを重ねるフォルダをオーバーレイ (overlay) と呼びます。ベースはオーバーレイを知らないので、同じベースを dev と prod などいくつものオーバーレイで使えます。kubectl kustomize は組み立てた結果を出すだけで、kubectl apply -k で当てます。",
           "code": {
             "language": "yaml",
-            "text": "# overlays/dev/kustomization.yaml\nresources:\n  - ../../base\nnamespace: try-kcna\nnamePrefix: dev-\nimages:\n  - name: nginx\n    newTag: \"1.28\""
+            "title": "overlays/dev/kustomization.yaml",
+            "text": "resources:\n  - ../../base\nnamespace: try-kcna\nnamePrefix: dev-\nimages:\n  - name: nginx\n    newTag: \"1.28\""
+          },
+          "fields": {
+            "items": [
+              {
+                "keys": [
+                  "resources"
+                ],
+                "text": "元になるマニフェストのファイルか、kustomization.yaml のあるフォルダの一覧です。ここではベースを指しています。"
+              },
+              {
+                "keys": [
+                  "namespace"
+                ],
+                "text": "全部の資源に付ける名前空間です。"
+              },
+              {
+                "keys": [
+                  "namePrefix"
+                ],
+                "text": "全部の資源の名前の前に付ける文字です。web は dev-web になります。"
+              },
+              {
+                "keys": [
+                  "images"
+                ],
+                "text": "イメージの名前・タグ・ダイジェストの差し替えです。パッチを書かずに変えられます。"
+              },
+              {
+                "keys": [
+                  "images[].name"
+                ],
+                "text": "差し替える対象のイメージの名前です。"
+              },
+              {
+                "keys": [
+                  "images[].newTag"
+                ],
+                "text": "新しいタグです。1.28 を引用符で囲み、数ではなく文字列として書きます。"
+              }
+            ],
+            "sources": [
+              "https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/",
+              "https://kubectl.docs.kubernetes.io/references/kustomize/kustomization/"
+            ]
           }
         },
         {
@@ -47,7 +124,161 @@
             "language": "bash",
             "text": "helm install web ./mychart -n try-kcna\nhelm upgrade web ./mychart -n try-kcna -f values-prod.yaml\nhelm history web -n try-kcna\nhelm rollback web 1 -n try-kcna"
           },
-          "output": "REVISION  UPDATED                   STATUS      CHART          APP VERSION  DESCRIPTION\n1         Mon Jan 11 10:27:17 2027  superseded  mychart-0.1.0  1.16.0       Install complete\n2         Mon Jan 11 10:28:40 2027  superseded  mychart-0.1.0  1.16.0       Upgrade complete\n3         Mon Jan 11 10:29:05 2027  deployed    mychart-0.1.0  1.16.0       Rollback to 1"
+          "output": "REVISION  UPDATED                   STATUS      CHART          APP VERSION  DESCRIPTION\n1         Mon Jan 11 10:27:17 2027  superseded  mychart-0.1.0  1.28         Install complete\n2         Mon Jan 11 10:28:40 2027  superseded  mychart-0.1.0  1.28         Upgrade complete\n3         Mon Jan 11 10:29:05 2027  deployed    mychart-0.1.0  1.28         Rollback to 1"
+        },
+        {
+          "text": "チャートの中身を見ます。mychart フォルダの Chart.yaml は、チャートの名札です。",
+          "code": {
+            "language": "yaml",
+            "title": "mychart/Chart.yaml",
+            "text": "apiVersion: v2\nname: mychart\ndescription: nginx を動かす小さなチャート\ntype: application\nversion: 0.1.0\nappVersion: \"1.28\""
+          },
+          "fields": {
+            "items": [
+              {
+                "keys": [
+                  "apiVersion"
+                ],
+                "text": "チャートの API の版です (必須)。Helm 3 以降を要るチャートは v2 にします。"
+              },
+              {
+                "keys": [
+                  "name"
+                ],
+                "text": "チャートの名前です (必須)。"
+              },
+              {
+                "keys": [
+                  "description"
+                ],
+                "text": "1 文の説明です。"
+              },
+              {
+                "keys": [
+                  "type"
+                ],
+                "text": "チャートの種類です。application と、部品だけを持つ library があります。"
+              },
+              {
+                "keys": [
+                  "version"
+                ],
+                "text": "チャートの版です (必須)。SemVer 2 の形にすることになっています (厳密には強制されません)。"
+              },
+              {
+                "keys": [
+                  "appVersion"
+                ],
+                "text": "中で動くアプリの版です。チャートの版とは別で、引用符で囲むことが勧められています。"
+              }
+            ],
+            "sources": [
+              "https://helm.sh/docs/topics/charts/"
+            ]
+          }
+        },
+        {
+          "text": "values.yaml は、テンプレートに入れる既定の値です。項目の名前は作る人が決めます。helm install や upgrade の -f や --set で上書きできます。",
+          "code": {
+            "language": "yaml",
+            "title": "mychart/values.yaml",
+            "text": "replicaCount: 2\nimage:\n  repository: nginx\n  tag: \"1.28\""
+          },
+          "fields": {
+            "items": [
+              {
+                "keys": [
+                  "replicaCount"
+                ],
+                "text": "このチャートで決めた項目で、テンプレートが Pod の数に使います。"
+              },
+              {
+                "keys": [
+                  "image",
+                  "image.repository",
+                  "image.tag"
+                ],
+                "text": "このチャートで決めた項目で、テンプレートがイメージの名前とタグに使います。"
+              }
+            ],
+            "sources": [
+              "https://helm.sh/docs/topics/charts/"
+            ]
+          }
+        },
+        {
+          "text": "templates フォルダのファイルは、値を差し込むマニフェストです。{{ .Values.image.tag }} には values.yaml の値、{{ .Release.Name }} には helm install で付けた名前が入り、できたマニフェストがクラスターに送られます。",
+          "code": {
+            "language": "yaml",
+            "title": "mychart/templates/deployment.yaml",
+            "text": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: {{ .Release.Name }}\nspec:\n  replicas: {{ .Values.replicaCount }}\n  selector:\n    matchLabels:\n      app: {{ .Release.Name }}\n  template:\n    metadata:\n      labels:\n        app: {{ .Release.Name }}\n    spec:\n      containers:\n        - name: web\n          image: \"{{ .Values.image.repository }}:{{ .Values.image.tag }}\""
+          },
+          "fields": {
+            "items": [
+              {
+                "keys": [
+                  "apiVersion",
+                  "kind"
+                ],
+                "text": "作る資源の API の版と種類です。"
+              },
+              {
+                "keys": [
+                  "metadata",
+                  "metadata.name"
+                ],
+                "text": "Deployment の名前です。.Release.Name は Helm のリリースの名前で、helm install web なら web です。"
+              },
+              {
+                "keys": [
+                  "spec"
+                ],
+                "text": "望ましい状態です。"
+              },
+              {
+                "keys": [
+                  "spec.replicas"
+                ],
+                "text": "Pod の数です。.Values.replicaCount は values.yaml の replicaCount です。"
+              },
+              {
+                "keys": [
+                  "spec.selector",
+                  "spec.selector.matchLabels",
+                  "spec.selector.matchLabels.app"
+                ],
+                "text": "この Deployment が受け持つ Pod を選ぶラベルです。template のラベルと合わせます。"
+              },
+              {
+                "keys": [
+                  "spec.template",
+                  "spec.template.metadata",
+                  "spec.template.metadata.labels",
+                  "spec.template.metadata.labels.app"
+                ],
+                "text": "作る Pod のひな形と、その Pod に付けるラベルです。"
+              },
+              {
+                "keys": [
+                  "spec.template.spec",
+                  "spec.template.spec.containers",
+                  "spec.template.spec.containers[].name"
+                ],
+                "text": "Pod の中で動かすコンテナの一覧と、コンテナの名前です。"
+              },
+              {
+                "keys": [
+                  "spec.template.spec.containers[].image"
+                ],
+                "text": "使うイメージです。values.yaml の repository と tag をつないでいます。"
+              }
+            ],
+            "sources": [
+              "https://helm.sh/docs/topics/charts/",
+              "https://helm.sh/docs/chart_template_guide/builtin_objects/",
+              "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"
+            ]
+          }
         },
         {
           "text": "GitOps では、システムの望ましい状態をファイルで宣言し、ふつうは Git などのバージョン管理を正本 (source of truth) にします。OpenGitOps の原則は、宣言的であること、版が残り変わらないこと、エージェントが正本から自動で取り込むこと、絶えず観て合わせ続けることの 4 つです。Argo CD は Git の状態 (target state) と動いている状態 (live state) を比べ、ずれると OutOfSync と出します。Flux は GitRepository などの Source から取ってきた状態にクラスタを合わせ続けます (Reconciliation)。"
@@ -287,6 +518,34 @@
         {
           "label": "Helm: helm history",
           "url": "https://helm.sh/docs/helm/helm_history/"
+        },
+        {
+          "label": "kubernetes.io の Kustomize (英語)",
+          "url": "https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/"
+        },
+        {
+          "label": "kubectl.docs.kubernetes.io の kustomization の項目",
+          "url": "https://kubectl.docs.kubernetes.io/references/kustomize/kustomization/"
+        },
+        {
+          "label": "helm.sh の Charts",
+          "url": "https://helm.sh/docs/topics/charts/"
+        },
+        {
+          "label": "helm.sh の Built-in Objects",
+          "url": "https://helm.sh/docs/chart_template_guide/builtin_objects/"
+        },
+        {
+          "label": "kubernetes.io の Deployments (英語)",
+          "url": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"
+        },
+        {
+          "label": "kubectl.docs.kubernetes.io の labels",
+          "url": "https://kubectl.docs.kubernetes.io/references/kustomize/kustomization/labels/"
+        },
+        {
+          "label": "kubectl.docs.kubernetes.io の commonLabels",
+          "url": "https://kubectl.docs.kubernetes.io/references/kustomize/kustomization/commonlabels/"
         }
       ]
     },

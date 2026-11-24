@@ -965,6 +965,16 @@ async function run(browser, name, width, height) {
     check((await card.locator('.hb-topic__read').innerText()) === '確認済み' && (await page.getByRole('navigation', { name: 'ハンドブックの部' }).getByText(/13 トピック · 確認済み 1/).isVisible()), `${tag} 目次に確認済みと、確認済みの数が出る`);
   }
 
+  // 15. 設定ファイルのサンプル: ファイルの名前と、項目の意味と出典が出る
+  {
+    await page.goto(`${BASE}handbook/infrastructure-as-code/`);
+    await page.getByRole('heading', { name: '全体の流れ' }).waitFor();
+    const notes = page.locator('.hb-fields');
+    check((await notes.count()) === 2 && (await page.getByText(/^main\.tf( — hcl)?$/).count()) >= 1, `${tag} IaC にファイルのサンプルと項目の意味が出る (${await notes.count()})`);
+    check((await notes.first().locator('dt').count()) >= 10 && (await notes.first().locator('a[href^="https://developer.hashicorp.com/"]').count()) >= 1, `${tag} 項目ごとの意味と公式の出典が並ぶ`);
+    await noHorizontalOverflow(page, width, `${tag} ファイルのサンプル`);
+  }
+
   // 15a. 用語の短い意味の吹き出し: カーソルとフォーカスで出る・Esc で消える・吹き出しへカーソルを移せる・はみ出さない
   {
     await page.goto(`${BASE}handbook/core-concepts/`);

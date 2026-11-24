@@ -225,6 +225,47 @@
           }
         },
         {
+          "text": "設定は、インストールの前に設定ファイルに書いておくこともできます。k3s は起動のときに /etc/rancher/k3s/config.yaml を読みます。キーは k3s server のフラグの名前と同じで、何度も書けるフラグは YAML の一覧にします。同じ項目をフラグでも書くと、フラグが優先されます。ただし node-label や disable のように何度も書けるものは、ファイルの値に足されます。下の値は例なので、自分の環境に合わせて要る行だけを書きます。",
+          "code": {
+            "language": "yaml",
+            "title": "/etc/rancher/k3s/config.yaml",
+            "text": "write-kubeconfig-mode: \"0600\"\ntls-san:\n  - \"k3s.example.com\"\nnode-label:\n  - \"disktype=ssd\"\ndisable:\n  - traefik"
+          },
+          "fields": {
+            "items": [
+              {
+                "keys": [
+                  "write-kubeconfig-mode"
+                ],
+                "text": "k3s.yaml を書くときのファイルの権限です。既定は 600 (root だけが読める) で、0644 にするとほかの利用者も読めます。"
+              },
+              {
+                "keys": [
+                  "tls-san"
+                ],
+                "text": "API サーバーの証明書に足す名前か IP アドレスです。ここに書いた名前でも、証明書の確認を通して接続できます。"
+              },
+              {
+                "keys": [
+                  "node-label"
+                ],
+                "text": "このノードに付けるラベルです。nodeSelector などで Pod を置くノードを選ぶときに使えます。"
+              },
+              {
+                "keys": [
+                  "disable"
+                ],
+                "text": "入れない同梱の部品です。入っていれば消されます。traefik を書くと、同梱の Ingress コントローラーが無くなるので、Ingress の手順を試すなら書きません。"
+              }
+            ],
+            "sources": [
+              "https://docs.k3s.io/installation/configuration",
+              "https://docs.k3s.io/cli/server",
+              "https://docs.k3s.io/installation/packaged-components"
+            ]
+          }
+        },
+        {
           "text": "ノードが Ready になり、kube-system に CoreDNS などの Pod が動いていれば準備ができています。helm-install- で始まる Pod は、同梱の部品を入れ終えると Completed のままになるもので、正常です。",
           "code": {
             "language": "bash",
@@ -323,6 +364,10 @@
         {
           "label": "Kubernetes: Share a Cluster with Namespaces",
           "url": "https://kubernetes.io/docs/tasks/administer-cluster/namespaces/"
+        },
+        {
+          "label": "docs.k3s.io の Managing Packaged Components",
+          "url": "https://docs.k3s.io/installation/packaged-components"
         }
       ]
     },

@@ -4,10 +4,13 @@ import type { Domain } from './types';
 import { DOMAINS } from '../lib/lessonStatus';
 import { appendixGroup, isAppendixDomain, type AppendixDomain } from '../lib/handbook';
 
-export type HandbookCode = { language: 'bash' | 'yaml'; text: string };
+/** title はファイルの名前 (設定ファイルのサンプルに付ける) */
+export type HandbookCode = { language: 'bash' | 'yaml' | 'hcl' | 'dockerfile'; text: string; title?: string };
+/** 設定ファイルのサンプルの項目の意味。keys はサンプルの項目の道 (lib/codeKeys.ts)、sources はトピックの sources の url */
+export type HandbookFields = { items: { keys: string[]; text: string }[]; sources: string[] };
 /** 手順のあとクラスタの中で起きること (本文に書いてある結果を短く)。ok は思いどおり、warn は失敗・止まる */
 export type HandbookResult = { text: string; tone: 'ok' | 'warn' };
-export type HandbookStep = { text: string; code?: HandbookCode; output?: string; result?: HandbookResult };
+export type HandbookStep = { text: string; code?: HandbookCode; output?: string; result?: HandbookResult; fields?: HandbookFields };
 export type HandbookTry = { goal: string; steps: HandbookStep[] };
 export type HandbookTopic = {
   id: string;

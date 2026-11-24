@@ -38,13 +38,121 @@
           "output": "# HELP apiserver_request_total [STABLE] Counter of apiserver requests broken out for each verb, dry run value, group, version, resource, scope, component, and HTTP response code.\n# TYPE apiserver_request_total counter\napiserver_request_total{code=\"200\",component=\"apiserver\",dry_run=\"\",group=\"\",resource=\"pods\",scope=\"namespace\",subresource=\"\",verb=\"LIST\",version=\"v1\"} 1342"
         },
         {
-          "text": "Prometheus は、メトリクスを時系列 (記録した時刻と値の並び) として集めて貯める道具です。対象の HTTP の口へ自分から取りに行く pull が基本で、対象はサービスディスカバリか静的な設定で見つけます。push は中継の gateway を通す形で扱えます。時系列はメトリクス名と、ラベルと呼ぶキーと値の組で見分けます。値の種類には、増える一方 (再起動で 0 に戻る) の Counter と、上がりも下がりもする Gauge などがあります。"
+          "text": "Prometheus は、メトリクスを時系列 (記録した時刻と値の並び) として集めて貯める道具です。対象の HTTP の口へ自分から取りに行く pull が基本で、対象はサービスディスカバリか静的な設定で見つけます。push は中継の gateway を通す形で扱えます。時系列はメトリクス名と、ラベルと呼ぶキーと値の組で見分けます。値の種類には、増える一方 (再起動で 0 に戻る) の Counter と、上がりも下がりもする Gauge などがあります。 設定ファイルの例は公式の最初の手順のもので、Prometheus が自分自身のメトリクスを 5 秒ごとに取りに行きます。",
+          "code": {
+            "language": "yaml",
+            "title": "prometheus.yml",
+            "text": "global:\n  scrape_interval: 15s\n  external_labels:\n    monitor: codelab-monitor\nscrape_configs:\n  - job_name: prometheus\n    scrape_interval: 5s\n    static_configs:\n      - targets: ['localhost:9090']"
+          },
+          "fields": {
+            "items": [
+              {
+                "keys": [
+                  "global"
+                ],
+                "text": "全体の既定の値です。"
+              },
+              {
+                "keys": [
+                  "global.scrape_interval"
+                ],
+                "text": "取りに行く間隔の既定です。"
+              },
+              {
+                "keys": [
+                  "global.external_labels",
+                  "global.external_labels.monitor"
+                ],
+                "text": "外の仕組み (連合・リモートの保存先・Alertmanager) とやりとりするときに、時系列やアラートに付けるラベルです。monitor は例の名前です。"
+              },
+              {
+                "keys": [
+                  "scrape_configs"
+                ],
+                "text": "取りに行く対象の設定の一覧です。"
+              },
+              {
+                "keys": [
+                  "scrape_configs[].job_name"
+                ],
+                "text": "対象のまとまりの名前です。job というラベルとして時系列に付きます。"
+              },
+              {
+                "keys": [
+                  "scrape_configs[].scrape_interval"
+                ],
+                "text": "このまとまりだけの間隔です。global の値より優先されます。"
+              },
+              {
+                "keys": [
+                  "scrape_configs[].static_configs",
+                  "scrape_configs[].static_configs[].targets"
+                ],
+                "text": "対象の住所を直接書く一覧です。取りに行く道を書かなければ /metrics です。"
+              }
+            ],
+            "sources": [
+              "https://prometheus.io/docs/prometheus/latest/configuration/configuration/",
+              "https://prometheus.io/docs/prometheus/latest/getting_started/"
+            ]
+          }
         },
         {
           "text": "トレースは、1 つのリクエストがアプリの中を通る道筋です。道筋は処理ごとのスパンに分かれ、各スパンは名前・親のスパン ID・開始と終了の時刻・スパンコンテキスト (トレース ID とスパン ID) などを持ちます。Kubernetes の部品は OpenTelemetry のプロトコル (OTLP) の gRPC でトレースを送れて、既定の送り先は 4317 番です。OpenTelemetry Collector で受け取るときは、受け取り (receivers) と送り出し (exporters) を pipeline でつなぎます。OpenTelemetry は観測のバックエンドそのものではなく、保存と可視化は Jaeger や Prometheus などに任せます。",
           "code": {
             "language": "yaml",
+            "title": "OpenTelemetry Collector の config.yaml",
             "text": "receivers:\n  otlp:\n    protocols:\n      grpc:\nexporters:\n  # 本番では、使うバックエンドの exporter に差し替える\n  debug:\n    verbosity: detailed\nservice:\n  pipelines:\n    traces:\n      receivers: [otlp]\n      exporters: [debug]"
+          },
+          "fields": {
+            "items": [
+              {
+                "keys": [
+                  "receivers"
+                ],
+                "text": "受け取り口の設定です。書いただけでは動かず、下の pipelines に入れると動きます。"
+              },
+              {
+                "keys": [
+                  "receivers.otlp",
+                  "receivers.otlp.protocols",
+                  "receivers.otlp.protocols.grpc"
+                ],
+                "text": "OTLP を gRPC で受け取ります。中が空なので既定の設定を使います。"
+              },
+              {
+                "keys": [
+                  "exporters"
+                ],
+                "text": "送り出し先の設定です。"
+              },
+              {
+                "keys": [
+                  "exporters.debug",
+                  "exporters.debug.verbosity"
+                ],
+                "text": "受け取ったデータを Collector の出力に書く、確かめるための送り先です。detailed は詳しく書きます。"
+              },
+              {
+                "keys": [
+                  "service",
+                  "service.pipelines"
+                ],
+                "text": "使う部品をつなぐところです。"
+              },
+              {
+                "keys": [
+                  "service.pipelines.traces",
+                  "service.pipelines.traces.receivers",
+                  "service.pipelines.traces.exporters"
+                ],
+                "text": "トレースの道です。どの受け取り口から、どの送り先へ流すかを並べます。"
+              }
+            ],
+            "sources": [
+              "https://opentelemetry.io/docs/collector/configuration/",
+              "https://github.com/open-telemetry/opentelemetry-collector/blob/main/exporter/debugexporter/README.md"
+            ]
           }
         },
         {
@@ -210,6 +318,22 @@
         {
           "label": "Google SRE book: Service Level Objectives",
           "url": "https://sre.google/sre-book/service-level-objectives/"
+        },
+        {
+          "label": "prometheus.io の Configuration",
+          "url": "https://prometheus.io/docs/prometheus/latest/configuration/configuration/"
+        },
+        {
+          "label": "prometheus.io の Getting started",
+          "url": "https://prometheus.io/docs/prometheus/latest/getting_started/"
+        },
+        {
+          "label": "opentelemetry.io の Collector の Configuration",
+          "url": "https://opentelemetry.io/docs/collector/configuration/"
+        },
+        {
+          "label": "OpenTelemetry Collector の debug exporter",
+          "url": "https://github.com/open-telemetry/opentelemetry-collector/blob/main/exporter/debugexporter/README.md"
         }
       ]
     },
