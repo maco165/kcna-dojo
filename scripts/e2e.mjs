@@ -319,7 +319,7 @@ async function run(browser, name, width, height) {
   const listed = await page.evaluate(() => [...new Set([...document.querySelectorAll('.rows a[href*="/lesson/"], table a[href*="/lesson/"]')].map((a) => a.getAttribute('href')))]);
   check(JSON.stringify(listed) === JSON.stringify(exercises.map((l) => `/kcna-dojo/lesson/${l.id}/`)), `${tag} 週の一覧は問題演習だけ (${listed.length})`);
   const weekLabs = page.getByRole('navigation', { name: 'この週の実践' });
-  check(JSON.stringify(await weekLabs.locator('a').evaluateAll((as) => as.map((a) => a.getAttribute('href')))) === JSON.stringify(['/kcna-dojo/hands-on/run-containers/', '/kcna-dojo/hands-on/']), `${tag} 週の画面から、その週の実習を覆った章と実践の一覧へ行ける`);
+  check(JSON.stringify(await weekLabs.locator('a').evaluateAll((as) => as.map((a) => a.getAttribute('href')))) === JSON.stringify(['/kcna-dojo/hands-on/vm-setup/', '/kcna-dojo/hands-on/run-containers/', '/kcna-dojo/hands-on/']), `${tag} 週の画面から、0 章・その週の実習を覆った章・実践の一覧へ行ける`);
   if (width < 768) {
     check(await page.getByText(`0/${exercises.length} 完了`).isVisible(), `${tag} 週の完了の数は問題演習だけ`);
     // 下のタブは 5 つ。どの幅でも字がタブからはみ出さない (復習の数が 2 桁のときも)
@@ -561,6 +561,7 @@ async function run(browser, name, width, height) {
   check(new URL(page.url()).pathname === '/kcna-dojo/hands-on/', `${tag} 実習の「一覧へ戻る」は実践の一覧`);
   check(await page.getByText('0 / 6 完了').isVisible(), `${tag} 章が覆った実習は、完了していても一覧の数に入れない`);
   check((await page.locator('a.cmp-card[href^="/kcna-dojo/lesson/w"]').count()) === 6 && (await page.locator('a.cmp-card[href^="/kcna-dojo/hands-on/"]').count()) === chapters.length, `${tag} 実践の一覧に、章 ${chapters.length} と、章が覆っていない実習 6 本が並ぶ`);
+  check((await page.locator('p a[href="/kcna-dojo/lesson/w2-lab/"]').count()) === 1, `${tag} 実践の一覧の説明から、複数のノードの実習へ行ける`);
   check((await page.title()) === '実践 | クラネイ', `${tag} 実践の一覧の題名 (${await page.title()})`);
   await noHorizontalOverflow(page, width, `${tag} 実践の一覧`);
   await page.goto(`${BASE}lesson/${lab.id}/`);

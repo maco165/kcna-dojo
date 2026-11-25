@@ -7,7 +7,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { buildPages, renderPage, sitemap } from '../scripts/prerender.mjs';
 import type { HandsOnChapter } from '../src/content/types';
 import { WEEKS } from '../src/content/curriculum';
-import { COVERED_LABS, COVERED_REST, chaptersOfLab, handsOnLinks, listedLabs } from '../src/content/coveredLabs';
+import { COVERED_LABS, FIRST_CHAPTER, handsOnLabel, COVERED_REST, chaptersOfLab, handsOnLinks, listedLabs } from '../src/content/coveredLabs';
 import { HANDS_ON, chapterTitle } from '../src/content/handsOn';
 import ProgressScreen from '../src/screens/ProgressScreen';
 import { summary } from '../src/screens/Settings';
@@ -264,6 +264,7 @@ describe('画面', { timeout: 30_000 }, () => {
   });
   it('章が覆った実習は一覧から外し、ページには章へのリンクを出す。覆う章と実習は実在する', async () => {
     const labs = WEEKS.flatMap(labsOf).map((l) => l.id);
+    expect(FIRST_CHAPTER).toEqual((({ id, order, title }) => ({ id, order, title }))(HANDS_ON[0]));
     for (const [lab, chapters] of Object.entries(COVERED_LABS)) {
       expect(labs).toContain(lab);
       // 番号と題は、章のデータと同じ。並びは章の番号の順
@@ -292,8 +293,9 @@ describe('画面', { timeout: 30_000 }, () => {
   });
   it('週の画面の「動かして確かめる」は、覆われた週では章へ、ほかの週では実習へ送る', async () => {
     const paths = (w: number) => handsOnLinks(WEEKS[w - 1]).map((l) => l.path);
-    expect(paths(1)).toEqual(['hands-on/run-containers/']);
-    expect(paths(2)).toEqual(['hands-on/install-k3s/', 'hands-on/self-healing/']);
+    expect(paths(1)).toEqual(['hands-on/vm-setup/', 'hands-on/run-containers/']);
+    expect(paths(2)).toEqual(['hands-on/vm-setup/', 'hands-on/install-k3s/', 'hands-on/self-healing/']);
+    expect([1, 2, 3].map((w) => handsOnLabel(WEEKS[w - 1]).includes('0 章から順に'))).toEqual([true, true, false]);
     expect(paths(3)).toEqual(['lesson/w3-lab/']);
     vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} }));
     for (const w of [1, 2, 3]) {
@@ -324,6 +326,7 @@ describe('画面', { timeout: 30_000 }, () => {
     expect(counts()).toEqual(['1 / 1 完了', '1 / 6 完了']);
     expect(el.querySelectorAll(`a.cmp-card[href^="${BASE}lesson/w"]`)).toHaveLength(6);
     expect(el.querySelector(`a.cmp-card[href="${BASE}hands-on/sample/"]`)).not.toBeNull();
+    expect([...el.querySelectorAll('p a')].map((a) => a.getAttribute('href'))).toContain(`${BASE}lesson/w2-lab/`);
     await act(async () => root.render(<HandsOnIndex progress={p} chapters={[]} />));
     expect(counts()).toEqual(['1 / 6 完了']);
     expect(el.textContent).toContain('章は準備中です');
@@ -341,7 +344,8 @@ describe('書き出す HTML', { timeout: 60_000 }, () => {
   it('章が覆った実習は、書き出した一覧に並べず、実習のページから章へつなぐ', () => {
     const body = (p: string) => new DOMParser().parseFromString(renderPage(readFileSync(path.resolve(process.cwd(), 'index.html'), 'utf8'), pages.find((x) => x.path === p)), 'text/html');
     const hrefs = [...body('hands-on/').querySelectorAll('#root a')].map((a) => a.getAttribute('href')).filter((h) => h!.includes('-lab/'));
-    expect(hrefs).toEqual([3, 4, 5, 6, 7, 8].map((w) => `${BASE}lesson/w${w}-lab/`));
+    // 先頭の w2-lab は、一覧の説明の「複数のノードがある人は」のリンク
+    expect(hrefs).toEqual([2, 3, 4, 5, 6, 7, 8].map((w) => `${BASE}lesson/w${w}-lab/`));
     expect(body('lesson/w2-lab/').querySelector('#root')!.textContent).toContain(COVERED_REST['w2-lab']);
     expect(body('lesson/w1-lab/').querySelector('#root')!.textContent).not.toContain('複数のノードがある人');
     expect(body('lesson/w1-lab/').querySelector(`#root a[href="${BASE}hands-on/run-containers/"]`)).not.toBeNull();

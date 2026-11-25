@@ -16,6 +16,9 @@ export const COVERED_LABS: Record<string, readonly ChapterRef[]> = {
   ],
 };
 
+/** 初めに進める章。章は前の章で作った仮想マシンを使うので、週の画面から章へ送るときは先頭に置く */
+export const FIRST_CHAPTER: ChapterRef = { id: 'vm-setup', order: 0, title: '仮想マシンを用意する' };
+
 /** 章の番号 ("0 章") */
 export const chapterNo = (c: { order: number }) => `${c.order} 章`;
 
@@ -29,11 +32,18 @@ export const listedLabs = (weeks: WeekMeta[]): { lab: LabLesson; week: number }[
 export const handsOnLinks = (week: WeekMeta): { path: string; label: string }[] =>
   labsOf(week).flatMap((lab) => {
     const chapters = chaptersOfLab(lab.id);
-    return chapters.length > 0 ? chapters.map((c) => ({ path: `hands-on/${c.id}/`, label: `${chapterNo(c)} ${c.title}` })) : [{ path: `lesson/${lab.id}/`, label: lab.title }];
+    return chapters.length > 0 ? [FIRST_CHAPTER, ...chapters].map((c) => ({ path: `hands-on/${c.id}/`, label: `${chapterNo(c)} ${c.title}` })) : [{ path: `lesson/${lab.id}/`, label: lab.title }];
   });
+
+/** 週の画面の行き先の前に置く短い文 (章へ送る週では、0 章から順に進めることを添える) */
+export const handsOnLabel = (week: WeekMeta) => `動かして確かめる${labsOf(week).some((lab) => chaptersOfLab(lab.id).length > 0) ? ` (章は ${chapterNo(FIRST_CHAPTER)}から順に進めます)` : ''}`;
 
 /** 覆った実習のページと結果に出す 1 行の始め (画面と書き出す HTML で共通。後ろに章へのリンクを続ける) */
 export const COVERED_LEAD = 'この実習の中身は、実践の章に入りました。初めての人はこちらから:';
 
 /** 章が覆っていない分の残る実習に、章へのリンクの後ろへ足す文 */
 export const COVERED_REST: Record<string, string> = { 'w2-lab': '複数のノードがある人は、この実習も役に立ちます。' };
+
+/** 覆ったが、まだ役に立つ所の残る実習 (一覧の説明から 1 行でつなぐ) */
+export const restLabs = (weeks: WeekMeta[]): LabLesson[] => weeks.flatMap(labsOf).filter((lab) => lab.id in COVERED_REST);
+export const REST_LEAD = '複数のノードがある人は、この実習も役に立ちます:';

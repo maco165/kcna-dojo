@@ -7,7 +7,7 @@ import Crumbs from '../components/Crumbs';
 import RepoLink from '../components/RepoLink';
 import SiteLogo from '../components/SiteLogo';
 import { dueReviewCount } from '../content';
-import { chapterNo, listedLabs } from '../content/coveredLabs';
+import { REST_LEAD, chapterNo, listedLabs, restLabs } from '../content/coveredLabs';
 import { WEEKS } from '../content/curriculum';
 import { CHAPTERS_LEAD, HANDS_ON, HANDS_ON_LEAD, HANDS_ON_TITLE, HANDS_ON_WHO, LABS_LEAD, NO_CHAPTERS } from '../content/handsOn';
 import type { HandsOnMeta } from '../content/types';
@@ -65,7 +65,15 @@ export function HandsOnIndex({ progress, chapters = HANDS_ON }: { progress: Prog
           <span>週ごとの実習</span>
           <span className="hb-muted">{`${doneLessons(LABS.map((x) => x.lab), progress)} / ${LABS.length} 完了`}</span>
         </h2>
-        <p className="hb-muted">{LABS_LEAD}</p>
+        <p className="hb-muted">
+          {LABS_LEAD}
+          {restLabs(WEEKS).map((lab) => (
+            <span key={lab.id}>
+              {' '}
+              {REST_LEAD} <a href={lessonHref(lab.id)}>{lab.title}</a>
+            </span>
+          ))}
+        </p>
         <ul className="cmp-list">
           {LABS.map(({ lab, week }) => {
             const done = progress.lessons[lab.id]?.done === true;

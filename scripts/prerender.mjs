@@ -317,7 +317,7 @@ export async function buildPages(load, { chapters } = {}) {
   const { HANDS_ON_CHAPTERS } = await load('/src/content/handsOnChapters.ts');
   const { OS_LABEL, WHERE_LABEL } = await load('/src/lib/handsOn.ts');
   const { exercisesOf } = await load('/src/lib/lessonStatus.ts');
-  const { COVERED_LEAD, COVERED_REST, chapterNo, chaptersOfLab, handsOnLinks, listedLabs } = await load('/src/content/coveredLabs.ts');
+  const { COVERED_LEAD, COVERED_REST, chapterNo, chaptersOfLab, handsOnLabel, handsOnLinks, listedLabs, restLabs, REST_LEAD } = await load('/src/content/coveredLabs.ts');
   const chapterList = chapters ?? HANDS_ON_CHAPTERS;
   const labList = listedLabs(WEEKS);
   pages.push({
@@ -332,7 +332,7 @@ export async function buildPages(load, { chapters } = {}) {
       `<p>${esc(chapterList.length > 0 ? handsOn.CHAPTERS_LEAD : handsOn.NO_CHAPTERS)}</p>`,
       chapterList.length > 0 ? `<ul>${chapterList.map((c) => `<li>${esc(chapterNo(c))}: ${link(`hands-on/${c.id}/`, c.title)} (約 ${c.minutes} 分): ${esc(c.summary)}</li>`).join('')}</ul>` : '',
       '<h2>週ごとの実習</h2>',
-      `<p>${esc(handsOn.LABS_LEAD)}</p>`,
+      `<p>${esc(handsOn.LABS_LEAD)}${restLabs(WEEKS).map((l) => ` ${esc(REST_LEAD)} ${link(`lesson/${l.id}/`, l.title)}`).join('')}</p>`,
       `<ul>${labList.map(({ lab, week }) => `<li>第 ${week} 週: ${link(`lesson/${lab.id}/`, lab.title)}: ${esc(lab.goal)}</li>`).join('')}</ul>`,
     ]
       .filter(Boolean)
@@ -419,7 +419,7 @@ export async function buildPages(load, { chapters } = {}) {
       title: `第 ${w.week} 週 ${w.title}`,
       description: clip(`第 ${w.week} 週 ${w.title} (${w.domain}・${w.area})。この週で説明できるようにすること: ${w.goals.join('・')}`),
       // 第 1 週はトップと同じ画面なので、h1 も画面と同じサイト名にし、週の名前は h2 にする
-      body: [w.week === 1 ? `<h1>${esc(SITE_TITLE)}</h1>\n<h2>第 1 週 ${esc(w.title)}</h2>` : `<h1>第 ${w.week} 週 ${esc(w.title)}</h1>`, `<p>${esc(w.domain)} · ${esc(w.area)}</p>`, '<h2>この週で説明できるようにすること</h2>', `<ol>${w.goals.map((g) => `<li>${esc(g)}</li>`).join('')}</ol>`, '<h2>先に読む</h2>', `<ul>${w.read.map((r) => `<li>${link(`handbook/${r.topic}/`, r.label)}</li>`).join('')}</ul>`, '<h2>問題演習</h2>', exercisesOf({ content: { lessons: ls } }).map(weekLessonHtml).join('\n'), `<h2>動かして確かめる</h2><ul>${handsOnLinks(w).map((l) => `<li>${link(l.path, l.label)}</li>`).join('')}<li>${link('hands-on/', '実践の一覧')}</li></ul>`].join('\n'),
+      body: [w.week === 1 ? `<h1>${esc(SITE_TITLE)}</h1>\n<h2>第 1 週 ${esc(w.title)}</h2>` : `<h1>第 ${w.week} 週 ${esc(w.title)}</h1>`, `<p>${esc(w.domain)} · ${esc(w.area)}</p>`, '<h2>この週で説明できるようにすること</h2>', `<ol>${w.goals.map((g) => `<li>${esc(g)}</li>`).join('')}</ol>`, '<h2>先に読む</h2>', `<ul>${w.read.map((r) => `<li>${link(`handbook/${r.topic}/`, r.label)}</li>`).join('')}</ul>`, '<h2>問題演習</h2>', exercisesOf({ content: { lessons: ls } }).map(weekLessonHtml).join('\n'), `<h2>${esc(handsOnLabel(w))}</h2><ul>${handsOnLinks(w).map((l) => `<li>${link(l.path, l.label)}</li>`).join('')}<li>${link('hands-on/', '実践の一覧')}</li></ul>`].join('\n'),
     });
     for (const l of ls) {
       const qs = l.kind === 'quiz' ? l.questions : [];

@@ -14,7 +14,7 @@ import BottomTabs from '../components/BottomTabs';
 import RepoLink from '../components/RepoLink';
 import SiteLogo from '../components/SiteLogo';
 import StatusIcon from '../components/StatusIcon';
-import { handsOnLinks } from '../content/coveredLabs';
+import { handsOnLabel, handsOnLinks } from '../content/coveredLabs';
 import { WEEKS, type WeekMeta } from '../content/curriculum';
 import type { QuizLessonMeta as Lesson } from '../content/types';
 import {
@@ -149,7 +149,7 @@ function PreRead({ meta }: { meta: WeekMeta }) {
 function WeekLabs({ meta }: { meta: WeekMeta }) {
   return (
     <nav className="pre-read" aria-label="この週の実践">
-      <span className="pre-read__label">動かして確かめる</span>
+      <span className="pre-read__label">{handsOnLabel(meta)}</span>
       {handsOnLinks(meta).map((l) => (
         <a key={l.path} className="gloss-chip" href={`${BASE}${l.path}`}>
           {l.label}
