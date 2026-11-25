@@ -1,0 +1,2092 @@
+{
+  "id": "run-containers",
+  "order": 2,
+  "title": "コンテナを動かす",
+  "summary": "ほしい状態を YAML に書いて Pod を動かします。中を見て、2 つのコンテナを組み、自分のイメージを作って動かし、使う量の上限を超えたときまで体験します。",
+  "goal": "Pod を YAML で作り、調べ、自分のイメージを動かし、メモリと CPU の上限で起きることを説明できる",
+  "features": [
+    "Pod は、住所とボリュームを分け合うコンテナの組",
+    "apply は「この状態にして」と頼む。同じなら何も変えない",
+    "イメージを作る道具 (Docker) と、動かす道具 (k3s の containerd) は別",
+    "置けるかは requests で決まり、メモリの超過は止められ、CPU の超過は待たされる",
+    "1 つきりの Pod は、消すと戻らない"
+  ],
+  "minutes": 110,
+  "needs": [
+    "1 章を終えた仮想マシン kcna (k3s が入り、kubectl が使える)",
+    "インターネットへの接続 (Docker とイメージを取ってきます)",
+    "ディスクの空き (Docker とイメージで、仮想マシンの中に 1 GB 前後増えます)",
+    "出力について: 「仮想マシンの中」の出力は、2026-11-25 に Linux の QEMU の上で、Ubuntu 24.04 の公式のクラウドイメージ (x86_64・2 コア・2 GB・20 GB) と k3s v1.36.6+k3s1 で取りました。Multipass を打つ手順は実機で確かめていないので、出力を載せていません。M 系の Mac でも手順は同じです。CPU の種類が出るところだけ arm64 か aarch64 になります。"
+  ],
+  "reads": [
+    {
+      "topic": "containerization",
+      "label": "コンテナ化"
+    },
+    {
+      "topic": "container-internals",
+      "label": "コンテナの仕組み"
+    },
+    {
+      "topic": "scheduling",
+      "label": "スケジューリング"
+    }
+  ],
+  "steps": [
+    {
+      "id": "enter",
+      "text": "1 章を終えた仮想マシンの中に入ります。ホストの端末で打ちます。",
+      "why": "この章のコマンドは、最初と最後のほかは全部、仮想マシンの中で打つためです。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass shell kcna"
+      },
+      "lines": [
+        {
+          "code": "multipass shell kcna",
+          "text": "kcna の中の端末を開く。止まっていれば、動かしてから開く"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "行の頭が ubuntu@kcna:~$ に変われば、中に入っています。",
+      "trouble": [
+        {
+          "symptom": "multipass: command not found、または「認識されません」と出る",
+          "check": "端末を閉じて開き直し、multipass version を打つ",
+          "fix": "開き直しても出るなら、Multipass を入れる手順をもう一度行う"
+        },
+        {
+          "symptom": "kcna が無いと出る",
+          "check": "multipass list で名前を見る",
+          "fix": "0 章から始める"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/shell/"
+    },
+    {
+      "id": "check-host",
+      "text": "仮想マシンの中で、どのマシンにいるかと、クラスターの様子を見ます。hostname が kcna でなければ、先へ進まず multipass shell kcna で入ります。",
+      "why": "自分の PC の別のクラスターで打たないためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "hostname\nkubectl get nodes"
+      },
+      "lines": [
+        {
+          "code": "hostname",
+          "text": "このマシンの名前を出す"
+        },
+        {
+          "code": "kubectl get nodes",
+          "text": "ノードの一覧を出す"
+        }
+      ],
+      "output": "kcna\nNAME   STATUS   ROLES           AGE   VERSION\nkcna   Ready    control-plane   84s   v1.36.6+k3s1",
+      "read": "kcna と出て、ノードの STATUS が Ready なら進めます。VERSION が v1.36.6+k3s1 でない人は、出力の版を読み替えます。",
+      "trouble": [
+        {
+          "symptom": "kcna ではない名前が出る",
+          "check": "行の頭が ubuntu@kcna かを見る",
+          "fix": "ホストにいる。multipass shell kcna で入り、もう一度打つ"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        },
+        {
+          "symptom": "permission denied や localhost:8080 と出る",
+          "check": "echo $KUBECONFIG を打つ",
+          "fix": "空なら export KUBECONFIG=~/.kube/k3s.yaml を打つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/architecture/nodes/"
+    },
+    {
+      "id": "words",
+      "text": "Pod は、Kubernetes が動かすいちばん小さな単位です。1 つ以上のコンテナを、同じノードに、同じ住所で置きます。1 章では命令 (kubectl run) で作りました。この章では、ほしい状態を YAML というファイルに書いて渡します。これを「宣言」と呼びます。",
+      "why": "命令は打ったら消えますが、ファイルは残ります。残せば、見直し・やり直し・人との共有ができるためです。YAML は、「名前: 値」を並べ、字下げ (スペース) で入れ子を表す書き方です。タブは使えません。",
+      "source": "https://kubernetes.io/docs/concepts/workloads/pods/"
+    },
+    {
+      "id": "prepare",
+      "text": "作業のフォルダと、練習用の名前空間 ch2 を作ります。",
+      "why": "この章で書くファイルと、クラスターに作るものを、まとめて片付けられるようにするためです。端末を開き直したら、cd ~/ch2 を打ってから続けます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "mkdir -p ~/ch2\ncd ~/ch2\npwd\nkubectl create namespace ch2\nkubectl wait --for=create serviceaccount/default -n ch2 --timeout=60s"
+      },
+      "lines": [
+        {
+          "code": "mkdir -p ~/ch2",
+          "text": "ch2 というフォルダを作る"
+        },
+        {
+          "code": "cd ~/ch2",
+          "text": "ch2 へ移る"
+        },
+        {
+          "code": "pwd",
+          "text": "今いる場所を出す"
+        },
+        {
+          "code": "kubectl create namespace ch2",
+          "text": "名前空間 ch2 を作る"
+        },
+        {
+          "code": "kubectl wait --for=create serviceaccount/default -n ch2 --timeout=60s",
+          "text": "ch2 の準備 (Pod が使う利用者) ができるまで待つ"
+        }
+      ],
+      "output": "/home/ubuntu/ch2\nnamespace/ch2 created\nserviceaccount/default condition met",
+      "read": "/home/ubuntu/ch2 と出て、namespace/ch2 created と出れば進めます。",
+      "trouble": [
+        {
+          "symptom": "AlreadyExists と出る",
+          "check": "kubectl get namespaces を打つ",
+          "fix": "もうあるので、そのまま進む"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/"
+    },
+    {
+      "id": "write-pod",
+      "text": "Pod の YAML を書きます。下の枠を、最後の EOF までまとめて貼り付けます。",
+      "why": "cat > ファイル <<'EOF' は、EOF の行までをファイルに書く書き方です。エディターを覚えなくても、同じファイルを作れるためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cat > web.yaml <<'EOF'\napiVersion: v1\nkind: Pod\nmetadata:\n  name: web\n  labels:\n    app: web\nspec:\n  containers:\n  - name: web\n    image: nginx:1.27-alpine\n    ports:\n    - containerPort: 80\nEOF\ncat -n web.yaml"
+      },
+      "lines": [
+        {
+          "code": "cat > web.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま web.yaml というファイルに書く"
+        },
+        {
+          "code": "apiVersion: v1",
+          "text": "使う API の種類と版。Pod は、いちばん基本の v1 にある"
+        },
+        {
+          "code": "kind: Pod",
+          "text": "作るものの種類"
+        },
+        {
+          "code": "metadata:",
+          "text": "名前などの、ものを見分けるための情報"
+        },
+        {
+          "code": "  name: web",
+          "text": "Pod の名前"
+        },
+        {
+          "code": "  labels:",
+          "text": "ラベル。見分けや選び出しに使う、名前と値の札"
+        },
+        {
+          "code": "    app: web",
+          "text": "app という札に web と書く"
+        },
+        {
+          "code": "spec:",
+          "text": "こうなっていてほしい、という中身"
+        },
+        {
+          "code": "  containers:",
+          "text": "Pod に入れるコンテナの一覧"
+        },
+        {
+          "code": "  - name: web",
+          "text": "1 つ目のコンテナの名前。- は一覧の 1 件の印"
+        },
+        {
+          "code": "    image: nginx:1.27-alpine",
+          "text": "使うイメージと版"
+        },
+        {
+          "code": "    ports:",
+          "text": "コンテナが使う番号 (ポート) の一覧"
+        },
+        {
+          "code": "    - containerPort: 80",
+          "text": "80 番を使うという覚え書き"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "cat -n web.yaml",
+          "text": "書いたファイルを、行の番号を付けて出す"
+        }
+      ],
+      "output": "     1\tapiVersion: v1\n     2\tkind: Pod\n     3\tmetadata:\n     4\t  name: web\n     5\t  labels:\n     6\t    app: web\n     7\tspec:\n     8\t  containers:\n     9\t  - name: web\n    10\t    image: nginx:1.27-alpine\n    11\t    ports:\n    12\t    - containerPort: 80",
+      "read": "字下げは、スペース 2 つずつです。containers の中身が、name や image です。字下げがずれると、別の意味になります。",
+      "trouble": [
+        {
+          "symptom": "行の頭が > のまま進まない",
+          "check": "最後の EOF が、行の頭から始まっているかを見る",
+          "fix": "Ctrl キーを押しながら C で止め、枠をコピーし直して貼る"
+        },
+        {
+          "symptom": "No such file or directory と出る",
+          "check": "pwd を打つ",
+          "fix": "cd ~/ch2 で移ってから貼る"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/workloads/pods/"
+    },
+    {
+      "id": "dry-run",
+      "text": "作らずに、API サーバーに確かめてもらいます。",
+      "why": "間違いを、作る前に見つけるためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl apply --dry-run=server -f web.yaml -n ch2\nkubectl get pods -n ch2"
+      },
+      "lines": [
+        {
+          "code": "kubectl apply --dry-run=server -f web.yaml -n ch2",
+          "text": "web.yaml を API サーバーに渡し、作る直前まで確かめる。-f は読むファイル"
+        },
+        {
+          "code": "kubectl get pods -n ch2",
+          "text": "Pod の一覧を出す"
+        }
+      ],
+      "output": "pod/web created (server dry run)\nNo resources found in ch2 namespace.",
+      "read": "(server dry run) は「作ったことにしただけ」の印です。だから一覧は空です。",
+      "trouble": [
+        {
+          "symptom": "the path ... does not exist と出る",
+          "check": "pwd と ls を打つ",
+          "fix": "作業のフォルダにいない。cd で移ってから打つ"
+        },
+        {
+          "symptom": "namespaces \"ch2\" not found と出る",
+          "check": "kubectl get namespaces を打つ",
+          "fix": "無ければ kubectl create namespace ch2 で作る"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_apply/"
+    },
+    {
+      "id": "bad-field",
+      "text": "わざと、欄の名前を間違えて渡します。",
+      "why": "YAML のつまずきで多いのは、つづりと字下げです。断られた文から場所を読む練習です。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "sed 's/containers:/container:/' web.yaml | kubectl apply -n ch2 -f -"
+      },
+      "lines": [
+        {
+          "code": "sed 's/containers:/container:/' web.yaml | kubectl apply -n ch2 -f -",
+          "text": "containers を container に替えたものを作り (元のファイルは変えない)、そのまま渡す。-f - は、ファイルの代わりに左の出力を読む"
+        }
+      ],
+      "output": "Error from server (BadRequest): error when creating \"STDIN\": Pod in version \"v1\" cannot be handled as a Pod: strict decoding error: unknown field \"spec.container\"",
+      "read": "unknown field \"spec.container\" は「spec の中に container という欄は無い」です。どこの、何という名前かが書いてあります。",
+      "trouble": [
+        {
+          "symptom": "pod/web created と出る",
+          "check": "sed の行を見る",
+          "fix": "つづりが替わっていない。kubectl delete pod web -n ch2 で消し、行をコピーして打つ"
+        },
+        {
+          "symptom": "the path ... does not exist と出る",
+          "check": "pwd と ls を打つ",
+          "fix": "作業のフォルダにいない。cd で移ってから打つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_apply/"
+    },
+    {
+      "id": "apply",
+      "text": "Pod を作り、もう一度同じものを渡します。",
+      "why": "apply は「この状態にして」という頼み方です。もう同じなら、何も変えません。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl apply -f web.yaml -n ch2\nkubectl wait --for=condition=Ready pod/web -n ch2 --timeout=180s\nkubectl apply -f web.yaml -n ch2"
+      },
+      "lines": [
+        {
+          "code": "kubectl apply -f web.yaml -n ch2",
+          "text": "web.yaml のとおりの Pod を作る"
+        },
+        {
+          "code": "kubectl wait --for=condition=Ready pod/web -n ch2 --timeout=180s",
+          "text": "使えるようになるまで待つ"
+        },
+        {
+          "code": "kubectl apply -f web.yaml -n ch2",
+          "text": "同じファイルをもう一度渡す"
+        }
+      ],
+      "output": "pod/web created\npod/web condition met\npod/web unchanged",
+      "read": "1 度目は created、2 度目は unchanged です。何度打っても同じ結果になります。",
+      "trouble": [
+        {
+          "symptom": "toomanyrequests や 429 と出る",
+          "check": "kubectl describe の Events で、Failed to pull image の行の終わりを見る",
+          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る"
+        },
+        {
+          "symptom": "イメージが not found と出る",
+          "check": "Events で、イメージの名前と版 (: の後ろ) を見る",
+          "fix": "つづりが正しいなら、その版はもう配られていない。hub.docker.com でイメージのページを開き、同じ系統の新しい版に替える。この先の出力の版は、替えた版に読み替える"
+        },
+        {
+          "symptom": "timed out waiting for the condition と出る",
+          "check": "kubectl describe pod web -n ch2 の Events を見る",
+          "fix": "イメージを取っている途中なら、もう一度待つ。取れないなら、その文で探す"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/overview/working-with-objects/object-management/"
+    },
+    {
+      "id": "spec-status",
+      "text": "書いたことと、クラスターが書き足したことを見ます。",
+      "why": "1 つのものは、ほしい状態 (spec) と、今の状態 (status) の 2 つを持ちます。この 2 つを比べて動くのが Kubernetes です。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl get pod web -n ch2 -o wide\nkubectl get pod web -n ch2 -o yaml | grep -E '^(spec|status):|^  (uid|nodeName|restartPolicy|phase|podIP):'"
+      },
+      "lines": [
+        {
+          "code": "kubectl get pod web -n ch2 -o wide",
+          "text": "一覧を、詳しい列まで出す"
+        },
+        {
+          "code": "kubectl get pod web -n ch2 -o yaml | grep -E '^(spec|status):|^  (uid|nodeName|restartPolicy|phase|podIP):'",
+          "text": "Pod の全部を YAML で出し、目印の行だけを抜く"
+        }
+      ],
+      "output": "NAME   READY   STATUS    RESTARTS   AGE   IP          NODE   NOMINATED NODE   READINESS GATES\nweb    1/1     Running   0          9s    10.42.0.9   kcna   <none>           <none>\n  uid: e6dd23ae-6ace-40e2-ab15-d22d946ac8d6\nspec:\n  nodeName: kcna\n  restartPolicy: Always\nstatus:\n  phase: Running\n  podIP: 10.42.0.9",
+      "read": "restartPolicy と nodeName は、自分では書いていません。既定の値や、置き場所の決定が spec に書き足されました。status の phase と podIP は、今の様子です。uid は、作り直すと変わる、本当の見分けの番号です。",
+      "trouble": [
+        {
+          "symptom": "何も出ない",
+          "check": "kubectl get pods -n ch2 を打つ",
+          "fix": "web が無ければ、前の手順で作る"
+        },
+        {
+          "symptom": "permission denied や localhost:8080 と出る",
+          "check": "echo $KUBECONFIG を打つ",
+          "fix": "空なら export KUBECONFIG=~/.kube/k3s.yaml を打つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/overview/working-with-objects/"
+    },
+    {
+      "id": "describe",
+      "text": "describe で、今の様子と起きたことをまとめて見ます。",
+      "why": "動かないときは、一覧、describe、記録の順に見ると、原因にたどり着きやすいためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl describe pod web -n ch2 | grep -E '^(Name|Node|Labels|Status|IP):|State:|Ready:|Restart Count:|Limits:|Requests:|QoS'\nkubectl describe pod web -n ch2 | sed -n '/^Events/,$p'"
+      },
+      "lines": [
+        {
+          "code": "kubectl describe pod web -n ch2 | grep -E '^(Name|Node|Labels|Status|IP):|State:|Ready:|Restart Count:|Limits:|Requests:|QoS'",
+          "text": "詳しい説明から、目印の行だけを抜く"
+        },
+        {
+          "code": "kubectl describe pod web -n ch2 | sed -n '/^Events/,$p'",
+          "text": "起きたこと (Events) から後ろを出す"
+        }
+      ],
+      "output": "Name:             web\nNode:             kcna/10.0.2.15\nLabels:           app=web\nStatus:           Running\nIP:               10.42.0.9\n    State:          Running\n    Ready:          True\n    Restart Count:  0\nQoS Class:                   BestEffort\nEvents:\n  Type    Reason     Age   From               Message\n  ----    ------     ----  ----               -------\n  Normal  Scheduled  9s    default-scheduler  Successfully assigned ch2/web to kcna\n  Normal  Pulling    9s    kubelet            spec.containers{web}: Pulling image \"nginx:1.27-alpine\"\n  Normal  Pulled     2s    kubelet            spec.containers{web}: Successfully pulled image \"nginx:1.27-alpine\" in 6.879s (6.879s including waiting). Image size: 20984244 bytes.\n  Normal  Created    1s    kubelet            spec.containers{web}: Container created\n  Normal  Started    1s    kubelet            spec.containers{web}: Container started",
+      "read": "State が Running、Ready が True なら動いています。QoS Class の BestEffort は、使う量を何も決めていないという意味です。後の手順で決めます。",
+      "trouble": [
+        {
+          "symptom": "Events が <none> になる",
+          "check": "AGE を見る",
+          "fix": "時間がたつとイベントは消える。困ることはない"
+        },
+        {
+          "symptom": "pods \"web\" not found と出る",
+          "check": "kubectl get pods -n ch2 を打つ",
+          "fix": "無ければ作る"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_describe/"
+    },
+    {
+      "id": "logs-exec",
+      "text": "ページを取り、記録に残ることと、中の様子を見ます。",
+      "why": "記録は、コンテナが画面に書いたものです。exec は、動いているコンテナの中でコマンドを打ちます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "POD_IP=$(kubectl get pod web -n ch2 -o jsonpath='{.status.podIP}')\ncurl -s http://$POD_IP/no-such-page > /dev/null\nkubectl logs web -n ch2 --tail=1\nkubectl exec web -n ch2 -- ls /usr/share/nginx/html"
+      },
+      "lines": [
+        {
+          "code": "POD_IP=$(kubectl get pod web -n ch2 -o jsonpath='{.status.podIP}')",
+          "text": "web の住所を覚える"
+        },
+        {
+          "code": "curl -s http://$POD_IP/no-such-page > /dev/null",
+          "text": "無いページを取りに行く。返ってきた中身は捨てる"
+        },
+        {
+          "code": "kubectl logs web -n ch2 --tail=1",
+          "text": "記録の最後の 1 行を出す"
+        },
+        {
+          "code": "kubectl exec web -n ch2 -- ls /usr/share/nginx/html",
+          "text": "コンテナの中の、ページの置き場所を見る"
+        }
+      ],
+      "output": "10.42.0.1 - - [25/Nov/2026:06:21:04 +0000] \"GET /no-such-page HTTP/1.1\" 404 153 \"-\" \"curl/8.5.0\" \"-\"\n50x.html\nindex.html",
+      "read": "記録の 404 は「そのページは無い」です。クラスターの人 (10.42. で始まる住所) が GET したことも読めます。ls には 50x.html と index.html が出ます。",
+      "trouble": [
+        {
+          "symptom": "記録に 404 の行が無い",
+          "check": "echo $POD_IP を打つ",
+          "fix": "空なら 1 行目から打ち直す"
+        },
+        {
+          "symptom": "container not found と出る",
+          "check": "kubectl get pods -n ch2 で STATUS を見る",
+          "fix": "Running になってから打つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_logs/"
+    },
+    {
+      "id": "cp",
+      "text": "ファイルを、仮想マシンからコンテナへ写します。",
+      "why": "中のファイルを一時的に替えて、試すためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "echo '<h1>hello from cp</h1>' > index.html\nkubectl cp index.html ch2/web:/usr/share/nginx/html/index.html\ncurl -s http://$POD_IP"
+      },
+      "lines": [
+        {
+          "code": "echo '<h1>hello from cp</h1>' > index.html",
+          "text": "写すページを書く"
+        },
+        {
+          "code": "kubectl cp index.html ch2/web:/usr/share/nginx/html/index.html",
+          "text": "ch2 の web の中へ写す。書き方は、名前空間/Pod:場所"
+        },
+        {
+          "code": "curl -s http://$POD_IP",
+          "text": "ページを取る"
+        }
+      ],
+      "output": "<h1>hello from cp</h1>",
+      "read": "hello from cp が返ります。写したものは、そのコンテナの中だけにあり、コンテナを作り直すと消えます。長く使う中身は、あとでイメージに入れます。",
+      "trouble": [
+        {
+          "symptom": "tar が無いと出る",
+          "check": "kubectl exec web -n ch2 -- tar --help を打つ",
+          "fix": "cp は、中の tar を使う。tar の無いイメージでは使えない"
+        },
+        {
+          "symptom": "古いページが返る",
+          "check": "cp の行にエラーが出ていないかを見る",
+          "fix": "cp の行を打ち直す"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_cp/"
+    },
+    {
+      "id": "port-forward",
+      "text": "port-forward で、手元の番号から Pod の番号へつなぎます。",
+      "why": "Pod の住所は、クラスターの中だけで通じます。port-forward は、API サーバーを通って Pod へ届く、試すための通り道です。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl port-forward pod/web 8080:80 -n ch2 > pf.log 2>&1 &\nsleep 3\ncurl -s http://localhost:8080\ncat pf.log\nkill $!"
+      },
+      "lines": [
+        {
+          "code": "kubectl port-forward pod/web 8080:80 -n ch2 > pf.log 2>&1 &",
+          "text": "仮想マシンの 8080 番を、web の 80 番へつなぐ。& は、裏で動かし続ける印"
+        },
+        {
+          "code": "sleep 3",
+          "text": "つながるまで 3 秒待つ"
+        },
+        {
+          "code": "curl -s http://localhost:8080",
+          "text": "8080 番からページを取る"
+        },
+        {
+          "code": "cat pf.log",
+          "text": "port-forward の記録を出す"
+        },
+        {
+          "code": "kill $!",
+          "text": "裏で動かしたものを止める。$! は、最後に裏で動かしたものの番号"
+        }
+      ],
+      "output": "[1] 6472\n<h1>hello from cp</h1>\nForwarding from 127.0.0.1:8080 -> 80\nForwarding from [::1]:8080 -> 80\nHandling connection for 8080",
+      "read": "Forwarding が「つないだ」、Handling が「1 回通した」です。1 行目の [1] と数字は、裏で動かしたものの番号です。止めると、通り道も消えます。仮想マシンの localhost なので、ホストのブラウザからは見えません。",
+      "trouble": [
+        {
+          "symptom": "address already in use と出る",
+          "check": "cat pf.log と jobs を打つ",
+          "fix": "前の port-forward が残っている。kill %1 で止めてから打つ"
+        },
+        {
+          "symptom": "curl で何も出ない",
+          "check": "cat pf.log を打つ",
+          "fix": "Forwarding の行が出るまで待ち、もう一度 curl を打つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_port-forward/"
+    },
+    {
+      "id": "labels",
+      "text": "ラベルの違う Pod を足し、選び出します。",
+      "why": "Kubernetes の多くの部品は、名前ではなくラベルで Pod を選びます。3 章の Deployment も、後の章の Service もそうです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl run api --image=nginx:1.27-alpine --labels=app=api,tier=back -n ch2\nkubectl wait --for=condition=Ready pod/api -n ch2 --timeout=180s\nkubectl label pod web tier=front -n ch2\nkubectl get pods -n ch2 --show-labels\nkubectl get pods -n ch2 -l app=web\nkubectl get pods -n ch2 -l 'app in (web,api),tier!=front'"
+      },
+      "lines": [
+        {
+          "code": "kubectl run api --image=nginx:1.27-alpine --labels=app=api,tier=back -n ch2",
+          "text": "app=api と tier=back の 2 つの札を付けて、api という Pod を作る"
+        },
+        {
+          "code": "kubectl wait --for=condition=Ready pod/api -n ch2 --timeout=180s",
+          "text": "api が使えるようになるまで待つ"
+        },
+        {
+          "code": "kubectl label pod web tier=front -n ch2",
+          "text": "web に tier=front の札を足す"
+        },
+        {
+          "code": "kubectl get pods -n ch2 --show-labels",
+          "text": "ラベルの列も出す"
+        },
+        {
+          "code": "kubectl get pods -n ch2 -l app=web",
+          "text": "app が web の Pod だけを出す (-l は選び方)"
+        },
+        {
+          "code": "kubectl get pods -n ch2 -l 'app in (web,api),tier!=front'",
+          "text": "app が web か api で、tier が front でないものを出す"
+        }
+      ],
+      "output": "pod/api created\npod/api condition met\npod/web labeled\nNAME   READY   STATUS    RESTARTS   AGE   LABELS\napi    1/1     Running   0          3s    app=api,tier=back\nweb    1/1     Running   0          16s   app=web,tier=front\nNAME   READY   STATUS    RESTARTS   AGE\nweb    1/1     Running   0          16s\nNAME   READY   STATUS    RESTARTS   AGE\napi    1/1     Running   0          3s",
+      "read": "最後は api だけです。, は「どちらも満たす」、in は「どれか」、!= は「違う」です。",
+      "trouble": [
+        {
+          "symptom": "No resources found と出る",
+          "check": "--show-labels で、付いている札を見る",
+          "fix": "札のつづりと = を直す。-n ch2 も付ける"
+        },
+        {
+          "symptom": "toomanyrequests や 429 と出る",
+          "check": "kubectl describe の Events で、Failed to pull image の行の終わりを見る",
+          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/"
+    },
+    {
+      "id": "label-overwrite",
+      "text": "わざと、もう付いているラベルを書き替えます。",
+      "why": "うっかり替えないように、kubectl が止めることを見るためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl label pod web tier=back -n ch2\nkubectl label pod web tier=back -n ch2 --overwrite"
+      },
+      "lines": [
+        {
+          "code": "kubectl label pod web tier=back -n ch2",
+          "text": "tier を back に替えようとする"
+        },
+        {
+          "code": "kubectl label pod web tier=back -n ch2 --overwrite",
+          "text": "書き替えてよい、と伝えて替える"
+        }
+      ],
+      "output": "error: 'tier' already has a value (front), and --overwrite is false\npod/web labeled",
+      "read": "1 行目は already has a value で断られ、--overwrite を付けると替わります。",
+      "trouble": [
+        {
+          "symptom": "1 行目から替わる",
+          "check": "--overwrite を付けていないかを見る",
+          "fix": "替わっていれば、そのまま進む"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_label/"
+    },
+    {
+      "id": "write-pair",
+      "text": "2 つのコンテナの Pod を書きます。writer が時刻をページに書き、web が配ります。",
+      "why": "主役を助けるコンテナを、サイドカーと呼びます。initContainers に restartPolicy: Always と書くと、主役より先に始まり、最後まで一緒に動きます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cat > pair.yaml <<'EOF'\napiVersion: v1\nkind: Pod\nmetadata:\n  name: pair\nspec:\n  volumes:\n  - name: work\n    emptyDir: {}\n  initContainers:\n  - name: writer\n    image: busybox:1.37\n    restartPolicy: Always\n    command: ['sh', '-c', 'while true; do date > /work/index.html; echo wrote; sleep 5; done']\n    volumeMounts:\n    - name: work\n      mountPath: /work\n  containers:\n  - name: web\n    image: nginx:1.27-alpine\n    volumeMounts:\n    - name: work\n      mountPath: /usr/share/nginx/html\nEOF\nkubectl apply -f pair.yaml -n ch2\nkubectl wait --for=condition=Ready pod/pair -n ch2 --timeout=180s\nkubectl get pod pair -n ch2"
+      },
+      "lines": [
+        {
+          "code": "cat > pair.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま pair.yaml というファイルに書く"
+        },
+        {
+          "code": "apiVersion: v1",
+          "text": "使う API の版"
+        },
+        {
+          "code": "kind: Pod",
+          "text": "作るものの種類"
+        },
+        {
+          "code": "metadata:",
+          "text": "見分けるための情報"
+        },
+        {
+          "code": "  name: pair",
+          "text": "Pod の名前"
+        },
+        {
+          "code": "spec:",
+          "text": "ほしい中身"
+        },
+        {
+          "code": "  volumes:",
+          "text": "Pod が持つ、ファイルの置き場所 (ボリューム) の一覧"
+        },
+        {
+          "code": "  - name: work",
+          "text": "置き場所の名前"
+        },
+        {
+          "code": "    emptyDir: {}",
+          "text": "空のフォルダから始める。Pod が消えると、一緒に消える"
+        },
+        {
+          "code": "  initContainers:",
+          "text": "先に始めるコンテナの一覧"
+        },
+        {
+          "code": "  - name: writer",
+          "text": "助けるコンテナの名前"
+        },
+        {
+          "code": "    image: busybox:1.37",
+          "text": "小さな道具の入ったイメージ"
+        },
+        {
+          "code": "    restartPolicy: Always",
+          "text": "最後まで動き続けるサイドカーにする"
+        },
+        {
+          "code": "    command: ['sh', '-c', 'while true; do date > /work/index.html; echo wrote; sleep 5; done']",
+          "text": "始めるコマンド。5 秒おきに時刻をファイルに書き、記録に wrote と出す"
+        },
+        {
+          "code": "    volumeMounts:",
+          "text": "置き場所を、コンテナの中のどこに見せるか"
+        },
+        {
+          "code": "    - name: work",
+          "text": "見せる置き場所の名前"
+        },
+        {
+          "code": "      mountPath: /work",
+          "text": "writer には /work として見せる"
+        },
+        {
+          "code": "  containers:",
+          "text": "主役のコンテナの一覧"
+        },
+        {
+          "code": "  - name: web",
+          "text": "主役の名前"
+        },
+        {
+          "code": "    image: nginx:1.27-alpine",
+          "text": "使うイメージ"
+        },
+        {
+          "code": "    volumeMounts:",
+          "text": "置き場所を見せる"
+        },
+        {
+          "code": "    - name: work",
+          "text": "同じ置き場所"
+        },
+        {
+          "code": "      mountPath: /usr/share/nginx/html",
+          "text": "web には、ページの置き場所として見せる"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "kubectl apply -f pair.yaml -n ch2",
+          "text": "Pod を作る"
+        },
+        {
+          "code": "kubectl wait --for=condition=Ready pod/pair -n ch2 --timeout=180s",
+          "text": "使えるようになるまで待つ"
+        },
+        {
+          "code": "kubectl get pod pair -n ch2",
+          "text": "一覧を出す"
+        }
+      ],
+      "output": "pod/pair created\npod/pair condition met\nNAME   READY   STATUS    RESTARTS   AGE\npair   2/2     Running   0          6s",
+      "read": "READY の 2/2 は、2 つのコンテナが使えるという意味です。サイドカーも数に入ります。",
+      "trouble": [
+        {
+          "symptom": "toomanyrequests や 429 と出る",
+          "check": "kubectl describe の Events で、Failed to pull image の行の終わりを見る",
+          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る"
+        },
+        {
+          "symptom": "イメージが not found と出る",
+          "check": "Events で、イメージの名前と版 (: の後ろ) を見る",
+          "fix": "つづりが正しいなら、その版はもう配られていない。hub.docker.com でイメージのページを開き、同じ系統の新しい版に替える。この先の出力の版は、替えた版に読み替える"
+        },
+        {
+          "symptom": "1/2 や Init の付いた STATUS が続く",
+          "check": "kubectl describe pod pair -n ch2 の Events を見る",
+          "fix": "イメージを取っている途中なら待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/workloads/pods/sidecar-containers/"
+    },
+    {
+      "id": "shared",
+      "text": "2 つのコンテナが、何を共有しているかを見ます。",
+      "why": "同じ Pod のコンテナは、住所 (ネットワーク) と、見せ合ったボリュームを共有します。ファイルとプロセスの見え方は別です。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl exec pair -n ch2 -c writer -- wget -qO- http://localhost\nkubectl exec pair -n ch2 -c web -- cat /usr/share/nginx/html/index.html\nkubectl logs pair -n ch2 -c writer --tail=2\nkubectl exec pair -n ch2 -c writer -- ps"
+      },
+      "lines": [
+        {
+          "code": "kubectl exec pair -n ch2 -c writer -- wget -qO- http://localhost",
+          "text": "writer の中から、localhost の Web ページを取る。-c はコンテナを選ぶ"
+        },
+        {
+          "code": "kubectl exec pair -n ch2 -c web -- cat /usr/share/nginx/html/index.html",
+          "text": "web の中から、共有したファイルを読む"
+        },
+        {
+          "code": "kubectl logs pair -n ch2 -c writer --tail=2",
+          "text": "writer の記録を出す"
+        },
+        {
+          "code": "kubectl exec pair -n ch2 -c writer -- ps",
+          "text": "writer から見えるプロセスを出す"
+        }
+      ],
+      "output": "Wed Nov 25 06:21:18 UTC 2026\nWed Nov 25 06:21:18 UTC 2026\nwrote\nPID   USER     TIME  COMMAND\n    1 root      0:00 sh -c while true; do date > /work/index.html; echo wrote; sleep 5; done\n    8 root      0:00 sleep 5\n   15 root      0:00 ps",
+      "read": "writer に Web サーバーは入っていませんが、localhost で web に届きます。住所が同じだからです。時刻は writer が書いたものです。ps に nginx は出ません。プロセスの見え方は別だからです。",
+      "trouble": [
+        {
+          "symptom": "Defaulted container という行が出る",
+          "check": "-c を付けたかを見る",
+          "fix": "コンテナが 2 つあるときは、-c で選ぶ。付けないと、先頭のものが選ばれる"
+        },
+        {
+          "symptom": "wget: can't connect と出る",
+          "check": "kubectl get pod pair -n ch2 を打つ",
+          "fix": "2/2 になってから打つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/workloads/pods/sidecar-containers/"
+    },
+    {
+      "id": "why-docker",
+      "text": "ここから、自分のイメージを作ります。イメージは、コンテナの中身 (ファイルと始め方) をまとめたものです。作り方は Dockerfile というファイルに書きます。作る道具に Docker を使います。",
+      "why": "k3s は、コンテナを動かす道具 (containerd) を持ちますが、Dockerfile からイメージを作る道具は持ちません。そこで、作るときだけ Docker を足します。k3s は Docker を使わず、イメージの置き場所も別です。だから、作ったイメージを k3s へ渡す手順が要ります。Docker は「作る」、k3s は「動かす」と分けて見ます。",
+      "source": "https://docs.k3s.io/advanced"
+    },
+    {
+      "id": "docker-repo",
+      "text": "仮想マシンに、Docker の公式の配布元を足します。",
+      "why": "Ubuntu に最初から入っている一覧には、Docker の公式のものが無いためです。Docker の公式の手順のとおりです。配布元の鍵を置き、取ってくるものが本物かを apt (Ubuntu にプログラムを入れる道具) に確かめさせます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "sudo apt-get update -qq\nsudo apt-get install -y -qq ca-certificates curl > /dev/null 2>&1\nsudo install -m 0755 -d /etc/apt/keyrings\nsudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc\nsudo chmod a+r /etc/apt/keyrings/docker.asc\nsudo tee /etc/apt/sources.list.d/docker.sources <<EOF\nTypes: deb\nURIs: https://download.docker.com/linux/ubuntu\nSuites: $(. /etc/os-release && echo \"${UBUNTU_CODENAME:-$VERSION_CODENAME}\")\nComponents: stable\nArchitectures: $(dpkg --print-architecture)\nSigned-By: /etc/apt/keyrings/docker.asc\nEOF\nsudo apt-get update -qq"
+      },
+      "lines": [
+        {
+          "code": "sudo apt-get update -qq",
+          "text": "入れられるものの一覧を新しくする (-qq は表示を減らす)"
+        },
+        {
+          "code": "sudo apt-get install -y -qq ca-certificates curl > /dev/null 2>&1",
+          "text": "https の確認と取得に使うものを入れる。-y は確認に「はい」と答える"
+        },
+        {
+          "code": "sudo install -m 0755 -d /etc/apt/keyrings",
+          "text": "鍵を置くフォルダを作る"
+        },
+        {
+          "code": "sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc",
+          "text": "Docker の鍵を取ってくる"
+        },
+        {
+          "code": "sudo chmod a+r /etc/apt/keyrings/docker.asc",
+          "text": "誰でも読めるようにする"
+        },
+        {
+          "code": "sudo tee /etc/apt/sources.list.d/docker.sources <<EOF",
+          "text": "次の行から EOF までを、管理者として配布元のファイルに書く (tee は画面にも出す)"
+        },
+        {
+          "code": "Types: deb",
+          "text": "Ubuntu のプログラムの形"
+        },
+        {
+          "code": "URIs: https://download.docker.com/linux/ubuntu",
+          "text": "配布元の住所"
+        },
+        {
+          "code": "Suites: $(. /etc/os-release && echo \"${UBUNTU_CODENAME:-$VERSION_CODENAME}\")",
+          "text": "Ubuntu の版の名前。このマシンから読み取る"
+        },
+        {
+          "code": "Components: stable",
+          "text": "安定版を使う"
+        },
+        {
+          "code": "Architectures: $(dpkg --print-architecture)",
+          "text": "CPU の種類。このマシンから読み取る"
+        },
+        {
+          "code": "Signed-By: /etc/apt/keyrings/docker.asc",
+          "text": "確かめに使う鍵"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで"
+        },
+        {
+          "code": "sudo apt-get update -qq",
+          "text": "足した配布元も含めて、一覧を新しくする"
+        }
+      ],
+      "output": "Types: deb\nURIs: https://download.docker.com/linux/ubuntu\nSuites: noble\nComponents: stable\nArchitectures: amd64\nSigned-By: /etc/apt/keyrings/docker.asc",
+      "read": "Suites が noble (24.04 の名前) になれば、配布元を足せています。M 系の Mac では Architectures が arm64 になります。",
+      "trouble": [
+        {
+          "symptom": "NO_PUBKEY や is not signed と出る",
+          "check": "ls -l /etc/apt/keyrings/docker.asc を打つ",
+          "fix": "無いか 0 バイトなら、curl の行から打ち直す"
+        },
+        {
+          "symptom": "Could not get lock と出る",
+          "check": "ps -C unattended-upgr を打つ",
+          "fix": "Ubuntu が自動の更新をしている。数分待ってもう一度打つ"
+        }
+      ],
+      "source": "https://docs.docker.com/engine/install/ubuntu/"
+    },
+    {
+      "id": "docker-install",
+      "text": "Docker を入れます。1〜3 分かかります。仮想マシンの中だけで打ちます。",
+      "why": "公式の手順のまとまりを入れるためです。docker のコマンドは管理者の権限で動くので、この章では sudo を付けて打ちます。先に、Docker が中で使う住所の範囲を決めておきます。既定の 172.17 で始まる範囲は、ホストと仮想マシンの間の住所と重なることがあり、重なると仮想マシンに入れなくなるためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "sudo mkdir -p /etc/docker\nsudo tee /etc/docker/daemon.json > /dev/null <<'EOF'\n{\"bip\": \"10.201.0.1/24\"}\nEOF\nsudo apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin > ~/docker-install.log 2>&1\nsudo docker --version\nsystemctl is-active docker\nps -C containerd -o pid,args"
+      },
+      "lines": [
+        {
+          "code": "sudo mkdir -p /etc/docker",
+          "text": "Docker の設定を置くフォルダを作る"
+        },
+        {
+          "code": "sudo tee /etc/docker/daemon.json > /dev/null <<'EOF'",
+          "text": "次の行から EOF までを、Docker の設定のファイルに書く"
+        },
+        {
+          "code": "{\"bip\": \"10.201.0.1/24\"}",
+          "text": "Docker が中で使う住所の範囲を、10.201.0 で始まるものにする"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで"
+        },
+        {
+          "code": "sudo apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin > ~/docker-install.log 2>&1",
+          "text": "Docker の本体・コマンド・動かす部品・作る部品を入れる。長い表示はファイルに書く"
+        },
+        {
+          "code": "sudo docker --version",
+          "text": "版を出す"
+        },
+        {
+          "code": "systemctl is-active docker",
+          "text": "Docker のサービスが動いているかを出す"
+        },
+        {
+          "code": "ps -C containerd -o pid,args",
+          "text": "containerd のプロセスを出す"
+        }
+      ],
+      "output": "Docker version 29.10.1, build c48360f\nactive\n    PID COMMAND\n   3629 containerd\n  12245 /usr/bin/containerd",
+      "read": "版と active が出れば入っています。版は、打った日の最新なので違ってかまいません。containerd が 2 つになりました。1 つは k3s のもの、もう 1 つ (/usr/bin/containerd) は Docker と一緒に入ったものです。別々に動いています。",
+      "trouble": [
+        {
+          "symptom": "入れたあと、ホストから仮想マシンに入れなくなった",
+          "check": "ホストで multipass list を打ち、kcna の State と IPv4 を見る",
+          "fix": "住所が重なったおそれがある。multipass stop kcna で止め、multipass restore kcna.k3s-v136 で 1 章の終わりへ戻し、設定のファイルを書く行からやり直す (この章で書いたファイルも戻るので、最初から)"
+        },
+        {
+          "symptom": "Unable to locate package docker-ce と出る",
+          "check": "cat ~/docker-install.log と、前の手順の Suites を見る",
+          "fix": "配布元を足す手順からやり直す。将来、この配布元から取れなくなったら、出典のページで今の手順を見る"
+        },
+        {
+          "symptom": "Cannot connect to the Docker daemon と出る",
+          "check": "systemctl is-active docker を打つ",
+          "fix": "sudo systemctl start docker を打つ"
+        }
+      ],
+      "source": "https://docs.docker.com/engine/install/ubuntu/"
+    },
+    {
+      "id": "dockerfile",
+      "text": "配るページと、Dockerfile を書きます。",
+      "why": "Dockerfile は、元にするイメージと、足すものを順に書いた手順書です。1 行ごとに、層 (レイヤー) として積み重なります。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "mkdir -p ~/ch2/hello\ncd ~/ch2/hello\necho '<h1>hello from my image</h1>' > index.html\ncat > Dockerfile <<'EOF'\nFROM nginx:1.27-alpine\nCOPY index.html /usr/share/nginx/html/index.html\nEOF\nls"
+      },
+      "lines": [
+        {
+          "code": "mkdir -p ~/ch2/hello",
+          "text": "hello というフォルダを作る"
+        },
+        {
+          "code": "cd ~/ch2/hello",
+          "text": "hello へ移る"
+        },
+        {
+          "code": "echo '<h1>hello from my image</h1>' > index.html",
+          "text": "配るページを書く"
+        },
+        {
+          "code": "cat > Dockerfile <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま Dockerfile というファイルに書く"
+        },
+        {
+          "code": "FROM nginx:1.27-alpine",
+          "text": "元にするイメージ"
+        },
+        {
+          "code": "COPY index.html /usr/share/nginx/html/index.html",
+          "text": "手元の index.html を、イメージの中へ写す"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "ls",
+          "text": "フォルダの中身を出す"
+        }
+      ],
+      "output": "Dockerfile\nindex.html",
+      "read": "Dockerfile と index.html の 2 つが出ます。Dockerfile の頭は大文字で、後ろに .txt などは付けません。",
+      "trouble": [
+        {
+          "symptom": "ファイルの名前が違う",
+          "check": "ls を打つ",
+          "fix": "名前を Dockerfile にして書き直す"
+        }
+      ],
+      "source": "https://docs.docker.com/reference/dockerfile/"
+    },
+    {
+      "id": "build",
+      "text": "イメージを作ります。",
+      "why": "作ったものには、名前と版 (hello:0.1) を付けます。後で、どれを動かすかを言い分けるためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "sudo docker build -q -t hello:0.1 .\nsudo docker image inspect hello:0.1 --format \"{{.Os}}/{{.Architecture}} {{len .RootFS.Layers}} layers\"\nsudo docker run --rm hello:0.1 cat /usr/share/nginx/html/index.html"
+      },
+      "lines": [
+        {
+          "code": "sudo docker build -q -t hello:0.1 .",
+          "text": "今のフォルダ (.) を渡して作る。-t は名前と版、-q は結果だけを出す"
+        },
+        {
+          "code": "sudo docker image inspect hello:0.1 --format \"{{.Os}}/{{.Architecture}} {{len .RootFS.Layers}} layers\"",
+          "text": "作ったイメージの OS・CPU の種類・層の数を出す"
+        },
+        {
+          "code": "sudo docker run --rm hello:0.1 cat /usr/share/nginx/html/index.html",
+          "text": "Docker で 1 回だけ動かし、ページを読む。--rm は終わったら消す"
+        }
+      ],
+      "output": "sha256:6f97e7f1cef90debeda9b18170e36fea81552dd3487977c40bbcc840c6f05ebf\nlinux/amd64 9 layers\n<h1>hello from my image</h1>",
+      "read": "1 行目の sha256 で始まる値は、イメージの番号です。docker run で、自分のページが読めました。M 系の Mac では linux/arm64 になります。",
+      "trouble": [
+        {
+          "symptom": "toomanyrequests や 429 と出る",
+          "check": "kubectl describe の Events で、Failed to pull image の行の終わりを見る",
+          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る"
+        },
+        {
+          "symptom": "イメージが not found と出る",
+          "check": "Events で、イメージの名前と版 (: の後ろ) を見る",
+          "fix": "つづりが正しいなら、その版はもう配られていない。hub.docker.com でイメージのページを開き、同じ系統の新しい版に替える。この先の出力の版は、替えた版に読み替える"
+        },
+        {
+          "symptom": "failed to read dockerfile と出る",
+          "check": "pwd と ls を打つ",
+          "fix": "cd ~/ch2/hello で移り、Dockerfile があるかを見る"
+        },
+        {
+          "symptom": "permission denied ... docker.sock と出る",
+          "check": "sudo を付けたかを見る",
+          "fix": "sudo を付けて打つ"
+        }
+      ],
+      "source": "https://docs.docker.com/reference/cli/docker/buildx/build/"
+    },
+    {
+      "id": "never-pull",
+      "text": "わざと、k3s に渡す前に動かします。",
+      "why": "Docker と k3s の置き場所が別であることを、失敗で確かめるためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cd ~/ch2\ncat > hello.yaml <<'EOF'\napiVersion: v1\nkind: Pod\nmetadata:\n  name: hello\nspec:\n  nodeName: kcna\n  containers:\n  - name: hello\n    image: hello:0.1\n    imagePullPolicy: Never\nEOF\nkubectl apply -f hello.yaml -n ch2\nkubectl wait --for=jsonpath='{.status.containerStatuses[0].state.waiting.reason}'=ErrImageNeverPull pod/hello -n ch2 --timeout=60s\nsudo docker images -q hello\nsudo crictl images | grep -c hello"
+      },
+      "lines": [
+        {
+          "code": "cd ~/ch2",
+          "text": "ch2 へ戻る"
+        },
+        {
+          "code": "cat > hello.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま hello.yaml というファイルに書く"
+        },
+        {
+          "code": "apiVersion: v1",
+          "text": "使う API の版"
+        },
+        {
+          "code": "kind: Pod",
+          "text": "作るものの種類"
+        },
+        {
+          "code": "metadata:",
+          "text": "見分けるための情報"
+        },
+        {
+          "code": "  name: hello",
+          "text": "Pod の名前"
+        },
+        {
+          "code": "spec:",
+          "text": "ほしい中身"
+        },
+        {
+          "code": "  nodeName: kcna",
+          "text": "置くノードを、イメージを渡す kcna に決める"
+        },
+        {
+          "code": "  containers:",
+          "text": "コンテナの一覧"
+        },
+        {
+          "code": "  - name: hello",
+          "text": "コンテナの名前"
+        },
+        {
+          "code": "    image: hello:0.1",
+          "text": "自分で作ったイメージ"
+        },
+        {
+          "code": "    imagePullPolicy: Never",
+          "text": "外 (レジストリ) へ取りに行かず、ノードにあるものだけを使う"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "kubectl apply -f hello.yaml -n ch2",
+          "text": "Pod を作る"
+        },
+        {
+          "code": "kubectl wait --for=jsonpath='{.status.containerStatuses[0].state.waiting.reason}'=ErrImageNeverPull pod/hello -n ch2 --timeout=60s",
+          "text": "待つ理由が ErrImageNeverPull になるまで待つ"
+        },
+        {
+          "code": "sudo docker images -q hello",
+          "text": "Docker の置き場所にある hello の番号を出す"
+        },
+        {
+          "code": "sudo crictl images | grep -c hello",
+          "text": "k3s の置き場所にある hello を数える"
+        }
+      ],
+      "output": "pod/hello created\npod/hello condition met\n6f97e7f1cef9\n0",
+      "read": "Docker には番号が出て、k3s では 0 です。ErrImageNeverPull は「取りに行くなと言われ、ノードにも無い」です。イメージを置いて共有する場所を、レジストリと呼びます。",
+      "trouble": [
+        {
+          "symptom": "timed out waiting for the condition と出る",
+          "check": "kubectl get pod hello -n ch2 を打つ",
+          "fix": "STATUS が ErrImageNeverPull なら、そのまま進む"
+        },
+        {
+          "symptom": "ErrImagePull になる",
+          "check": "imagePullPolicy の行を見る",
+          "fix": "Never が無いと、外へ取りに行く。hello.yaml を書き直し、kubectl delete pod hello -n ch2 のあとで apply する"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/containers/images/"
+    },
+    {
+      "id": "import",
+      "text": "イメージを 1 つのファイルにし、k3s の containerd に取り込みます。",
+      "why": "レジストリを通さずに、同じノードの k3s へ渡すためです。取り込んだイメージは、そのノードだけにあります。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "sudo docker save hello:0.1 -o hello.tar\nsudo k3s ctr images import hello.tar\nsudo crictl images | grep -E 'IMAGE|hello'\nkubectl wait --for=condition=Ready pod/hello -n ch2 --timeout=180s\nkubectl get pod hello -n ch2 -o wide\nHELLO_IP=$(kubectl get pod hello -n ch2 -o jsonpath='{.status.podIP}')\ncurl -s http://$HELLO_IP"
+      },
+      "lines": [
+        {
+          "code": "sudo docker save hello:0.1 -o hello.tar",
+          "text": "イメージを hello.tar というファイルに書き出す"
+        },
+        {
+          "code": "sudo k3s ctr images import hello.tar",
+          "text": "hello.tar を、k3s の containerd に取り込む"
+        },
+        {
+          "code": "sudo crictl images | grep -E 'IMAGE|hello'",
+          "text": "k3s の置き場所の、見出しと hello の行を出す"
+        },
+        {
+          "code": "kubectl wait --for=condition=Ready pod/hello -n ch2 --timeout=180s",
+          "text": "hello が使えるようになるまで待つ"
+        },
+        {
+          "code": "kubectl get pod hello -n ch2 -o wide",
+          "text": "一覧を出す"
+        },
+        {
+          "code": "HELLO_IP=$(kubectl get pod hello -n ch2 -o jsonpath='{.status.podIP}')",
+          "text": "hello の住所を覚える"
+        },
+        {
+          "code": "curl -s http://$HELLO_IP",
+          "text": "ページを取る"
+        }
+      ],
+      "output": "docker.io/library/hello:0.1             \tsaved\napplication/vnd.oci.image.index.v1+json sha256:6f97e7f1cef90debeda9b18170e36fea81552dd3487977c40bbcc840c6f05ebf\nImporting\telapsed: 3.4 s\ttotal:   0.0 B\t(0.0 B/s)\nIMAGE                                        TAG                     IMAGE ID            SIZE\ndocker.io/library/hello                      0.1                     7906a21922148       21MB\npod/hello condition met\nNAME    READY   STATUS    RESTARTS   AGE   IP           NODE   NOMINATED NODE   READINESS GATES\nhello   1/1     Running   0          14s   10.42.0.12   kcna   <none>           <none>\n<h1>hello from my image</h1>",
+      "read": "docker.io/library/hello と 0.1 が出れば取り込めています。作り直さなくても、k3s が少しおきに確かめ直し、Pod が動き出しました。NODE が kcna なので、取り込んだこのノードで動いています。",
+      "trouble": [
+        {
+          "symptom": "No such image と出る",
+          "check": "sudo docker images を打つ",
+          "fix": "作る手順をもう一度行う"
+        },
+        {
+          "symptom": "hello がいつまでも動かない",
+          "check": "kubectl describe pod hello -n ch2 の Events を見る",
+          "fix": "kubectl delete pod hello -n ch2 で消し、kubectl apply -f hello.yaml -n ch2 で作り直す"
+        }
+      ],
+      "source": "https://docs.k3s.io/cli"
+    },
+    {
+      "id": "docker-off",
+      "text": "Docker を止め、次の起動でも始まらないようにします。",
+      "why": "作り終えたので、k3s が使うメモリを空けるためです。止めても hello は動き続けます。k3s が動かしているからです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "sudo systemctl disable --now docker.socket docker.service containerd.service\nrm ~/docker-install.log\nps -C containerd -o pid,args\ncurl -s http://$HELLO_IP"
+      },
+      "lines": [
+        {
+          "code": "sudo systemctl disable --now docker.socket docker.service containerd.service",
+          "text": "Docker と、一緒に入った containerd を止め、自動で始まらないようにする。k3s の containerd は別なので止まらない"
+        },
+        {
+          "code": "rm ~/docker-install.log",
+          "text": "入れたときの記録を消す"
+        },
+        {
+          "code": "ps -C containerd -o pid,args",
+          "text": "containerd のプロセスを出す"
+        },
+        {
+          "code": "curl -s http://$HELLO_IP",
+          "text": "hello からページを取る"
+        }
+      ],
+      "output": "Synchronizing state of docker.service with SysV service script with /usr/lib/systemd/systemd-sysv-install.\nExecuting: /usr/lib/systemd/systemd-sysv-install disable docker\nRemoved \"/etc/systemd/system/sockets.target.wants/docker.socket\".\nRemoved \"/etc/systemd/system/multi-user.target.wants/containerd.service\".\nRemoved \"/etc/systemd/system/multi-user.target.wants/docker.service\".\nDisabling 'docker.service', but its triggering units are still active:\ndocker.socket\n    PID COMMAND\n   3629 containerd\n<h1>hello from my image</h1>",
+      "read": "Removed の行は、自動で始める印を消したという意味です。Disabling の 2 行は、止める順のうえでの知らせで、問題ありません。k3s の containerd だけが残り、ページも返ります。また作るときは sudo systemctl start docker を打ちます。",
+      "trouble": [
+        {
+          "symptom": "ps が見出しだけになる",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "k3s を止めてしまった。sudo systemctl start k3s で始める"
+        }
+      ],
+      "source": "https://docs.docker.com/engine/install/linux-postinstall/"
+    },
+    {
+      "id": "node-room",
+      "text": "ノードの空きと、予約された量を見ます。",
+      "why": "Pod には「最低これだけ要る」(requests) と「ここまで」(limits) を書けます。ノードに置けるかは、今の使用量ではなく、requests の合計で決まります。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl get node kcna -o jsonpath='{.status.allocatable.cpu} {.status.allocatable.memory}{\"\\n\"}'\nkubectl describe node kcna | sed -n '/^Allocated/,/^Events/p'\nkubectl top node"
+      },
+      "lines": [
+        {
+          "code": "kubectl get node kcna -o jsonpath='{.status.allocatable.cpu} {.status.allocatable.memory}{\"\\n\"}'",
+          "text": "置いてよい CPU とメモリの量を出す"
+        },
+        {
+          "code": "kubectl describe node kcna | sed -n '/^Allocated/,/^Events/p'",
+          "text": "予約された合計を出す"
+        },
+        {
+          "code": "kubectl top node",
+          "text": "今、実際に使っている量を出す"
+        }
+      ],
+      "output": "2 2014840Ki\nAllocated resources:\n  (Total limits may be over 100 percent, i.e., overcommitted.)\n  Resource           Requests    Limits\n  --------           --------    ------\n  cpu                200m (10%)  0 (0%)\n  memory             140Mi (7%)  170Mi (8%)\n  ephemeral-storage  0 (0%)      0 (0%)\n  hugepages-2Mi      0 (0%)      0 (0%)\nEvents:\nNAME   CPU(cores)   CPU(%)   MEMORY(bytes)   MEMORY(%)\nkcna   778m         38%      1195Mi          60%",
+      "read": "CPU の 200m は、0.2 コアです (1000m が 1 コア)。Requests の % が、予約した割合です。top の使用量とは別の数です。Limits は合計が 100% を超えてもよく、超えた分を約束しているわけではありません。",
+      "trouble": [
+        {
+          "symptom": "metrics not available yet と出る",
+          "check": "kubectl get pods -n kube-system を打つ",
+          "fix": "metrics-server が動いてから 1 分ほどで数が出る"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/"
+    },
+    {
+      "id": "pending",
+      "text": "わざと、2 コアのノードに 4 コアを頼みます。",
+      "why": "置ける場所が無いとき、Pod がどうなるかを見るためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cat > big.yaml <<'EOF'\napiVersion: v1\nkind: Pod\nmetadata:\n  name: big\nspec:\n  containers:\n  - name: big\n    image: nginx:1.27-alpine\n    resources:\n      requests:\n        cpu: \"4\"\nEOF\nkubectl apply -f big.yaml -n ch2\nkubectl wait --for=jsonpath='{.status.conditions[0].reason}'=Unschedulable pod/big -n ch2 --timeout=60s\nkubectl get pod big -n ch2\nkubectl get events -n ch2 --field-selector involvedObject.name=big -o custom-columns=REASON:.reason,MESSAGE:.message\nkubectl delete pod big -n ch2"
+      },
+      "lines": [
+        {
+          "code": "cat > big.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま big.yaml というファイルに書く"
+        },
+        {
+          "code": "apiVersion: v1",
+          "text": "使う API の版"
+        },
+        {
+          "code": "kind: Pod",
+          "text": "作るものの種類"
+        },
+        {
+          "code": "metadata:",
+          "text": "見分けるための情報"
+        },
+        {
+          "code": "  name: big",
+          "text": "Pod の名前"
+        },
+        {
+          "code": "spec:",
+          "text": "ほしい中身"
+        },
+        {
+          "code": "  containers:",
+          "text": "コンテナの一覧"
+        },
+        {
+          "code": "  - name: big",
+          "text": "コンテナの名前"
+        },
+        {
+          "code": "    image: nginx:1.27-alpine",
+          "text": "使うイメージ"
+        },
+        {
+          "code": "    resources:",
+          "text": "使う量の決まり"
+        },
+        {
+          "code": "      requests:",
+          "text": "最低これだけ要る、という予約"
+        },
+        {
+          "code": "        cpu: \"4\"",
+          "text": "4 コア"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "kubectl apply -f big.yaml -n ch2",
+          "text": "Pod を作る"
+        },
+        {
+          "code": "kubectl wait --for=jsonpath='{.status.conditions[0].reason}'=Unschedulable pod/big -n ch2 --timeout=60s",
+          "text": "「置けない」と決まるまで待つ"
+        },
+        {
+          "code": "kubectl get pod big -n ch2",
+          "text": "一覧を出す"
+        },
+        {
+          "code": "kubectl get events -n ch2 --field-selector involvedObject.name=big -o custom-columns=REASON:.reason,MESSAGE:.message",
+          "text": "big のイベントの理由と文を出す"
+        },
+        {
+          "code": "kubectl delete pod big -n ch2",
+          "text": "big を消す"
+        }
+      ],
+      "output": "pod/big created\npod/big condition met\nNAME   READY   STATUS    RESTARTS   AGE\nbig    0/1     Pending   0          0s\nREASON             MESSAGE\nFailedScheduling   0/1 nodes are available: 1 Insufficient cpu. no new claims to deallocate, preemption: 0/1 nodes are available: 1 Preemption is not helpful for scheduling.\npod \"big\" deleted from ch2 namespace",
+      "read": "STATUS は Pending (置き場所待ち) です。Insufficient cpu は「CPU の空きが足りない」です。0/1 は、1 台のうち置けるのが 0 台という意味です。Pod は、空くまで待ち続けます。直すには、頼む量を減らすか、ノードを増やします。",
+      "trouble": [
+        {
+          "symptom": "Running になる",
+          "check": "nproc と big.yaml の cpu を見る",
+          "fix": "ノードのコアが 4 より多い。cpu を \"64\" に替えて試す"
+        },
+        {
+          "symptom": "timed out waiting for the condition と出る",
+          "check": "kubectl describe pod big -n ch2 の Events を見る",
+          "fix": "FailedScheduling があれば、そのまま進む"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/scheduling-eviction/kube-scheduler/"
+    },
+    {
+      "id": "oom",
+      "text": "わざと、メモリの上限を超えさせます。",
+      "why": "メモリは、上限を超えると絞れません。カーネルがコンテナを止めます。これを OOMKilled (メモリ不足で止められた) と呼びます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cat > oom.yaml <<'EOF'\napiVersion: v1\nkind: Pod\nmetadata:\n  name: oom\nspec:\n  restartPolicy: Never\n  containers:\n  - name: oom\n    image: busybox:1.37\n    command: ['sh', '-c', 'tail /dev/zero']\n    resources:\n      limits:\n        memory: 32Mi\nEOF\nkubectl apply -f oom.yaml -n ch2\nkubectl wait --for=jsonpath='{.status.phase}'=Failed pod/oom -n ch2 --timeout=120s\nkubectl get pod oom -n ch2\nkubectl get pod oom -n ch2 -o jsonpath='{.status.containerStatuses[0].state.terminated.reason} {.status.containerStatuses[0].state.terminated.exitCode}{\"\\n\"}'\nkubectl get pod oom -n ch2 -o jsonpath='{.spec.containers[0].resources}{\"\\n\"}'"
+      },
+      "lines": [
+        {
+          "code": "cat > oom.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま oom.yaml というファイルに書く"
+        },
+        {
+          "code": "apiVersion: v1",
+          "text": "使う API の版"
+        },
+        {
+          "code": "kind: Pod",
+          "text": "作るものの種類"
+        },
+        {
+          "code": "metadata:",
+          "text": "見分けるための情報"
+        },
+        {
+          "code": "  name: oom",
+          "text": "Pod の名前"
+        },
+        {
+          "code": "spec:",
+          "text": "ほしい中身"
+        },
+        {
+          "code": "  restartPolicy: Never",
+          "text": "止まっても始め直さない。1 回で見るため"
+        },
+        {
+          "code": "  containers:",
+          "text": "コンテナの一覧"
+        },
+        {
+          "code": "  - name: oom",
+          "text": "コンテナの名前"
+        },
+        {
+          "code": "    image: busybox:1.37",
+          "text": "小さな道具の入ったイメージ"
+        },
+        {
+          "code": "    command: ['sh', '-c', 'tail /dev/zero']",
+          "text": "終わりの無いデータを覚え続け、メモリを使い切ろうとする"
+        },
+        {
+          "code": "    resources:",
+          "text": "使う量の決まり"
+        },
+        {
+          "code": "      limits:",
+          "text": "ここまで、という上限"
+        },
+        {
+          "code": "        memory: 32Mi",
+          "text": "メモリは 32Mi まで"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "kubectl apply -f oom.yaml -n ch2",
+          "text": "Pod を作る"
+        },
+        {
+          "code": "kubectl wait --for=jsonpath='{.status.phase}'=Failed pod/oom -n ch2 --timeout=120s",
+          "text": "終わる (Failed) まで待つ"
+        },
+        {
+          "code": "kubectl get pod oom -n ch2",
+          "text": "一覧を出す"
+        },
+        {
+          "code": "kubectl get pod oom -n ch2 -o jsonpath='{.status.containerStatuses[0].state.terminated.reason} {.status.containerStatuses[0].state.terminated.exitCode}{\"\\n\"}'",
+          "text": "止まった理由と、終わりの番号を出す"
+        },
+        {
+          "code": "kubectl get pod oom -n ch2 -o jsonpath='{.spec.containers[0].resources}{\"\\n\"}'",
+          "text": "決まった量を出す"
+        }
+      ],
+      "output": "pod/oom created\npod/oom condition met\nNAME   READY   STATUS      RESTARTS   AGE\noom    0/1     OOMKilled   0          3s\nOOMKilled 137\n{\"limits\":{\"memory\":\"32Mi\"},\"requests\":{\"memory\":\"32Mi\"}}",
+      "read": "137 は 128 + 9 で、9 番の合図 (強制終了) で止められたという番号です。32Mi は 32 メビバイトです。limits だけ書くと、requests も同じ値になります。",
+      "trouble": [
+        {
+          "symptom": "toomanyrequests や 429 と出る",
+          "check": "kubectl describe の Events で、Failed to pull image の行の終わりを見る",
+          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る"
+        },
+        {
+          "symptom": "Error になり OOMKilled でない",
+          "check": "kubectl logs oom -n ch2 を打つ",
+          "fix": "command の行のつづりを直し、kubectl delete pod oom -n ch2 のあとで作り直す"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/"
+    },
+    {
+      "id": "cpu",
+      "text": "CPU の上限を超えさせ、止められないことを見ます。",
+      "why": "CPU は、超えた分を待たせるだけです。遅くなりますが、止まりません。メモリとの大きな違いです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cat > cpu.yaml <<'EOF'\napiVersion: v1\nkind: Pod\nmetadata:\n  name: cpu\nspec:\n  terminationGracePeriodSeconds: 1\n  containers:\n  - name: cpu\n    image: busybox:1.37\n    command: ['sh', '-c', 'while true; do :; done']\n    resources:\n      limits:\n        cpu: 200m\nEOF\nkubectl apply -f cpu.yaml -n ch2\nkubectl wait --for=condition=Ready pod/cpu -n ch2 --timeout=180s\nsleep 20\nkubectl exec cpu -n ch2 -- cat /sys/fs/cgroup/cpu.max\nkubectl exec cpu -n ch2 -- grep -E '^nr_' /sys/fs/cgroup/cpu.stat\nkubectl get pod cpu -n ch2\nkubectl delete pod cpu -n ch2"
+      },
+      "lines": [
+        {
+          "code": "cat > cpu.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま cpu.yaml というファイルに書く"
+        },
+        {
+          "code": "apiVersion: v1",
+          "text": "使う API の版"
+        },
+        {
+          "code": "kind: Pod",
+          "text": "作るものの種類"
+        },
+        {
+          "code": "metadata:",
+          "text": "見分けるための情報"
+        },
+        {
+          "code": "  name: cpu",
+          "text": "Pod の名前"
+        },
+        {
+          "code": "spec:",
+          "text": "ほしい中身"
+        },
+        {
+          "code": "  terminationGracePeriodSeconds: 1",
+          "text": "消すときに待つ秒数を短くする"
+        },
+        {
+          "code": "  containers:",
+          "text": "コンテナの一覧"
+        },
+        {
+          "code": "  - name: cpu",
+          "text": "コンテナの名前"
+        },
+        {
+          "code": "    image: busybox:1.37",
+          "text": "小さな道具の入ったイメージ"
+        },
+        {
+          "code": "    command: ['sh', '-c', 'while true; do :; done']",
+          "text": "休まずに回り続け、CPU を使い切ろうとする"
+        },
+        {
+          "code": "    resources:",
+          "text": "使う量の決まり"
+        },
+        {
+          "code": "      limits:",
+          "text": "ここまで、という上限"
+        },
+        {
+          "code": "        cpu: 200m",
+          "text": "CPU は 0.2 コアまで"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "kubectl apply -f cpu.yaml -n ch2",
+          "text": "Pod を作る"
+        },
+        {
+          "code": "kubectl wait --for=condition=Ready pod/cpu -n ch2 --timeout=180s",
+          "text": "使えるようになるまで待つ"
+        },
+        {
+          "code": "sleep 20",
+          "text": "20 秒動かす"
+        },
+        {
+          "code": "kubectl exec cpu -n ch2 -- cat /sys/fs/cgroup/cpu.max",
+          "text": "カーネルに渡された上限を出す"
+        },
+        {
+          "code": "kubectl exec cpu -n ch2 -- grep -E '^nr_' /sys/fs/cgroup/cpu.stat",
+          "text": "待たされた回数などを出す"
+        },
+        {
+          "code": "kubectl get pod cpu -n ch2",
+          "text": "一覧を出す"
+        },
+        {
+          "code": "kubectl delete pod cpu -n ch2",
+          "text": "cpu を消す"
+        }
+      ],
+      "output": "pod/cpu created\npod/cpu condition met\n20000 100000\nnr_periods 208\nnr_throttled 208\nnr_bursts 0\nNAME   READY   STATUS    RESTARTS   AGE\ncpu    1/1     Running   0          22s\npod \"cpu\" deleted from ch2 namespace",
+      "read": "cpu.max の 20000 100000 は、100000 のうち 20000 (0.2 コア分) だけ使えるという意味です。nr_periods が区切りの数、nr_throttled が待たされた区切りの数です。ほとんど待たされていますが、RESTARTS は 0 で Running のままです。",
+      "trouble": [
+        {
+          "symptom": "toomanyrequests や 429 と出る",
+          "check": "kubectl describe の Events で、Failed to pull image の行の終わりを見る",
+          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る"
+        },
+        {
+          "symptom": "No such file or directory と出る",
+          "check": "kubectl get pod cpu -n ch2 を打つ",
+          "fix": "Running になってから打つ。カーネルが古いと、この場所に無い (0 章の Ubuntu 24.04 にはある)"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/"
+    },
+    {
+      "id": "change-forbidden",
+      "text": "わざと、動いている Pod の変えられない欄を変えます。",
+      "why": "Pod は、作ったあとに変えられる欄がわずかです。ファイルを直せば何でも替わる、とは限りません。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "sed 's/containerPort: 80/containerPort: 8080/' web.yaml > web2.yaml\nkubectl apply -f web2.yaml -n ch2 2>&1 | head -n 1"
+      },
+      "lines": [
+        {
+          "code": "sed 's/containerPort: 80/containerPort: 8080/' web.yaml > web2.yaml",
+          "text": "ポートだけを替えたファイルを作る"
+        },
+        {
+          "code": "kubectl apply -f web2.yaml -n ch2 2>&1 | head -n 1",
+          "text": "渡して、返事の 1 行目だけを出す"
+        }
+      ],
+      "output": "The Pod \"web\" is invalid: spec: Forbidden: pod updates may not change fields other than `spec.containers[*].image`,`spec.initContainers[*].image`,`spec.activeDeadlineSeconds`,`spec.tolerations` (only additions to existing tolerations),`spec.terminationGracePeriodSeconds` (allow it to be set to 1 if it was previously negative)",
+      "read": "Forbidden と出て、変えてよい欄の一覧が続きます。image は替えられますが、ports は替えられません。変えたいときは、消して作り直します。",
+      "trouble": [
+        {
+          "symptom": "configured と出る",
+          "check": "diff web.yaml web2.yaml を打つ",
+          "fix": "違いが 1 行出るはず。出なければ sed の行を打ち直す"
+        },
+        {
+          "symptom": "the path ... does not exist と出る",
+          "check": "pwd と ls を打つ",
+          "fix": "作業のフォルダにいない。cd で移ってから打つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/workloads/pods/"
+    },
+    {
+      "id": "change-image",
+      "text": "変えられる欄の image を替えます。",
+      "why": "同じ Pod のまま、中のコンテナだけが作り直されることを見るためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl get pod web -n ch2 -o jsonpath='{.metadata.uid}{\"\\n\"}'\nsed 's/1.27-alpine/1.28-alpine/' web.yaml > web3.yaml\nkubectl apply -f web3.yaml -n ch2\nkubectl wait --for=jsonpath='{.status.containerStatuses[0].restartCount}'=1 pod/web -n ch2 --timeout=180s\nkubectl wait --for=condition=Ready pod/web -n ch2 --timeout=180s\nkubectl get pod web -n ch2\nkubectl get pod web -n ch2 -o jsonpath='{.metadata.uid} {.spec.containers[0].image}{\"\\n\"}'\ncurl -s http://$POD_IP | grep title"
+      },
+      "lines": [
+        {
+          "code": "kubectl get pod web -n ch2 -o jsonpath='{.metadata.uid}{\"\\n\"}'",
+          "text": "替える前の uid を出す"
+        },
+        {
+          "code": "sed 's/1.27-alpine/1.28-alpine/' web.yaml > web3.yaml",
+          "text": "イメージの版を替えたファイルを作る"
+        },
+        {
+          "code": "kubectl apply -f web3.yaml -n ch2",
+          "text": "渡す"
+        },
+        {
+          "code": "kubectl wait --for=jsonpath='{.status.containerStatuses[0].restartCount}'=1 pod/web -n ch2 --timeout=180s",
+          "text": "始め直した数が 1 になるまで待つ"
+        },
+        {
+          "code": "kubectl wait --for=condition=Ready pod/web -n ch2 --timeout=180s",
+          "text": "使えるようになるまで待つ"
+        },
+        {
+          "code": "kubectl get pod web -n ch2",
+          "text": "一覧を出す"
+        },
+        {
+          "code": "kubectl get pod web -n ch2 -o jsonpath='{.metadata.uid} {.spec.containers[0].image}{\"\\n\"}'",
+          "text": "替えた後の uid とイメージを出す"
+        },
+        {
+          "code": "curl -s http://$POD_IP | grep title",
+          "text": "ページを取る"
+        }
+      ],
+      "output": "e6dd23ae-6ace-40e2-ab15-d22d946ac8d6\npod/web configured\npod/web condition met\npod/web condition met\nNAME   READY   STATUS    RESTARTS     AGE\nweb    1/1     Running   1 (9s ago)   2m55s\ne6dd23ae-6ace-40e2-ab15-d22d946ac8d6 nginx:1.28-alpine\n<title>Welcome to nginx!</title>",
+      "read": "uid が同じなので、同じ Pod です。RESTARTS が 1 になり、cp で写したページは消えて、元の Welcome to nginx! に戻りました。住所も変わっていません。",
+      "trouble": [
+        {
+          "symptom": "toomanyrequests や 429 と出る",
+          "check": "kubectl describe の Events で、Failed to pull image の行の終わりを見る",
+          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る"
+        },
+        {
+          "symptom": "イメージが not found と出る",
+          "check": "Events で、イメージの名前と版 (: の後ろ) を見る",
+          "fix": "つづりが正しいなら、その版はもう配られていない。hub.docker.com でイメージのページを開き、同じ系統の新しい版に替える。この先の出力の版は、替えた版に読み替える"
+        },
+        {
+          "symptom": "RESTARTS が 0 のまま",
+          "check": "kubectl describe pod web -n ch2 の Events を見る",
+          "fix": "新しいイメージを取っている途中なら待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/"
+    },
+    {
+      "id": "delete",
+      "text": "Pod を消し、戻らないことを確かめます。",
+      "why": "ファイルに書いて作っても、Pod は 1 つきりです。消えたら、誰かが作り直すまで戻りません。作り直す役目の仕組みを、3 章で動かします。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl delete -f web.yaml -n ch2\nsleep 10\nkubectl get pods -n ch2"
+      },
+      "lines": [
+        {
+          "code": "kubectl delete -f web.yaml -n ch2",
+          "text": "web.yaml に書いたものを消す"
+        },
+        {
+          "code": "sleep 10",
+          "text": "10 秒待つ"
+        },
+        {
+          "code": "kubectl get pods -n ch2",
+          "text": "一覧を出す"
+        }
+      ],
+      "output": "pod \"web\" deleted from ch2 namespace\nNAME    READY   STATUS      RESTARTS   AGE\napi     1/1     Running     0          2m54s\nhello   1/1     Running     0          71s\noom     0/1     OOMKilled   0          52s\npair    2/2     Running     0          2m50s",
+      "read": "web がありません。待っても戻りません。oom は Never なので止まったまま残り、ほかは動いています。",
+      "trouble": [
+        {
+          "symptom": "消す行がしばらく止まる",
+          "check": "30 秒ほど待つ",
+          "fix": "終わりの合図を送って、止まるのを待っている"
+        },
+        {
+          "symptom": "the path ... does not exist と出る",
+          "check": "pwd と ls を打つ",
+          "fix": "作業のフォルダにいない。cd で移ってから打つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_delete/"
+    },
+    {
+      "id": "check-before-delete",
+      "text": "消す前に、どのマシンにいるかを見ます。kcna と出なければ、次の手順を打ちません。",
+      "why": "次の手順は名前空間をまるごと消し、元に戻せません。打つ場所を先に確かめます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "hostname"
+      },
+      "lines": [
+        {
+          "code": "hostname",
+          "text": "このマシンの名前を出す"
+        }
+      ],
+      "output": "kcna",
+      "read": "kcna と出れば、仮想マシンの中です。",
+      "trouble": [
+        {
+          "symptom": "kcna ではない名前が出る",
+          "check": "行の頭が ubuntu@kcna かを見る",
+          "fix": "ホストにいる。multipass shell kcna で入り、もう一度打つ"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man1/hostname.1.html"
+    },
+    {
+      "id": "delete-namespace",
+      "text": "名前空間 ch2 を消します。前の手順で kcna と出たときだけ打ちます。",
+      "why": "中に作ったものを、まとめて片付けるためです。次の章は、k3s の部品だけの状態から始めます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cd ~\nkubectl delete namespace ch2\nkubectl get namespaces"
+      },
+      "lines": [
+        {
+          "code": "cd ~",
+          "text": "ホームへ戻る"
+        },
+        {
+          "code": "kubectl delete namespace ch2",
+          "text": "ch2 を、中のものごと消す。終わるまで待つ"
+        },
+        {
+          "code": "kubectl get namespaces",
+          "text": "名前空間の一覧を出す"
+        }
+      ],
+      "output": "namespace \"ch2\" deleted\nNAME              STATUS   AGE\ndefault           Active   5m16s\nkube-node-lease   Active   5m16s\nkube-public       Active   5m16s\nkube-system       Active   5m16s",
+      "read": "ch2 が消え、default と kube- で始まる 4 つだけになれば、片付いています。手元の ~/ch2 の YAML は残るので、読み返せます。",
+      "trouble": [
+        {
+          "symptom": "消す行がしばらく止まる",
+          "check": "1 分ほど待つ",
+          "fix": "中の Pod が終わるのを待っている。そのまま待つ"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/"
+    },
+    {
+      "id": "leave",
+      "text": "仮想マシンから出ます。",
+      "why": "次は、ホストで控えを取るためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "exit"
+      },
+      "lines": [
+        {
+          "code": "exit",
+          "text": "今の端末を終える。仮想マシンは動き続ける"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "行の頭が、自分の PC のものに戻ります。",
+      "trouble": [
+        {
+          "symptom": "行の頭が ubuntu@kcna のまま",
+          "check": "もう一度見る",
+          "fix": "もう一度 exit を打つ"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man1/bash.1.html"
+    },
+    {
+      "id": "snapshot",
+      "text": "ホストで、この章を終えた状態の控えを ch2-end という名前で取り、仮想マシンに入り直します。",
+      "why": "次の章で失敗しても、ここへ戻れるようにするためです。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass stop kcna\nmultipass snapshot --name ch2-end kcna\nmultipass list --snapshots\nmultipass shell kcna"
+      },
+      "lines": [
+        {
+          "code": "multipass stop kcna",
+          "text": "止める。控えは、止まっているときだけ取れる。stop は動いている (Running) ときだけ打てる"
+        },
+        {
+          "code": "multipass snapshot --name ch2-end kcna",
+          "text": "今の状態を ch2-end という名前で控える"
+        },
+        {
+          "code": "multipass list --snapshots",
+          "text": "控えの一覧を出す"
+        },
+        {
+          "code": "multipass shell kcna",
+          "text": "止まっている kcna を動かし、中に入り直す"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "一覧に ch2-end が並べば取れています。戻すときは、止めてから multipass restore kcna.ch2-end を打ちます。最後の行で、行の頭が ubuntu@kcna:~$ に変わります。課題と後片付けは、この中で続けます。",
+      "trouble": [
+        {
+          "symptom": "止まっていないので取れないと出る",
+          "check": "multipass list で State を見る",
+          "fix": "multipass stop kcna で止めてから取る"
+        },
+        {
+          "symptom": "ch2-end がもうあると出る",
+          "check": "multipass list --snapshots を打つ",
+          "fix": "前の控えを使うか、--name ch2-endb のように別の名前にする"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/snapshot/"
+    }
+  ],
+  "cleanup": [
+    {
+      "id": "check-vm",
+      "text": "仮想マシンの中で、どのマシンにいるかを見ます。kcna と出なければ止まり、multipass shell kcna で入ります。",
+      "why": "次の手順は、つないでいるクラスターのものを消します。自分の PC の別のクラスターで打たないためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "hostname"
+      },
+      "lines": [
+        {
+          "code": "hostname",
+          "text": "このマシンの名前を出す"
+        }
+      ],
+      "output": "kcna",
+      "read": "kcna と出れば、仮想マシンの中です。",
+      "trouble": [
+        {
+          "symptom": "kcna ではない名前が出る",
+          "check": "行の頭が ubuntu@kcna かを見る",
+          "fix": "ホストにいる。multipass shell kcna で入り、もう一度打つ"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man1/hostname.1.html"
+    },
+    {
+      "id": "delete-practice",
+      "text": "仮想マシンの中で、課題で作った名前空間を消します。課題をしていなければ、何も起きません。",
+      "why": "次の章を、k3s の部品だけの状態から始めるためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl delete namespace practice --ignore-not-found\nkubectl get namespaces"
+      },
+      "lines": [
+        {
+          "code": "kubectl delete namespace practice --ignore-not-found",
+          "text": "practice を消す。無くてもエラーにしない (--ignore-not-found)"
+        },
+        {
+          "code": "kubectl get namespaces",
+          "text": "名前空間の一覧を出す"
+        }
+      ],
+      "output": "namespace \"practice\" deleted\nNAME              STATUS   AGE\ndefault           Active   5m37s\nkube-node-lease   Active   5m37s\nkube-public       Active   5m37s\nkube-system       Active   5m37s",
+      "read": "default と kube- で始まる 4 つだけになれば、片付いています。k3s は消しません。",
+      "trouble": [
+        {
+          "symptom": "消す行がしばらく止まる",
+          "check": "1 分ほど待つ",
+          "fix": "中の Pod が終わるのを待っている。そのまま待つ"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_delete/"
+    },
+    {
+      "id": "rest",
+      "text": "今日はここまでにするときは、exit で出てから、ホストで仮想マシンを止めます。止まっていれば (Stopped)、打ちません。",
+      "why": "動いている間は PC のメモリを使うためです。次の章でも使うので、消しません。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass stop kcna"
+      },
+      "lines": [
+        {
+          "code": "multipass stop kcna",
+          "text": "kcna を止める"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "続けるときは multipass shell kcna で、動かして中に入れます。k3s は自分で始まります。",
+      "trouble": [
+        {
+          "symptom": "止まったか分からない",
+          "check": "multipass list で State を見る",
+          "fix": "Stopped なら止まっている。Running なら、もう一度止める"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/stop/"
+    }
+  ],
+  "challenges": [
+    {
+      "task": "仮想マシンの中で、practice という名前空間を作り、app=shop というラベルを付けた nginx:1.27-alpine の Pod shop を動かしてください。",
+      "hint": "kubectl run に --labels を付けます。作った直後は、準備ができるのを待ちます。",
+      "answer": "kubectl create namespace practice\nkubectl wait --for=create serviceaccount/default -n practice --timeout=60s\nkubectl run shop --image=nginx:1.27-alpine --labels=app=shop -n practice\nkubectl wait --for=condition=Ready pod/shop -n practice --timeout=180s",
+      "verify": "kubectl get pods -n practice -l app=shop を打ち、shop が 1/1 の Running なら正解です。"
+    },
+    {
+      "task": "仮想マシンの中で、メモリを 100Gi 予約する Pod を作り、置けない理由をイベントから読んでください。",
+      "hint": "kubectl run は、--overrides で spec を足せます。YAML に書いてもかまいません。",
+      "answer": "kubectl run huge --image=nginx:1.27-alpine -n practice --overrides='{\"spec\":{\"containers\":[{\"name\":\"huge\",\"image\":\"nginx:1.27-alpine\",\"resources\":{\"requests\":{\"memory\":\"100Gi\"}}}]}}'\nsleep 5\nkubectl get events -n practice --field-selector involvedObject.name=huge",
+      "verify": "kubectl get pods -n practice を打ち、huge が Pending で、イベントに Insufficient memory があれば正解です。"
+    },
+    {
+      "task": "仮想マシンの中で、shop のコンテナの 80 番を手元の 9090 番へつなぎ、ページを取ってから、通り道を消してください。",
+      "hint": "port-forward を裏で動かし、最後に止めます。",
+      "answer": "kubectl port-forward pod/shop 9090:80 -n practice > /dev/null 2>&1 &\nsleep 3\ncurl -s http://localhost:9090 | grep title\nkill $!",
+      "verify": "Welcome to nginx! が返り、止めたあとの curl -s http://localhost:9090 で何も返らなければ正解です。"
+    }
+  ],
+  "sources": [
+    {
+      "label": "Kubernetes: Pods",
+      "url": "https://kubernetes.io/docs/concepts/workloads/pods/"
+    },
+    {
+      "label": "Kubernetes: Pod Lifecycle",
+      "url": "https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/"
+    },
+    {
+      "label": "Kubernetes: Sidecar Containers",
+      "url": "https://kubernetes.io/docs/concepts/workloads/pods/sidecar-containers/"
+    },
+    {
+      "label": "Kubernetes: Object Management",
+      "url": "https://kubernetes.io/docs/concepts/overview/working-with-objects/object-management/"
+    },
+    {
+      "label": "Kubernetes: Labels and Selectors",
+      "url": "https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/"
+    },
+    {
+      "label": "Kubernetes: Volumes (emptyDir)",
+      "url": "https://kubernetes.io/docs/concepts/storage/volumes/"
+    },
+    {
+      "label": "Kubernetes: Images",
+      "url": "https://kubernetes.io/docs/concepts/containers/images/"
+    },
+    {
+      "label": "Kubernetes: Resource Management",
+      "url": "https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/"
+    },
+    {
+      "label": "Kubernetes: kube-scheduler",
+      "url": "https://kubernetes.io/docs/concepts/scheduling-eviction/kube-scheduler/"
+    },
+    {
+      "label": "kubectl apply",
+      "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_apply/"
+    },
+    {
+      "label": "kubectl cp",
+      "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_cp/"
+    },
+    {
+      "label": "kubectl port-forward",
+      "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_port-forward/"
+    },
+    {
+      "label": "Docker: Install on Ubuntu",
+      "url": "https://docs.docker.com/engine/install/ubuntu/"
+    },
+    {
+      "label": "Docker: Dockerfile reference",
+      "url": "https://docs.docker.com/reference/dockerfile/"
+    },
+    {
+      "label": "Docker: Bridge network driver (bip)",
+      "url": "https://docs.docker.com/engine/network/drivers/bridge/"
+    },
+    {
+      "label": "Docker: image save",
+      "url": "https://docs.docker.com/reference/cli/docker/image/save/"
+    },
+    {
+      "label": "Docker Hub: 取得の上限",
+      "url": "https://docs.docker.com/docker-hub/usage/"
+    },
+    {
+      "label": "K3s: CLI (k3s ctr・k3s crictl)",
+      "url": "https://docs.k3s.io/cli"
+    },
+    {
+      "label": "K3s: Import Images",
+      "url": "https://docs.k3s.io/add-ons/import-images"
+    },
+    {
+      "label": "K3s: Advanced Options",
+      "url": "https://docs.k3s.io/advanced"
+    },
+    {
+      "label": "Multipass: snapshot",
+      "url": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/snapshot/"
+    }
+  ]
+}
