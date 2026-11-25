@@ -25,7 +25,7 @@ import {
   type ColorMode,
   examDate,
   goalXp,
-  parseProgressText,
+  mergeImported, parseProgressText,
   planStart,
   resetProgress,
   saveProgress,
@@ -209,10 +209,7 @@ function Body({ progress, updateProgress }: Props) {
                     variant="primary"
                     label="置き換える"
                     onClick={() => {
-                      // 目標と受験日を変えたことの無い端末の書き出しなら、今の設定を引き継ぐ。
-                      // 画面の色はこの端末の見た目の設定なので、読み込んでも今の端末の色を残す
-                      const base = loaded.profile ? loaded : { ...loaded, profile: progress.profile };
-                      const next = base.profile ? setProfile(base, { colorMode: colorMode(progress) }) : base;
+                      const next = mergeImported(loaded, progress);
                       if (!saveProgress(next)) {
                         setLoadError('このブラウザに保存できませんでした (容量の上限やプライベートモードなど)。今の記録はそのままです。');
                         setLoaded(null);

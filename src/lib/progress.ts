@@ -486,7 +486,7 @@ export function daysToExam(p: Progress, now: Date): number | null {
   return d ? daysBetween(dayKey(now), d) : null;
 }
 
-/** 初めて学んだ日 (XP・レッスン・答え・模擬試験・ハンドブック・実践の記録のいちばん古い日)。記録が無ければ null */
+/** 初めて学んだ日 (XP・レッスン・答え・模擬試験・ハンドブックの記録のいちばん古い日。問題演習の計画の起点なので、実践の手順の印は入れない。章の完了は、実習の完了と同じく XP の日として入る)。記録が無ければ null */
 export function firstStudyDay(p: Progress): string | null {
   const days: string[] = Object.keys(p.xp.byDay);
   const fromIso = (iso: string) => {
@@ -497,7 +497,6 @@ export function firstStudyDay(p: Progress): string | null {
   for (const a of Object.values(p.answers)) fromIso(a.last);
   for (const e of p.exams ?? []) fromIso(e.at);
   for (const h of Object.values(p.handbook ?? {})) fromIso(h.at);
-  for (const h of Object.values(p.handsOn ?? {})) fromIso(h.at);
   return days.length > 0 ? days.sort()[0] : null;
 }
 
@@ -557,6 +556,15 @@ export function resetProgress(p: Progress): Progress {
   const next = emptyProgress();
   if (p.profile) next.profile = { ...p.profile };
   return next;
+}
+
+/**
+ * 読み込んだ記録で置き換えるときの形。目標と受験日を変えたことの無い端末の書き出しなら、今の設定を引き継ぐ。
+ * 画面の色はこの端末の見た目の設定なので、読み込んでも今の端末の色を残す。実践の OS は読み込んだ値、無ければ今の値
+ */
+export function mergeImported(loaded: Progress, current: Progress): Progress {
+  const base = loaded.profile ? loaded : { ...loaded, profile: current.profile };
+  return base.profile ? setProfile(base, { colorMode: colorMode(current), os: base.profile.os ?? current.profile?.os }) : base;
 }
 
 /** 書き出すファイルの名前 (kcna-progress-YYYY-MM-DD.json) */
