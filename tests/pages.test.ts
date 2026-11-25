@@ -82,7 +82,7 @@ const ldOf = (doc: Document): Ld[] => [...doc.querySelectorAll('script[type="app
 });
 /** ページの種類ごとに入れる型 (トップ以外。無いページは BreadcrumbList だけ) */
 const expectedType = (p: string) =>
-  /^(handbook|commands|compare)\/[^/]+\/$/.test(p) ? 'TechArticle' : p === 'glossary/' ? 'DefinedTermSet' : /^glossary\/[^/]+\/$/.test(p) ? 'DefinedTerm' : p.startsWith('lesson/') ? 'LearningResource' : undefined;
+  /^(handbook|commands|compare|hands-on)\/[^/]+\/$/.test(p) ? 'TechArticle' : p === 'glossary/' ? 'DefinedTermSet' : /^glossary\/[^/]+\/$/.test(p) ? 'DefinedTerm' : p.startsWith('lesson/') ? 'LearningResource' : undefined;
 
 describe('構造化データとパンくず', { timeout: 30_000 }, () => {
   it('検索に載るページは BreadcrumbList と種類ごとの型を持ち、JSON として読めて url が canonical と合う。WebSite はトップだけ', () => {
@@ -129,6 +129,16 @@ describe('構造化データとパンくず', { timeout: 30_000 }, () => {
     expect([...l.doc.querySelectorAll('#root nav a')].map((a) => a.getAttribute('href'))).toEqual(['/kcna-dojo/']);
     const l2 = docs.find((d) => d.page.path.startsWith('lesson/w2-'))!;
     expect([...l2.doc.querySelectorAll('#root nav a')].map((a) => a.getAttribute('href'))).toEqual(['/kcna-dojo/', '/kcna-dojo/week/2/']);
+  });
+  it('実習のパンくずは実践の下。週のページには問題演習だけを並べ、実習は実践へのリンクにする', () => {
+    for (let w = 1; w <= 8; w++) {
+      const lab = docs.find((d) => d.page.path === `lesson/w${w}-lab/`)!;
+      expect([...lab.doc.querySelectorAll('#root nav a')].map((a) => a.getAttribute('href'))).toEqual(['/kcna-dojo/', '/kcna-dojo/hands-on/']);
+      const week = docs.find((d) => d.page.path === `week/${w}/`)!.doc;
+      expect([...week.querySelectorAll('h3 a')].map((a) => a.getAttribute('href')).filter((h) => h!.includes('-lab'))).toEqual([]);
+      const all = [...week.querySelectorAll('#root li a')].map((a) => a.getAttribute('href'));
+      expect(all).toEqual(expect.arrayContaining([`/kcna-dojo/lesson/w${w}-lab/`, '/kcna-dojo/hands-on/']));
+    }
   });
 });
 

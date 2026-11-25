@@ -76,7 +76,7 @@ export function renderPage(template, { path: p, title, fullTitle, description, b
 }
 
 /** すべてのページ (経路・題名・説明・本文・検索に載せるか) を、画面と同じデータから作る */
-export async function buildPages(load) {
+export async function buildPages(load, { chapters } = {}) {
   const { pageTitle } = await load('/src/lib/pageMeta.ts');
   const { withSite } = await load('/src/lib/pageTitle.ts');
   const { parseRoute } = await load('/src/lib/route.ts');
@@ -311,6 +311,78 @@ export async function buildPages(load) {
     });
   }
 
+  // 実践: 一覧と章 (手順は全部の OS の分を書く。課題の答えは、画面と同じく折りたたむ)。chapters はテストが見本の章を渡すため
+  const handsOn = await load('/src/content/handsOn.ts');
+  const { HANDS_ON_CHAPTERS } = await load('/src/content/handsOnChapters.ts');
+  const { OS_LABEL, WHERE_LABEL } = await load('/src/lib/handsOn.ts');
+  const { exercisesOf, labsOf } = await load('/src/lib/lessonStatus.ts');
+  const chapterList = chapters ?? HANDS_ON_CHAPTERS;
+  const labList = WEEKS.flatMap((w) => labsOf(w).map((lab) => ({ lab, week: w.week })));
+  pages.push({
+    path: 'hands-on/',
+    title: handsOn.HANDS_ON_TITLE,
+    description: '自分の端末で Kubernetes を動かして確かめる実践の一覧。手順ごとに、なぜするのか・コマンドの意味・出力の読み方・つまずいた時の直し方を書いた章と、KCNA-JP の問題演習の週に合わせた実習。',
+    body: [
+      `<h1>${esc(handsOn.HANDS_ON_TITLE)}</h1>`,
+      `<p>${esc(handsOn.HANDS_ON_LEAD)}</p>`,
+      `<p>${esc(handsOn.HANDS_ON_WHO)} ${link('', '問題演習へ')}</p>`,
+      '<h2>章</h2>',
+      `<p>${esc(chapterList.length > 0 ? handsOn.CHAPTERS_LEAD : handsOn.NO_CHAPTERS)}</p>`,
+      chapterList.length > 0 ? `<ul>${chapterList.map((c) => `<li>${esc(handsOn.chapterNo(c))}: ${link(`hands-on/${c.id}/`, c.title)} (約 ${c.minutes} 分): ${esc(c.summary)}</li>`).join('')}</ul>` : '',
+      '<h2>週ごとの実習</h2>',
+      `<p>${esc(handsOn.LABS_LEAD)}</p>`,
+      `<ul>${labList.map(({ lab, week }) => `<li>第 ${week} 週: ${link(`lesson/${lab.id}/`, lab.title)}: ${esc(lab.goal)}</li>`).join('')}</ul>`,
+    ]
+      .filter(Boolean)
+      .join('\n'),
+  });
+  for (const c of chapterList) {
+    const lineHtml = (s) => `<p>${s.code.language === 'bash' || s.code.language === 'powershell' ? 'コマンドの意味' : '1 行ずつの意味'}</p><dl>${s.lines.map((l) => `<dt><code>${(s.code.language === 'bash' ? linkShell(l.code, COMMAND_BRIEFS).pieces : [l.code]).map((p) => (typeof p === 'string' ? esc(p) : link(`commands/${p.id}/`, p.text))).join('')}</code></dt><dd>${esc(l.text)}</dd>`).join('')}</dl>`;
+    const stepHtml = (s) => {
+      const tags = [s.os && `${OS_LABEL[s.os]} の手順`, s.where && WHERE_LABEL[s.where]].filter(Boolean);
+      return [
+        '<li>',
+        tags.length ? `<p>${esc(tags.join(' · '))}</p>` : '',
+        `<p>${esc(s.text)}</p><p>なぜ: ${esc(s.why)}</p>`,
+        s.unverified ? `<p>実機で未確認: ${esc(s.unverified)}</p>` : '',
+        s.code?.title ? `<p><code>${esc(s.code.title)}</code></p>` : '',
+        s.code ? `<pre><code>${esc(s.code.text)}</code></pre>` : '',
+        s.lines ? lineHtml(s) : '',
+        s.output ? `<p>実機の出力</p><pre>${esc(s.output)}</pre>` : '',
+        s.read ? `<p>出力の読み方: ${esc(s.read)}</p>` : '',
+        s.trouble?.length ? `<p>つまずいた時</p>${s.trouble.map((t) => `<dl><dt>症状</dt><dd>${esc(t.symptom)}</dd><dt>確かめ方</dt><dd>${esc(t.check)}</dd><dt>直し方</dt><dd>${esc(t.fix)}</dd></dl>`).join('')}` : '',
+        s.source ? `<p>出典: <a href="${esc(s.source)}">${esc(new URL(s.source).hostname)}</a></p>` : '',
+        '</li>',
+      ].join('');
+    };
+    const list = (xs) => `<ul>${xs.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>`;
+    pages.push({
+      path: `hands-on/${c.id}/`,
+      title: c.short ?? c.title,
+      heading: c.title,
+      description: clip(c.summary),
+      entity: article(c.title, [...c.sources, ...[...c.steps, ...c.cleanup].filter((s) => s.source && !c.sources.some((x) => x.url === s.source)).map((s) => ({ label: new URL(s.source).hostname, url: s.source }))]),
+      body: [
+        `<h1>${esc(c.title)}</h1>`,
+        `<p>${esc(handsOn.chapterNo(c))} · 約 ${c.minutes} 分</p>`,
+        `<p>${esc(c.summary)}</p>`,
+        '<h2>始める前に</h2>',
+        `<h3>この章でできるようになること</h3><p>${esc(c.goal)}</p>`,
+        `<h3>この章で分かる特徴</h3>${list(c.features)}`,
+        `<h3>用意するもの</h3>${list(c.needs)}`,
+        c.reads.length ? `<h3>先に読む</h3><ul>${c.reads.map((r) => `<li>${link(`handbook/${r.topic}/`, r.label)}</li>`).join('')}</ul>` : '',
+        `<h2>手順</h2><ol>${c.steps.map(stepHtml).join('')}</ol>`,
+        `<h2>課題</h2><ol>${c.challenges.map((x) => `<li><p>${esc(x.task)}</p><details><summary>ヒント</summary><p>${esc(x.hint)}</p></details><details><summary>答え</summary><pre>${esc(x.answer)}</pre></details><p>確かめ方: ${esc(x.verify)}</p></li>`).join('')}</ol>`,
+        `<h2>後片付け</h2><ol>${c.cleanup.map(stepHtml).join('')}</ol>`,
+        '<h2>出典</h2>',
+        `<ul>${c.sources.map((s) => `<li><a href="${esc(s.url)}">${esc(s.label)}</a></li>`).join('')}</ul>`,
+        `<p>${link('hands-on/', '実践の一覧')}</p>`,
+      ]
+        .filter(Boolean)
+        .join('\n'),
+    });
+  }
+
   // 週とレッスン (問題文までを書き、答えと解説は書かない。画面でも答えるまで出ないため)
   // 問題は画面で答える前に見えるもの (問題文・コード・選択肢・候補) だけを書く。空欄は ＿＿＿ にする。
   // 選択肢と候補はデータの並びでは正解が前に寄るので (画面は出すたびに混ぜる)、問題の id から決まる順に混ぜて正解の位置を見せない
@@ -324,12 +396,10 @@ export async function buildPages(load) {
     const parts = [choice ? `4 択 ${choice} 問` : '', qs.length - choice ? `穴埋め ${qs.length - choice} 問` : ''].filter(Boolean);
     return parts.length > 1 ? `${parts.join('・')}の全 ${qs.length} 問` : parts[0];
   };
-  // 週のページのレッスンごとの項目。何を問うかが分かるよう、答える前に見える問題文を先頭から数問 (実習は目的) だけ書く。答え・選択肢は書かない
+  // 週のページのレッスンごとの項目。何を問うかが分かるよう、答える前に見える問題文を先頭から数問だけ書く。答え・選択肢は書かない
   const weekLessonHtml = (l) =>
     `<h3>${link(`lesson/${l.id}/`, l.title)}</h3><p>${esc(l.summary)}</p>` +
-    (l.kind === 'lab'
-      ? `<p>${esc(l.goal)}</p>`
-      : `<p>問うことの例:</p><ul>${l.questions.slice(0, WEEK_PROMPTS).map((q) => `<li>${esc(q.prompt)}</li>`).join('')}</ul>`);
+    `<p>問うことの例:</p><ul>${l.questions.slice(0, WEEK_PROMPTS).map((q) => `<li>${esc(q.prompt)}</li>`).join('')}</ul>`;
   // レッスン → 出てくる用語とコマンド (用語集とコマンドのページから見たつながりの逆向き)
   const commandPageIds = new Set(COMMAND_PAGES.map((c) => c.id));
   const relatedOfLesson = (l) => {
@@ -347,16 +417,16 @@ export async function buildPages(load) {
       title: `第 ${w.week} 週 ${w.title}`,
       description: clip(`第 ${w.week} 週 ${w.title} (${w.domain}・${w.area})。この週で説明できるようにすること: ${w.goals.join('・')}`),
       // 第 1 週はトップと同じ画面なので、h1 も画面と同じサイト名にし、週の名前は h2 にする
-      body: [w.week === 1 ? `<h1>${esc(SITE_TITLE)}</h1>\n<h2>第 1 週 ${esc(w.title)}</h2>` : `<h1>第 ${w.week} 週 ${esc(w.title)}</h1>`, `<p>${esc(w.domain)} · ${esc(w.area)}</p>`, '<h2>この週で説明できるようにすること</h2>', `<ol>${w.goals.map((g) => `<li>${esc(g)}</li>`).join('')}</ol>`, '<h2>先に読む</h2>', `<ul>${w.read.map((r) => `<li>${link(`handbook/${r.topic}/`, r.label)}</li>`).join('')}</ul>`, '<h2>レッスン</h2>', ls.map(weekLessonHtml).join('\n')].join('\n'),
+      body: [w.week === 1 ? `<h1>${esc(SITE_TITLE)}</h1>\n<h2>第 1 週 ${esc(w.title)}</h2>` : `<h1>第 ${w.week} 週 ${esc(w.title)}</h1>`, `<p>${esc(w.domain)} · ${esc(w.area)}</p>`, '<h2>この週で説明できるようにすること</h2>', `<ol>${w.goals.map((g) => `<li>${esc(g)}</li>`).join('')}</ol>`, '<h2>先に読む</h2>', `<ul>${w.read.map((r) => `<li>${link(`handbook/${r.topic}/`, r.label)}</li>`).join('')}</ul>`, '<h2>問題演習</h2>', exercisesOf({ content: { lessons: ls } }).map(weekLessonHtml).join('\n'), `<h2>動かして確かめる</h2><ul>${labsOf(w).map((l) => `<li>${link(`lesson/${l.id}/`, l.title)}</li>`).join('')}<li>${link('hands-on/', '実践の一覧')}</li></ul>`].join('\n'),
     });
     for (const l of ls) {
       const qs = l.kind === 'quiz' ? l.questions : [];
       pages.push({
         path: `lesson/${l.id}/`,
         title: l.title,
-        parent: w.week === 1 ? '' : `week/${w.week}/`,
+        parent: l.kind === 'lab' ? 'hands-on/' : w.week === 1 ? '' : `week/${w.week}/`,
         entity: { '@type': 'LearningResource', name: l.title, learningResourceType: l.kind === 'lab' ? '実習' : '練習問題', isAccessibleForFree: true },
-        description: clip(`第 ${w.week} 週 ${w.title} のレッスン「${l.title}」。${l.summary}。${qs[0]?.prompt ?? ''}`),
+        description: clip(`第 ${w.week} 週 ${w.title} の${l.kind === 'lab' ? '実習' : 'レッスン'}「${l.title}」。${l.summary}。${qs[0]?.prompt ?? ''}`),
         body: [
           `<h1>${esc(l.title)}</h1>`,
           `<p>${esc(l.summary)}</p>`,
@@ -473,12 +543,12 @@ export function mixById(xs, key) {
 export const isIndexed = (page) => !page.noindex && (page.canonical === undefined || page.canonical === page.path);
 
 /**
- * パンくずの階層 (トップから自分まで)。一覧の下のページは一覧を親にし、レッスンは週 (parent) を親にする。
+ * パンくずの階層 (トップから自分まで)。一覧の下のページは一覧を親にし、レッスンは週、実習は実践の一覧 (parent) を親にする。
  * 第 1 週はトップと同じ画面なので、第 1 週のレッスンの parent はトップにする
  */
 export function crumbsOf(p, parent) {
   if (p === '') return [''];
-  const list = p.match(/^(handbook|commands|compare|glossary)\/[^/]+\/$/);
+  const list = p.match(/^(handbook|commands|compare|glossary|hands-on)\/[^/]+\/$/);
   const up = parent ?? (list ? `${list[1]}/` : '');
   return up === '' ? ['', p] : ['', up, p];
 }
