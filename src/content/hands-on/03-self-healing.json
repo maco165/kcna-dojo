@@ -793,8 +793,8 @@
           "text": "crash を消す"
         }
       ],
-      "output": "@@",
-      "read": "12 行の列は、名前・READY・STATUS・RESTARTS・AGE です。RESTARTS が増えるまでの間が、だんだん空きます。STATUS は、失敗した直後が Error、待っていると分かると CrashLoopBackOff です。CrashLoopBackOff は原因の名前ではなく「失敗が続くので待っている」です。BackOff のイベントも、待っているという知らせです。原因は、記録や、終わりの番号から探します。",
+      "output": "pod/crash created\npod/crash condition met\ncrash   1/1   Running   1 (1s ago)   4s\ncrash   0/1   Error   1 (6s ago)   9s\ncrash   0/1   Error   1 (12s ago)   15s\ncrash   0/1   Error   2 (15s ago)   20s\ncrash   0/1   Error   2 (20s ago)   25s\ncrash   0/1   Error   2 (25s ago)   30s\ncrash   0/1   Error   2 (31s ago)   36s\ncrash   1/1   Running   3 (25s ago)   41s\ncrash   0/1   Error   3 (30s ago)   46s\ncrash   0/1   Error   3 (35s ago)   51s\ncrash   0/1   Error   3 (40s ago)   56s\ncrash   0/1   Error   3 (45s ago)   61s\nREASON    MESSAGE\nBackOff   Back-off restarting failed container main in pod crash_ch3(d245ecb0-2bf7-437f-b931-0de69e5e8b2a)\nstart\npod \"crash\" deleted from ch3 namespace",
+      "read": "12 行の列は、名前・READY・STATUS・RESTARTS・AGE です。RESTARTS が増えるまでの間が、だんだん空きます。待っている間の STATUS は Error か CrashLoopBackOff で、どちらが見えるかは打つ時によります。CrashLoopBackOff は原因の名前ではなく「失敗が続くので待っている」です。BackOff のイベントも、待っているという知らせです。原因は、記録や、終わりの番号から探します。",
       "trouble": [
         {
           "symptom": "toomanyrequests や 429 と出る",
