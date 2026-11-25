@@ -1808,7 +1808,7 @@
     "inside": [
       "Deployment では、kubectl が、その Deployment の持つ ReplicaSet を API サーバーから読みます。古い版の ReplicaSet が、履歴の正体です。",
       "ReplicaSet に付いた番号 (リビジョン) の順に並べ、CHANGE-CAUSE の欄には、アノテーション kubernetes.io/change-cause の値を出します。書いていなければ <none> です。",
-      "残しておく数は revisionHistoryLimit (既定は 10) で決まり、それより古いものは出ません。"
+      "古い版を残しておく数は revisionHistoryLimit (既定は 10。今の版は別) で決まり、超えた分はあとで片付けられます。"
     ],
     "api": [
       {
@@ -1867,10 +1867,10 @@
     "api": [],
     "examples": [
       {
-        "title": "作られるもの (Helm の文書の例。一部)",
-        "code": "$ helm create foo",
-        "output": "foo/\n├── .helmignore   # Contains patterns to ignore when packaging Helm charts.\n├── Chart.yaml    # Information about your chart\n├── values.yaml   # The default values for your templates\n├── charts/       # Charts that this chart depends on\n└── templates/    # The template files\n    └── tests/    # The test files",
-        "note": "文書にある、作られるフォルダの形です。"
+        "title": "ひな形を作る (形の例)",
+        "code": "$ helm create hello",
+        "output": "Creating hello",
+        "note": "hello フォルダの中に、Chart.yaml・values.yaml・charts・templates などができます。"
       }
     ],
     "sources": [
@@ -1891,7 +1891,7 @@
     "command": "helm uninstall",
     "tool": "helm",
     "summary": "リリース (入れたもの) を外します。",
-    "detail": "そのリリースが作ったリソースを消し、履歴も消します。名前空間そのものは消しません。履歴を残したいときは --keep-history を付けます。",
+    "detail": "そのリリースが作ったリソースを消し、履歴も消します。名前空間そのものは消しません。フックで作ったもの・残す印 (helm.sh/resource-policy: keep) の付いたもの・CRD は残ることがあります。履歴を残したいときは --keep-history を付けます。",
     "usage": "helm uninstall <リリース名> [オプション]",
     "flags": [
       {
@@ -1931,6 +1931,14 @@
       {
         "label": "helm.sh の Using Helm",
         "url": "https://helm.sh/docs/intro/using_helm/"
+      },
+      {
+        "label": "helm.sh の Advanced Helm Techniques (記録の置き場所)",
+        "url": "https://helm.sh/docs/topics/advanced/"
+      },
+      {
+        "label": "helm.sh の Chart Hooks",
+        "url": "https://helm.sh/docs/topics/charts_hooks/"
       }
     ],
     "usedIn": [
@@ -1976,7 +1984,7 @@
     "command": "head",
     "tool": "Linux",
     "summary": "最初の数行だけを出します。",
-    "detail": "何も付けなければ最初の 10 行です。-n 3 か -3 で行数を決めます。長い出力の、先頭だけを確かめたいときに使います。",
+    "detail": "何も付けなければ最初の 10 行です。-n 3 のように行数を決めます (-3 は古い書き方です)。長い出力の、先頭だけを確かめたいときに使います。",
     "usage": "head [オプション] [ファイル...]",
     "flags": [
       {
@@ -1984,7 +1992,7 @@
           "-n",
           "--lines"
         ],
-        "text": "出す行数 (-3 のようにも書ける)"
+        "text": "出す行数"
       }
     ],
     "source": "https://man7.org/linux/man-pages/man1/head.1.html",
@@ -2001,7 +2009,12 @@
         "output": "1\n2"
       }
     ],
-    "sources": [],
+    "sources": [
+      {
+        "label": "man7.org の pipe(7)",
+        "url": "https://man7.org/linux/man-pages/man7/pipe.7.html"
+      }
+    ],
     "usedIn": [
       {
         "topic": "observability",
@@ -2018,7 +2031,7 @@
     "command": "kubectl version",
     "tool": "kubectl",
     "summary": "kubectl と、API サーバーの版を出します。",
-    "detail": "版の差が大きいと、使えない機能が出ます。公式では、kubectl と API サーバーの差は minor の版で 1 つまでが対応の範囲です。",
+    "detail": "版の差が大きいと、使えない機能が出ます。公式では、kubectl と API サーバーの差は minor の版で 1 つまで (古くても新しくても) が対応の範囲です。",
     "usage": "kubectl version [オプション]",
     "flags": [
       {
@@ -2077,7 +2090,7 @@
     "command": "kubectl api-versions",
     "tool": "kubectl",
     "summary": "API サーバーが受け付ける、API のグループと版を一覧します。",
-    "detail": "「グループ/版」の形で並びます。マニフェストの apiVersion に書けるものが分かります。",
+    "detail": "「グループ/版」の形で並びます。マニフェストの apiVersion に書く形と同じです (読むだけの API も混ざります)。",
     "usage": "kubectl api-versions",
     "flags": [],
     "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_api-versions/",
@@ -2124,7 +2137,7 @@
     "command": "ps",
     "tool": "Linux",
     "summary": "動いているプロセス (プログラム) を一覧します。",
-    "detail": "何も付けなければ、その端末で自分が動かしているものだけです。-ef で全部を、-o で出す列を選べます。",
+    "detail": "ふつうの Linux では、何も付けなければ、その端末で自分が動かしているものだけです (BusyBox の ps は、見えるプロセスを全部出します)。-ef で全部を、-o で出す列を選べます。",
     "usage": "ps [オプション]",
     "flags": [
       {
@@ -2155,10 +2168,10 @@
     "api": [],
     "examples": [
       {
-        "title": "番号・親の番号・名前を出す (一部) (このページのために打った例)",
-        "code": "$ ps -o pid,ppid,comm | head -3",
-        "output": "    PID    PPID COMMAND\n   1617       1 systemd\n   1654    1617 (sd-pam)",
-        "note": "端末の開き方で、出るものは変わります。PPID が親の番号です。"
+        "title": "番号・親の番号・名前を出す (形の例)",
+        "code": "$ ps -o pid,ppid,comm",
+        "output": "    PID    PPID COMMAND\n   2101    2100 bash\n   2150    2101 ps",
+        "note": "番号は環境で変わります。PPID が親の番号で、ps の親は、打ったシェル (bash) です。"
       }
     ],
     "sources": [
@@ -2499,6 +2512,10 @@
       {
         "label": "K3s: Cluster Access",
         "url": "https://docs.k3s.io/cluster-access"
+      },
+      {
+        "label": "sudo.ws の sudoers (env_reset)",
+        "url": "https://www.sudo.ws/docs/man/sudoers.man/"
       }
     ],
     "usedIn": [
@@ -2542,7 +2559,7 @@
         "title": "自分を確かめる (形の例)",
         "code": "$ kubectl auth whoami",
         "output": "ATTRIBUTE   VALUE\nUsername    system:admin\nGroups      [system:masters system:authenticated]",
-        "note": "名前とグループは、使う kubeconfig で変わります。"
+        "note": "名前とグループは、使う kubeconfig で変わります。このあとに Extra の行が付くことがあります。"
       }
     ],
     "sources": [
