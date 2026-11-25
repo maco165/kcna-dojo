@@ -18,7 +18,7 @@ import { XP_PER_CORRECT, XP_PER_LAB } from '../lib/grade';
 import { answerHistory, completeLesson, currentStreak, goalXp, recordAnswer, todayXp, type Progress } from '../lib/progress';
 import { shuffleChoices } from '../lib/shuffle';
 import { WEEKS } from '../content/curriculum';
-import { handbookHref, lessonHref, weekHref } from '../lib/route';
+import { handbookHref, handsOnHref, lessonHref, weekHref } from '../lib/route';
 import ShareButton from '../components/ShareButton';
 import { lessonShareText, shareUrl, type ShareData } from '../lib/share';
 import { WIDE_QUERY, useMediaQuery } from '../lib/useMediaQuery';
@@ -223,7 +223,7 @@ function LabRun({ lesson, week, progress, updateProgress }: Props & { lesson: La
   if (finished) {
     return (
       <ResultView
-        backHref={weekHref(week)}
+        backHref={handsOnHref()}
         lessonLabel={`第 ${week} 週 · ${lesson.title}`}
         stats={[
           { label: '手順', value: `${total} / ${total}` },
@@ -239,7 +239,7 @@ function LabRun({ lesson, week, progress, updateProgress }: Props & { lesson: La
 
   return (
     <div className="lesson">
-      <LessonBar title={lesson.title} closeHref={weekHref(week)} current={checked.length} total={total} unit="手順" />
+      <LessonBar title={lesson.title} closeHref={handsOnHref()} current={checked.length} total={total} unit="手順" />
       <main className="lesson__main">
         <VStack gap={5}>
           <QuestionHeadingLevel.Provider value={2}>

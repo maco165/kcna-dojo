@@ -20,36 +20,12 @@ import { useEffect, useRef, useState } from 'react';
 import { Button } from '@astryxdesign/core/Button';
 import { HStack } from '@astryxdesign/core/Stack';
 import { StatusDot } from '@astryxdesign/core/StatusDot';
-import { compareHref, glossaryTermHref, guideHref, handbookHref, lessonHref } from '../lib/route';
-import { COMMAND_BRIEFS } from '../content/commandBriefs';
-import glossary from '../content/glossary.json';
-import type { GlossaryTerm } from '../lib/glossary';
+import { compareHref, guideHref, handbookHref, lessonHref } from '../lib/route';
+import { MEANINGS, Prose, TERM_NAMES } from '../components/TermProse';
 import TermTipArea from '../components/TermTip';
-import { makeTermLinker, termNames, type TermPiece } from '../lib/termLinks';
+import { makeTermLinker, type TermPiece } from '../lib/termLinks';
 import { SITE_NAME } from '../lib/site';
 import { WIDE_QUERY, useMediaQuery } from '../lib/useMediaQuery';
-
-const TERMS = (glossary as { terms: GlossaryTerm[] }).terms;
-const TERM_NAMES = termNames(TERMS);
-/** 語の id → 短い意味 (吹き出しに出す) */
-const MEANINGS = new Map([...TERMS.map((t) => [t.id, t.description] as const), ...COMMAND_BRIEFS.map((c) => [`cmd:${c.id}`, c.summary] as const)]);
-
-/** 本文。用語集にある語 (ページの中で最初の 1 回) を強調し、用語集のその語へのリンクにする */
-function Prose({ pieces }: { pieces: TermPiece[] }) {
-  return (
-    <>
-      {pieces.map((p, i) =>
-        typeof p === 'string' ? (
-          p
-        ) : (
-          <a key={i} className="hb-term" data-term={p.id} href={glossaryTermHref(p.id)}>
-            {p.text}
-          </a>
-        ),
-      )}
-    </>
-  );
-}
 
 /** 1 段: 説明、コマンドかマニフェスト、出力の例 */
 function Step({ step, text, sources }: { step: HandbookStep; text: TermPiece[]; sources: HandbookTopic['sources'] }) {

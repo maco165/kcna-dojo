@@ -44,7 +44,8 @@ export default function App() {
   else if (Screen && route.name === 'commands') screen = <Screen key={route.commandId ?? 'index'} progress={progress} commandId={route.commandId} />;
   else if (Screen && route.name === 'compare') screen = <Screen key={route.tableId ?? 'index'} progress={progress} tableId={route.tableId} />;
   else if (Screen && route.name === 'glossary') screen = <Screen key={route.termId ?? 'index'} progress={progress} termId={route.termId} />;
-  else if (Screen && (route.name === 'guide' || route.name === 'progress' || route.name === 'about')) screen = <Screen progress={progress} />;
+  else if (Screen && route.name === 'handsOnChapter') screen = <Screen key={route.chapterId} progress={progress} updateProgress={updateProgress} chapterId={route.chapterId} />;
+  else if (Screen && (route.name === 'guide' || route.name === 'handsOn' || route.name === 'progress' || route.name === 'about')) screen = <Screen progress={progress} />;
   else if (Screen && route.name === 'lesson') screen = <Screen key={route.lessonId} lessonId={route.lessonId} progress={progress} updateProgress={updateProgress} />;
   else if (Screen) screen = <Screen progress={progress} updateProgress={updateProgress} />;
   else screen = <Home week={route.name === 'home' ? route.week : 1} progress={progress} />;

@@ -115,6 +115,11 @@ body {
   padding: 0;
 }
 
+/* スマホの週の画面: レッスンの一覧の下の、その週の実践へのリンク */
+.week-labs {
+  padding-top: var(--spacing-3);
+}
+
 .pre-read__label {
   font-size: 12px;
   color: var(--color-text-secondary);
@@ -138,7 +143,7 @@ body {
   position: fixed;
   inset: auto 0 0 0;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   padding: var(--spacing-1) 0 var(--spacing-3);
   background: var(--color-background-surface);
   border-top: 1px solid var(--color-border);
@@ -3256,4 +3261,77 @@ html[data-loading='true'] body::before {
 
 .cal__cell[data-day] {
   cursor: pointer;
+}
+
+/* ---------- 実践の章 ---------- */
+
+.ho-prep,
+.ho-note,
+.ho-more {
+  max-width: 40em;
+}
+
+.ho-note {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.ho-note b {
+  display: block;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.ho-os {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.ho-steps {
+  gap: 32px;
+}
+
+.ho-tags {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ho-more {
+  font-size: 14px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.ho-more > summary {
+  cursor: pointer;
+  padding: 4px 0;
+  font-weight: 600;
+}
+
+.ho-more p,
+.ho-trouble dd {
+  margin: 0;
+}
+
+.ho-trouble {
+  margin: 4px 0 8px;
+  padding-left: 12px;
+  border-left: 2px solid var(--color-border-emphasized);
+}
+
+.ho-trouble dt {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+/* 課題の答えと、つまずいた時のコマンドは、改行をそのまま出す */
+.ho-answer,
+.ho-trouble dd {
+  white-space: pre-wrap;
 }

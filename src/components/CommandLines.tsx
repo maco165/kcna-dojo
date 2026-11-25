@@ -4,16 +4,17 @@ import type { HandbookLine } from '../content/handbook';
 import { commandsHref } from '../lib/route';
 import { linkShell } from '../lib/shellLinks';
 
-export default function CommandLines({ lines }: { lines: HandbookLine[] }) {
+/** isShell: 行の中のコマンドの名前をリンクにするか (PowerShell や YAML の行では、同じつづりでも別のものなのでしない) */
+export default function CommandLines({ lines, isShell = true, title = 'コマンドの意味' }: { lines: HandbookLine[]; isShell?: boolean; title?: string }) {
   return (
     <div className="hb-fields hb-lines">
-      <p className="hb-fields__title">コマンドの意味</p>
+      <p className="hb-fields__title">{title}</p>
       <dl>
         {lines.map((l, i) => (
           <div key={i}>
             <dt>
               <code>
-                {linkShell(l.code, COMMAND_BRIEFS).pieces.map((p, j) =>
+                {(isShell ? linkShell(l.code, COMMAND_BRIEFS).pieces : [l.code]).map((p, j) =>
                   typeof p === 'string' ? (
                     p
                   ) : (

@@ -32,7 +32,7 @@ import { EXAM_WEIGHTS } from '../lib/exam';
 import { gradeFill } from '../lib/grade';
 import { NEW_ISSUE_URL } from '../lib/links';
 import type { Progress } from '../lib/progress';
-import { aboutHref, glossaryHref, handbookHref, lessonHref, weekHref } from '../lib/route';
+import { aboutHref, glossaryHref, handbookHref, handsOnHref, lessonHref, weekHref } from '../lib/route';
 import { topicByCompetency } from '../content/handbook';
 import { SITE_NAME } from '../lib/site';
 import { WIDE_QUERY, useMediaQuery } from '../lib/useMediaQuery';
@@ -201,7 +201,7 @@ function Body() {
         <ClusterAnimation />
         <div className="guide-hero__fg">
           <ul className="guide-tags" aria-label="問題の種類">
-            {['問題を解く前に', '穴埋め・4 択・実習・模擬試験'].map((t) => (
+            {['問題を解く前に', '穴埋め・4 択・実践・模擬試験'].map((t) => (
               <li key={t}>{t}</li>
             ))}
           </ul>
@@ -225,7 +225,7 @@ function Body() {
         </div>
         <div>
           <dt>レッスン</dt>
-          <dd>{STATS.lessons}</dd>
+          <dd>{STATS.lessons - STATS.labs}</dd>
         </div>
         <div>
           <dt>問</dt>
@@ -342,7 +342,9 @@ function Body() {
             </li>
             <li>その週のレッスンを解く。答えたあとに、解説と出典、出てきたコマンドの説明が出る</li>
             <li>間違えた問題は、答えたあとの「読み直す」からハンドブックと用語集に戻る</li>
-            <li>週末の実習で、手元のクラスタで動かして確かめる</li>
+            <li>
+              初めての人は <a href={handsOnHref()}>実践</a> で、自分の端末で動かして確かめる。問題だけ解きたい人は、問題演習だけで進めてよい
+            </li>
             <li>間違えた問題は 1・3・7 日後に復習に出る。8 週を終えたら模擬試験で仕上げる</li>
           </ol>
         </section>
@@ -462,7 +464,7 @@ function Body() {
               </h2>
               <ol className="guide-steps">
                 <li>
-                  公開カリキュラムの細目を、{STATS.weeks} 週・{STATS.lessons} レッスンに割る
+                  公開カリキュラムの細目を、{STATS.weeks} 週・{STATS.lessons - STATS.labs} レッスンに割る
                 </li>
                 <li>公式の文書を読んで問題を一から書き、各問に出典の URL を付ける</li>
                 <li>書いた担当とは別の担当が、出典のページと 1 問ずつ照らして直す</li>

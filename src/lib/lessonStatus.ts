@@ -1,8 +1,17 @@
 import { WEEKS } from '../content/curriculum';
-import type { Domain, LessonMeta as Lesson } from '../content/types';
+import type { Domain, LabLesson, LessonMeta as Lesson, QuizLessonMeta, WeekIndex } from '../content/types';
 import { addDays, dayKey, planStart, weekStartDay, type Progress } from './progress';
 
 export type LessonStatus = 'done' | 'next' | 'pending';
+
+/** 週の問題演習 (実習を除いたレッスン)。週の画面・左の一覧・進捗・「次」・書き出す HTML の週のページが数えるのは、これだけ */
+export const exercisesOf = (week: { content?: WeekIndex }): QuizLessonMeta[] => (week.content?.lessons ?? []).filter((l) => l.kind === 'quiz');
+
+/** 週の実習 (実践の一覧に並べる) */
+export const labsOf = (week: { content?: WeekIndex }): LabLesson[] => (week.content?.lessons ?? []).filter((l) => l.kind === 'lab');
+
+/** 終えたレッスンの数 */
+export const doneLessons = (lessons: { id: string }[], progress: Progress) => lessons.filter((l) => progress.lessons[l.id]?.done).length;
 
 /** まだ終えていない最初のレッスンだけが「次」 */
 export function lessonStatuses(lessons: Lesson[], progress: Progress): LessonStatus[] {
@@ -51,8 +60,7 @@ export const DOMAINS: { name: Domain; short: string; weight: number }[] = [
 export function domainAccuracy(progress: Progress): Record<Domain, number | null> {
   const sum = new Map<Domain, { right: number; total: number }>();
   for (const w of WEEKS) {
-    for (const l of w.content?.lessons ?? []) {
-      if (l.kind !== 'quiz') continue;
+    for (const l of exercisesOf(w)) {
       for (const q of l.questions) {
         const a = progress.answers[q.id];
         if (!a) continue;
@@ -83,27 +91,20 @@ export function weeklyXp(progress: Progress, now: Date): { day: string; xp: numb
 
 /**
  * 計画との差。終わっているはずの週 (利用者の開始日から数えた週の 7 日目が昨日まで) の問題のレッスンの数と、そのうち終えた数。
- * 実習はクラスタが無いと進められないので、遅れには数えず labsLeft (残っている実習の数) に分ける。
+ * 実習は実践のページで別に数えるので、入れない。
  * expected が 0 なら、まだ計画の週が終わっていない
  */
-export function planStatus(progress: Progress, now: Date): { expected: number; done: number; labsLeft: number } {
+export function planStatus(progress: Progress, now: Date): { expected: number; done: number } {
   const today = dayKey(now);
   const start = planStart(progress, now);
   let expected = 0;
   let done = 0;
-  let labsLeft = 0;
   for (const w of WEEKS) {
     const end = addDays(weekStartDay(start, w.week), 6);
     if (end >= today) continue;
-    for (const l of w.content?.lessons ?? []) {
-      const isDone = progress.lessons[l.id]?.done === true;
-      if (l.kind === 'lab') {
-        if (!isDone) labsLeft++;
-        continue;
-      }
-      expected++;
-      if (isDone) done++;
-    }
+    const lessons = exercisesOf(w);
+    expected += lessons.length;
+    done += doneLessons(lessons, progress);
   }
-  return { expected, done, labsLeft };
+  return { expected, done };
 }

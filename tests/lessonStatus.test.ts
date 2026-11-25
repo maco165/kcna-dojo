@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { LessonMeta } from '../src/content/types';
 import { WEEKS } from '../src/content/curriculum';
-import { domainAccuracy, lessonCaption, lessonCorrect, lessonStatuses, planStatus, weeklyXp } from '../src/lib/lessonStatus';
+import { domainAccuracy, doneLessons, exercisesOf, labsOf, lessonCaption, lessonCorrect, lessonStatuses, planStatus, weeklyXp } from '../src/lib/lessonStatus';
 import { emptyProgress, type Progress } from '../src/lib/progress';
 
 const lessons: LessonMeta[] = WEEKS[0].content!.lessons;
@@ -22,6 +22,25 @@ describe('lessonStatuses', () => {
 
   it('全部終えると next は無い', () => {
     expect(lessonStatuses(lessons, withDone(lessons.map((l) => l.id)))).not.toContain('next');
+  });
+});
+
+describe('問題演習と実習の分け方', () => {
+  it('週の問題演習に実習は入らず、実習は別に並ぶ。終えた数も別に数える', () => {
+    for (const w of WEEKS) {
+      const all = w.content!.lessons;
+      const ids = exercisesOf(w).map((l) => l.id);
+      expect(ids).toEqual(all.map((l) => l.id).filter((id) => !id.endsWith('-lab')));
+      expect(labsOf(w).map((l) => l.id)).toEqual([`w${w.week}-lab`]);
+    }
+    const p = withDone(['w1-l1', 'w1-lab']);
+    expect(doneLessons(exercisesOf(WEEKS[0]), p)).toBe(1);
+    expect(doneLessons(labsOf(WEEKS[0]), p)).toBe(1);
+  });
+  it('問題演習を全部終えれば、実習が残っていても「次」は無い', () => {
+    const ex = exercisesOf(WEEKS[0]);
+    expect(lessonStatuses(ex, withDone(ex.map((l) => l.id)))).not.toContain('next');
+    expect(lessonStatuses(ex, emptyProgress())).toHaveLength(ex.length);
   });
 });
 
@@ -85,9 +104,8 @@ describe('進捗の画面の数字', () => {
 
   it('計画: 開始日から数えて 7 日目を過ぎた週のレッスンだけを、終わっているはずの数に入れる', () => {
     const week1Quiz = lessons.filter((l) => l.kind === 'quiz');
-    const week1Labs = lessons.length - week1Quiz.length;
-    expect(planStatus(startedOn(emptyProgress()), at('2026-11-29'))).toEqual({ expected: 0, done: 0, labsLeft: 0 });
-    expect(planStatus(startedOn(withDone(['w1-l1', 'w1-l2'])), at('2026-11-30'))).toEqual({ expected: week1Quiz.length, done: 2, labsLeft: week1Labs });
+    expect(planStatus(startedOn(emptyProgress()), at('2026-11-29'))).toEqual({ expected: 0, done: 0 });
+    expect(planStatus(startedOn(withDone(['w1-l1', 'w1-l2'])), at('2026-11-30'))).toEqual({ expected: week1Quiz.length, done: 2 });
     // 開始日を 1 週あとにした人は、同じ日でもまだ遅れていない
     expect(planStatus(startedOn(withDone(['w1-l1', 'w1-l2']), '2026-11-30'), at('2026-11-30')).expected).toBe(0);
   });
@@ -102,9 +120,8 @@ describe('進捗の画面の数字', () => {
     expect(planStatus(p, at('2027-05-10')).expected).toBe(lessons.filter((l) => l.kind === 'quiz').length);
   });
 
-  it('計画: 問題を全部終えて実習だけ残るなら遅れにしない', () => {
+  it('計画: 問題を全部終えて実習だけ残るなら遅れにしない (実習は数に入れない)', () => {
     const s = planStatus(startedOn(withDone(lessons.filter((l) => l.kind === 'quiz').map((l) => l.id))), at('2026-11-30'));
-    expect(s.done).toBe(s.expected);
-    expect(s.labsLeft).toBeGreaterThan(0);
+    expect(s).toEqual({ expected: lessons.length - 1, done: lessons.length - 1 });
   });
 });
