@@ -11,7 +11,7 @@
     "減らすほうが遅いのは、安定化の窓があるため",
     "増やしても、ノードの空きが無ければ Pending のまま"
   ],
-  "minutes": 150,
+  "minutes": 170,
   "needs": [
     "3 章を終えた仮想マシン kcna (k3s が動き、kubectl が使える)",
     "インターネットへの接続 (イメージを取ってきます)",
@@ -1150,7 +1150,7 @@
         }
       ],
       "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
-      "read": "何もエラーが出なければ止まっています。続けるときは、ホストで multipass shell kcna を打つと、動かして中に入れます。休む前に、前の手順の最後で Taints が <none> だったことを確かめます。印が残っていると、再起動のあとに動かない Pod が出ることがあります (外すのは kubectl taint nodes kcna demo=yes:NoSchedule- です)。戻ったら cd ~/ch4 を打ちます。kubectl get pods -n ch4 で web の 3 つが 1/1 になるまで待ちます。SVC_IP は、次に使う手順で決め直します。戻った直後の 1〜2 分は、一覧が止める前の古い様子のことがあります。少し待ってもう一度見ます。",
+      "read": "何もエラーが出なければ止まっています。休む前に、前の手順の最後で Taints が <none> だったことを思い出します。印が残っていると、新しく作る Pod が置けず Pending になります (外すのは、仮想マシンの中で kubectl taint nodes kcna demo=yes:NoSchedule- です)。続けるときは、ホストで multipass shell kcna を打つと、動かして中に入れます。戻ったら cd ~/ch4 を打ちます。kubectl get pods -n ch4 で web の 3 つが 1/1 になるまで待ちます。SVC_IP は、次に使う手順で決め直します。戻った直後の 1〜2 分は、一覧が止める前の古い様子のことがあります。少し待ってもう一度見ます。",
       "trouble": [
         {
           "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
@@ -1542,7 +1542,7 @@
         }
       ],
       "output": "pod/load created\npod/load condition met\nweb   Deployment/web   cpu: 5%/50%   1     4     1     85s\nweb   Deployment/web   cpu: 5%/50%   1     4     1     97s\nweb   Deployment/web   cpu: 5%/50%   1     4     1     110s\nweb   Deployment/web   cpu: 340%/50%   1     4     1     2m3s\nweb   Deployment/web   cpu: 340%/50%   1     4     1     2m15s\nweb   Deployment/web   cpu: 430%/50%   1     4     4     2m27s\nweb   Deployment/web   cpu: 225%/50%   1     4     4     2m40s\nweb   Deployment/web   cpu: 105%/50%   1     4     4     2m52s\nweb   Deployment/web   cpu: 102%/50%   1     4     4     3m5s\nNAME                   CPU(cores)   MEMORY(bytes)\nload                   581m         2Mi\nweb-6d455b9f54-4ntpp   20m          2Mi\nweb-6d455b9f54-5bmbx   20m          2Mi\nweb-6d455b9f54-m98tj   22m          3Mi\nweb-6d455b9f54-wsrbp   20m          2Mi\nAbleToScale=True ReadyForNewScale\nScalingActive=True ValidMetricFound\nScalingLimited=True TooManyReplicas",
-      "read": "使用率が目標の 50% を大きく超え、数が増えます。たとえば 1 つで 425% なら、1 × 425 ÷ 50 = 8.5 を切り上げた 9 がほしい数です。最大の 4 で止まると、ScalingLimited が True (TooManyReplicas) になります。「もっと要るが、上限」です。数が増えると、1 つあたりの使用率は下がります。増え始めるまでの時間と % は、使用量が集まる時機とマシンの速さで変わります (この手順を作ったときは、始めて 30〜60 秒で増えました)。休んだり間が空いたりすると、数が 1 でないところから始まることもあります。",
+      "read": "使用率が目標の 50% を大きく超え、数が増えます。たとえば 1 つで 425% なら、1 × 425 ÷ 50 = 8.5 を切り上げた 9 がほしい数です。最大の 4 で止まると、ScalingLimited が True (TooManyReplicas) になります。「もっと要るが、上限」です。数が増えると、1 つあたりの使用率は下がります。増え始めるまでの時間と % は、使用量が集まる時機とマシンの速さで変わります (この手順を作ったときは、始めて 30 秒〜1 分余りで増えました)。休んだり間が空いたりすると、数が 1 でないところから始まることもあります。",
       "trouble": [
         {
           "symptom": "使用率が上がらない",
@@ -1667,6 +1667,11 @@
           "symptom": "4 のまま",
           "check": "もう 1 分待って kubectl get hpa web -n ch4 を打つ",
           "fix": "新しい Pod の使用量が集まるまで (1 分ほど) と、窓の 30 秒を合わせた分だけ遅れる。さらに 1 分待つ"
+        },
+        {
+          "symptom": "すぐに 1 へ戻った",
+          "check": "kubectl get hpa web -n ch4 で REPLICAS を見る",
+          "fix": "HPA が計算した時に、新しい Pod がまだ Pending だったと考えられる。1 に戻っていれば次へ進む"
         }
       ],
       "source": "https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/"
@@ -2132,7 +2137,7 @@
       "task": "仮想マシンの中で、shop を手で 5 つにし、2 分後と、さらに 5 分後に、HPA が戻したかを見てください。",
       "hint": "shop の HPA は autoscale で作ったので、減らす窓は既定の 300 秒です。",
       "answer": "kubectl scale deployment shop --replicas=5 -n practice\nsleep 120\nkubectl get hpa shop -n practice\nsleep 300\nkubectl get hpa shop -n practice",
-      "verify": "2 分後は 5 のまま、7 分後には 2 に戻っていれば正解です。増やした直後、使用量の無い Pod がある間に HPA が「今の数 5」を記録し、その記録が窓の 300 秒残るためです (この章を作ったときは、時刻を測った 2 回は、どちらも 5 分余りで戻りました)。戻る時機は、使用量が集まる早さで前後します。"
+      "verify": "7 分後に 2 に戻っていれば正解です。2 分後は、ふつう 5 のままです。増やした直後、使用量の無い Pod がある間に HPA が「今の数 5」を記録し、その記録が窓の 300 秒残るためです (この章を作ったときは、時刻を測った 2 回は、どちらも 5 分余りで戻りました)。戻る時機は、使用量が集まる早さで前後します。HPA が計算した時に新しい Pod がまだ Pending だと、その分を数えないので、2 分より前に 2 に戻ることもあります。"
     }
   ],
   "sources": [

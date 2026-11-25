@@ -728,7 +728,7 @@
           "fix": "マシンが忙しいと、外れるのが 3 秒に間に合わないことがある。もう一度行う"
         }
       ],
-      "source": "https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/"
+      "source": "https://kubernetes.io/docs/concepts/workloads/pods/pod-termination/"
     },
     {
       "id": "break",
@@ -909,7 +909,7 @@
         }
       ],
       "output": "deployment.apps/slow created\nWaiting for deployment \"slow\" rollout to finish: 0 of 2 updated replicas are available...\nWaiting for deployment \"slow\" rollout to finish: 1 of 2 updated replicas are available...\ndeployment \"slow\" successfully rolled out\nservice/slow exposed\n[1] 43450\ndeployment.apps/slow env updated\nWaiting for deployment \"slow\" rollout to finish: 1 out of 2 new replicas have been updated...\nWaiting for deployment \"slow\" rollout to finish: 1 out of 2 new replicas have been updated...\nWaiting for deployment \"slow\" rollout to finish: 1 out of 2 new replicas have been updated...\nWaiting for deployment \"slow\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"slow\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"slow\" rollout to finish: 1 old replicas are pending termination...\ndeployment \"slow\" successfully rolled out\n     58 000\n    142 200",
-      "read": "更新はすぐに「終わった」と出ます。ところが 000 (つなげない) が混ざります。理由は 2 つあります。終わったと言われた時、新しい Pod はまだ起動の途中でした (readiness が無い)。それを「使える」とみなして、動いていた古い Pod も先に消されました。混ざる数は、打つ時とマシンの速さで変わります。",
+      "read": "更新はすぐに「終わった」と出ます。ところが 000 (つなげない) が混ざります。理由は 2 つあります。終わったと言われた時、新しい Pod はまだ起動の途中でした (readiness が無い)。それを「使える」とみなして、動いていた古い Pod も先に消されました。消える途中の Pod に渡した分も混ざりえます。混ざる数は、打つ時とマシンの速さで変わります。",
       "trouble": [
         {
           "symptom": "全部 200 になる",
@@ -2088,8 +2088,8 @@
       "url": "https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/"
     },
     {
-      "label": "Kubernetes: Pod Lifecycle (終わり方)",
-      "url": "https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/"
+      "label": "Kubernetes: Pod Termination",
+      "url": "https://kubernetes.io/docs/concepts/workloads/pods/pod-termination/"
     },
     {
       "label": "Kubernetes: Liveness, Readiness and Startup Probes",
