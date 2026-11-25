@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import commands from '../src/content/commands.json';
 import { COMMAND_PAGES, findCommandPage, implUrl } from '../src/content/commandPages';
+// @ts-expect-error 検査の規則は JS (scripts/private-words.mjs)
+import { PRIVATE } from '../scripts/private-words.mjs';
 import { commandsHref, parseRoute } from '../src/lib/route';
 import type { CommandData } from '../src/lib/commandRefs';
 
 const DATA = commands as CommandData;
-/** 家のクラスタの名前・住所が載っていないか (載せるなら伏せる決まり) */
-const PRIVATE = /192\.168\.|slave-\d|pihole|keycloak|household|k3s-home|\/home\/maco/;
 
 describe('コマンドのページ', () => {
   it('問題に出てくるコマンドのすべてにページがある (無いコマンドを除く)', () => {
@@ -26,6 +26,7 @@ describe('コマンドのページ', () => {
       for (const a of p.api) expect(a.path.startsWith('/'), `${p.id} ${a.path}`).toBe(true);
     }
   });
+  // 載せるなら伏せる決まり
   it('家のクラスタの名前・住所を載せていない', () => {
     for (const p of COMMAND_PAGES) expect(JSON.stringify(p).match(PRIVATE)?.[0], p.id).toBeUndefined();
   });

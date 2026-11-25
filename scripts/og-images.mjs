@@ -36,6 +36,7 @@ export function kickerOf(page) {
   if (p.startsWith('glossary/')) return '用語集';
   if (p.startsWith('commands/')) return 'コマンド';
   if (p.startsWith('compare/')) return '似た語の比較表';
+  if (p.startsWith('hands-on/') || page.parent === 'hands-on/') return '実践';
   if (p.startsWith('lesson/')) return 'レッスン';
   if (p.startsWith('week/')) return '週のレッスン';
   if (p === 'exam/') return '模擬試験';

@@ -25,7 +25,7 @@ import {
   type ColorMode,
   examDate,
   goalXp,
-  parseProgressText,
+  mergeImported, parseProgressText,
   planStart,
   resetProgress,
   saveProgress,
@@ -70,10 +70,14 @@ function CalendarPlan({ weeklyDays }: { weeklyDays: number | undefined }) {
 }
 
 function summary(p: Progress) {
-  const lessons = Object.values(p.lessons).filter((l) => l.done).length;
+  const doneIds = Object.keys(p.lessons).filter((id) => p.lessons[id].done);
+  // 実習 (id が w1-lab の形) は実践として数える
+  const labs = doneIds.filter((id) => /^w\d+-lab$/.test(id)).length;
+  const lessons = doneIds.length - labs;
+  const chapters = Object.values(p.handsOn ?? {}).filter((h) => h.done).length;
   const answers = Object.keys(p.answers).length;
   const read = Object.values(p.handbook ?? {}).filter((h) => h.done).length;
-  return `完了したレッスン ${lessons} · 答えた問題 ${answers} · 合計 ${p.xp.total} XP · ハンドブックの確認済み ${read}`;
+  return `完了したレッスン ${lessons} · 完了した実践 ${labs + chapters} · 答えた問題 ${answers} · 合計 ${p.xp.total} XP · ハンドブックの確認済み ${read}`;
 }
 
 function Body({ progress, updateProgress }: Props) {
@@ -130,7 +134,7 @@ function Body({ progress, updateProgress }: Props) {
                 <SegmentedControlItem key={g} value={String(g)} label={`${g} XP`} />
               ))}
             </SegmentedControl>
-            <Text type="supporting">1 問正解で 3 XP、実習で 10 XP です。</Text>
+            <Text type="supporting">1 問正解で 3 XP、実践の章か実習を終えると 10 XP です。</Text>
           </VStack>
           <VStack gap={1.5}>
             <Text weight="medium">週の目標</Text>
@@ -205,10 +209,7 @@ function Body({ progress, updateProgress }: Props) {
                     variant="primary"
                     label="置き換える"
                     onClick={() => {
-                      // 目標と受験日を変えたことの無い端末の書き出しなら、今の設定を引き継ぐ。
-                      // 画面の色はこの端末の見た目の設定なので、読み込んでも今の端末の色を残す
-                      const base = loaded.profile ? loaded : { ...loaded, profile: progress.profile };
-                      const next = base.profile ? setProfile(base, { colorMode: colorMode(progress) }) : base;
+                      const next = mergeImported(loaded, progress);
                       if (!saveProgress(next)) {
                         setLoadError('このブラウザに保存できませんでした (容量の上限やプライベートモードなど)。今の記録はそのままです。');
                         setLoaded(null);
@@ -235,7 +236,7 @@ function Body({ progress, updateProgress }: Props) {
         isOpen={confirmReset}
         onOpenChange={setConfirmReset}
         title="記録を消しますか?"
-        description="完了したレッスン・XP・連続日数と休みの札・日ごとの答えた数・問題ごとの正誤・模擬試験の結果・ハンドブックの読んだ記録を消します。目標・受験日・画面の色の設定は残ります。消す前に書き出しておくと、あとで読み込んで戻せます。"
+        description="完了したレッスン・XP・連続日数と休みの札・日ごとの答えた数・問題ごとの正誤・模擬試験の結果・ハンドブックの読んだ記録・実践の手順の印を消します。目標・受験日・画面の色・実践の OS の設定は残ります。消す前に書き出しておくと、あとで読み込んで戻せます。"
         actionLabel="消す"
         cancelLabel="やめる"
         onAction={() => {

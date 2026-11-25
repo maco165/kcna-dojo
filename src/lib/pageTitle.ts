@@ -28,7 +28,11 @@ export function lightTitle(route: Route): string | undefined {
       return 'ハンドブック';
     case 'glossary':
       return '用語集';
-    // 比較表の表とコマンドのページの題名は、それぞれのデータが要るので、ここでは決めない (route.ts と prerender が決める)
+    case 'handsOn':
+      return '実践';
+    // 比較表の表・コマンドのページ・実践の章の題名は、それぞれのデータが要るので、ここでは決めない (route.ts と prerender が決める)
+    case 'handsOnChapter':
+      return undefined;
     case 'compare':
       return route.tableId ? undefined : '似た語の比較表';
     case 'commands':
@@ -50,13 +54,14 @@ export function lightTitle(route: Route): string | undefined {
 
 /**
  * そのページのタブの題名を決める (サイトの中で移ったとき route.ts が使う。書き出した題名と同じことは tests/pages.test.ts が見る)。
- * ハンドブックのトピックと用語集の語は pageMeta、コマンドのページはコマンドのデータ、比較表の表は比較表のデータだけを後から読む
+ * ハンドブックのトピックと用語集の語は pageMeta、コマンドのページはコマンドのデータ、実践の章は章の軽い一覧、比較表の表は比較表のデータだけを後から読む
  * (pageMeta はハンドブックのデータも読むので、コマンドと比較表には使わない)
  */
 export async function resolveTitle(route: Route): Promise<string> {
   if (needsHeavyTitle(route)) return (await import('./pageMeta')).fullTitle(route);
   if (route.name === 'commands' && route.commandId) return withSite((await import('../content/commandPages')).commandPageTitle(route.commandId));
   if (route.name === 'compare' && route.tableId) return withSite((await import('../content/compare')).tableTitle(route.tableId));
+  if (route.name === 'handsOnChapter') return withSite((await import('../content/handsOn')).chapterTitle(route.chapterId));
   return withSite(lightTitle(route));
 }
 

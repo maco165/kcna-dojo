@@ -73,7 +73,7 @@ export function StudyCalendar({ progress, now }: { progress: Progress; now: Date
           <span role="img" className="cal__cell cal__cell--key cal__cell--partial" aria-label="答えたが終えていない日" title="答えたが終えていない日" />
           <Text type="supporting">{`答えたが終えていない日${partial > 0 ? ` (${partial} 日)` : ''}`}</Text>
         </HStack>
-        <Text type="supporting">学んだ日は、レッスン・復習・模擬試験を終えた日です (連続日数・週の目標と同じ数え方)。</Text>
+        <Text type="supporting">学んだ日は、レッスン・実習・実践の章・復習・模擬試験を終えた日です (連続日数・週の目標と同じ数え方)。</Text>
       </VStack>
     </Card>
   );

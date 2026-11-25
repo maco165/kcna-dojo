@@ -55,6 +55,8 @@ describe('ページごとの OG 画像', () => {
   });
 
   it('種類の札', () => {
+    expect(kickerOf({ path: 'hands-on/' })).toBe('実践');
+    expect(kickerOf({ path: 'lesson/w1-lab/', parent: 'hands-on/' })).toBe('実践');
     expect(['handbook/x/', 'glossary/x/', 'commands/x/', 'compare/x/', 'lesson/w1-l1/', 'week/2/', 'exam/', 'about/'].map((p) => kickerOf({ path: p }))).toEqual(['ハンドブック', '用語集', 'コマンド', '似た語の比較表', 'レッスン', '週のレッスン', '模擬試験', 'KCNA-JP 対策']);
   });
 
