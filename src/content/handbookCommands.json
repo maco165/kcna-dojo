@@ -1,0 +1,1680 @@
+[
+  {
+    "id": "sudo",
+    "command": "sudo",
+    "tool": "Linux",
+    "summary": "管理者 (root) の権限で、後ろに書いたコマンドを動かします。",
+    "detail": "Linux では、システムのファイルを変えたり、秘密のファイルを読んだりできるのは、ふつう root という管理者だけです。sudo は、許されたユーザーに、1 つのコマンドだけを root として動かさせます。何でもできてしまうので、意味の分かったコマンドにだけ付けます。",
+    "usage": "sudo <コマンド> [引数]",
+    "flags": [
+      {
+        "flags": [
+          "-u"
+        ],
+        "text": "root ではなく、指定したユーザーとして動かす"
+      }
+    ],
+    "source": "https://man7.org/linux/man-pages/man8/sudo.8.html",
+    "inside": [
+      "sudo は、決まりのファイル (ふつう /etc/sudoers) を見て、このユーザーがそのコマンドを動かしてよいかを確かめます。",
+      "許されていれば、本人かを確かめるために、ふつうは自分のパスワードを聞きます (root のパスワードではありません)。同じ端末では、既定で 5 分ほど、もう一度打っても聞かれません。",
+      "確かめられたら、後ろのコマンドを root として動かし、終わったらその終了コードを返します。元のシェルは自分のままです。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "パスワードを聞かずに試し、断られる例 (このページのために打った例)",
+        "code": "$ sudo -n true",
+        "output": "sudo: interactive authentication is required",
+        "note": "-n は「聞かずに試す」です。本人の確認がまだなので、何も動かさずに断られました。文言は sudo の種類や版で変わります (この例は sudo-rs)。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "sudo.ws の sudo の説明",
+        "url": "https://www.sudo.ws/docs/man/sudo.man/"
+      },
+      {
+        "label": "sudo.ws の sudoers (聞かれるのは自分のパスワード)",
+        "url": "https://www.sudo.ws/docs/man/sudoers.man/"
+      }
+    ],
+    "usedIn": [
+      {
+        "topic": "containerization",
+        "label": "コンテナ化: イメージ・ランタイム・CRI"
+      },
+      {
+        "topic": "setup-k3s",
+        "label": "ハンドブックを試すための k3s の入れ方"
+      }
+    ]
+  },
+  {
+    "id": "mkdir",
+    "command": "mkdir",
+    "tool": "Linux",
+    "summary": "新しいフォルダ (ディレクトリ) を作ります。",
+    "detail": "make directory の略です。-p を付けると、途中のフォルダもまとめて作り、すでにあってもエラーにしません。手順の中で何度打っても困らないので、-p がよく付きます。",
+    "usage": "mkdir [オプション] <フォルダの名前>",
+    "flags": [
+      {
+        "flags": [
+          "-p",
+          "--parents"
+        ],
+        "text": "途中のフォルダもまとめて作る。すでにあってもエラーにしない"
+      }
+    ],
+    "source": "https://man7.org/linux/man-pages/man1/mkdir.1.html",
+    "inside": [
+      "mkdir は、mkdir というシステムコール (カーネルへの頼みごと) で、名前と権限を渡してフォルダを作ります。権限は、渡した値から umask (はじめに外しておく権限の設定) の分を引いたものになります。",
+      "-p を付けると、手前のフォルダから順に 1 つずつ作ります。すでにあるフォルダは飛ばします。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "-p で途中のフォルダも作る様子を、カーネルへの頼みごとで見る (このページのために打った例)",
+        "code": "$ strace -f -e trace=mkdir mkdir -p a/b",
+        "output": "mkdir(\"a\", 0777)                        = 0\nmkdir(\"a/b\", 0777)                      = 0",
+        "note": "a を作ってから a/b を作っています。= 0 は成功です。strace は、プログラムがカーネルに頼んだことを見る道具です。"
+      },
+      {
+        "title": "もう一度打ってもエラーにならない (このページのために打った例)",
+        "code": "$ mkdir -p a; echo \"rc=$?\"",
+        "output": "rc=0",
+        "note": "$? は直前のコマンドの終了コードで、0 は成功です。-p が無いと、すでにあるというエラーになります。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "man7.org の mkdir(2)",
+        "url": "https://man7.org/linux/man-pages/man2/mkdir.2.html"
+      }
+    ],
+    "usedIn": [
+      {
+        "topic": "setup-k3s",
+        "label": "ハンドブックを試すための k3s の入れ方"
+      }
+    ]
+  },
+  {
+    "id": "cp",
+    "command": "cp",
+    "tool": "Linux",
+    "summary": "ファイルを写します (コピーします)。",
+    "detail": "copy の略です。元のファイルはそのまま残ります。写した先に同じ名前のファイルがあると、上書きします。",
+    "usage": "cp [オプション] <元> <写した先>",
+    "flags": [
+      {
+        "flags": [
+          "-p"
+        ],
+        "text": "権限・持ち主・時刻もそのまま写す (できる範囲で)"
+      },
+      {
+        "flags": [
+          "-r",
+          "-R"
+        ],
+        "text": "フォルダを中身ごと写す"
+      },
+      {
+        "flags": [
+          "-i"
+        ],
+        "text": "上書きの前に聞く"
+      }
+    ],
+    "source": "https://man7.org/linux/man-pages/man1/cp.1.html",
+    "inside": [
+      "cp は元のファイルを読む用に開き、写した先を新しく作って開きます。新しいファイルの権限は、元のファイルの権限から umask の分を引いたものです。",
+      "中身を写します。この例の機械では、まず中身を共有する写し方を試し、できなければカーネルに写させます (copy_file_range)。",
+      "すでにあるファイルに上書きするときは、ふつう権限と持ち主はそのままで、中身だけが入れ替わります。",
+      "新しいファイルの持ち主は、cp を動かした人です。sudo cp で写すと root の持ち物になるので、自分で使うには chown で持ち主を変えます。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "cp がカーネルに頼んだこと (一部) (このページのために打った例)",
+        "code": "$ strace -e trace=openat,copy_file_range cp f g",
+        "output": "openat(AT_FDCWD, \"f\", O_RDONLY)         = 3\nopenat(AT_FDCWD, \"g\", O_WRONLY|O_CREAT|O_EXCL, 0644) = 4\ncopy_file_range(3, NULL, 4, NULL, 9223372035781033984, 0) = 6\ncopy_file_range(3, NULL, 4, NULL, 9223372035781033984, 0) = 0",
+        "note": "f (権限 644、6 バイト) を読む用に、g を新しく作って書く用に開き、6 バイトを写しています。権限 600 の f で試すと、g は 0600 で作られました。作り方は cp の種類や版で変わります (この例は uutils の cp 0.10.0)。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "GNU coreutils の文書の元原稿 (cp)",
+        "url": "https://github.com/coreutils/coreutils/blob/master/doc/coreutils.texi"
+      }
+    ],
+    "usedIn": [
+      {
+        "topic": "setup-k3s",
+        "label": "ハンドブックを試すための k3s の入れ方"
+      }
+    ]
+  },
+  {
+    "id": "chown",
+    "command": "chown",
+    "tool": "Linux",
+    "summary": "ファイルの持ち主を変えます。",
+    "detail": "change owner の略です。「ユーザー:グループ」の形で新しい持ち主を書きます。持ち主を変えられるのはふつう root だけなので、sudo と一緒に使います (グループだけなら、自分の入っているグループには自分でも変えられます)。",
+    "usage": "chown [オプション] <ユーザー>[:<グループ>] <ファイル>",
+    "flags": [
+      {
+        "flags": [
+          "-R"
+        ],
+        "text": "フォルダの中身も全部変える"
+      }
+    ],
+    "source": "https://man7.org/linux/man-pages/man1/chown.1.html",
+    "inside": [
+      "名前で書かれたユーザーとグループを、番号 (UID と GID) に直します。番号で書けば、そのまま使います。",
+      "chown などのシステムコールで、ファイルに記録された持ち主の番号を書き換えます。中身は変わりません。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "番号を渡している様子 (このページのために打った例)",
+        "code": "$ strace -e trace=chown chown \"$(id -u):$(id -g)\" f",
+        "output": "chown(\"f\", 1000, 1000)                  = 0",
+        "note": "$(id -u) と $(id -g) が 1000 に置き換わってから、chown に渡っています。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "man7.org の chown(2)",
+        "url": "https://man7.org/linux/man-pages/man2/chown.2.html"
+      }
+    ],
+    "usedIn": [
+      {
+        "topic": "setup-k3s",
+        "label": "ハンドブックを試すための k3s の入れ方"
+      }
+    ]
+  },
+  {
+    "id": "chmod",
+    "command": "chmod",
+    "tool": "Linux",
+    "summary": "ファイルの権限 (だれが読める・書ける・動かせるか) を変えます。",
+    "detail": "change mode の略です。600 のような 3 桁の数は、左から持ち主・グループ・そのほかの人の権限です。読む 4・書く 2・動かす 1 を足します。600 は「持ち主だけが読み書きでき、ほかの人は何もできない」です。フォルダでは「動かす」が「中に入る」の意味になるので、フォルダに 600 を付けると自分も入れなくなります。",
+    "usage": "chmod [オプション] <権限> <ファイル>",
+    "flags": [
+      {
+        "flags": [
+          "-R"
+        ],
+        "text": "フォルダの中身も全部変える"
+      }
+    ],
+    "source": "https://man7.org/linux/man-pages/man1/chmod.1.html",
+    "inside": [
+      "600 を 8 進数 (0〜7 で数える数) として読み、持ち主は読み書き (4+2)、グループとそのほかの人は無し、という権限にします。",
+      "chmod などのシステムコールで、ファイルの権限を書き換えます。変えられるのは、持ち主と root です。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "600 にして確かめる (このページのために打った例)",
+        "code": "$ chmod 600 f\n$ ls -l f | cut -c1-10",
+        "output": "-rw-------",
+        "note": "左端の - はふつうのファイルの印で、rw- が持ち主、次の --- がグループ、最後の --- がそのほかの人です。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "man7.org の chmod(2)",
+        "url": "https://man7.org/linux/man-pages/man2/chmod.2.html"
+      }
+    ],
+    "usedIn": [
+      {
+        "topic": "setup-k3s",
+        "label": "ハンドブックを試すための k3s の入れ方"
+      }
+    ]
+  },
+  {
+    "id": "id",
+    "command": "id",
+    "tool": "Linux",
+    "summary": "自分 (や指定したユーザー) の番号と、入っているグループを出します。",
+    "detail": "Linux は、ユーザーを名前ではなく番号 (UID) で見分けます。id -u はユーザーの番号、id -g はグループの番号だけを出します。",
+    "usage": "id [オプション] [ユーザー]",
+    "flags": [
+      {
+        "flags": [
+          "-u",
+          "--user"
+        ],
+        "text": "ユーザーの番号だけを出す"
+      },
+      {
+        "flags": [
+          "-g",
+          "--group"
+        ],
+        "text": "グループの番号だけを出す"
+      },
+      {
+        "flags": [
+          "-n",
+          "--name"
+        ],
+        "text": "番号ではなく名前で出す (-u や -g と一緒に使う)"
+      }
+    ],
+    "source": "https://man7.org/linux/man-pages/man1/id.1.html",
+    "inside": [
+      "id は、いま動いているプロセスのユーザーの番号を、カーネルに聞きます (geteuid など)。",
+      "オプションが無ければ、番号に当たる名前も調べて、入っているグループと一緒に出します。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "自分の番号を出す (このページのために打った例)",
+        "code": "$ id -u\n$ id -g",
+        "output": "1000\n1000",
+        "note": "番号は環境で変わります。$(id -u) と書くと、この結果がその場所に入ります。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "man7.org の geteuid(2)",
+        "url": "https://man7.org/linux/man-pages/man2/geteuid.2.html"
+      }
+    ],
+    "usedIn": [
+      {
+        "topic": "setup-k3s",
+        "label": "ハンドブックを試すための k3s の入れ方"
+      }
+    ]
+  },
+  {
+    "id": "export",
+    "command": "export",
+    "tool": "Linux",
+    "summary": "環境変数を決めて、これから動かすコマンドに渡します。",
+    "detail": "環境変数は、コマンドが読む「名前=値」の設定です。export しない変数はそのシェルの中だけのもので、ほかのコマンドには渡りません。開いている端末の中だけで効くので、次に開いたときも使うなら、bash では ~/.bashrc に書きます。",
+    "usage": "export <名前>=<値>",
+    "flags": [
+      {
+        "flags": [
+          "-p"
+        ],
+        "text": "今 export されている変数を一覧する"
+      }
+    ],
+    "source": "https://man7.org/linux/man-pages/man1/export.1p.html",
+    "inside": [
+      "export は別のプログラムではなく、シェルの中の命令です。シェルが、その変数に「外にも渡す」という印を付けます。",
+      "そのあとシェルがコマンドを動かすとき、印の付いた変数がまとめて渡ります。kubectl は、渡された KUBECONFIG を見て、読むファイルを決めます。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "export したものだけが渡る (このページのために打った例)",
+        "code": "$ export X=1\n$ Y=2\n$ sh -c 'echo X=$X Y=$Y'",
+        "output": "X=1 Y=",
+        "note": "別のシェル (sh) を動かして、渡った変数を出しています。export していない Y は渡っていません。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "kubernetes.io の kubeconfig によるクラスターアクセスの設定",
+        "url": "https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/"
+      }
+    ],
+    "usedIn": [
+      {
+        "topic": "setup-k3s",
+        "label": "ハンドブックを試すための k3s の入れ方"
+      }
+    ]
+  },
+  {
+    "id": "echo",
+    "command": "echo",
+    "tool": "Linux",
+    "summary": "後ろに書いた文字を、そのまま画面に出します。",
+    "detail": "文字を出すだけのコマンドですが、>> と組み合わせると、ファイルの最後に 1 行足せます。> が 1 つだと、ファイルの中身を全部消して書き直すので、足すときは必ず 2 つにします。",
+    "usage": "echo [オプション] <文字>",
+    "flags": [
+      {
+        "flags": [
+          "-n"
+        ],
+        "text": "最後に改行を付けない"
+      }
+    ],
+    "source": "https://man7.org/linux/man-pages/man1/echo.1.html",
+    "inside": [
+      "echo の引数を空白でつなぎ、改行を付けて標準出力 (ふつうは画面) に書きます。",
+      "後ろに >> ファイル と書くと、シェルが先にそのファイルを「最後に足す」形で開き、出力の行き先をそこに変えてから echo を動かします。",
+      "一重の引用符 '...' で囲んだ文字は、シェルが中を読み替えません。$ や ~ もそのままの文字で書かれます。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": ">> で 1 行ずつ足す (このページのために打った例)",
+        "code": "$ echo a >> g\n$ echo b >> g\n$ cat g",
+        "output": "a\nb",
+        "note": "2 回打つと 2 行になります。cat はファイルの中身を出すコマンドです。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "man7.org の bash(1) (REDIRECTION)",
+        "url": "https://man7.org/linux/man-pages/man1/bash.1.html"
+      }
+    ],
+    "usedIn": [
+      {
+        "topic": "security",
+        "label": "セキュリティ: 認証・RBAC・Secret・Pod のセキュリティ"
+      },
+      {
+        "topic": "setup-k3s",
+        "label": "ハンドブックを試すための k3s の入れ方"
+      }
+    ]
+  },
+  {
+    "id": "sh",
+    "command": "sh",
+    "tool": "Linux",
+    "summary": "シェル (コマンドを読んで動かすプログラム) を動かします。",
+    "detail": "sh - と書くと、シェルは標準入力から届いた文字を、コマンドのまとまりごとに読んで動かします。curl で取ったスクリプトをパイプ (|) で渡すと、保存せずにそのまま実行されます。中身をそのまま動かすので、信用できる配り元のものだけに使います。",
+    "usage": "sh [オプション] [- | <スクリプト>]",
+    "flags": [
+      {
+        "flags": [
+          "-c"
+        ],
+        "text": "後ろの文字を、コマンドとして動かす"
+      }
+    ],
+    "source": "https://man7.org/linux/man-pages/man1/sh.1p.html",
+    "inside": [
+      "パイプ (|) は、左のコマンドの出力を、右のコマンドの標準入力につなぎます。2 つは同時に動きます。",
+      "sh は、届いた文字をコマンドとして読み、echo のような中の命令は自分で、mkdir のような別のプログラムは新しいプロセスを起こして動かします。",
+      "k3s のインストールスクリプトは、最後の { ... } のかたまりで本番の処理を順に呼びます。シェルはかたまりを終わりまで読んでから動かすので、途中までしか届かなかったときに本番の処理が始まりません。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "文字をパイプで渡して動かす (このページのために打った例)",
+        "code": "$ printf 'echo hello\\n' | sh -",
+        "output": "hello",
+        "note": "渡した「echo hello」がコマンドとして動きました。"
+      },
+      {
+        "title": "別のプログラムを起こす様子 (このページのために打った例)",
+        "code": "$ strace -f -e trace=execve sh -c 'mkdir x; echo hi'",
+        "output": "execve(\"/usr/bin/sh\", [\"sh\", \"-c\", \"mkdir x; echo hi\"], ...) = 0\n[pid ...] execve(\"/usr/bin/mkdir\", [\"mkdir\", \"x\"], ...) = 0\nhi",
+        "note": "mkdir は別のプログラムとして起こされ、echo はシェルが自分で出しています。番号や住所は省いてあります。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "k3s v1.36.6+k3s1: install.sh",
+        "url": "https://github.com/k3s-io/k3s/blob/v1.36.6%2Bk3s1/install.sh"
+      },
+      {
+        "label": "K3s: Quick-Start Guide",
+        "url": "https://docs.k3s.io/quick-start"
+      }
+    ],
+    "usedIn": [
+      {
+        "topic": "setup-k3s",
+        "label": "ハンドブックを試すための k3s の入れ方"
+      }
+    ]
+  },
+  {
+    "id": "k3s-uninstall",
+    "command": "k3s-uninstall.sh",
+    "tool": "k3s",
+    "summary": "k3s と、そのマシンにあるクラスターのデータを消します。",
+    "detail": "k3s を入れたときに /usr/local/bin に置かれるスクリプトです。消したデータは戻りません。実行するとすぐに消し始め、確認は出ません。",
+    "usage": "k3s-uninstall.sh",
+    "flags": [],
+    "source": "https://docs.k3s.io/installation/uninstall",
+    "inside": [
+      "root でなければ、sudo で自分を動かし直します。",
+      "k3s-killall.sh を動かし、k3s のサービスとコンテナを止めます。",
+      "systemd (か openrc) のサービスの登録を外し、サービスのファイルを消します。ほかの k3s のサービスが残っていれば、ここで止めて、残りは消しません (このときも、このスクリプト自身は消えます)。",
+      "kubectl・crictl・ctr のリンク、/etc/rancher/k3s、データのフォルダ (ふつう /var/lib/rancher/k3s)、/var/lib/kubelet、k3s のバイナリなどを消します。Local Storage の PV のデータも消えますが、外部のデータストアは消えません。最後に、このスクリプト自身も消えます。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "root でなければ sudo で動かし直す行 (スクリプトの中身。動かしてはいません)",
+        "code": "$ grep \"exec sudo\" /usr/local/bin/k3s-uninstall.sh",
+        "output": "[ $(id -u) -eq 0 ] || exec sudo --preserve-env=K3S_DATA_DIR $0 $@",
+        "note": "k3s の install.sh が書き出す行から取った形の例です。id -u が 0 (root) でなければ、sudo で同じスクリプトを動かし直します。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "k3s v1.36.6+k3s1: install.sh (create_uninstall)",
+        "url": "https://github.com/k3s-io/k3s/blob/v1.36.6%2Bk3s1/install.sh#L898"
+      }
+    ],
+    "usedIn": [
+      {
+        "topic": "setup-k3s",
+        "label": "ハンドブックを試すための k3s の入れ方"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-create-namespace",
+    "command": "kubectl create namespace",
+    "tool": "kubectl",
+    "summary": "新しい名前空間を作ります。",
+    "detail": "名前空間は、クラスターの中を区切る入れ物です。練習用に 1 つ作っておくと、名前空間を消すだけで、その中のものをまとめて片付けられます。namespace は ns と短く書けます。",
+    "usage": "kubectl create namespace <名前> [オプション]",
+    "flags": [
+      {
+        "flags": [
+          "--dry-run"
+        ],
+        "text": "作らずに試す (client は手元だけ、server は API サーバーで確かめるところまで)"
+      }
+    ],
+    "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_create/kubectl_create_namespace/",
+    "inside": [
+      "kubectl が、名前だけを書いた Namespace を手元で組み立てます。ファイルは要りません。",
+      "API サーバーに POST で送ります。API サーバーは、認証・認可・検査を通してから保存先に書きます。",
+      "名前空間ができると、Kubernetes が default という名前の ServiceAccount をその中に作ります。"
+    ],
+    "api": [
+      {
+        "method": "POST",
+        "path": "/api/v1/namespaces",
+        "note": "名前空間を作る"
+      }
+    ],
+    "examples": [
+      {
+        "title": "名前空間を作る (形の例)",
+        "code": "$ kubectl create namespace try-kcna",
+        "output": "namespace/try-kcna created"
+      }
+    ],
+    "sources": [
+      {
+        "label": "kubectl v0.37.2: pkg/cmd/create/create_namespace.go",
+        "url": "https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/cmd/create/create_namespace.go"
+      },
+      {
+        "label": "Kubernetes: Namespaces",
+        "url": "https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/"
+      },
+      {
+        "label": "Kubernetes: Service Accounts",
+        "url": "https://kubernetes.io/docs/concepts/security/service-accounts/"
+      }
+    ],
+    "usedIn": [
+      {
+        "topic": "core-concepts",
+        "label": "Kubernetes の中心の考え方"
+      },
+      {
+        "topic": "administration",
+        "label": "クラスタの管理: kubectl・kubeconfig・資源の上限"
+      },
+      {
+        "topic": "scheduling",
+        "label": "スケジューリング: Pod を置くノードの決まり方"
+      },
+      {
+        "topic": "containerization",
+        "label": "コンテナ化: イメージ・ランタイム・CRI"
+      },
+      {
+        "topic": "networking",
+        "label": "ネットワーク: Pod・Service・DNS・入口・NetworkPolicy"
+      },
+      {
+        "topic": "security",
+        "label": "セキュリティ: 認証・RBAC・Secret・Pod のセキュリティ"
+      },
+      {
+        "topic": "troubleshooting",
+        "label": "障害対応: 状態・イベント・ログの順に読む"
+      },
+      {
+        "topic": "storage",
+        "label": "ストレージ: ボリューム・PV・PVC・StorageClass"
+      },
+      {
+        "topic": "setup-k3s",
+        "label": "ハンドブックを試すための k3s の入れ方"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-create-deployment",
+    "command": "kubectl create deployment",
+    "tool": "kubectl",
+    "summary": "Deployment を作り、指定したイメージの Pod を動かします。",
+    "detail": "YAML のファイルを書かずに、名前とイメージだけで作れます。数を書かなければ Pod は 1 つです。",
+    "usage": "kubectl create deployment <名前> --image=<イメージ> [オプション]",
+    "flags": [
+      {
+        "flags": [
+          "--image"
+        ],
+        "text": "動かすイメージ (必須)"
+      },
+      {
+        "flags": [
+          "--replicas"
+        ],
+        "text": "Pod の数 (既定は 1)"
+      },
+      {
+        "flags": [
+          "--dry-run"
+        ],
+        "text": "作らずに試す (client は手元だけ、server は API サーバーで確かめるところまで)"
+      },
+      {
+        "flags": [
+          "-o",
+          "--output"
+        ],
+        "text": "出力の形 (yaml など)"
+      }
+    ],
+    "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_create/kubectl_create_deployment/",
+    "inside": [
+      "kubectl が、名前とイメージから Deployment を手元で組み立てます。app=<名前> というラベルと、それを選ぶセレクターも付けます。コンテナの名前はイメージの名前から取ります。",
+      "API サーバーに POST で送り、保存されます。ここで kubectl の仕事は終わりです。",
+      "あとはコントローラーが ReplicaSet を作り、ReplicaSet が Pod を作り、スケジューラーがノードを選び、kubelet がイメージを取って動かします。kubectl rollout status で、動き出すまで待てます。"
+    ],
+    "api": [
+      {
+        "method": "POST",
+        "path": "/apis/apps/v1/namespaces/<名前空間>/deployments",
+        "note": "Deployment を作る"
+      }
+    ],
+    "examples": [
+      {
+        "title": "何が作られるかを、作らずに見る (このページのために打った例)",
+        "code": "$ kubectl create deployment hello --image=nginx:1.27-alpine -n try-kcna --dry-run=client -o yaml",
+        "output": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  labels:\n    app: hello\n  name: hello\n  namespace: try-kcna\nspec:\n  replicas: 1\n  selector:\n    matchLabels:\n      app: hello\n  strategy: {}\n  template:\n    metadata:\n      labels:\n        app: hello\n    spec:\n      containers:\n      - image: nginx:1.27-alpine\n        name: nginx\n        resources: {}\nstatus: {}",
+        "note": "名前とイメージだけで、ラベルやセレクターまで書かれた Deployment ができています。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "Kubernetes: Deployments",
+        "url": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"
+      }
+    ],
+    "usedIn": [
+      {
+        "topic": "core-concepts",
+        "label": "Kubernetes の中心の考え方"
+      },
+      {
+        "topic": "administration",
+        "label": "クラスタの管理: kubectl・kubeconfig・資源の上限"
+      },
+      {
+        "topic": "networking",
+        "label": "ネットワーク: Pod・Service・DNS・入口・NetworkPolicy"
+      },
+      {
+        "topic": "troubleshooting",
+        "label": "障害対応: 状態・イベント・ログの順に読む"
+      },
+      {
+        "topic": "setup-k3s",
+        "label": "ハンドブックを試すための k3s の入れ方"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-config-get-contexts",
+    "command": "kubectl config get-contexts",
+    "tool": "kubectl",
+    "summary": "kubeconfig にあるコンテキストを一覧します。",
+    "detail": "コンテキストは「どのクラスタに・どのユーザーで・どの名前空間を見るか」の組です。* の付いた行が、今使っている組です。",
+    "usage": "kubectl config get-contexts [名前] [オプション]",
+    "flags": [],
+    "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_config/kubectl_config_get-contexts/",
+    "inside": [
+      "kubectl が、手元の kubeconfig のファイルを読みます。KUBECONFIG (複数なら合わせたもの) か --kubeconfig があればそのファイル、無ければ ~/.kube/config です。k3s に付いてくる kubectl は、代わりに /etc/rancher/k3s/k3s.yaml を読もうとします。",
+      "contexts の一覧を表にして出します。API サーバーには聞かないので、クラスタが止まっていても出ます。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "コンテキストが 1 つのファイル (このページのために打った例)",
+        "code": "$ kubectl config get-contexts",
+        "output": "CURRENT   NAME      CLUSTER   AUTHINFO   NAMESPACE\n*         default   default   default",
+        "note": "NAMESPACE が空なら、default の名前空間を使います。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "Kubernetes: kubeconfig によるクラスターアクセスの設定",
+        "url": "https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/"
+      },
+      {
+        "label": "K3s: CLI Tools (kubectl)",
+        "url": "https://docs.k3s.io/cli"
+      }
+    ],
+    "usedIn": [
+      {
+        "topic": "administration",
+        "label": "クラスタの管理: kubectl・kubeconfig・資源の上限"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-config-current-context",
+    "command": "kubectl config current-context",
+    "tool": "kubectl",
+    "summary": "今使っているコンテキストの名前を出します。",
+    "detail": "コマンドを打つ前に、つなぐ先を間違えていないかを確かめるのに使います。",
+    "usage": "kubectl config current-context",
+    "flags": [],
+    "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_config/kubectl_config_current-context/",
+    "inside": [
+      "kubectl が、手元の kubeconfig の current-context の値を読んで、そのまま出します。",
+      "API サーバーには聞かないので、名前が出ても、つながるとは限りません。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "名前を出す (このページのために打った例)",
+        "code": "$ kubectl config current-context",
+        "output": "default"
+      }
+    ],
+    "sources": [
+      {
+        "label": "Kubernetes: kubeconfig によるクラスターアクセスの設定",
+        "url": "https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/"
+      }
+    ],
+    "usedIn": [
+      {
+        "topic": "administration",
+        "label": "クラスタの管理: kubectl・kubeconfig・資源の上限"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-config-set-context",
+    "command": "kubectl config set-context",
+    "tool": "kubectl",
+    "summary": "コンテキストの中身 (名前空間など) を書き換えます (無ければ作ります)。",
+    "detail": "--current を付けると今のコンテキストを変えます。--namespace を決めておくと、そのあと -n を書かなくても、その名前空間を見ます。",
+    "usage": "kubectl config set-context (<名前> | --current) [オプション]",
+    "flags": [
+      {
+        "flags": [
+          "--current"
+        ],
+        "text": "今使っているコンテキストを変える"
+      },
+      {
+        "flags": [
+          "--namespace"
+        ],
+        "text": "既定の名前空間を決める"
+      },
+      {
+        "flags": [
+          "--cluster"
+        ],
+        "text": "つなぐクラスタを決める"
+      },
+      {
+        "flags": [
+          "--user"
+        ],
+        "text": "使うユーザーを決める"
+      }
+    ],
+    "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_config/kubectl_config_set-context/",
+    "inside": [
+      "kubectl が kubeconfig のファイルを読み、指定したところだけを変えて書き戻します。",
+      "書き込む権限の無いファイルなら失敗します。クラスタの側は何も変わりません。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "既定の名前空間を変える (このページのために打った例)",
+        "code": "$ kubectl config set-context --current --namespace=try-kcna",
+        "output": "Context \"default\" modified.",
+        "note": "名前空間が本当にあるかは確かめないので、名前を打ち間違えても成功します。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "Kubernetes: kubeconfig によるクラスターアクセスの設定",
+        "url": "https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/"
+      }
+    ],
+    "usedIn": [
+      {
+        "topic": "administration",
+        "label": "クラスタの管理: kubectl・kubeconfig・資源の上限"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-config-view",
+    "command": "kubectl config view",
+    "tool": "kubectl",
+    "summary": "kubeconfig の中身を出します。",
+    "detail": "トークン・パスワード・秘密鍵などの値は隠して出ます (--raw と --flatten を付けると隠れません)。人に見せる前に、残っている秘密が無いか確かめます。--minify を付けると、今のコンテキストで使うところだけになります。",
+    "usage": "kubectl config view [オプション]",
+    "flags": [
+      {
+        "flags": [
+          "--minify"
+        ],
+        "text": "今のコンテキストで使うところだけを出す"
+      },
+      {
+        "flags": [
+          "--raw"
+        ],
+        "text": "秘密も隠さずに出す (人に見せない)"
+      },
+      {
+        "flags": [
+          "-o",
+          "--output"
+        ],
+        "text": "出力の形 (jsonpath で一部だけを取り出せる)"
+      }
+    ],
+    "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_config/kubectl_config_view/",
+    "inside": [
+      "kubectl が手元の kubeconfig を読みます。KUBECONFIG に複数のファイルを並べたときは、1 つに合わせます。",
+      "証明書やトークンの値を隠した形に替えて出します。API サーバーには聞きません。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "今の既定の名前空間だけを取り出す (このページのために打った例)",
+        "code": "$ kubectl config view --minify -o jsonpath='{..namespace}'",
+        "output": "try-kcna",
+        "note": "{..namespace} は、どこにあっても namespace という項目を探す書き方です。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "Kubernetes: kubeconfig によるクラスターアクセスの設定",
+        "url": "https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/"
+      }
+    ],
+    "usedIn": [
+      {
+        "topic": "administration",
+        "label": "クラスタの管理: kubectl・kubeconfig・資源の上限"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-create-quota",
+    "command": "kubectl create quota",
+    "tool": "kubectl",
+    "summary": "ResourceQuota (名前空間で使ってよい量の上限) を作ります。",
+    "detail": "Pod の数や、CPU・メモリの合計に上限を付けます。上限を超えるものを作ろうとすると、API サーバーが断ります。",
+    "usage": "kubectl create quota <名前> [--hard=<項目>=<上限>,...] [オプション]",
+    "flags": [
+      {
+        "flags": [
+          "--hard"
+        ],
+        "text": "上限を、カンマで区切って並べる (例: pods=2,requests.cpu=1)"
+      },
+      {
+        "flags": [
+          "--dry-run"
+        ],
+        "text": "作らずに試す (client は手元だけ、server は API サーバーで確かめるところまで)"
+      }
+    ],
+    "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_create/kubectl_create_quota/",
+    "inside": [
+      "kubectl が、--hard の並びから ResourceQuota を手元で組み立て、API サーバーに POST で送ります。",
+      "保存されたあと、コントローラーが今の使用量を数えて status に書きます。",
+      "名前空間に Pod などを作る要求が来るたびに、API サーバーの中の検査 (ResourceQuota のアドミッション) が上限と比べ、超えるなら 403 で断ります。Deployment なら、Deployment は作れて、Pod を作るところで断られます (イベントの FailedCreate)。cpu や memory の上限を付けると、requests などを書かない Pod も断られます。すでにある Pod は消えません。"
+    ],
+    "api": [
+      {
+        "method": "POST",
+        "path": "/api/v1/namespaces/<名前空間>/resourcequotas",
+        "note": "ResourceQuota を作る"
+      }
+    ],
+    "examples": [
+      {
+        "title": "何が作られるかを、作らずに見る (このページのために打った例)",
+        "code": "$ kubectl create quota pod-limit --hard=pods=2 -n try-kcna --dry-run=client -o yaml",
+        "output": "apiVersion: v1\nkind: ResourceQuota\nmetadata:\n  name: pod-limit\n  namespace: try-kcna\nspec:\n  hard:\n    pods: \"2\"\nstatus: {}",
+        "note": "hard が上限です。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "Kubernetes: Resource Quotas",
+        "url": "https://kubernetes.io/docs/concepts/policy/resource-quotas/"
+      }
+    ],
+    "usedIn": [
+      {
+        "topic": "administration",
+        "label": "クラスタの管理: kubectl・kubeconfig・資源の上限"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-set-resources",
+    "command": "kubectl set resources",
+    "tool": "kubectl",
+    "summary": "Deployment などのコンテナの requests と limits を書き換えます。",
+    "detail": "コンテナを選ばなければ、全部のコンテナが変わります。requests は「確保してほしい量」、limits は「使ってよい上限」です。Deployment では Pod のひな形が変わるので、Pod が入れ替わります。",
+    "usage": "kubectl set resources (<種類> <名前> | -f <ファイル>) [--requests=...] [--limits=...]",
+    "flags": [
+      {
+        "flags": [
+          "--requests"
+        ],
+        "text": "確保してほしい量 (例: cpu=100m,memory=64Mi)"
+      },
+      {
+        "flags": [
+          "--limits"
+        ],
+        "text": "使ってよい上限"
+      },
+      {
+        "flags": [
+          "--local"
+        ],
+        "text": "API サーバーに送らず、手元のファイルだけで試す"
+      },
+      {
+        "flags": [
+          "-f",
+          "--filename"
+        ],
+        "text": "対象を書いたファイル"
+      }
+    ],
+    "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_set/kubectl_set_resources/",
+    "inside": [
+      "kubectl が対象を API サーバーから読み、コンテナの resources を変えた差分を組み立てます。",
+      "差分を PATCH で送ります。",
+      "Deployment なら Pod のひな形が変わったので、コントローラーが新しい ReplicaSet を作り、Pod を少しずつ入れ替えます。"
+    ],
+    "api": [
+      {
+        "method": "GET",
+        "path": "/apis/apps/v1/namespaces/<名前空間>/deployments/<名前>",
+        "note": "今の中身を読む"
+      },
+      {
+        "method": "PATCH",
+        "path": "/apis/apps/v1/namespaces/<名前空間>/deployments/<名前>",
+        "note": "変わったところを送る"
+      }
+    ],
+    "examples": [
+      {
+        "title": "手元のファイルで、変わるところを見る (このページのために打った例)",
+        "code": "$ kubectl set resources -f w.yaml --requests=cpu=100m --local -o yaml",
+        "output": "...\n      containers:\n      - image: nginx:1.27-alpine\n        name: nginx\n        resources:\n          requests:\n            cpu: 100m\n...",
+        "note": "前後は省いてあります。resources に requests が入りました。100m は CPU 0.1 個分です。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "Kubernetes: Resource Management for Pods and Containers",
+        "url": "https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/"
+      }
+    ],
+    "usedIn": [
+      {
+        "topic": "administration",
+        "label": "クラスタの管理: kubectl・kubeconfig・資源の上限"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-wait",
+    "command": "kubectl wait",
+    "tool": "kubectl",
+    "summary": "リソースが、決めた状態になるまで待ちます。",
+    "detail": "Pod が Ready になる前に次のコマンドを打つと失敗することがあるので、間にはさみます。待つ時間を過ぎると、失敗として終わります。",
+    "usage": "kubectl wait --for=<条件> (<種類>/<名前> | <種類> -l <ラベル>) [オプション]",
+    "flags": [
+      {
+        "flags": [
+          "--for"
+        ],
+        "text": "待つ条件 (condition=Ready、delete、jsonpath=... など)"
+      },
+      {
+        "flags": [
+          "--timeout"
+        ],
+        "text": "待つ長さ (既定は 30s。120s は 120 秒)"
+      }
+    ],
+    "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_wait/",
+    "inside": [
+      "kubectl が対象を API サーバーに聞き、条件を満たしていればすぐに終わります。",
+      "まだなら、変化の知らせを受け取り続け (watch)、条件を満たしたところで終わります。condition=Ready は、status の conditions の Ready が True になることです。",
+      "--timeout を過ぎると、エラーを出して 0 でない終了コードで終わります。"
+    ],
+    "api": [
+      {
+        "method": "GET",
+        "path": "/api/v1/namespaces/<名前空間>/pods",
+        "note": "今の状態と、変化を受け取る (watch)"
+      }
+    ],
+    "examples": [
+      {
+        "title": "Pod が Ready になるまで待つ (形の例)",
+        "code": "$ kubectl wait --for=condition=Ready pod/web -n try-kcna --timeout=120s",
+        "output": "pod/web condition met"
+      }
+    ],
+    "sources": [
+      {
+        "label": "Kubernetes: Pod Lifecycle (Pod conditions)",
+        "url": "https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-conditions"
+      }
+    ],
+    "usedIn": [
+      {
+        "topic": "containerization",
+        "label": "コンテナ化: イメージ・ランタイム・CRI"
+      },
+      {
+        "topic": "security",
+        "label": "セキュリティ: 認証・RBAC・Secret・Pod のセキュリティ"
+      },
+      {
+        "topic": "storage",
+        "label": "ストレージ: ボリューム・PV・PVC・StorageClass"
+      }
+    ]
+  },
+  {
+    "id": "k3s-crictl-pods",
+    "command": "k3s crictl pods",
+    "tool": "k3s",
+    "summary": "そのノードにある Pod を、状態 (STATE) も付けて、コンテナランタイムに聞いて一覧します。",
+    "detail": "kubectl と違い、API サーバーを通さずにノードの中を直接見ます。API サーバーがつながらないときの調べものにも使えます。root の権限が要ります。",
+    "usage": "k3s crictl pods [オプション]",
+    "flags": [
+      {
+        "flags": [
+          "--label"
+        ],
+        "text": "ラベルで絞り込む (例: --label run=web)"
+      },
+      {
+        "flags": [
+          "--name"
+        ],
+        "text": "名前で絞り込む"
+      }
+    ],
+    "source": "https://kubernetes.io/docs/tasks/debug/debug-cluster/crictl/",
+    "inside": [
+      "k3s に入っている crictl が、k3s の containerd のソケットに CRI (ランタイムと話す決まり) でつなぎます。",
+      "Pod のサンドボックス (Pod の外側の箱) の一覧をもらい、表にして出します。見えるのは、打ったノードのものだけです。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "ラベルで絞り込む (形の例)",
+        "code": "$ sudo k3s crictl pods --label run=web",
+        "output": "POD ID          CREATED          STATE    NAME   NAMESPACE   ATTEMPT   RUNTIME\n1a2b3c4d5e6f7   30 seconds ago   Ready    web    try-kcna    0         (default)",
+        "note": "POD ID と時刻は環境で変わります。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "cri-tools: crictl",
+        "url": "https://github.com/kubernetes-sigs/cri-tools/blob/master/docs/crictl.md"
+      },
+      {
+        "label": "K3s: CLI Tools",
+        "url": "https://docs.k3s.io/cli"
+      }
+    ],
+    "usedIn": [
+      {
+        "topic": "containerization",
+        "label": "コンテナ化: イメージ・ランタイム・CRI"
+      }
+    ]
+  },
+  {
+    "id": "k3s-crictl-rmi",
+    "command": "k3s crictl rmi",
+    "tool": "k3s",
+    "summary": "そのノードのコンテナランタイムから、イメージを消します。",
+    "detail": "消えるのは打ったノードの中だけで、レジストリのイメージは消えません。タグで指しても、同じイメージに付いたほかのタグも一緒に消えます。root の権限が要ります。",
+    "usage": "k3s crictl rmi <イメージ> [イメージ...]",
+    "flags": [],
+    "source": "https://kubernetes.io/docs/tasks/debug/debug-cluster/crictl/",
+    "inside": [
+      "k3s に入っている crictl が、k3s の containerd に CRI で「このイメージを消して」と頼みます。",
+      "containerd が、そのイメージの名前を外し、ほかで使われていない層を片付けます。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "取り込んだイメージを消す (形の例)",
+        "code": "$ sudo k3s crictl rmi docker.io/library/hello:0.1",
+        "output": "Deleted: docker.io/library/hello:0.1"
+      }
+    ],
+    "sources": [
+      {
+        "label": "cri-tools: crictl (rmi)",
+        "url": "https://github.com/kubernetes-sigs/cri-tools/blob/master/docs/crictl.md"
+      },
+      {
+        "label": "K3s: CLI Tools",
+        "url": "https://docs.k3s.io/cli"
+      }
+    ],
+    "usedIn": [
+      {
+        "topic": "containerization",
+        "label": "コンテナ化: イメージ・ランタイム・CRI"
+      }
+    ]
+  },
+  {
+    "id": "docker-rmi",
+    "command": "docker rmi",
+    "tool": "docker",
+    "summary": "手元の Docker から、イメージを消します。",
+    "detail": "docker image rm と同じです。タグで指すと、まずそのタグを外し、ほかのタグが無ければイメージの中身も消えます。レジストリのイメージは消えません。",
+    "usage": "docker rmi [オプション] <イメージ> [イメージ...]",
+    "flags": [
+      {
+        "flags": [
+          "-f",
+          "--force"
+        ],
+        "text": "使われていても消す"
+      }
+    ],
+    "source": "https://docs.docker.com/reference/cli/docker/image/rm/",
+    "inside": [
+      "docker コマンドが、Docker のデーモン (dockerd) に「このイメージを消して」と頼みます。",
+      "デーモンがタグを外します。それが最後のタグなら、ほかのイメージが使っていない層も消します。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "作ったイメージを消す (このページのために打った例)",
+        "code": "$ docker rmi kcna-rmi:0.1",
+        "output": "Untagged: kcna-rmi:0.1\nDeleted: sha256:35ddcf94406e0cca78503f8a5b61dc3b0143ba09f1435c695a59188fa0d0ea71",
+        "note": "Untagged はタグを外したこと、Deleted は中身が消えたことです。"
+      }
+    ],
+    "sources": [],
+    "usedIn": [
+      {
+        "topic": "containerization",
+        "label": "コンテナ化: イメージ・ランタイム・CRI"
+      }
+    ]
+  },
+  {
+    "id": "cat",
+    "command": "cat",
+    "tool": "Linux",
+    "summary": "ファイルの中身を、そのまま画面に出します。",
+    "detail": "concatenate (つなげる) の略で、並べたファイルを順につなげて出します。cat > ファイル <<'EOF' と書くと、EOF の行までの文字をファイルに書けます。",
+    "usage": "cat [オプション] [ファイル...]",
+    "flags": [
+      {
+        "flags": [
+          "-n",
+          "--number"
+        ],
+        "text": "行の番号を付ける"
+      }
+    ],
+    "source": "https://man7.org/linux/man-pages/man1/cat.1.html",
+    "inside": [
+      "ファイルを順に開いて読み、標準出力 (ふつうは画面) に書きます。ファイルを書かなければ、標準入力から読みます。",
+      "<<'EOF' (ヒアドキュメント) は、EOF だけの行までの文字を、シェルが標準入力として渡す書き方です。EOF を引用符で囲むと、中の $ などを読み替えません。",
+      "> ファイル は、出力の行き先をそのファイルにする書き方です。中身がすでにあれば、消してから書きます。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "複数の行をファイルに書いて、出す (このページのために打った例)",
+        "code": "$ cat > a.txt <<'EOF'\nreplicas: 2\nname: web\nEOF\n$ cat a.txt",
+        "output": "replicas: 2\nname: web",
+        "note": "1 つ目の cat が書き、2 つ目の cat が読んでいます。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "man7.org の bash(1) (Here Documents)",
+        "url": "https://man7.org/linux/man-pages/man1/bash.1.html"
+      }
+    ],
+    "usedIn": [
+      {
+        "topic": "administration",
+        "label": "クラスタの管理: kubectl・kubeconfig・資源の上限"
+      },
+      {
+        "topic": "containerization",
+        "label": "コンテナ化: イメージ・ランタイム・CRI"
+      }
+    ]
+  },
+  {
+    "id": "sed",
+    "command": "sed",
+    "tool": "Linux",
+    "summary": "文字を、決まりに従って置き換えながら出します。",
+    "detail": "stream editor の略です。s/前/後/ は「前」を「後」に替える書き方です。-i を付けると、画面に出す代わりにファイルを書き換えます。",
+    "usage": "sed [オプション] <決まり> [ファイル...]",
+    "flags": [
+      {
+        "flags": [
+          "-i",
+          "--in-place"
+        ],
+        "text": "ファイルを書き換える"
+      }
+    ],
+    "source": "https://man7.org/linux/man-pages/man1/sed.1.html",
+    "inside": [
+      "ファイルを 1 行ずつ読み、決まりを当てて、結果を出します。s は、1 行の中の最初の 1 か所を替えます (全部替えるなら s/前/後/g)。",
+      "-i を付けると、結果をいったん別のファイルに書き、最後に元の名前に付け替えます。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "replicas を 2 から 3 に替える (このページのために打った例)",
+        "code": "$ sed -i 's/replicas: 2/replicas: 3/' a.txt\n$ grep replicas a.txt",
+        "output": "replicas: 3"
+      },
+      {
+        "title": "-i が別のファイルに書いて付け替える様子 (このページのために打った例)",
+        "code": "$ strace -f -e trace=openat,rename sed -i 's/3/4/' a.txt",
+        "output": "openat(AT_FDCWD, \"a.txt\", O_RDONLY)     = 3\nopenat(AT_FDCWD, \"./sed7GltRe\", O_RDWR|O_CREAT|O_EXCL, 0600) = 4\nrename(\"./sed7GltRe\", \"a.txt\")          = 0",
+        "note": "関係のある行だけを抜き出しています。"
+      }
+    ],
+    "sources": [],
+    "usedIn": [
+      {
+        "topic": "administration",
+        "label": "クラスタの管理: kubectl・kubeconfig・資源の上限"
+      }
+    ]
+  },
+  {
+    "id": "rm",
+    "command": "rm",
+    "tool": "Linux",
+    "summary": "ファイルを消します。",
+    "detail": "remove の略です。ごみ箱には入らず、ふつうは元に戻せません。名前をよく確かめてから打ちます。* を使うと、名前の合うファイルがまとめて消えるので、先に ls で何が当てはまるかを見ておくと安全です。フォルダは、何も付けない rm では消せません。",
+    "usage": "rm [オプション] <ファイル> [ファイル...]",
+    "flags": [
+      {
+        "flags": [
+          "-i"
+        ],
+        "text": "消す前に聞く"
+      }
+    ],
+    "source": "https://man7.org/linux/man-pages/man1/rm.1.html",
+    "inside": [
+      "unlink などのシステムコールで、フォルダの中からファイルの名前を外します。",
+      "その中身を指す名前がほかに無く、開いているプログラムも無ければ、中身の場所が空きます。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "カーネルに頼んだこと (このページのために打った例)",
+        "code": "$ strace -e trace=unlink,unlinkat rm a.txt",
+        "output": "unlinkat(AT_FDCWD, \"a.txt\", 0)          = 0",
+        "note": "名前を外す頼みごとが 1 つだけです。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "man7.org の unlink(2)",
+        "url": "https://man7.org/linux/man-pages/man2/unlink.2.html"
+      }
+    ],
+    "usedIn": [
+      {
+        "topic": "administration",
+        "label": "クラスタの管理: kubectl・kubeconfig・資源の上限"
+      },
+      {
+        "topic": "containerization",
+        "label": "コンテナ化: イメージ・ランタイム・CRI"
+      }
+    ]
+  },
+  {
+    "id": "grep",
+    "command": "grep",
+    "tool": "Linux",
+    "summary": "文字の中から、探している言葉のある行だけを出します。",
+    "detail": "長い出力から必要な行だけを見たいときに、パイプ (|) の後ろに付けます。",
+    "usage": "grep [オプション] <言葉> [ファイル...]",
+    "flags": [
+      {
+        "flags": [
+          "-i",
+          "--ignore-case"
+        ],
+        "text": "大文字と小文字を区別しない"
+      },
+      {
+        "flags": [
+          "-v",
+          "--invert-match"
+        ],
+        "text": "言葉の無い行を出す"
+      }
+    ],
+    "source": "https://man7.org/linux/man-pages/man1/grep.1.html",
+    "inside": [
+      "1 行ずつ読み、言葉 (正規表現) に合う行をそのまま出します。ファイルを書かなければ、標準入力 (パイプの左の出力) を読みます。",
+      "合う行があれば終了コード 0、無ければ 1 で終わります。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "大文字と小文字を区別せずに探す (このページのために打った例)",
+        "code": "$ grep -i REPLICAS a.txt",
+        "output": "replicas: 3"
+      },
+      {
+        "title": "見つからないときの終了コード (このページのために打った例)",
+        "code": "$ grep nothing a.txt; echo rc=$?",
+        "output": "rc=1",
+        "note": "1 は「合う行が無い」です。"
+      }
+    ],
+    "sources": [],
+    "usedIn": [
+      {
+        "topic": "scheduling",
+        "label": "スケジューリング: Pod を置くノードの決まり方"
+      },
+      {
+        "topic": "containerization",
+        "label": "コンテナ化: イメージ・ランタイム・CRI"
+      },
+      {
+        "topic": "troubleshooting",
+        "label": "障害対応: 状態・イベント・ログの順に読む"
+      }
+    ]
+  },
+  {
+    "id": "tail",
+    "command": "tail",
+    "tool": "Linux",
+    "summary": "最後の数行だけを出します。",
+    "detail": "何も付けなければ最後の 10 行です。-n で行数を決めます。長い出力の、終わりの方だけを見たいときに使います。kubectl describe は、起きたこと (Events) を最後に出すので、tail と組み合わせると原因だけをすぐに読めます。反対に、先頭だけを見るコマンドは head です。",
+    "usage": "tail [オプション] [ファイル...]",
+    "flags": [
+      {
+        "flags": [
+          "-n",
+          "--lines"
+        ],
+        "text": "出す行数"
+      },
+      {
+        "flags": [
+          "-f"
+        ],
+        "text": "足された行を出し続ける (ログを見張る)"
+      }
+    ],
+    "source": "https://man7.org/linux/man-pages/man1/tail.1.html",
+    "inside": [
+      "パイプから読むときは終わりまで読み、最後の決めた行数だけを残して出します。",
+      "ファイルなら、後ろから読んで必要な行を探すこともできます。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "最後の 3 行 (このページのために打った例)",
+        "code": "$ printf '1\\n2\\n3\\n4\\n5\\n' | tail -n 3",
+        "output": "3\n4\n5"
+      }
+    ],
+    "sources": [],
+    "usedIn": [
+      {
+        "topic": "scheduling",
+        "label": "スケジューリング: Pod を置くノードの決まり方"
+      },
+      {
+        "topic": "troubleshooting",
+        "label": "障害対応: 状態・イベント・ログの順に読む"
+      },
+      {
+        "topic": "storage",
+        "label": "ストレージ: ボリューム・PV・PVC・StorageClass"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-create-ingress",
+    "command": "kubectl create ingress",
+    "tool": "kubectl",
+    "summary": "Ingress (HTTP の通信を Service に振り分ける決まり) を作ります。",
+    "detail": "--rule に「ホスト名/パス=Service:ポート」の形で書きます。決まりを実際に動かすのは Ingress コントローラーなので、入っていなければ、作っても通信は届きません。",
+    "usage": "kubectl create ingress <名前> --rule=<ホスト>/<パス>=<Service>:<ポート> [オプション]",
+    "flags": [
+      {
+        "flags": [
+          "--rule"
+        ],
+        "text": "振り分けの決まり。パスの最後に * を付けると、そのパスと、その下 (/ で区切った先) に当てはまる (/foo* は /foo/bar に当たり、/foobar には当たらない)"
+      },
+      {
+        "flags": [
+          "--class"
+        ],
+        "text": "使う Ingress コントローラーの種類 (IngressClass)"
+      },
+      {
+        "flags": [
+          "--dry-run"
+        ],
+        "text": "作らずに試す (client は手元だけ、server は API サーバーで確かめるところまで)"
+      }
+    ],
+    "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_create/kubectl_create_ingress/",
+    "inside": [
+      "kubectl が、--rule の文字から Ingress を手元で組み立てます。パスの最後に * があれば、* を除いて pathType を Prefix (/ で区切った前の部分が合えばよい) に、無ければ Exact (完全に同じ) にします。",
+      "API サーバーに POST で送り、保存されます。",
+      "Ingress コントローラー (k3s では同梱の Traefik) が新しい Ingress に気づき、自分の設定に取り込みます。"
+    ],
+    "api": [
+      {
+        "method": "POST",
+        "path": "/apis/networking.k8s.io/v1/namespaces/<名前空間>/ingresses",
+        "note": "Ingress を作る"
+      }
+    ],
+    "examples": [
+      {
+        "title": "何が作られるかを、作らずに見る (このページのために打った例)",
+        "code": "$ kubectl create ingress web --class=traefik --rule=\"web.example.test/*=web:80\" --dry-run=client -o yaml",
+        "output": "apiVersion: networking.k8s.io/v1\nkind: Ingress\nmetadata:\n  name: web\nspec:\n  ingressClassName: traefik\n  rules:\n  - host: web.example.test\n    http:\n      paths:\n      - backend:\n          service:\n            name: web\n            port:\n              number: 80\n        path: /\n        pathType: Prefix\nstatus:\n  loadBalancer: {}",
+        "note": "/* が、path: / と pathType: Prefix になりました。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "Kubernetes: Ingress",
+        "url": "https://kubernetes.io/docs/concepts/services-networking/ingress/"
+      },
+      {
+        "label": "kubectl v0.37.2: pkg/cmd/create/create_ingress.go",
+        "url": "https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/cmd/create/create_ingress.go"
+      }
+    ],
+    "usedIn": [
+      {
+        "topic": "networking",
+        "label": "ネットワーク: Pod・Service・DNS・入口・NetworkPolicy"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-create-serviceaccount",
+    "command": "kubectl create serviceaccount",
+    "tool": "kubectl",
+    "summary": "ServiceAccount (Pod の中のプログラムの身元) を作ります。",
+    "detail": "RBAC を使うクラスタでは、作っただけではほとんど何もできません。RoleBinding などで権限を結び付けて使います。serviceaccount は sa と短く書けます。",
+    "usage": "kubectl create serviceaccount <名前> [オプション]",
+    "flags": [
+      {
+        "flags": [
+          "--dry-run"
+        ],
+        "text": "作らずに試す (client は手元だけ、server は API サーバーで確かめるところまで)"
+      }
+    ],
+    "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_create/kubectl_create_serviceaccount/",
+    "inside": [
+      "kubectl が、名前だけを書いた ServiceAccount を手元で組み立て、API サーバーに POST で送ります。",
+      "Pod の serviceAccountName にこの名前を書くと、Pod の中のプログラムは、この身元のトークンで API サーバーに話しかけられます。",
+      "API サーバーから見たユーザー名は system:serviceaccount:<名前空間>:<名前> の形です。"
+    ],
+    "api": [
+      {
+        "method": "POST",
+        "path": "/api/v1/namespaces/<名前空間>/serviceaccounts",
+        "note": "ServiceAccount を作る"
+      }
+    ],
+    "examples": [
+      {
+        "title": "何が作られるかを、作らずに見る (このページのために打った例)",
+        "code": "$ kubectl create serviceaccount viewer -n try-kcna --dry-run=client -o yaml",
+        "output": "apiVersion: v1\nkind: ServiceAccount\nmetadata:\n  name: viewer\n  namespace: try-kcna",
+        "note": "名前と名前空間だけの、短いものです。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "Kubernetes: Service Accounts",
+        "url": "https://kubernetes.io/docs/concepts/security/service-accounts/"
+      },
+      {
+        "label": "Kubernetes: Using RBAC Authorization",
+        "url": "https://kubernetes.io/docs/reference/access-authn-authz/rbac/"
+      }
+    ],
+    "usedIn": [
+      {
+        "topic": "security",
+        "label": "セキュリティ: 認証・RBAC・Secret・Pod のセキュリティ"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-patch",
+    "command": "kubectl patch",
+    "tool": "kubectl",
+    "summary": "動いているリソースの、一部の項目だけを書き換えます。",
+    "detail": "変えたいところだけを JSON か YAML で -p に書きます。全部を書き直さなくてよいので、1 か所だけ直すのに向いています。",
+    "usage": "kubectl patch (<種類> <名前> | -f <ファイル>) -p <変えるところ> [オプション]",
+    "flags": [
+      {
+        "flags": [
+          "-p",
+          "--patch"
+        ],
+        "text": "変えるところ (JSON か YAML)"
+      },
+      {
+        "flags": [
+          "--type"
+        ],
+        "text": "重ね方 (strategic が既定。merge・json もある)"
+      },
+      {
+        "flags": [
+          "--local"
+        ],
+        "text": "API サーバーに送らず、手元のファイルで試す"
+      },
+      {
+        "flags": [
+          "-f",
+          "--filename"
+        ],
+        "text": "対象を書いたファイル"
+      }
+    ],
+    "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_patch/",
+    "inside": [
+      "kubectl が、-p に書いた内容を JSON にして、PATCH で API サーバーに送ります。",
+      "strategic と merge では、API サーバーが今の中身に重ねます。書いた項目だけが変わり、書かなかった項目はそのままです。",
+      "一覧 (配列) の重ね方は --type と項目で変わります。strategic では、コンテナのように名前で合わせる一覧があります。"
+    ],
+    "api": [
+      {
+        "method": "PATCH",
+        "path": "/api/v1/namespaces/<名前空間>/services/<名前>",
+        "note": "変えるところを送る (Service の場合)"
+      }
+    ],
+    "examples": [
+      {
+        "title": "手元のファイルで、セレクターだけが変わるのを見る (このページのために打った例)",
+        "code": "$ kubectl patch -f s.yaml --local -p '{\"spec\":{\"selector\":{\"app\":\"web\"}}}' -o yaml",
+        "output": "apiVersion: v1\nkind: Service\nmetadata:\n  name: web\nspec:\n  ports:\n  - port: 80\n  selector:\n    app: web",
+        "note": "元のファイルでは app: wbe でした。ports は書かなかったので、そのままです。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "Kubernetes: Update API Objects in Place Using kubectl patch",
+        "url": "https://kubernetes.io/docs/tasks/manage-kubernetes-objects/update-api-object-kubectl-patch/"
+      }
+    ],
+    "usedIn": [
+      {
+        "topic": "troubleshooting",
+        "label": "障害対応: 状態・イベント・ログの順に読む"
+      }
+    ]
+  },
+  {
+    "id": "base64",
+    "command": "base64",
+    "tool": "Linux",
+    "summary": "データを、英数字と + / = の文字だけに置き換えます (戻すこともできます)。",
+    "detail": "暗号ではありません。だれでも戻せるので、秘密を守る力はありません。Secret の data の値は、この形で書かれています。",
+    "usage": "base64 [オプション] [ファイル]",
+    "flags": [
+      {
+        "flags": [
+          "-d",
+          "--decode"
+        ],
+        "text": "元に戻す"
+      },
+      {
+        "flags": [
+          "-w"
+        ],
+        "text": "何文字で改行するか (既定は 76。0 なら改行しない)"
+      }
+    ],
+    "source": "https://man7.org/linux/man-pages/man1/base64.1.html",
+    "inside": [
+      "3 バイトずつ取り、6 ビットの 4 つに分けて、64 種類の文字 (英数字と + と /) に置き換えます。余りは = で埋めます。",
+      "-d では、逆に文字からバイトに戻します。鍵は要りません。",
+      "ファイルを書かなければ、標準入力 (パイプの左の出力) を読みます。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "置き換えて、戻す (このページのために打った例)",
+        "code": "$ echo -n example-only | base64\n$ echo ZXhhbXBsZS1vbmx5 | base64 -d",
+        "output": "ZXhhbXBsZS1vbmx5\nexample-only",
+        "note": "echo の -n は、最後に改行を付けない指定です。付けないと、改行も一緒に置き換わります。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "Kubernetes: Secrets",
+        "url": "https://kubernetes.io/docs/concepts/configuration/secret/"
+      }
+    ],
+    "usedIn": [
+      {
+        "topic": "security",
+        "label": "セキュリティ: 認証・RBAC・Secret・Pod のセキュリティ"
+      }
+    ]
+  },
+  {
+    "id": "sleep",
+    "command": "sleep",
+    "tool": "Linux",
+    "summary": "決めた秒数だけ、何もせずに待ちます。",
+    "detail": "クラスタの中で変化が起きるのを少し待ってから、次のコマンドを打ちたいときに使います。状態がはっきりしているときは、kubectl wait のほうが確実です (早く終われば待たず、終わらなければ失敗を知らせるため)。",
+    "usage": "sleep <秒数>",
+    "flags": [],
+    "source": "https://man7.org/linux/man-pages/man1/sleep.1.html",
+    "inside": [
+      "sleep は、カーネルに「この時間だけ起こさないで」と頼みます。待っている間、CPU はほとんど使いません。",
+      "時間が来ると、何も出さずに終わります。Ctrl+C を押すと、待つのをやめます。",
+      "数の後ろに m (分) や h (時間) も付けられます (GNU・uutils・BusyBox の sleep)。コンテナの中で sleep 3600 と書くのは、コンテナをすぐに終わらせないためです。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "2 秒待つ (このページのために打った例)",
+        "code": "$ time sleep 2",
+        "output": "real\t0m2.007s\nuser\t0m0.001s\nsys\t0m0.006s",
+        "note": "time は、かかった時間を出すシェルの命令です。real が実際の時間、user と sys が CPU を使った時間で、ほとんど使っていません。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "BusyBox の sleep",
+        "url": "https://busybox.net/downloads/BusyBox.html"
+      }
+    ],
+    "usedIn": [
+      {
+        "topic": "troubleshooting",
+        "label": "障害対応: 状態・イベント・ログの順に読む"
+      },
+      {
+        "topic": "storage",
+        "label": "ストレージ: ボリューム・PV・PVC・StorageClass"
+      }
+    ]
+  }
+]

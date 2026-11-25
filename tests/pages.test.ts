@@ -3,7 +3,9 @@ import path from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
 // @ts-expect-error 書き出しの手順は JS (scripts/prerender.mjs)
 import { buildPages, renderPage } from '../scripts/prerender.mjs';
+import handbookCommands from '../src/content/handbookCommands.json';
 import { HANDBOOK_TOPICS } from '../src/content/handbook';
+import { LINE_NOTE_TOPICS, lineNotes } from '../src/content/lineNotes';
 import { resolveTitle } from '../src/lib/pageTitle';
 import { BASE, parseRoute } from '../src/lib/route';
 
@@ -56,9 +58,10 @@ describe('書き出す全ページ', { timeout: 30_000 }, () => {
   });
   it('コマンドの意味と、コマンドのページへのリンクを、書き出した本文にも書く', () => {
     const { doc } = docs.find(({ page }) => page.path === 'handbook/setup-k3s/')!;
-    const t = HANDBOOK_TOPICS.find((x) => x.id === 'setup-k3s')!;
-    const dds = [...doc.querySelectorAll('dd')].map((e) => e.textContent);
-    for (const l of [...t.flow, ...t.try.flatMap((x) => x.steps)].flatMap((s) => s.lines ?? [])) expect(dds).toContain(l.text);
+    for (const t of HANDBOOK_TOPICS.filter((x) => LINE_NOTE_TOPICS.has(x.id))) {
+      const dds = [...docs.find(({ page }) => page.path === `handbook/${t.id}/`)!.doc.querySelectorAll('dd')].map((e) => e.textContent);
+      for (const s of [...t.flow, ...t.try.flatMap((x) => x.steps)]) for (const l of lineNotes(t.id, s)) expect(dds, l.code).toContain(l.text);
+    }
     const hrefs = [...doc.querySelectorAll('dt a')].map((a) => a.getAttribute('href'));
     expect(hrefs).toEqual(expect.arrayContaining(['curl', 'sh', 'sudo', 'cp', 'kubectl-get'].map((id) => `${BASE}commands/${id}/`)));
   });
@@ -268,7 +271,15 @@ describe('JS なしの HTML のページどうしのリンク', { timeout: 30_00
     const noLesson = (xs: typeof docs) => xs.filter(({ doc: d }) => hrefs(d, 'lesson/').length === 0).map(({ page }) => page.path);
     // 練習するレッスンを持たない付録のトピックとコマンドもあるので、半分より多くがつながっていることと、レッスンの側からの逆向きを見る
     expect(noLesson(topics).length).toBeLessThan(topics.length / 2);
-    expect(noLesson(commands).length).toBeLessThan(commands.length / 2);
+    // 問題に出ないコマンド (handbookCommands.json) はレッスンの代わりに、使うハンドブックのトピックと両向きにつながる
+    const own = new Set((handbookCommands as { id: string }[]).map((c) => `commands/${c.id}/`));
+    const asked = commands.filter(({ page }) => !own.has(page.path));
+    expect(noLesson(asked).length).toBeLessThan(asked.length / 2);
+    for (const { page, doc: d } of commands.filter((x) => own.has(x.page.path))) {
+      const topicsOf = hrefs(d, 'handbook/').filter((h) => h !== 'handbook/');
+      expect(topicsOf.length, page.path).toBeGreaterThan(0);
+      for (const h of topicsOf) expect(hrefs(doc(h), 'commands/'), `${h} → ${page.path}`).toContain(page.path);
+    }
     const back = commands.flatMap(({ page, doc: d }) => hrefs(d, 'lesson/').filter((l) => !hrefs(doc(l), 'commands/').includes(page.path)).map((l) => `${page.path} ← ${l}`));
     expect(back).toEqual([]);
   });

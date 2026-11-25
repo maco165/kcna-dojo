@@ -21,6 +21,7 @@ import { Button } from '@astryxdesign/core/Button';
 import { HStack } from '@astryxdesign/core/Stack';
 import { StatusDot } from '@astryxdesign/core/StatusDot';
 import { compareHref, glossaryTermHref, guideHref, handbookHref, lessonHref } from '../lib/route';
+import { topicLineNotes, type LineNote } from '../content/lineNotes';
 import { COMMAND_BRIEFS } from '../content/commandBriefs';
 import glossary from '../content/glossary.json';
 import type { GlossaryTerm } from '../lib/glossary';
@@ -52,7 +53,7 @@ function Prose({ pieces }: { pieces: TermPiece[] }) {
 }
 
 /** 1 段: 説明、コマンドかマニフェスト、出力の例 */
-function Step({ step, text, sources }: { step: HandbookStep; text: TermPiece[]; sources: HandbookTopic['sources'] }) {
+function Step({ step, text, sources, lines }: { step: HandbookStep; text: TermPiece[]; sources: HandbookTopic['sources']; lines: { notes: LineNote[]; repeated: boolean } }) {
   return (
     <div className="hb-step">
       <p className="hb-step__text">
@@ -61,7 +62,7 @@ function Step({ step, text, sources }: { step: HandbookStep; text: TermPiece[]; 
       {/* 設定ファイルのサンプルは、打つコマンドではないので手順の絵を出さない */}
       {step.code && !step.fields && (step.code.language === 'bash' || step.code.language === 'yaml') && <StepVisual code={step.code.text} language={step.code.language} result={step.result} />}
       {step.code && <LazyCodeBlock code={step.code.text} language={step.code.language} title={step.code.title} hasCopyButton />}
-      {step.lines && <CommandLines lines={step.lines} />}
+      {lines.notes.length > 0 && <CommandLines lines={lines.notes} repeated={lines.repeated} />}
       {step.fields && <FieldNotes title={step.code?.title} fields={step.fields} sources={sources} />}
       {step.output && (
         <figure className="hb-output">
@@ -233,6 +234,9 @@ function Topic({ id, progress, updateProgress }: { id: string; progress: Progres
   const lessons = t.lessons.map((l) => findLesson(l)).filter((x) => x !== undefined);
   // 本文の順に、語ごとに最初の 1 回だけリンクにする (描く前にまとめて決めるので、何度描いても同じ)
   const link = makeTermLinker(TERM_NAMES, t.noTermLinks ?? []);
+  // コマンドの意味も、画面の順に見て「前に出たか」を決める
+  const notes = topicLineNotes(t.id, [...t.flow, ...t.try.flatMap((x) => x.steps)]);
+  const tryAt = t.try.map((_, i) => t.flow.length + t.try.slice(0, i).reduce((n, x) => n + x.steps.length, 0));
   const rec = progress.handbook?.[t.id];
   // 続きからの案内は、開いたときの記録で出す (読み進めるたびに出し入れすると、本文がずれる)
   const opened = openedRecord;
@@ -275,7 +279,7 @@ function Topic({ id, progress, updateProgress }: { id: string; progress: Progres
         <ol className="hb-flow">
           {t.flow.map((s, i) => (
             <li key={i} data-flow-step={i}>
-              <Step step={s} text={prose.flow[i]} sources={t.sources} />
+              <Step step={s} text={prose.flow[i]} sources={t.sources} lines={notes[i]} />
             </li>
           ))}
         </ol>
@@ -292,7 +296,7 @@ function Topic({ id, progress, updateProgress }: { id: string; progress: Progres
             <ol className="hb-flow">
               {x.steps.map((s, j) => (
                 <li key={j}>
-                  <Step step={s} text={prose.tries[i][j]} sources={t.sources} />
+                  <Step step={s} text={prose.tries[i][j]} sources={t.sources} lines={notes[tryAt[i] + j]} />
                 </li>
               ))}
             </ol>

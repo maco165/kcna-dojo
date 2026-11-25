@@ -1,0 +1,17 @@
+{
+  "curl -sfL https://get.k3s.io | sh -": "k3s の公式のインストールスクリプトを取ってきて (curl)、そのままシェルに渡して動かします (| sh -)。-sfL は「余計な表示をしない・取れなければ失敗にする・移転先へたどる」の 3 つをまとめた書き方です。途中で自分のパスワードを聞かれることがあります (スクリプトが sudo を使うため)。",
+  "mkdir -p ~/.kube": "自分のホームに .kube というフォルダを作ります。~ は自分のホームのことです。すでにあれば何もしません (-p)。",
+  "sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/k3s.yaml": "接続の情報のファイルを、今作ったフォルダに写します。元のファイルは root しか読めないので sudo を付けます。",
+  "sudo chown \"$(id -u):$(id -g)\" ~/.kube/k3s.yaml": "写したファイルの持ち主を、root から自分に変えます。$(id -u) と $(id -g) は、自分のユーザーとグループの番号に置き換わります。",
+  "chmod 600 ~/.kube/k3s.yaml": "そのファイルを、自分だけが読み書きできるようにします。",
+  "export KUBECONFIG=~/.kube/k3s.yaml": "kubectl に「このファイルを使って」と教えます。今開いている端末だけで効きます。",
+  "echo 'export KUBECONFIG=~/.kube/k3s.yaml' >> ~/.bashrc": "上の 1 行を ~/.bashrc の最後に足します。bash の端末を開くと、ふつう ~/.bashrc が読まれるので、次からは打たなくて済みます。",
+  "kubectl get nodes": "クラスターにいるノード (マシン) の一覧を出します。",
+  "/usr/local/bin/k3s-uninstall.sh": "k3s を入れたときに一緒に置かれた、消すためのスクリプトを動かします。確認は出ず、すぐに消し始めます。",
+  "kubectl create namespace try-kcna": "try-kcna という名前の名前空間 (クラスターの中の入れ物) を作ります。",
+  "kubectl auth can-i create deployments -n try-kcna": "try-kcna の中に Deployment を作ってよいかを聞きます。-n は名前空間を選ぶ書き方です。",
+  "kubectl create deployment hello --image=nginx:1.27-alpine -n try-kcna": "hello という名前の Deployment を作り、nginx のイメージから Pod を 1 つ動かします。",
+  "kubectl rollout status deployment/hello -n try-kcna": "hello の Pod が動き出すまで待ち、進み具合を出します。",
+  "kubectl delete namespace try-kcna": "名前空間を消します。中に作ったものも一緒に消えます。",
+  "kubectl get pods -n kube-system": "k3s の部品が動いている名前空間 kube-system の、Pod の一覧を出します。"
+}
