@@ -11,7 +11,7 @@
     "readiness は外す、liveness は始め直す、startup は起動を待つ",
     "見張る役が止まっている間は、壊れても戻らない"
   ],
-  "minutes": 100,
+  "minutes": 130,
   "needs": [
     "2 章を終えた仮想マシン kcna (k3s が動き、kubectl が使える)",
     "インターネットへの接続 (イメージを取ってきます)",
@@ -78,7 +78,7 @@
           "text": "ノードの一覧を出す"
         }
       ],
-      "output": "kcna\nNAME   STATUS   ROLES           AGE     VERSION\nkcna   Ready    control-plane   5m35s   v1.36.6+k3s1",
+      "output": "kcna\nNAME   STATUS   ROLES           AGE     VERSION\nkcna   Ready    control-plane   6m36s   v1.36.6+k3s1",
       "read": "kcna と出て、ノードの STATUS が Ready なら進めます。VERSION が v1.36.6+k3s1 でない人は、出力の版を読み替えます。",
       "trouble": [
         {
@@ -108,7 +108,7 @@
     {
       "id": "prepare",
       "text": "作業のフォルダと、練習用の名前空間 ch3 を作ります。",
-      "why": "作るものを、まとめて片付けられるようにするためです。端末を開き直したら、cd ~/ch3 を打ってから続けます。",
+      "why": "作るものを、まとめて片付けられるようにするためです。端末を開き直したときや再起動のあとは、cd ~/ch3 を打ちます。POD や SVC_IP のような覚えた値は、端末を閉じると消えるので、それを決めた行も打ち直します。",
       "where": "vm",
       "code": {
         "language": "bash",
@@ -150,7 +150,7 @@
     },
     {
       "id": "parts",
-      "text": "部品がどこで動くかと、ノードが生きている印を見ます。",
+      "text": "部品がどこで動くかと、ノードが生きている印を見ます。15 秒待つ行があります。",
       "why": "戻す役目のコントローラーが、どこにいるかを確かめるためです。kubelet は、ノードが生きている印 (Lease) を、決まった間隔で新しくします。",
       "where": "vm",
       "code": {
@@ -183,8 +183,8 @@
           "text": "もう一度出す"
         }
       ],
-      "output": "NAME                                      READY   STATUS      RESTARTS        AGE     IP          NODE   NOMINATED NODE   READINESS GATES\ncoredns-7cfb7bc9c7-gmhlh                  1/1     Running     0               5m29s   10.42.0.5   kcna   <none>           <none>\nhelm-install-traefik-crd-fxs99            0/1     Completed   0               5m29s   10.42.0.6   kcna   <none>           <none>\nhelm-install-traefik-gkvg9                0/1     Completed   2 (4m54s ago)   5m29s   10.42.0.2   kcna   <none>           <none>\nlocal-path-provisioner-5598c9cb4c-n96xw   1/1     Running     0               5m29s   10.42.0.4   kcna   <none>           <none>\nmetrics-server-6dc596dfb8-npmjl           1/1     Running     0               5m29s   10.42.0.3   kcna   <none>           <none>\nsvclb-traefik-0d9e18ff-29w4x              2/2     Running     0               4m40s   10.42.0.8   kcna   <none>           <none>\ntraefik-7c8677d4d9-lfrlq                  1/1     Running     0               4m41s   10.42.0.7   kcna   <none>           <none>\nroot        3613       1 20 06:19 ?        00:01:13 /usr/local/bin/k3s server\nNAME   HOLDER   AGE\nkcna   kcna     5m26s\n2026-11-25T06:24:55.601242Z\n2026-11-25T06:25:15.980737Z",
-      "read": "coredns などの Pod はありますが、kube-apiserver や controller-manager という Pod はありません。k3s server の 1 つのプロセスの中で動いているためです。このノードは管理もするので server です。仕事だけをするノードなら k3s agent と出て、kubectl get nodes の ROLES は <none> になります。印の時刻は 15 秒で新しくなりました。止まると、ノードが Ready でなくなります。",
+      "output": "NAME                                      READY   STATUS      RESTARTS        AGE     IP          NODE   NOMINATED NODE   READINESS GATES\ncoredns-7cfb7bc9c7-qd7kb                  1/1     Running     0               6m31s   10.42.0.2   kcna   <none>           <none>\nhelm-install-traefik-crd-rccb2            0/1     Completed   0               6m31s   10.42.0.3   kcna   <none>           <none>\nhelm-install-traefik-q52kr                0/1     Completed   2 (5m55s ago)   6m31s   10.42.0.6   kcna   <none>           <none>\nlocal-path-provisioner-5598c9cb4c-cbtxl   1/1     Running     0               6m31s   10.42.0.4   kcna   <none>           <none>\nmetrics-server-6dc596dfb8-prrgf           1/1     Running     0               6m31s   10.42.0.5   kcna   <none>           <none>\nsvclb-traefik-bc4e378c-dt6qw              2/2     Running     0               5m38s   10.42.0.7   kcna   <none>           <none>\ntraefik-7c8677d4d9-btrnv                  1/1     Running     0               5m38s   10.42.0.8   kcna   <none>           <none>\nroot        3613       1 28 07:23 ?        00:02:01 /usr/local/bin/k3s server\nNAME   HOLDER   AGE\nkcna   kcna     6m27s\n2026-11-25T07:30:32.236655Z\n2026-11-25T07:30:52.440137Z",
+      "read": "coredns などの Pod はありますが、kube-apiserver や controller-manager という Pod はありません。k3s server の 1 つのプロセスの中で動いているためです。このノードは管理もするので server です。仕事だけをするノードなら k3s agent と出て、kubectl get nodes の ROLES は <none> になります。印の時刻は、15 秒の間に新しくなりました。印が新しくならない時間が続くと、ノードが Ready でないと扱われます。",
       "trouble": [
         {
           "symptom": "時刻が変わらない",
@@ -201,7 +201,7 @@
     },
     {
       "id": "bare-gone",
-      "text": "裸の Pod (1 つきりの Pod) を消して、戻らないことを見ます。",
+      "text": "裸の Pod (1 つきりの Pod) を消して、戻らないことを見ます。10 秒待つ行があります。",
       "why": "このあと作る Deployment と比べるためです。",
       "where": "vm",
       "code": {
@@ -240,7 +240,7 @@
         {
           "symptom": "toomanyrequests や 429 と出る",
           "check": "kubectl describe の Events で、Failed to pull image の行の終わりを見る",
-          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る"
+          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る。短い「429 Too Many Requests」だけのときは、使いすぎを防ぐ別の上限なので、数分待ってからもう一度行う"
         },
         {
           "symptom": "イメージが not found と出る",
@@ -362,13 +362,13 @@
           "text": "3 つの種類を一度に出す"
         }
       ],
-      "output": "deployment.apps/web created\nWaiting for deployment \"web\" rollout to finish: 0 of 2 updated replicas are available...\nWaiting for deployment \"web\" rollout to finish: 1 of 2 updated replicas are available...\ndeployment \"web\" successfully rolled out\nNAME                  READY   UP-TO-DATE   AVAILABLE   AGE\ndeployment.apps/web   2/2     2            2           4s\n\nNAME                            DESIRED   CURRENT   READY   AGE\nreplicaset.apps/web-dbb6fffff   2         2         2       4s\n\nNAME                      READY   STATUS    RESTARTS   AGE\npod/web-dbb6fffff-fsznl   1/1     Running   0          4s\npod/web-dbb6fffff-pwc5r   1/1     Running   0          4s",
+      "output": "deployment.apps/web created\nWaiting for deployment \"web\" rollout to finish: 0 of 2 updated replicas are available...\nWaiting for deployment \"web\" rollout to finish: 1 of 2 updated replicas are available...\ndeployment \"web\" successfully rolled out\nNAME                  READY   UP-TO-DATE   AVAILABLE   AGE\ndeployment.apps/web   2/2     2            2           2s\n\nNAME                            DESIRED   CURRENT   READY   AGE\nreplicaset.apps/web-dbb6fffff   2         2         2       2s\n\nNAME                      READY   STATUS    RESTARTS   AGE\npod/web-dbb6fffff-9q8dx   1/1     Running   0          2s\npod/web-dbb6fffff-jws9b   1/1     Running   0          2s",
       "read": "Deployment が ReplicaSet を作り、ReplicaSet が Pod を 2 つ作りました。名前が、web、web-英数字、web-英数字-英数字と伸びています。READY の 2/2 は、2 つのうち 2 つが使えるという意味です。",
       "trouble": [
         {
           "symptom": "toomanyrequests や 429 と出る",
           "check": "kubectl describe の Events で、Failed to pull image の行の終わりを見る",
-          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る"
+          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る。短い「429 Too Many Requests」だけのときは、使いすぎを防ぐ別の上限なので、数分待ってからもう一度行う"
         },
         {
           "symptom": "イメージが not found と出る",
@@ -403,7 +403,7 @@
           "text": "種類・名前・親の種類・親の名前を並べて出す"
         }
       ],
-      "output": "KIND         NAME                  OWNER        OWNER_NAME\nReplicaSet   web-dbb6fffff         Deployment   web\nPod          web-dbb6fffff-fsznl   ReplicaSet   web-dbb6fffff\nPod          web-dbb6fffff-pwc5r   ReplicaSet   web-dbb6fffff",
+      "output": "KIND         NAME                  OWNER        OWNER_NAME\nReplicaSet   web-dbb6fffff         Deployment   web\nPod          web-dbb6fffff-9q8dx   ReplicaSet   web-dbb6fffff\nPod          web-dbb6fffff-jws9b   ReplicaSet   web-dbb6fffff",
       "read": "Pod の親は ReplicaSet、ReplicaSet の親は Deployment です。ReplicaSet は「数を保つ」、Deployment は「版を替えるときの世話」と役目を分けています。版の替え方は後の章で動かします。",
       "trouble": [
         {
@@ -454,7 +454,7 @@
           "text": "作った記録と、作った部品を出す"
         }
       ],
-      "output": "web-dbb6fffff-fsznl\npod \"web-dbb6fffff-fsznl\" deleted from ch3 namespace\ndeployment \"web\" successfully rolled out\nNAME                  READY   STATUS    RESTARTS   AGE   IP           NODE   NOMINATED NODE   READINESS GATES\nweb-dbb6fffff-lg7s9   1/1     Running   0          1s    10.42.0.19   kcna   <none>           <none>\nweb-dbb6fffff-pwc5r   1/1     Running   0          6s    10.42.0.18   kcna   <none>           <none>\nFROM                    MESSAGE\nreplicaset-controller   Created pod: web-dbb6fffff-fsznl\nreplicaset-controller   Created pod: web-dbb6fffff-pwc5r\nreplicaset-controller   Created pod: web-dbb6fffff-lg7s9",
+      "output": "web-dbb6fffff-9q8dx\npod \"web-dbb6fffff-9q8dx\" deleted from ch3 namespace\ndeployment \"web\" successfully rolled out\nNAME                  READY   STATUS    RESTARTS   AGE   IP           NODE   NOMINATED NODE   READINESS GATES\nweb-dbb6fffff-78dsm   1/1     Running   0          3s    10.42.0.19   kcna   <none>           <none>\nweb-dbb6fffff-jws9b   1/1     Running   0          5s    10.42.0.18   kcna   <none>           <none>\nFROM                    MESSAGE\nreplicaset-controller   Created pod: web-dbb6fffff-9q8dx\nreplicaset-controller   Created pod: web-dbb6fffff-jws9b\nreplicaset-controller   Created pod: web-dbb6fffff-78dsm",
       "read": "消した名前は無くなり、別の名前の Pod が増えて 2 つに戻りました。AGE の若いほうが新しいものです。住所も変わります。イベントの FROM の replicaset-controller が、作った部品です。「同じ Pod が生き返る」のではなく、「代わりができる」です。",
       "trouble": [
         {
@@ -493,7 +493,7 @@
           "text": "一覧を出す"
         }
       ],
-      "output": "pod \"web-dbb6fffff-lg7s9\" deleted from ch3 namespace\npod \"web-dbb6fffff-pwc5r\" deleted from ch3 namespace\ndeployment \"web\" successfully rolled out\nNAME                  READY   STATUS    RESTARTS   AGE   IP           NODE   NOMINATED NODE   READINESS GATES\nweb-dbb6fffff-65npb   1/1     Running   0          2s    10.42.0.20   kcna   <none>           <none>\nweb-dbb6fffff-ptc5s   1/1     Running   0          2s    10.42.0.21   kcna   <none>           <none>",
+      "output": "pod \"web-dbb6fffff-78dsm\" deleted from ch3 namespace\npod \"web-dbb6fffff-jws9b\" deleted from ch3 namespace\nWaiting for deployment \"web\" rollout to finish: 0 of 2 updated replicas are available...\nWaiting for deployment \"web\" rollout to finish: 1 of 2 updated replicas are available...\ndeployment \"web\" successfully rolled out\nNAME                  READY   STATUS    RESTARTS   AGE   IP           NODE   NOMINATED NODE   READINESS GATES\nweb-dbb6fffff-q67w9   1/1     Running   0          2s    10.42.0.21   kcna   <none>           <none>\nweb-dbb6fffff-xfbnp   1/1     Running   0          2s    10.42.0.20   kcna   <none>           <none>",
       "read": "2 つとも新しい名前です。k3s の中の記録に「2 つ」が残っている限り、何度消しても戻ります。",
       "trouble": [
         {
@@ -543,7 +543,7 @@
           "text": "前のコンテナが終わった理由と番号を出す"
         }
       ],
-      "output": "web-dbb6fffff-65npb\npod/web-dbb6fffff-65npb condition met\npod/web-dbb6fffff-65npb condition met\nNAME                  READY   STATUS    RESTARTS     AGE\nweb-dbb6fffff-65npb   1/1     Running   1 (2s ago)   4s\nweb-dbb6fffff-ptc5s   1/1     Running   0            4s\nCompleted 0",
+      "output": "web-dbb6fffff-q67w9\npod/web-dbb6fffff-q67w9 condition met\npod/web-dbb6fffff-q67w9 condition met\nNAME                  READY   STATUS    RESTARTS     AGE\nweb-dbb6fffff-q67w9   1/1     Running   1 (1s ago)   4s\nweb-dbb6fffff-xfbnp   1/1     Running   0            4s\nCompleted 0",
       "read": "名前は同じままで、RESTARTS が 1 です。Pod は同じで、中のコンテナだけが作り直されました。Completed と 0 は「普通に終わった」ですが、Deployment の Pod は終わっても始め直します (restartPolicy が Always のため)。",
       "trouble": [
         {
@@ -566,7 +566,7 @@
       "where": "vm",
       "code": {
         "language": "bash",
-        "text": "cat > once.yaml <<'EOF'\napiVersion: v1\nkind: Pod\nmetadata:\n  name: once\nspec:\n  terminationGracePeriodSeconds: 1\n  restartPolicy: OnFailure\n  containers:\n  - name: main\n    image: busybox:1.37\n    command: ['sh', '-c', 'echo work; exit 0']\nEOF\ncat > never.yaml <<'EOF'\napiVersion: v1\nkind: Pod\nmetadata:\n  name: never\nspec:\n  terminationGracePeriodSeconds: 1\n  restartPolicy: Never\n  containers:\n  - name: main\n    image: busybox:1.37\n    command: ['sh', '-c', 'echo work; exit 1']\nEOF\nkubectl apply -f once.yaml -f never.yaml -n ch3\nkubectl wait --for=jsonpath='{.status.phase}'=Succeeded pod/once -n ch3 --timeout=120s\nkubectl wait --for=jsonpath='{.status.phase}'=Failed pod/never -n ch3 --timeout=120s\nkubectl get pods once never -n ch3\nkubectl delete pod once never -n ch3"
+        "text": "cat > once.yaml <<'EOF'\napiVersion: v1\nkind: Pod\nmetadata:\n  name: once\nspec:\n  terminationGracePeriodSeconds: 1\n  restartPolicy: OnFailure\n  containers:\n  - name: main\n    image: busybox:1.37\n    command: ['sh', '-c', 'echo work; exit 0']\nEOF\ncat > never.yaml <<'EOF'\napiVersion: v1\nkind: Pod\nmetadata:\n  name: never\nspec:\n  terminationGracePeriodSeconds: 1\n  restartPolicy: Never\n  containers:\n  - name: main\n    image: busybox:1.37\n    command: ['sh', '-c', 'echo work; exit 1']\nEOF\ncat > retry.yaml <<'EOF'\napiVersion: v1\nkind: Pod\nmetadata:\n  name: retry\nspec:\n  terminationGracePeriodSeconds: 1\n  restartPolicy: OnFailure\n  containers:\n  - name: main\n    image: busybox:1.37\n    command: ['sh', '-c', 'echo work; exit 1']\nEOF\nkubectl apply -f once.yaml -f never.yaml -f retry.yaml -n ch3\nkubectl wait --for=jsonpath='{.status.phase}'=Succeeded pod/once -n ch3 --timeout=120s\nkubectl wait --for=jsonpath='{.status.phase}'=Failed pod/never -n ch3 --timeout=120s\nkubectl wait --for=jsonpath='{.status.containerStatuses[0].restartCount}'=1 pod/retry -n ch3 --timeout=60s\nkubectl get pods once never retry -n ch3\nkubectl delete pod once never retry -n ch3"
       },
       "lines": [
         {
@@ -674,8 +674,60 @@
           "text": "ここまで (EOF) でファイルを書き終える"
         },
         {
-          "code": "kubectl apply -f once.yaml -f never.yaml -n ch3",
-          "text": "2 つの Pod を作る"
+          "code": "cat > retry.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま retry.yaml というファイルに書く"
+        },
+        {
+          "code": "apiVersion: v1",
+          "text": "使う API の版"
+        },
+        {
+          "code": "kind: Pod",
+          "text": "作るものの種類"
+        },
+        {
+          "code": "metadata:",
+          "text": "見分けるための情報"
+        },
+        {
+          "code": "  name: retry",
+          "text": "Pod の名前"
+        },
+        {
+          "code": "spec:",
+          "text": "ほしい中身"
+        },
+        {
+          "code": "  terminationGracePeriodSeconds: 1",
+          "text": "消すときに待つ秒数を短くする"
+        },
+        {
+          "code": "  restartPolicy: OnFailure",
+          "text": "失敗したときだけ始め直す"
+        },
+        {
+          "code": "  containers:",
+          "text": "コンテナの一覧"
+        },
+        {
+          "code": "  - name: main",
+          "text": "コンテナの名前"
+        },
+        {
+          "code": "    image: busybox:1.37",
+          "text": "小さな道具の入ったイメージ"
+        },
+        {
+          "code": "    command: ['sh', '-c', 'echo work; exit 1']",
+          "text": "work と書いて、失敗 (1) で終わる"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "kubectl apply -f once.yaml -f never.yaml -f retry.yaml -n ch3",
+          "text": "3 つの Pod を作る"
         },
         {
           "code": "kubectl wait --for=jsonpath='{.status.phase}'=Succeeded pod/once -n ch3 --timeout=120s",
@@ -686,21 +738,25 @@
           "text": "never が失敗で終わるまで待つ"
         },
         {
-          "code": "kubectl get pods once never -n ch3",
-          "text": "2 つの Pod を出す"
+          "code": "kubectl wait --for=jsonpath='{.status.containerStatuses[0].restartCount}'=1 pod/retry -n ch3 --timeout=60s",
+          "text": "retry が 1 回始め直すまで待つ"
         },
         {
-          "code": "kubectl delete pod once never -n ch3",
-          "text": "2 つを消す"
+          "code": "kubectl get pods once never retry -n ch3",
+          "text": "3 つの Pod を出す"
+        },
+        {
+          "code": "kubectl delete pod once never retry -n ch3",
+          "text": "3 つを消す"
         }
       ],
-      "output": "pod/once created\npod/never created\npod/once condition met\npod/never condition met\nNAME    READY   STATUS      RESTARTS   AGE\nonce    0/1     Completed   0          4s\nnever   0/1     Error       0          4s\npod \"once\" deleted from ch3 namespace\npod \"never\" deleted from ch3 namespace",
-      "read": "once は成功したので Completed、never は失敗しても Error のまま、どちらも RESTARTS は 0 です。終わりの番号は、0 が成功、0 でなければ失敗です。",
+      "output": "pod/once created\npod/never created\npod/retry created\npod/once condition met\npod/never condition met\npod/retry condition met\nNAME    READY   STATUS      RESTARTS     AGE\nonce    0/1     Completed   0            6s\nnever   0/1     Error       0            6s\nretry   0/1     Error       1 (2s ago)   6s\npod \"once\" deleted from ch3 namespace\npod \"never\" deleted from ch3 namespace\npod \"retry\" deleted from ch3 namespace",
+      "read": "once は成功したので Completed で、RESTARTS は 0 です。never は失敗しても Error のままで、RESTARTS は 0 です。retry は同じ失敗でも、OnFailure なので始め直され、RESTARTS が増えました。終わりの番号は、0 が成功、0 でなければ失敗です。",
       "trouble": [
         {
           "symptom": "toomanyrequests や 429 と出る",
           "check": "kubectl describe の Events で、Failed to pull image の行の終わりを見る",
-          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る"
+          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る。短い「429 Too Many Requests」だけのときは、使いすぎを防ぐ別の上限なので、数分待ってからもう一度行う"
         },
         {
           "symptom": "once が始め直す",
@@ -712,7 +768,7 @@
     },
     {
       "id": "crashloop",
-      "text": "わざと、始めてもすぐ失敗する Pod を作り、待ち時間が延びる様子を見ます。",
+      "text": "わざと、始めてもすぐ失敗する Pod を作り、待ち時間が延びる様子を見ます。1 分ほどかかります。",
       "why": "壊れたままのものを休みなく始め直すと、ノードが疲れます。そこで kubelet は、待つ時間を 10 秒、20 秒、40 秒と延ばします (上限は 300 秒)。この待ちが CrashLoopBackOff です。",
       "where": "vm",
       "code": {
@@ -793,13 +849,13 @@
           "text": "crash を消す"
         }
       ],
-      "output": "pod/crash created\npod/crash condition met\ncrash   1/1   Running   1 (1s ago)   4s\ncrash   0/1   Error   1 (6s ago)   9s\ncrash   0/1   Error   1 (12s ago)   15s\ncrash   0/1   Error   2 (15s ago)   20s\ncrash   0/1   Error   2 (20s ago)   25s\ncrash   0/1   Error   2 (25s ago)   30s\ncrash   0/1   Error   2 (31s ago)   36s\ncrash   1/1   Running   3 (25s ago)   41s\ncrash   0/1   Error   3 (30s ago)   46s\ncrash   0/1   Error   3 (35s ago)   51s\ncrash   0/1   Error   3 (40s ago)   56s\ncrash   0/1   Error   3 (45s ago)   61s\nREASON    MESSAGE\nBackOff   Back-off restarting failed container main in pod crash_ch3(d245ecb0-2bf7-437f-b931-0de69e5e8b2a)\nstart\npod \"crash\" deleted from ch3 namespace",
-      "read": "12 行の列は、名前・READY・STATUS・RESTARTS・AGE です。RESTARTS が増えるまでの間が、だんだん空きます。待っている間の STATUS は Error か CrashLoopBackOff で、どちらが見えるかは打つ時によります。CrashLoopBackOff は原因の名前ではなく「失敗が続くので待っている」です。BackOff のイベントも、待っているという知らせです。原因は、記録や、終わりの番号から探します。",
+      "output": "pod/crash created\npod/crash condition met\ncrash   1/1   Running   1 (2s ago)   4s\ncrash   0/1   Error   1 (7s ago)   9s\ncrash   0/1   Error   1 (13s ago)   15s\ncrash   0/1   Error   2 (16s ago)   20s\ncrash   0/1   Error   2 (22s ago)   26s\ncrash   0/1   Error   2 (27s ago)   31s\ncrash   0/1   Error   2 (32s ago)   36s\ncrash   1/1   Running   3 (26s ago)   43s\ncrash   0/1   Error   3 (31s ago)   48s\ncrash   0/1   Error   3 (37s ago)   54s\ncrash   0/1   Error   3 (42s ago)   59s\ncrash   0/1   Error   3 (47s ago)   64s\nREASON    MESSAGE\nBackOff   Back-off restarting failed container main in pod crash_ch3(4f628a8d-f925-483d-ad04-c08dcdc7d21f)\nstart\npod \"crash\" deleted from ch3 namespace",
+      "read": "12 行の列は、名前・READY・STATUS・RESTARTS・AGE です。RESTARTS の後ろの ( ) は、1 つ前のコンテナが終わってからの時間です。RESTARTS が増えるまでの間が、だんだん空きます。待っている間の STATUS は Error か CrashLoopBackOff で、どちらが見えるかは打つ時によります。CrashLoopBackOff は原因の名前ではなく「失敗が続くので待っている」です。BackOff のイベントも、待っているという知らせです。始め直したあと 10 分無事に動くと、待つ時間は最初に戻ります。原因は、記録や、終わりの番号から探します。",
       "trouble": [
         {
           "symptom": "toomanyrequests や 429 と出る",
           "check": "kubectl describe の Events で、Failed to pull image の行の終わりを見る",
-          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る"
+          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る。短い「429 Too Many Requests」だけのときは、使いすぎを防ぐ別の上限なので、数分待ってからもう一度行う"
         },
         {
           "symptom": "BackOff のイベントが出ない",
@@ -816,7 +872,7 @@
       "where": "vm",
       "code": {
         "language": "bash",
-        "text": "POD=$(kubectl get pods -n ch3 -l app=web -o jsonpath='{.items[0].metadata.name}')\nkubectl label pod $POD app=debug --overwrite -n ch3\nkubectl rollout status deployment/web -n ch3 --timeout=180s\nkubectl get pods -n ch3 -L app -o custom-columns='NAME:.metadata.name,APP:.metadata.labels.app,OWNER:.metadata.ownerReferences[0].kind'\nkubectl delete pod $POD -n ch3"
+        "text": "POD=$(kubectl get pods -n ch3 -l app=web -o jsonpath='{.items[0].metadata.name}')\nkubectl label pod $POD app=debug --overwrite -n ch3\nkubectl rollout status deployment/web -n ch3 --timeout=180s\nkubectl get pods -n ch3 -o custom-columns='NAME:.metadata.name,APP:.metadata.labels.app,OWNER:.metadata.ownerReferences[0].kind'\nkubectl delete pod $POD -n ch3"
       },
       "lines": [
         {
@@ -832,7 +888,7 @@
           "text": "全部の Pod が使えるようになるまで待つ"
         },
         {
-          "code": "kubectl get pods -n ch3 -L app -o custom-columns='NAME:.metadata.name,APP:.metadata.labels.app,OWNER:.metadata.ownerReferences[0].kind'",
+          "code": "kubectl get pods -n ch3 -o custom-columns='NAME:.metadata.name,APP:.metadata.labels.app,OWNER:.metadata.ownerReferences[0].kind'",
           "text": "名前・app・親を並べて出す"
         },
         {
@@ -840,7 +896,7 @@
           "text": "外した Pod を消す"
         }
       ],
-      "output": "pod/web-dbb6fffff-65npb labeled\nWaiting for deployment \"web\" rollout to finish: 1 of 2 updated replicas are available...\ndeployment \"web\" successfully rolled out\nNAME                  APP     OWNER\nweb-dbb6fffff-4qqgf   web     ReplicaSet\nweb-dbb6fffff-65npb   debug   <none>\nweb-dbb6fffff-ptc5s   web     ReplicaSet\npod \"web-dbb6fffff-65npb\" deleted from ch3 namespace",
+      "output": "pod/web-dbb6fffff-q67w9 labeled\nWaiting for deployment \"web\" rollout to finish: 1 of 2 updated replicas are available...\ndeployment \"web\" successfully rolled out\nNAME                  APP     OWNER\nweb-dbb6fffff-ngx56   web     ReplicaSet\nweb-dbb6fffff-q67w9   debug   <none>\nweb-dbb6fffff-xfbnp   web     ReplicaSet\npod \"web-dbb6fffff-q67w9\" deleted from ch3 namespace",
       "read": "3 つになりました。debug の Pod は親が <none> で、動いたままです。ReplicaSet は足りない 1 つを新しく作りました。外した Pod は裸なので、消すと戻りません。壊れた Pod を、あとで調べるために外すときに使えます。",
       "trouble": [
         {
@@ -886,7 +942,7 @@
           "text": "Pod の一覧を出す"
         }
       ],
-      "output": "NAME            UID\nweb-dbb6fffff   b56cacdf-a51c-404d-ab3d-a1f26f5c5ac8\nreplicaset.apps \"web-dbb6fffff\" deleted from ch3 namespace\nWaiting for deployment \"web\" rollout to finish: 0 of 2 updated replicas are available...\nWaiting for deployment \"web\" rollout to finish: 1 of 2 updated replicas are available...\ndeployment \"web\" successfully rolled out\nNAME            UID\nweb-dbb6fffff   51b781b1-15da-476a-b3c3-d424e3e91508\nNAME                  READY   STATUS    RESTARTS   AGE\nweb-dbb6fffff-mpgn4   1/1     Running   0          8s\nweb-dbb6fffff-w48hb   1/1     Running   0          8s",
+      "output": "NAME            UID\nweb-dbb6fffff   3ad85b2d-a855-4f98-86e8-cc0343953bcd\nreplicaset.apps \"web-dbb6fffff\" deleted from ch3 namespace\nWaiting for deployment \"web\" rollout to finish: 0 out of 2 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 0 of 2 updated replicas are available...\nWaiting for deployment \"web\" rollout to finish: 1 of 2 updated replicas are available...\ndeployment \"web\" successfully rolled out\nNAME            UID\nweb-dbb6fffff   c21824fc-bd60-4532-8372-c88b2317986a\nNAME                  READY   STATUS    RESTARTS   AGE\nweb-dbb6fffff-2j2dn   1/1     Running   0          9s\nweb-dbb6fffff-wctsv   1/1     Running   0          9s",
       "read": "名前は同じですが、uid が違う、新しい ReplicaSet です。名前の後ろは、Pod のひな型の中身から決まるためです。子の Pod も作り直されました。親を消すと、子も片付けられます。",
       "trouble": [
         {
@@ -896,6 +952,41 @@
         }
       ],
       "source": "https://kubernetes.io/docs/concepts/architecture/garbage-collection/"
+    },
+    {
+      "id": "break",
+      "text": "ここで休めます。休む人は、exit で出てから、ホストで 1 行目を打ちます。続けるときに、2 行目を打ちます。休まない人は、打たずに印を付けて先へ進みます。",
+      "why": "長い章なので、区切りを置くためです。止めても、作ったものとファイルは残ります。再起動と同じことが起きるので、Pod の中のコンテナは始め直され、Pod の住所も変わります。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass stop kcna\nmultipass shell kcna"
+      },
+      "lines": [
+        {
+          "code": "multipass stop kcna",
+          "text": "kcna を止める。動いている (Running) ときだけ打てる"
+        },
+        {
+          "code": "multipass shell kcna",
+          "text": "止まっている kcna を動かし、中に入る"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "2 行目のあと、行の頭が ubuntu@kcna:~$ に変われば戻れています。そのあと cd ~/ch3 を打ちます。kubectl get pods -n ch3 で web の Pod が 2 つとも 1/1 になるまで待ちます。RESTARTS が増えているのは、マシンを止めたためです。",
+      "trouble": [
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "activating なら、1 分ほど待つ"
+        },
+        {
+          "symptom": "No such file or directory と出る",
+          "check": "pwd を打つ",
+          "fix": "作業のフォルダにいない。cd で移る"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/stop/"
     },
     {
       "id": "service",
@@ -932,7 +1023,7 @@
           "text": "Service からページを取る"
         }
       ],
-      "output": "service/web exposed\nendpointslice.discovery.k8s.io/web-d6shm condition met\nweb-dbb6fffff-w48hb 10.42.0.26 ready=true\nweb-dbb6fffff-mpgn4 10.42.0.27 ready=true\n<title>Welcome to nginx!</title>",
+      "output": "service/web exposed\nendpointslice.discovery.k8s.io/web-vghrz condition met\nweb-dbb6fffff-2j2dn 10.42.0.28 ready=true\nweb-dbb6fffff-wctsv 10.42.0.27 ready=true\n<title>Welcome to nginx!</title>",
       "read": "2 つの Pod が ready=true で並び、ページが返ります。Service の住所は 10.43. で始まり、Pod が替わっても変わりません。",
       "trouble": [
         {
@@ -1083,7 +1174,7 @@
           "text": "一覧を出す"
         }
       ],
-      "output": "deployment.apps/web configured\nWaiting for deployment \"web\" rollout to finish: 1 out of 2 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 1 out of 2 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 1 out of 2 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"web\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"web\" rollout to finish: 1 old replicas are pending termination...\ndeployment \"web\" successfully rolled out\nNAME                   READY   STATUS    RESTARTS   AGE\nweb-794f8d69bd-82xkn   1/1     Running   0          8s\nweb-794f8d69bd-sbbjq   1/1     Running   0          7s",
+      "output": "deployment.apps/web configured\nWaiting for deployment \"web\" rollout to finish: 1 out of 2 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 1 out of 2 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 1 out of 2 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"web\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"web\" rollout to finish: 1 old replicas are pending termination...\ndeployment \"web\" successfully rolled out\nNAME                   READY   STATUS    RESTARTS   AGE\nweb-794f8d69bd-7jscf   1/1     Running   0          9s\nweb-794f8d69bd-wqxkj   1/1     Running   0          13s",
       "read": "ひな型が変わったので、Pod が新しいものに入れ替わりました。検査に通ってから READY が 1/1 になります。入れ替わりの細かい動きは後の章で見ます。",
       "trouble": [
         {
@@ -1138,8 +1229,8 @@
           "text": "Service から 5 回続けてページを取る"
         }
       ],
-      "output": "pod/web-794f8d69bd-82xkn condition met\nNAME                   READY   STATUS    RESTARTS   AGE\nweb-794f8d69bd-82xkn   0/1     Running   0          14s\nweb-794f8d69bd-sbbjq   1/1     Running   0          13s\nweb-794f8d69bd-82xkn ready=false\nweb-794f8d69bd-sbbjq ready=true\n<title>Welcome to nginx!</title>\n<title>Welcome to nginx!</title>\n<title>Welcome to nginx!</title>\n<title>Welcome to nginx!</title>\n<title>Welcome to nginx!</title>",
-      "read": "READY が 0/1 になりましたが、RESTARTS は 0 です。readiness の失敗では、始め直しません。Service の渡す先から外れるだけです。5 回とも、残った Pod が返事をしました。もし全部の Pod が外れると、Service は返事をできなくなります。これが「動いているのに止まって見える」状態です。",
+      "output": "pod/web-794f8d69bd-7jscf condition met\nNAME                   READY   STATUS    RESTARTS   AGE\nweb-794f8d69bd-7jscf   0/1     Running   0          17s\nweb-794f8d69bd-wqxkj   1/1     Running   0          21s\nweb-794f8d69bd-wqxkj ready=true\nweb-794f8d69bd-7jscf ready=false\n<title>Welcome to nginx!</title>\n<title>Welcome to nginx!</title>\n<title>Welcome to nginx!</title>\n<title>Welcome to nginx!</title>\n<title>Welcome to nginx!</title>",
+      "read": "READY が 0/1 になりましたが、RESTARTS は増えていません。readiness の失敗では、始め直しません。Service の渡す先から外れるだけです。5 回とも、残った Pod が返事をしました。もし全部の Pod が外れると、Service は返事をできなくなります。これが「動いているのに止まって見える」状態です。",
       "trouble": [
         {
           "symptom": "5 回のうち失敗がある",
@@ -1181,9 +1272,14 @@
           "text": "渡す先を出す"
         }
       ],
-      "output": "pod/web-794f8d69bd-82xkn condition met\nweb-794f8d69bd-82xkn ready=true\nweb-794f8d69bd-sbbjq ready=true",
+      "output": "pod/web-794f8d69bd-7jscf condition met\nweb-794f8d69bd-wqxkj ready=true\nweb-794f8d69bd-7jscf ready=true",
       "read": "2 つとも ready=true です。Pod の名前も変わっていません。",
       "trouble": [
+        {
+          "symptom": "開き直した・再起動したあとで、POD や SVC_IP が空",
+          "check": "echo $POD $SVC_IP を打つ",
+          "fix": "空なら、Service の手順の SVC_IP の行を打ち直す。POD は kubectl get pods -n ch3 -l app=web で 0/1 の Pod の名前を見て、POD=その名前 と打つ。再起動で両方 1/1 に戻っていれば、次へ進む"
+        },
         {
           "symptom": "ready=false のまま",
           "check": "kubectl exec $POD -n ch3 -- ls /usr/share/nginx/html を打つ",
@@ -1194,7 +1290,7 @@
     },
     {
       "id": "liveness",
-      "text": "liveness を失敗させる Pod を作ります。",
+      "text": "liveness を失敗させる Pod を作ります。40 秒ほどかかります。",
       "why": "liveness は「このまま待って直るか、始め直すべきか」の検査です。止まってしまったが終了もしないものを、始め直すためです。",
       "where": "vm",
       "code": {
@@ -1291,13 +1387,13 @@
           "text": "live を消す"
         }
       ],
-      "output": "pod/live created\npod/live condition met\nNAME   READY   STATUS    RESTARTS     AGE\nlive   1/1     Running   1 (0s ago)   32s\nREASON      MESSAGE\nScheduled   Successfully assigned ch3/live to kcna\nPulled      Container image \"busybox:1.37\" already present on machine and can be accessed by the pod\nCreated     Container created\nStarted     Container started\nUnhealthy   Liveness probe failed:\nKilling     Container main failed liveness probe, will be restarted\npod \"live\" deleted from ch3 namespace",
+      "output": "pod/live created\npod/live condition met\nNAME   READY   STATUS    RESTARTS     AGE\nlive   1/1     Running   1 (2s ago)   35s\nREASON      MESSAGE\nScheduled   Successfully assigned ch3/live to kcna\nPulled      Container image \"busybox:1.37\" already present on machine and can be accessed by the pod\nCreated     Container created\nStarted     Container started\nUnhealthy   Liveness probe failed:\nKilling     Container main failed liveness probe, will be restarted\npod \"live\" deleted from ch3 namespace",
       "read": "Unhealthy が検査の失敗、Killing が「止めて始め直す」です。RESTARTS が 1 になりました。プロセスは動いていたのに、検査が失敗したので始め直されました。readiness との違いはここです。",
       "trouble": [
         {
           "symptom": "toomanyrequests や 429 と出る",
           "check": "kubectl describe の Events で、Failed to pull image の行の終わりを見る",
-          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る"
+          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る。短い「429 Too Many Requests」だけのときは、使いすぎを防ぐ別の上限なので、数分待ってからもう一度行う"
         },
         {
           "symptom": "timed out waiting for the condition と出る",
@@ -1309,7 +1405,7 @@
     },
     {
       "id": "startup",
-      "text": "起動の遅い Pod を 2 つ作り、startupProbe のあるなしを比べます。",
+      "text": "起動の遅い Pod を 2 つ作り、startupProbe のあるなしを比べます。40 秒ほどかかります。",
       "why": "起動に時間のかかるものに liveness だけを付けると、起動し終わる前に止められます。startup は、起動が終わるまで、ほかの検査を待たせます。",
       "where": "vm",
       "code": {
@@ -1490,13 +1586,13 @@
           "text": "2 つを消す"
         }
       ],
-      "output": "pod/slow-bad created\npod/slow-good created\npod/slow-bad condition met\npod/slow-good condition met\nNAME        READY   STATUS    RESTARTS     AGE\nslow-bad    1/1     Running   2 (8s ago)   30s\nslow-good   1/1     Running   0            30s\npod \"slow-bad\" deleted from ch3 namespace\npod \"slow-good\" deleted from ch3 namespace",
+      "output": "pod/slow-bad created\npod/slow-good created\npod/slow-bad condition met\npod/slow-good condition met\nNAME        READY   STATUS    RESTARTS     AGE\nslow-bad    1/1     Running   2 (9s ago)   32s\nslow-good   1/1     Running   0            32s\npod \"slow-bad\" deleted from ch3 namespace\npod \"slow-good\" deleted from ch3 namespace",
       "read": "slow-bad は RESTARTS が増え、起動し終われません。READY が 1/1 と出ても、始め直した直後でまだ止められていないだけです (readiness が無いので、動き出すとすぐ 1/1 になります)。slow-good は 0 のままです。まとめると、startup は起動を待つ、readiness は渡すか外すかを決める、liveness は始め直すかを決める、です。",
       "trouble": [
         {
           "symptom": "toomanyrequests や 429 と出る",
           "check": "kubectl describe の Events で、Failed to pull image の行の終わりを見る",
-          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る"
+          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る。短い「429 Too Many Requests」だけのときは、使いすぎを防ぐ別の上限なので、数分待ってからもう一度行う"
         },
         {
           "symptom": "slow-good も始め直す",
@@ -1529,7 +1625,7 @@
           "text": "web の主役のプロセスを数える"
         }
       ],
-      "output": "kcna\nNAME                   READY   STATUS    RESTARTS   AGE\nweb-794f8d69bd-82xkn   1/1     Running   0          93s\nweb-794f8d69bd-sbbjq   1/1     Running   0          92s\n2",
+      "output": "kcna\nNAME                   READY   STATUS    RESTARTS   AGE\nweb-794f8d69bd-7jscf   1/1     Running   0          104s\nweb-794f8d69bd-wqxkj   1/1     Running   0          108s\n2",
       "read": "1 行目が kcna なら、仮想マシンの中です。nginx の主役は 2 つです。",
       "trouble": [
         {
@@ -1542,7 +1638,7 @@
     },
     {
       "id": "stop-k3s",
-      "text": "k3s を止めている間に、コンテナの主役を 1 つ止めます。前の手順で kcna と出たときだけ打ちます。",
+      "text": "k3s を止めている間に、コンテナの主役を 1 つ止めます。前の手順で kcna と出たときだけ打ちます。15 秒待つ行があります。",
       "why": "見張る役がいない間は、壊れても戻らないことを見るためです。",
       "where": "vm",
       "code": {
@@ -1613,7 +1709,7 @@
           "text": "一覧を出す"
         }
       ],
-      "output": "2\ndeployment \"web\" successfully rolled out\nNAME                   READY   STATUS    RESTARTS      AGE\nweb-794f8d69bd-82xkn   1/1     Running   1 (14s ago)   2m10s\nweb-794f8d69bd-sbbjq   1/1     Running   0             2m9s",
+      "output": "2\ndeployment \"web\" successfully rolled out\nNAME                   READY   STATUS    RESTARTS      AGE\nweb-794f8d69bd-7jscf   1/1     Running   0             2m29s\nweb-794f8d69bd-wqxkj   1/1     Running   1 (19s ago)   2m33s",
       "read": "2 つに戻りました。片方だけ RESTARTS が増え、名前はどちらも同じです。kubelet が、止まったコンテナだけを始め直しました。",
       "trouble": [
         {
@@ -1704,7 +1800,7 @@
         }
       ],
       "output": "deployment.apps/web annotated\ndeployment.apps/web unchanged\nby-hand",
-      "read": "diff は何も出さず、apply のあとも by-hand が残ります。書いていない欄は、ほかの人や部品が使うかもしれないので、触らない決まりです。",
+      "read": "diff は何も出さず、apply のあとも by-hand が残ります。書いていない欄は、ほかの人や部品が使うかもしれないので、触らない決まりです。反対に、前に自分が apply で書いて、ファイルから消した欄は、次の apply で消されます。kubectl が、前に書いたものを覚え書き (last-applied-configuration) に残して比べるためです。",
       "trouble": [
         {
           "symptom": "diff に何か出る",
@@ -1737,7 +1833,7 @@
           "text": "3 つの種類を出す"
         }
       ],
-      "output": "deployment.apps \"web\" deleted from ch3 namespace\npod/web-794f8d69bd-82xkn condition met\npod/web-794f8d69bd-cc8ks condition met\npod/web-794f8d69bd-sbbjq condition met\nNo resources found in ch3 namespace.",
+      "output": "deployment.apps \"web\" deleted from ch3 namespace\npod/web-794f8d69bd-7jscf condition met\npod/web-794f8d69bd-wqxkj condition met\nNo resources found in ch3 namespace.",
       "read": "1 つも残りません。ownerReferences をたどって、子が片付けられました。Service は子ではないので残ります。",
       "trouble": [
         {
@@ -1797,7 +1893,7 @@
           "text": "名前空間の一覧を出す"
         }
       ],
-      "output": "namespace \"ch3\" deleted\nNAME              STATUS   AGE\ndefault           Active   10m\nkube-node-lease   Active   10m\nkube-public       Active   10m\nkube-system       Active   10m",
+      "output": "namespace \"ch3\" deleted\nNAME              STATUS   AGE\ndefault           Active   11m\nkube-node-lease   Active   11m\nkube-public       Active   11m\nkube-system       Active   11m",
       "read": "ch3 が消え、default と kube- で始まる 4 つだけになれば、片付いています。手元の ~/ch3 の YAML は残るので、読み返せます。",
       "trouble": [
         {
@@ -1867,7 +1963,7 @@
         }
       ],
       "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
-      "read": "一覧に ch3-end が並べば取れています。戻すときは、止めてから multipass restore kcna.ch3-end を打ちます。最後の行で、行の頭が ubuntu@kcna:~$ に変わります。課題と後片付けは、この中で続けます。",
+      "read": "一覧に ch3-end が並べば取れています。戻すときは、止めてから multipass restore kcna.ch3-end を打ちます。今の状態も控えるかを聞かれたら、要らなければ no と答えます。最後の行で、行の頭が ubuntu@kcna:~$ に変わります。課題と後片付けは、この中で続けます。",
       "trouble": [
         {
           "symptom": "止まっていないので取れないと出る",
@@ -1929,7 +2025,7 @@
           "text": "名前空間の一覧を出す"
         }
       ],
-      "output": "namespace \"practice\" deleted\nNAME              STATUS   AGE\ndefault           Active   10m\nkube-node-lease   Active   10m\nkube-public       Active   10m\nkube-system       Active   10m",
+      "output": "namespace \"practice\" deleted\nNAME              STATUS   AGE\ndefault           Active   12m\nkube-node-lease   Active   12m\nkube-public       Active   12m\nkube-system       Active   12m",
       "read": "default と kube- で始まる 4 つだけになれば、片付いています。k3s は消しません。",
       "trouble": [
         {

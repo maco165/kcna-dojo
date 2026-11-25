@@ -11,7 +11,7 @@
     "置けるかは requests で決まり、メモリの超過は止められ、CPU の超過は待たされる",
     "1 つきりの Pod は、消すと戻らない"
   ],
-  "minutes": 110,
+  "minutes": 150,
   "needs": [
     "1 章を終えた仮想マシン kcna (k3s が入り、kubectl が使える)",
     "インターネットへの接続 (Docker とイメージを取ってきます)",
@@ -83,7 +83,7 @@
           "text": "ノードの一覧を出す"
         }
       ],
-      "output": "kcna\nNAME   STATUS   ROLES           AGE   VERSION\nkcna   Ready    control-plane   84s   v1.36.6+k3s1",
+      "output": "kcna\nNAME   STATUS   ROLES           AGE   VERSION\nkcna   Ready    control-plane   82s   v1.36.6+k3s1",
       "read": "kcna と出て、ノードの STATUS が Ready なら進めます。VERSION が v1.36.6+k3s1 でない人は、出力の版を読み替えます。",
       "trouble": [
         {
@@ -113,7 +113,7 @@
     {
       "id": "prepare",
       "text": "作業のフォルダと、練習用の名前空間 ch2 を作ります。",
-      "why": "この章で書くファイルと、クラスターに作るものを、まとめて片付けられるようにするためです。端末を開き直したら、cd ~/ch2 を打ってから続けます。",
+      "why": "この章で書くファイルと、クラスターに作るものを、まとめて片付けられるようにするためです。端末を開き直したときや再起動のあとは、cd ~/ch2 を打ちます。POD_IP や HELLO_IP のような覚えた値は、端末を閉じると消えるので、それを決めた行も打ち直します。",
       "where": "vm",
       "code": {
         "language": "bash",
@@ -339,7 +339,7 @@
         {
           "symptom": "toomanyrequests や 429 と出る",
           "check": "kubectl describe の Events で、Failed to pull image の行の終わりを見る",
-          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る"
+          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る。短い「429 Too Many Requests」だけのときは、使いすぎを防ぐ別の上限なので、数分待ってからもう一度行う"
         },
         {
           "symptom": "イメージが not found と出る",
@@ -373,7 +373,7 @@
           "text": "Pod の全部を YAML で出し、目印の行だけを抜く"
         }
       ],
-      "output": "NAME   READY   STATUS    RESTARTS   AGE   IP          NODE   NOMINATED NODE   READINESS GATES\nweb    1/1     Running   0          9s    10.42.0.9   kcna   <none>           <none>\n  uid: e6dd23ae-6ace-40e2-ab15-d22d946ac8d6\nspec:\n  nodeName: kcna\n  restartPolicy: Always\nstatus:\n  phase: Running\n  podIP: 10.42.0.9",
+      "output": "NAME   READY   STATUS    RESTARTS   AGE   IP          NODE   NOMINATED NODE   READINESS GATES\nweb    1/1     Running   0          12s   10.42.0.9   kcna   <none>           <none>\n  uid: 808bc593-18eb-4929-a962-0248f3814dc2\nspec:\n  nodeName: kcna\n  restartPolicy: Always\nstatus:\n  phase: Running\n  podIP: 10.42.0.9",
       "read": "restartPolicy と nodeName は、自分では書いていません。既定の値や、置き場所の決定が spec に書き足されました。status の phase と podIP は、今の様子です。uid は、作り直すと変わる、本当の見分けの番号です。",
       "trouble": [
         {
@@ -408,7 +408,7 @@
           "text": "起きたこと (Events) から後ろを出す"
         }
       ],
-      "output": "Name:             web\nNode:             kcna/10.0.2.15\nLabels:           app=web\nStatus:           Running\nIP:               10.42.0.9\n    State:          Running\n    Ready:          True\n    Restart Count:  0\nQoS Class:                   BestEffort\nEvents:\n  Type    Reason     Age   From               Message\n  ----    ------     ----  ----               -------\n  Normal  Scheduled  9s    default-scheduler  Successfully assigned ch2/web to kcna\n  Normal  Pulling    9s    kubelet            spec.containers{web}: Pulling image \"nginx:1.27-alpine\"\n  Normal  Pulled     2s    kubelet            spec.containers{web}: Successfully pulled image \"nginx:1.27-alpine\" in 6.879s (6.879s including waiting). Image size: 20984244 bytes.\n  Normal  Created    1s    kubelet            spec.containers{web}: Container created\n  Normal  Started    1s    kubelet            spec.containers{web}: Container started",
+      "output": "Name:             web\nNode:             kcna/10.0.2.15\nLabels:           app=web\nStatus:           Running\nIP:               10.42.0.9\n    State:          Running\n    Ready:          True\n    Restart Count:  0\nQoS Class:                   BestEffort\nEvents:\n  Type    Reason     Age   From               Message\n  ----    ------     ----  ----               -------\n  Normal  Scheduled  12s   default-scheduler  Successfully assigned ch2/web to kcna\n  Normal  Pulling    10s   kubelet            spec.containers{web}: Pulling image \"nginx:1.27-alpine\"\n  Normal  Pulled     1s    kubelet            spec.containers{web}: Successfully pulled image \"nginx:1.27-alpine\" in 9.128s (9.128s including waiting). Image size: 20984244 bytes.\n  Normal  Created    1s    kubelet            spec.containers{web}: Container created\n  Normal  Started    1s    kubelet            spec.containers{web}: Container started",
       "read": "State が Running、Ready が True なら動いています。QoS Class の BestEffort は、使う量を何も決めていないという意味です。後の手順で決めます。",
       "trouble": [
         {
@@ -431,7 +431,7 @@
       "where": "vm",
       "code": {
         "language": "bash",
-        "text": "POD_IP=$(kubectl get pod web -n ch2 -o jsonpath='{.status.podIP}')\ncurl -s http://$POD_IP/no-such-page > /dev/null\nkubectl logs web -n ch2 --tail=1\nkubectl exec web -n ch2 -- ls /usr/share/nginx/html"
+        "text": "POD_IP=$(kubectl get pod web -n ch2 -o jsonpath='{.status.podIP}')\ncurl -s http://$POD_IP/no-such-page > /dev/null\nkubectl logs web -n ch2 | grep '\" 404 '\nkubectl exec web -n ch2 -- ls /usr/share/nginx/html"
       },
       "lines": [
         {
@@ -443,15 +443,15 @@
           "text": "無いページを取りに行く。返ってきた中身は捨てる"
         },
         {
-          "code": "kubectl logs web -n ch2 --tail=1",
-          "text": "記録の最後の 1 行を出す"
+          "code": "kubectl logs web -n ch2 | grep '\" 404 '",
+          "text": "記録のうち、404 (無い) と返した行を出す"
         },
         {
           "code": "kubectl exec web -n ch2 -- ls /usr/share/nginx/html",
           "text": "コンテナの中の、ページの置き場所を見る"
         }
       ],
-      "output": "10.42.0.1 - - [25/Nov/2026:06:21:04 +0000] \"GET /no-such-page HTTP/1.1\" 404 153 \"-\" \"curl/8.5.0\" \"-\"\n50x.html\nindex.html",
+      "output": "10.42.0.1 - - [25/Nov/2026:08:04:50 +0000] \"GET /no-such-page HTTP/1.1\" 404 153 \"-\" \"curl/8.5.0\" \"-\"\n50x.html\nindex.html",
       "read": "記録の 404 は「そのページは無い」です。クラスターの人 (10.42. で始まる住所) が GET したことも読めます。ls には 50x.html と index.html が出ます。",
       "trouble": [
         {
@@ -537,13 +537,13 @@
           "text": "裏で動かしたものを止める。$! は、最後に裏で動かしたものの番号"
         }
       ],
-      "output": "[1] 6472\n<h1>hello from cp</h1>\nForwarding from 127.0.0.1:8080 -> 80\nForwarding from [::1]:8080 -> 80\nHandling connection for 8080",
+      "output": "[1] 6543\n<h1>hello from cp</h1>\nForwarding from 127.0.0.1:8080 -> 80\nForwarding from [::1]:8080 -> 80\nHandling connection for 8080",
       "read": "Forwarding が「つないだ」、Handling が「1 回通した」です。1 行目の [1] と数字は、裏で動かしたものの番号です。止めると、通り道も消えます。仮想マシンの localhost なので、ホストのブラウザからは見えません。",
       "trouble": [
         {
           "symptom": "address already in use と出る",
           "check": "cat pf.log と jobs を打つ",
-          "fix": "前の port-forward が残っている。kill %1 で止めてから打つ"
+          "fix": "前の port-forward が残っていれば、kill %1 で止めてから打つ。ほかのものが 8080 番を使っているなら、8080:80 を 8081:80 に替え、curl も 8081 番にする"
         },
         {
           "symptom": "curl で何も出ない",
@@ -588,7 +588,7 @@
           "text": "app が web か api で、tier が front でないものを出す"
         }
       ],
-      "output": "pod/api created\npod/api condition met\npod/web labeled\nNAME   READY   STATUS    RESTARTS   AGE   LABELS\napi    1/1     Running   0          3s    app=api,tier=back\nweb    1/1     Running   0          16s   app=web,tier=front\nNAME   READY   STATUS    RESTARTS   AGE\nweb    1/1     Running   0          16s\nNAME   READY   STATUS    RESTARTS   AGE\napi    1/1     Running   0          3s",
+      "output": "pod/api created\npod/api condition met\npod/web labeled\nNAME   READY   STATUS    RESTARTS   AGE   LABELS\napi    1/1     Running   0          2s    app=api,tier=back\nweb    1/1     Running   0          20s   app=web,tier=front\nNAME   READY   STATUS    RESTARTS   AGE\nweb    1/1     Running   0          21s\nNAME   READY   STATUS    RESTARTS   AGE\napi    1/1     Running   0          3s",
       "read": "最後は api だけです。, は「どちらも満たす」、in は「どれか」、!= は「違う」です。",
       "trouble": [
         {
@@ -599,7 +599,7 @@
         {
           "symptom": "toomanyrequests や 429 と出る",
           "check": "kubectl describe の Events で、Failed to pull image の行の終わりを見る",
-          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る"
+          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る。短い「429 Too Many Requests」だけのときは、使いすぎを防ぐ別の上限なので、数分待ってからもう一度行う"
         }
       ],
       "source": "https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/"
@@ -753,13 +753,13 @@
           "text": "一覧を出す"
         }
       ],
-      "output": "pod/pair created\npod/pair condition met\nNAME   READY   STATUS    RESTARTS   AGE\npair   2/2     Running   0          6s",
+      "output": "pod/pair created\npod/pair condition met\nNAME   READY   STATUS    RESTARTS   AGE\npair   2/2     Running   0          7s",
       "read": "READY の 2/2 は、2 つのコンテナが使えるという意味です。サイドカーも数に入ります。",
       "trouble": [
         {
           "symptom": "toomanyrequests や 429 と出る",
           "check": "kubectl describe の Events で、Failed to pull image の行の終わりを見る",
-          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る"
+          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る。短い「429 Too Many Requests」だけのときは、使いすぎを防ぐ別の上限なので、数分待ってからもう一度行う"
         },
         {
           "symptom": "イメージが not found と出る",
@@ -801,7 +801,7 @@
           "text": "writer から見えるプロセスを出す"
         }
       ],
-      "output": "Wed Nov 25 06:21:18 UTC 2026\nWed Nov 25 06:21:18 UTC 2026\nwrote\nPID   USER     TIME  COMMAND\n    1 root      0:00 sh -c while true; do date > /work/index.html; echo wrote; sleep 5; done\n    8 root      0:00 sleep 5\n   15 root      0:00 ps",
+      "output": "Wed Nov 25 07:25:55 UTC 2026\nWed Nov 25 07:25:55 UTC 2026\nwrote\nPID   USER     TIME  COMMAND\n    1 root      0:00 sh -c while true; do date > /work/index.html; echo wrote; sleep 5; done\n    8 root      0:00 sleep 5\n   15 root      0:00 ps",
       "read": "writer に Web サーバーは入っていませんが、localhost で web に届きます。住所が同じだからです。時刻は writer が書いたものです。ps に nginx は出ません。プロセスの見え方は別だからです。",
       "trouble": [
         {
@@ -820,17 +820,43 @@
     {
       "id": "why-docker",
       "text": "ここから、自分のイメージを作ります。イメージは、コンテナの中身 (ファイルと始め方) をまとめたものです。作り方は Dockerfile というファイルに書きます。作る道具に Docker を使います。",
-      "why": "k3s は、コンテナを動かす道具 (containerd) を持ちますが、Dockerfile からイメージを作る道具は持ちません。そこで、作るときだけ Docker を足します。k3s は Docker を使わず、イメージの置き場所も別です。だから、作ったイメージを k3s へ渡す手順が要ります。Docker は「作る」、k3s は「動かす」と分けて見ます。",
+      "why": "この章の入れ方の k3s は、コンテナを動かす道具 (containerd) を持ちますが、Dockerfile からイメージを作る道具は持ちません。そこで、作るときだけ Docker を足します。この k3s は Docker を使わず、イメージの置き場所も別です。だから、作ったイメージを k3s へ渡す手順が要ります。Docker は「作る」、k3s は「動かす」と分けて見ます。",
       "source": "https://docs.k3s.io/advanced"
+    },
+    {
+      "id": "check-before-repo",
+      "text": "Docker の配布元を足すの前に、どのマシンにいるかを見ます。kcna と出なければ、次の手順を打ちません。",
+      "why": "管理者の権限で、マシンの設定を変えるためです。自分の PC で打つと、PC のほうが変わります。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "hostname"
+      },
+      "lines": [
+        {
+          "code": "hostname",
+          "text": "このマシンの名前を出す"
+        }
+      ],
+      "output": "kcna",
+      "read": "kcna と出れば、仮想マシンの中です。",
+      "trouble": [
+        {
+          "symptom": "kcna ではない名前が出る",
+          "check": "行の頭が ubuntu@kcna かを見る",
+          "fix": "ホストにいる。multipass shell kcna で入り、もう一度打つ"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man1/hostname.1.html"
     },
     {
       "id": "docker-repo",
       "text": "仮想マシンに、Docker の公式の配布元を足します。",
-      "why": "Ubuntu に最初から入っている一覧には、Docker の公式のものが無いためです。Docker の公式の手順のとおりです。配布元の鍵を置き、取ってくるものが本物かを apt (Ubuntu にプログラムを入れる道具) に確かめさせます。",
+      "why": "Ubuntu に最初から入っている一覧には、Docker の公式のものが無いためです。Docker の公式の手順のとおりです。配布元の鍵を置き、取ってくるものが本物かを apt (Ubuntu にプログラムを入れる道具) に確かめさせます。公式の手順には、先に「古い Docker や、ぶつかるもの (docker.io や containerd、runc など) を消す」とあります。0 章で作った仮想マシンには入っていないので、省きます。",
       "where": "vm",
       "code": {
         "language": "bash",
-        "text": "sudo apt-get update -qq\nsudo apt-get install -y -qq ca-certificates curl > /dev/null 2>&1\nsudo install -m 0755 -d /etc/apt/keyrings\nsudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc\nsudo chmod a+r /etc/apt/keyrings/docker.asc\nsudo tee /etc/apt/sources.list.d/docker.sources <<EOF\nTypes: deb\nURIs: https://download.docker.com/linux/ubuntu\nSuites: $(. /etc/os-release && echo \"${UBUNTU_CODENAME:-$VERSION_CODENAME}\")\nComponents: stable\nArchitectures: $(dpkg --print-architecture)\nSigned-By: /etc/apt/keyrings/docker.asc\nEOF\nsudo apt-get update -qq"
+        "text": "sudo apt-get update -qq\nsudo apt-get install -y -qq ca-certificates curl > /dev/null\nsudo install -m 0755 -d /etc/apt/keyrings\nsudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc\nsudo chmod a+r /etc/apt/keyrings/docker.asc\nsudo tee /etc/apt/sources.list.d/docker.sources <<EOF\nTypes: deb\nURIs: https://download.docker.com/linux/ubuntu\nSuites: $(. /etc/os-release && echo \"${UBUNTU_CODENAME:-$VERSION_CODENAME}\")\nComponents: stable\nArchitectures: $(dpkg --print-architecture)\nSigned-By: /etc/apt/keyrings/docker.asc\nEOF\nsudo apt-get update -qq"
       },
       "lines": [
         {
@@ -838,7 +864,7 @@
           "text": "入れられるものの一覧を新しくする (-qq は表示を減らす)"
         },
         {
-          "code": "sudo apt-get install -y -qq ca-certificates curl > /dev/null 2>&1",
+          "code": "sudo apt-get install -y -qq ca-certificates curl > /dev/null",
           "text": "https の確認と取得に使うものを入れる。-y は確認に「はい」と答える"
         },
         {
@@ -890,8 +916,8 @@
           "text": "足した配布元も含めて、一覧を新しくする"
         }
       ],
-      "output": "Types: deb\nURIs: https://download.docker.com/linux/ubuntu\nSuites: noble\nComponents: stable\nArchitectures: amd64\nSigned-By: /etc/apt/keyrings/docker.asc",
-      "read": "Suites が noble (24.04 の名前) になれば、配布元を足せています。M 系の Mac では Architectures が arm64 になります。",
+      "output": "Scanning processes...\nScanning linux images...\nTypes: deb\nURIs: https://download.docker.com/linux/ubuntu\nSuites: noble\nComponents: stable\nArchitectures: amd64\nSigned-By: /etc/apt/keyrings/docker.asc",
+      "read": "Scanning で始まる行は、入れたあとの点検の進み具合で、出ないこともあります。Suites が noble (24.04 の名前) になれば、配布元を足せています。M 系の Mac では Architectures が arm64 になります。",
       "trouble": [
         {
           "symptom": "NO_PUBKEY や is not signed と出る",
@@ -900,16 +926,42 @@
         },
         {
           "symptom": "Could not get lock と出る",
-          "check": "ps -C unattended-upgr を打つ",
-          "fix": "Ubuntu が自動の更新をしている。数分待ってもう一度打つ"
+          "check": "同じ行の held by process の後ろの、番号と名前を見る",
+          "fix": "その名前のもの (unattended-upgr など) が更新をしている。数分待ってもう一度打つ。ロックのファイルは消さない"
         }
       ],
       "source": "https://docs.docker.com/engine/install/ubuntu/"
     },
     {
+      "id": "check-before-docker",
+      "text": "Docker を入れるの前に、どのマシンにいるかを見ます。kcna と出なければ、次の手順を打ちません。",
+      "why": "マシンの設定を書き、新しいサービスを動かすためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "hostname"
+      },
+      "lines": [
+        {
+          "code": "hostname",
+          "text": "このマシンの名前を出す"
+        }
+      ],
+      "output": "kcna",
+      "read": "kcna と出れば、仮想マシンの中です。",
+      "trouble": [
+        {
+          "symptom": "kcna ではない名前が出る",
+          "check": "行の頭が ubuntu@kcna かを見る",
+          "fix": "ホストにいる。multipass shell kcna で入り、もう一度打つ"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man1/hostname.1.html"
+    },
+    {
       "id": "docker-install",
       "text": "Docker を入れます。1〜3 分かかります。仮想マシンの中だけで打ちます。",
-      "why": "公式の手順のまとまりを入れるためです。docker のコマンドは管理者の権限で動くので、この章では sudo を付けて打ちます。先に、Docker が中で使う住所の範囲を決めておきます。既定の 172.17 で始まる範囲は、ホストと仮想マシンの間の住所と重なることがあり、重なると仮想マシンに入れなくなるためです。",
+      "why": "公式の手順のまとまりを入れるためです。docker のコマンドは管理者の権限で動くので、この章では sudo を付けて打ちます。先に、Docker が中で使う住所の範囲を決めます。既定の 172.17 で始まる範囲は、ホスト側の住所と重なることがあり、重なると仮想マシンに入れなくなるおそれがあります (この章を作ったときは、検証用の住所と重なって入れなくなりました)。10.201.0 で始まる住所を家や会社で使っている人は、10.202.0.1/24 のように、使っていない範囲に替えます。すでに Docker を使っているマシンでは、この手順を打ちません。daemon.json が上書きされ、前の設定が消えます。",
       "where": "vm",
       "code": {
         "language": "bash",
@@ -926,7 +978,7 @@
         },
         {
           "code": "{\"bip\": \"10.201.0.1/24\"}",
-          "text": "Docker が中で使う住所の範囲を、10.201.0 で始まるものにする"
+          "text": "Docker の既定のつなぎ口 (bridge) の住所を 10.201.0.1 にする。/24 は、10.201.0 で始まる範囲を使うという意味"
         },
         {
           "code": "EOF",
@@ -949,13 +1001,13 @@
           "text": "containerd のプロセスを出す"
         }
       ],
-      "output": "Docker version 29.10.1, build c48360f\nactive\n    PID COMMAND\n   3629 containerd\n  12245 /usr/bin/containerd",
+      "output": "Docker version 29.10.1, build c48360f\nactive\n    PID COMMAND\n   3630 containerd\n  12337 /usr/bin/containerd",
       "read": "版と active が出れば入っています。版は、打った日の最新なので違ってかまいません。containerd が 2 つになりました。1 つは k3s のもの、もう 1 つ (/usr/bin/containerd) は Docker と一緒に入ったものです。別々に動いています。",
       "trouble": [
         {
           "symptom": "入れたあと、ホストから仮想マシンに入れなくなった",
           "check": "ホストで multipass list を打ち、kcna の State と IPv4 を見る",
-          "fix": "住所が重なったおそれがある。multipass stop kcna で止め、multipass restore kcna.k3s-v136 で 1 章の終わりへ戻し、設定のファイルを書く行からやり直す (この章で書いたファイルも戻るので、最初から)"
+          "fix": "住所が重なったおそれがある。multipass stop kcna で止め、multipass restore kcna.k3s-v136 で 1 章の終わりへ戻す (今の状態も控えるかを聞かれたら no)。この章で作ったものも戻るので、この章の最初からやり直し、設定の範囲を使っていないものに替える"
         },
         {
           "symptom": "Unable to locate package docker-ce と出る",
@@ -966,9 +1018,19 @@
           "symptom": "Cannot connect to the Docker daemon と出る",
           "check": "systemctl is-active docker を打つ",
           "fix": "sudo systemctl start docker を打つ"
+        },
+        {
+          "symptom": "conflicts や held broken packages と出る",
+          "check": "cat ~/docker-install.log で、ぶつかったものの名前を見る",
+          "fix": "docker.io や containerd、runc が入っている。この仮想マシンで自分が入れたのでなければ、exit で出てからホストで multipass stop kcna、multipass restore kcna.k3s-v136 の順に打ち、1 章の終わりへ戻してやり直す (今の状態も控えるかを聞かれたら no)"
+        },
+        {
+          "symptom": "Docker が前から動いていて、住所の範囲が変わらない",
+          "check": "ip -br addr show docker0 を打つ",
+          "fix": "10.201.0.1 でなければ sudo systemctl restart docker を打つ。daemon.json は、Docker が始まるときに読まれる"
         }
       ],
-      "source": "https://docs.docker.com/engine/install/ubuntu/"
+      "source": "https://docs.docker.com/engine/network/drivers/bridge/"
     },
     {
       "id": "dockerfile",
@@ -1047,18 +1109,18 @@
           "text": "Docker で 1 回だけ動かし、ページを読む。--rm は終わったら消す"
         }
       ],
-      "output": "sha256:6f97e7f1cef90debeda9b18170e36fea81552dd3487977c40bbcc840c6f05ebf\nlinux/amd64 9 layers\n<h1>hello from my image</h1>",
+      "output": "sha256:35270b36ff3fa8fa40bb6a597d7879ddd270dbaf61846c33e4996b9651788d3b\nlinux/amd64 9 layers\n<h1>hello from my image</h1>",
       "read": "1 行目の sha256 で始まる値は、イメージの番号です。docker run で、自分のページが読めました。M 系の Mac では linux/arm64 になります。",
       "trouble": [
         {
           "symptom": "toomanyrequests や 429 と出る",
-          "check": "kubectl describe の Events で、Failed to pull image の行の終わりを見る",
-          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る"
+          "check": "sudo docker build の表示で、ERROR の行の終わりを見る",
+          "fix": "Docker Hub の、決まった時間に取れる回数の上限。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。短い「429 Too Many Requests」だけなら、使いすぎを防ぐ別の上限なので、数分待つ"
         },
         {
-          "symptom": "イメージが not found と出る",
-          "check": "Events で、イメージの名前と版 (: の後ろ) を見る",
-          "fix": "つづりが正しいなら、その版はもう配られていない。hub.docker.com でイメージのページを開き、同じ系統の新しい版に替える。この先の出力の版は、替えた版に読み替える"
+          "symptom": "not found と出る",
+          "check": "ERROR の行で、イメージの名前と版を見る",
+          "fix": "つづりが正しいなら、その版はもう配られていない。Dockerfile の FROM を、同じ系統の新しい版に替える"
         },
         {
           "symptom": "failed to read dockerfile と出る",
@@ -1113,7 +1175,7 @@
         },
         {
           "code": "  nodeName: kcna",
-          "text": "置くノードを、イメージを渡す kcna に決める"
+          "text": "置くノードを、イメージを渡す kcna に決める。練習だから名指しする。ふだんは scheduler に任せる"
         },
         {
           "code": "  containers:",
@@ -1152,7 +1214,7 @@
           "text": "k3s の置き場所にある hello を数える"
         }
       ],
-      "output": "pod/hello created\npod/hello condition met\n6f97e7f1cef9\n0",
+      "output": "pod/hello created\npod/hello condition met\n35270b36ff3f\n0",
       "read": "Docker には番号が出て、k3s では 0 です。ErrImageNeverPull は「取りに行くなと言われ、ノードにも無い」です。イメージを置いて共有する場所を、レジストリと呼びます。",
       "trouble": [
         {
@@ -1170,7 +1232,7 @@
     },
     {
       "id": "import",
-      "text": "イメージを 1 つのファイルにし、k3s の containerd に取り込みます。",
+      "text": "イメージを 1 つのファイルにし、k3s の containerd に取り込みます。hello が動き出すまで 1 分ほどかかることがあります。",
       "why": "レジストリを通さずに、同じノードの k3s へ渡すためです。取り込んだイメージは、そのノードだけにあります。",
       "where": "vm",
       "code": {
@@ -1207,7 +1269,7 @@
           "text": "ページを取る"
         }
       ],
-      "output": "docker.io/library/hello:0.1             \tsaved\napplication/vnd.oci.image.index.v1+json sha256:6f97e7f1cef90debeda9b18170e36fea81552dd3487977c40bbcc840c6f05ebf\nImporting\telapsed: 3.4 s\ttotal:   0.0 B\t(0.0 B/s)\nIMAGE                                        TAG                     IMAGE ID            SIZE\ndocker.io/library/hello                      0.1                     7906a21922148       21MB\npod/hello condition met\nNAME    READY   STATUS    RESTARTS   AGE   IP           NODE   NOMINATED NODE   READINESS GATES\nhello   1/1     Running   0          14s   10.42.0.12   kcna   <none>           <none>\n<h1>hello from my image</h1>",
+      "output": "docker.io/library/hello:0.1             \tsaved\napplication/vnd.oci.image.index.v1+json sha256:35270b36ff3fa8fa40bb6a597d7879ddd270dbaf61846c33e4996b9651788d3b\nImporting\telapsed: 4.7 s\ttotal:   0.0 B\t(0.0 B/s)\nIMAGE                                        TAG                     IMAGE ID            SIZE\ndocker.io/library/hello                      0.1                     c21a636c85379       21MB\npod/hello condition met\nNAME    READY   STATUS    RESTARTS   AGE   IP           NODE   NOMINATED NODE   READINESS GATES\nhello   1/1     Running   0          19s   10.42.0.12   kcna   <none>           <none>\n<h1>hello from my image</h1>",
       "read": "docker.io/library/hello と 0.1 が出れば取り込めています。作り直さなくても、k3s が少しおきに確かめ直し、Pod が動き出しました。NODE が kcna なので、取り込んだこのノードで動いています。",
       "trouble": [
         {
@@ -1221,16 +1283,42 @@
           "fix": "kubectl delete pod hello -n ch2 で消し、kubectl apply -f hello.yaml -n ch2 で作り直す"
         }
       ],
-      "source": "https://docs.k3s.io/cli"
+      "source": "https://docs.k3s.io/add-ons/import-images"
+    },
+    {
+      "id": "check-before-docker-off",
+      "text": "Docker を止めるの前に、どのマシンにいるかを見ます。kcna と出なければ、次の手順を打ちません。",
+      "why": "自分の PC で打つと、PC の Docker が止まるためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "hostname"
+      },
+      "lines": [
+        {
+          "code": "hostname",
+          "text": "このマシンの名前を出す"
+        }
+      ],
+      "output": "kcna",
+      "read": "kcna と出れば、仮想マシンの中です。",
+      "trouble": [
+        {
+          "symptom": "kcna ではない名前が出る",
+          "check": "行の頭が ubuntu@kcna かを見る",
+          "fix": "ホストにいる。multipass shell kcna で入り、もう一度打つ"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man1/hostname.1.html"
     },
     {
       "id": "docker-off",
       "text": "Docker を止め、次の起動でも始まらないようにします。",
-      "why": "作り終えたので、k3s が使うメモリを空けるためです。止めても hello は動き続けます。k3s が動かしているからです。",
+      "why": "作り終えたので、k3s が使うメモリを空けるためです。docker.socket も止めるのは、残すと docker のコマンドを打ったときに Docker が自動で始まるためです。止めても hello は動き続けます。k3s が動かしているからです。",
       "where": "vm",
       "code": {
         "language": "bash",
-        "text": "sudo systemctl disable --now docker.socket docker.service containerd.service\nrm ~/docker-install.log\nps -C containerd -o pid,args\ncurl -s http://$HELLO_IP"
+        "text": "sudo systemctl disable --now docker.socket docker.service containerd.service\nrm ~/docker-install.log ~/ch2/hello.tar\nps -C containerd -o pid,args\ncurl -s http://$HELLO_IP"
       },
       "lines": [
         {
@@ -1238,8 +1326,8 @@
           "text": "Docker と、一緒に入った containerd を止め、自動で始まらないようにする。k3s の containerd は別なので止まらない"
         },
         {
-          "code": "rm ~/docker-install.log",
-          "text": "入れたときの記録を消す"
+          "code": "rm ~/docker-install.log ~/ch2/hello.tar",
+          "text": "入れたときの記録と、取り込み終えたファイルを消す"
         },
         {
           "code": "ps -C containerd -o pid,args",
@@ -1250,7 +1338,7 @@
           "text": "hello からページを取る"
         }
       ],
-      "output": "Synchronizing state of docker.service with SysV service script with /usr/lib/systemd/systemd-sysv-install.\nExecuting: /usr/lib/systemd/systemd-sysv-install disable docker\nRemoved \"/etc/systemd/system/sockets.target.wants/docker.socket\".\nRemoved \"/etc/systemd/system/multi-user.target.wants/containerd.service\".\nRemoved \"/etc/systemd/system/multi-user.target.wants/docker.service\".\nDisabling 'docker.service', but its triggering units are still active:\ndocker.socket\n    PID COMMAND\n   3629 containerd\n<h1>hello from my image</h1>",
+      "output": "Synchronizing state of docker.service with SysV service script with /usr/lib/systemd/systemd-sysv-install.\nExecuting: /usr/lib/systemd/systemd-sysv-install disable docker\nRemoved \"/etc/systemd/system/sockets.target.wants/docker.socket\".\nRemoved \"/etc/systemd/system/multi-user.target.wants/containerd.service\".\nRemoved \"/etc/systemd/system/multi-user.target.wants/docker.service\".\nDisabling 'docker.service', but its triggering units are still active:\ndocker.socket\n    PID COMMAND\n   3630 containerd\n<h1>hello from my image</h1>",
       "read": "Removed の行は、自動で始める印を消したという意味です。Disabling の 2 行は、止める順のうえでの知らせで、問題ありません。k3s の containerd だけが残り、ページも返ります。また作るときは sudo systemctl start docker を打ちます。",
       "trouble": [
         {
@@ -1260,6 +1348,41 @@
         }
       ],
       "source": "https://docs.docker.com/engine/install/linux-postinstall/"
+    },
+    {
+      "id": "break",
+      "text": "ここで休めます。休む人は、exit で出てから、ホストで 1 行目を打ちます。続けるときに、2 行目を打ちます。休まない人は、打たずに印を付けて先へ進みます。",
+      "why": "長い章なので、区切りを置くためです。止めても、作ったものとファイルは残ります。再起動と同じことが起きるので、Pod の中のコンテナは始め直され、Pod の住所も変わります。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass stop kcna\nmultipass shell kcna"
+      },
+      "lines": [
+        {
+          "code": "multipass stop kcna",
+          "text": "kcna を止める。動いている (Running) ときだけ打てる"
+        },
+        {
+          "code": "multipass shell kcna",
+          "text": "止まっている kcna を動かし、中に入る"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "2 行目のあと、行の頭が ubuntu@kcna:~$ に変われば戻れています。そのあと cd ~/ch2 を打ちます。Pod の一覧は kubectl get pods -n ch2 で見ます。RESTARTS が増えているのは、マシンを止めたためです。",
+      "trouble": [
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "activating なら、1 分ほど待つ"
+        },
+        {
+          "symptom": "No such file or directory と出る",
+          "check": "pwd を打つ",
+          "fix": "作業のフォルダにいない。cd で移る"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/stop/"
     },
     {
       "id": "node-room",
@@ -1284,7 +1407,7 @@
           "text": "今、実際に使っている量を出す"
         }
       ],
-      "output": "2 2014840Ki\nAllocated resources:\n  (Total limits may be over 100 percent, i.e., overcommitted.)\n  Resource           Requests    Limits\n  --------           --------    ------\n  cpu                200m (10%)  0 (0%)\n  memory             140Mi (7%)  170Mi (8%)\n  ephemeral-storage  0 (0%)      0 (0%)\n  hugepages-2Mi      0 (0%)      0 (0%)\nEvents:\nNAME   CPU(cores)   CPU(%)   MEMORY(bytes)   MEMORY(%)\nkcna   778m         38%      1195Mi          60%",
+      "output": "2 2014844Ki\nAllocated resources:\n  (Total limits may be over 100 percent, i.e., overcommitted.)\n  Resource           Requests    Limits\n  --------           --------    ------\n  cpu                200m (10%)  0 (0%)\n  memory             140Mi (7%)  170Mi (8%)\n  ephemeral-storage  0 (0%)      0 (0%)\n  hugepages-2Mi      0 (0%)      0 (0%)\nEvents:\nNAME   CPU(cores)   CPU(%)   MEMORY(bytes)   MEMORY(%)\nkcna   815m         40%      1232Mi          62%",
       "read": "CPU の 200m は、0.2 コアです (1000m が 1 コア)。Requests の % が、予約した割合です。top の使用量とは別の数です。Limits は合計が 100% を超えてもよく、超えた分を約束しているわけではありません。",
       "trouble": [
         {
@@ -1383,7 +1506,7 @@
           "text": "big を消す"
         }
       ],
-      "output": "pod/big created\npod/big condition met\nNAME   READY   STATUS    RESTARTS   AGE\nbig    0/1     Pending   0          0s\nREASON             MESSAGE\nFailedScheduling   0/1 nodes are available: 1 Insufficient cpu. no new claims to deallocate, preemption: 0/1 nodes are available: 1 Preemption is not helpful for scheduling.\npod \"big\" deleted from ch2 namespace",
+      "output": "pod/big created\npod/big condition met\nNAME   READY   STATUS    RESTARTS   AGE\nbig    0/1     Pending   0          1s\nREASON             MESSAGE\nFailedScheduling   0/1 nodes are available: 1 Insufficient cpu. no new claims to deallocate, preemption: 0/1 nodes are available: 1 Preemption is not helpful for scheduling.\npod \"big\" deleted from ch2 namespace",
       "read": "STATUS は Pending (置き場所待ち) です。Insufficient cpu は「CPU の空きが足りない」です。0/1 は、1 台のうち置けるのが 0 台という意味です。Pod は、空くまで待ち続けます。直すには、頼む量を減らすか、ノードを増やします。",
       "trouble": [
         {
@@ -1402,7 +1525,7 @@
     {
       "id": "oom",
       "text": "わざと、メモリの上限を超えさせます。",
-      "why": "メモリは、上限を超えると絞れません。カーネルがコンテナを止めます。これを OOMKilled (メモリ不足で止められた) と呼びます。",
+      "why": "CPU と違い、メモリは待たせることができません。上限を超えて使おうとすると、カーネルがコンテナの中のプロセスを強制的に終わらせます。主役が終わると、コンテナも終わります。この理由を OOMKilled (メモリ不足で終わらされた) と呼びます。",
       "where": "vm",
       "code": {
         "language": "bash",
@@ -1490,13 +1613,13 @@
           "text": "決まった量を出す"
         }
       ],
-      "output": "pod/oom created\npod/oom condition met\nNAME   READY   STATUS      RESTARTS   AGE\noom    0/1     OOMKilled   0          3s\nOOMKilled 137\n{\"limits\":{\"memory\":\"32Mi\"},\"requests\":{\"memory\":\"32Mi\"}}",
+      "output": "pod/oom created\npod/oom condition met\nNAME   READY   STATUS      RESTARTS   AGE\noom    0/1     OOMKilled   0          4s\nOOMKilled 137\n{\"limits\":{\"memory\":\"32Mi\"},\"requests\":{\"memory\":\"32Mi\"}}",
       "read": "137 は 128 + 9 で、9 番の合図 (強制終了) で止められたという番号です。32Mi は 32 メビバイトです。limits だけ書くと、requests も同じ値になります。",
       "trouble": [
         {
           "symptom": "toomanyrequests や 429 と出る",
           "check": "kubectl describe の Events で、Failed to pull image の行の終わりを見る",
-          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る"
+          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る。短い「429 Too Many Requests」だけのときは、使いすぎを防ぐ別の上限なので、数分待ってからもう一度行う"
         },
         {
           "symptom": "Error になり OOMKilled でない",
@@ -1508,7 +1631,7 @@
     },
     {
       "id": "cpu",
-      "text": "CPU の上限を超えさせ、止められないことを見ます。",
+      "text": "CPU の上限を超えさせ、止められないことを見ます。20 秒待つ行があります。",
       "why": "CPU は、超えた分を待たせるだけです。遅くなりますが、止まりません。メモリとの大きな違いです。",
       "where": "vm",
       "code": {
@@ -1605,13 +1728,13 @@
           "text": "cpu を消す"
         }
       ],
-      "output": "pod/cpu created\npod/cpu condition met\n20000 100000\nnr_periods 208\nnr_throttled 208\nnr_bursts 0\nNAME   READY   STATUS    RESTARTS   AGE\ncpu    1/1     Running   0          22s\npod \"cpu\" deleted from ch2 namespace",
-      "read": "cpu.max の 20000 100000 は、100000 のうち 20000 (0.2 コア分) だけ使えるという意味です。nr_periods が区切りの数、nr_throttled が待たされた区切りの数です。ほとんど待たされていますが、RESTARTS は 0 で Running のままです。",
+      "output": "pod/cpu created\npod/cpu condition met\n20000 100000\nnr_periods 216\nnr_throttled 215\nnr_bursts 0\nNAME   READY   STATUS    RESTARTS   AGE\ncpu    1/1     Running   0          27s\npod \"cpu\" deleted from ch2 namespace",
+      "read": "cpu.max の 20000 100000 は、100000 のうち 20000 (0.2 コア分) だけ使えるという意味です。nr_periods が区切りの数、nr_throttled が待たされた区切りの数です。nr_throttled が 0 より多いので、待たされています (数は、マシンの忙しさで変わります)。それでも、RESTARTS は 0 で Running のままです。",
       "trouble": [
         {
           "symptom": "toomanyrequests や 429 と出る",
           "check": "kubectl describe の Events で、Failed to pull image の行の終わりを見る",
-          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る"
+          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る。短い「429 Too Many Requests」だけのときは、使いすぎを防ぐ別の上限なので、数分待ってからもう一度行う"
         },
         {
           "symptom": "No such file or directory と出る",
@@ -1641,7 +1764,7 @@
         }
       ],
       "output": "The Pod \"web\" is invalid: spec: Forbidden: pod updates may not change fields other than `spec.containers[*].image`,`spec.initContainers[*].image`,`spec.activeDeadlineSeconds`,`spec.tolerations` (only additions to existing tolerations),`spec.terminationGracePeriodSeconds` (allow it to be set to 1 if it was previously negative)",
-      "read": "Forbidden と出て、変えてよい欄の一覧が続きます。image は替えられますが、ports は替えられません。変えたいときは、消して作り直します。",
+      "read": "Forbidden と出て、変えてよい欄の一覧が続きます。image は替えられますが、ports は替えられません。変えたいときは、消して作り直します。例外もあり、CPU とメモリの量 (resources) は、resize という別の入口からなら、作り直さずに変えられます (1.35 から正式な機能)。",
       "trouble": [
         {
           "symptom": "configured と出る",
@@ -1663,7 +1786,7 @@
       "where": "vm",
       "code": {
         "language": "bash",
-        "text": "kubectl get pod web -n ch2 -o jsonpath='{.metadata.uid}{\"\\n\"}'\nsed 's/1.27-alpine/1.28-alpine/' web.yaml > web3.yaml\nkubectl apply -f web3.yaml -n ch2\nkubectl wait --for=jsonpath='{.status.containerStatuses[0].restartCount}'=1 pod/web -n ch2 --timeout=180s\nkubectl wait --for=condition=Ready pod/web -n ch2 --timeout=180s\nkubectl get pod web -n ch2\nkubectl get pod web -n ch2 -o jsonpath='{.metadata.uid} {.spec.containers[0].image}{\"\\n\"}'\ncurl -s http://$POD_IP | grep title"
+        "text": "kubectl get pod web -n ch2 -o jsonpath='{.metadata.uid}{\"\\n\"}'\nsed 's/1.27-alpine/1.28-alpine/' web.yaml > web3.yaml\nkubectl apply -f web3.yaml -n ch2\nkubectl wait --for=jsonpath='{.status.containerStatuses[0].image}'=docker.io/library/nginx:1.28-alpine pod/web -n ch2 --timeout=180s\nkubectl wait --for=condition=Ready pod/web -n ch2 --timeout=180s\nkubectl get pod web -n ch2\nkubectl get pod web -n ch2 -o jsonpath='{.metadata.uid} {.spec.containers[0].image}{\"\\n\"}'\nPOD_IP=$(kubectl get pod web -n ch2 -o jsonpath='{.status.podIP}')\ncurl -s http://$POD_IP | grep title"
       },
       "lines": [
         {
@@ -1679,8 +1802,8 @@
           "text": "渡す"
         },
         {
-          "code": "kubectl wait --for=jsonpath='{.status.containerStatuses[0].restartCount}'=1 pod/web -n ch2 --timeout=180s",
-          "text": "始め直した数が 1 になるまで待つ"
+          "code": "kubectl wait --for=jsonpath='{.status.containerStatuses[0].image}'=docker.io/library/nginx:1.28-alpine pod/web -n ch2 --timeout=180s",
+          "text": "動いているイメージが 1.28 になるまで待つ"
         },
         {
           "code": "kubectl wait --for=condition=Ready pod/web -n ch2 --timeout=180s",
@@ -1695,17 +1818,21 @@
           "text": "替えた後の uid とイメージを出す"
         },
         {
+          "code": "POD_IP=$(kubectl get pod web -n ch2 -o jsonpath='{.status.podIP}')",
+          "text": "web の住所を覚え直す"
+        },
+        {
           "code": "curl -s http://$POD_IP | grep title",
           "text": "ページを取る"
         }
       ],
-      "output": "e6dd23ae-6ace-40e2-ab15-d22d946ac8d6\npod/web configured\npod/web condition met\npod/web condition met\nNAME   READY   STATUS    RESTARTS     AGE\nweb    1/1     Running   1 (9s ago)   2m55s\ne6dd23ae-6ace-40e2-ab15-d22d946ac8d6 nginx:1.28-alpine\n<title>Welcome to nginx!</title>",
-      "read": "uid が同じなので、同じ Pod です。RESTARTS が 1 になり、cp で写したページは消えて、元の Welcome to nginx! に戻りました。住所も変わっていません。",
+      "output": "808bc593-18eb-4929-a962-0248f3814dc2\npod/web configured\npod/web condition met\npod/web condition met\nNAME   READY   STATUS    RESTARTS      AGE\nweb    1/1     Running   1 (12s ago)   3m50s\n808bc593-18eb-4929-a962-0248f3814dc2 nginx:1.28-alpine\n<title>Welcome to nginx!</title>",
+      "read": "uid が同じなので、同じ Pod です。RESTARTS が 1 つ増え、cp で写したページは消えて、元の Welcome to nginx! に戻りました。途中で休んだ人は、そのときにもうページが戻り、RESTARTS も多くなっています。",
       "trouble": [
         {
           "symptom": "toomanyrequests や 429 と出る",
           "check": "kubectl describe の Events で、Failed to pull image の行の終わりを見る",
-          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る"
+          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る。短い「429 Too Many Requests」だけのときは、使いすぎを防ぐ別の上限なので、数分待ってからもう一度行う"
         },
         {
           "symptom": "イメージが not found と出る",
@@ -1713,7 +1840,12 @@
           "fix": "つづりが正しいなら、その版はもう配られていない。hub.docker.com でイメージのページを開き、同じ系統の新しい版に替える。この先の出力の版は、替えた版に読み替える"
         },
         {
-          "symptom": "RESTARTS が 0 のまま",
+          "symptom": "開き直した・再起動したあとで、web3.yaml が作れない",
+          "check": "pwd を打つ",
+          "fix": "cd ~/ch2 で移ってから打つ"
+        },
+        {
+          "symptom": "timed out waiting for the condition と出る",
           "check": "kubectl describe pod web -n ch2 の Events を見る",
           "fix": "新しいイメージを取っている途中なら待つ"
         }
@@ -1722,7 +1854,7 @@
     },
     {
       "id": "delete",
-      "text": "Pod を消し、戻らないことを確かめます。",
+      "text": "Pod を消し、戻らないことを確かめます。10 秒待つ行があります。",
       "why": "ファイルに書いて作っても、Pod は 1 つきりです。消えたら、誰かが作り直すまで戻りません。作り直す役目の仕組みを、3 章で動かします。",
       "where": "vm",
       "code": {
@@ -1743,7 +1875,7 @@
           "text": "一覧を出す"
         }
       ],
-      "output": "pod \"web\" deleted from ch2 namespace\nNAME    READY   STATUS      RESTARTS   AGE\napi     1/1     Running     0          2m54s\nhello   1/1     Running     0          71s\noom     0/1     OOMKilled   0          52s\npair    2/2     Running     0          2m50s",
+      "output": "pod \"web\" deleted from ch2 namespace\nNAME    READY   STATUS      RESTARTS   AGE\napi     1/1     Running     0          3m45s\nhello   1/1     Running     0          86s\noom     0/1     OOMKilled   0          60s\npair    2/2     Running     0          3m41s",
       "read": "web がありません。待っても戻りません。oom は Never なので止まったまま残り、ほかは動いています。",
       "trouble": [
         {
@@ -1808,7 +1940,7 @@
           "text": "名前空間の一覧を出す"
         }
       ],
-      "output": "namespace \"ch2\" deleted\nNAME              STATUS   AGE\ndefault           Active   5m16s\nkube-node-lease   Active   5m16s\nkube-public       Active   5m16s\nkube-system       Active   5m16s",
+      "output": "namespace \"ch2\" deleted\nNAME              STATUS   AGE\ndefault           Active   6m17s\nkube-node-lease   Active   6m17s\nkube-public       Active   6m17s\nkube-system       Active   6m17s",
       "read": "ch2 が消え、default と kube- で始まる 4 つだけになれば、片付いています。手元の ~/ch2 の YAML は残るので、読み返せます。",
       "trouble": [
         {
@@ -1878,7 +2010,7 @@
         }
       ],
       "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
-      "read": "一覧に ch2-end が並べば取れています。戻すときは、止めてから multipass restore kcna.ch2-end を打ちます。最後の行で、行の頭が ubuntu@kcna:~$ に変わります。課題と後片付けは、この中で続けます。",
+      "read": "一覧に ch2-end が並べば取れています。戻すときは、止めてから multipass restore kcna.ch2-end を打ちます。今の状態も控えるかを聞かれたら、要らなければ no と答えます。最後の行で、行の頭が ubuntu@kcna:~$ に変わります。課題と後片付けは、この中で続けます。",
       "trouble": [
         {
           "symptom": "止まっていないので取れないと出る",
@@ -1940,7 +2072,7 @@
           "text": "名前空間の一覧を出す"
         }
       ],
-      "output": "namespace \"practice\" deleted\nNAME              STATUS   AGE\ndefault           Active   5m37s\nkube-node-lease   Active   5m37s\nkube-public       Active   5m37s\nkube-system       Active   5m37s",
+      "output": "namespace \"practice\" deleted\nNAME              STATUS   AGE\ndefault           Active   6m40s\nkube-node-lease   Active   6m40s\nkube-public       Active   6m40s\nkube-system       Active   6m40s",
       "read": "default と kube- で始まる 4 つだけになれば、片付いています。k3s は消しません。",
       "trouble": [
         {
@@ -2079,6 +2211,10 @@
     {
       "label": "K3s: Import Images",
       "url": "https://docs.k3s.io/add-ons/import-images"
+    },
+    {
+      "label": "Kubernetes: Resize Container Resources",
+      "url": "https://kubernetes.io/docs/tasks/configure-pod-container/resize-container-resources/"
     },
     {
       "label": "K3s: Advanced Options",
