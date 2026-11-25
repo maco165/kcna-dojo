@@ -143,8 +143,7 @@ describe('構造化データとパンくず', { timeout: 30_000 }, () => {
       expect([...week.querySelectorAll('h3 a')].map((a) => a.getAttribute('href')).filter((h) => h!.includes('-lab'))).toEqual([]);
       expect(week.querySelector('#root')!.textContent!.includes('章は 0 章から順に進めます')).toBe(w in WEEK_LINKS);
       const all = [...week.querySelectorAll('#root li a')].map((a) => a.getAttribute('href'));
-      expect(all.filter((h) => h!.includes('-lab/'))).toEqual(WEEK_LINKS[w] ? [] : [`/kcna-dojo/lesson/w${w}-lab/`]);
-      expect(all).toEqual(expect.arrayContaining([...(WEEK_LINKS[w] ?? [`lesson/w${w}-lab/`]).map((p) => `/kcna-dojo/${p}`), '/kcna-dojo/hands-on/']));
+      expect(all.filter((h) => h!.includes('/hands-on/') || h!.includes('-lab/'))).toEqual([...(WEEK_LINKS[w] ?? [`lesson/w${w}-lab/`]), 'hands-on/'].map((p) => `/kcna-dojo/${p}`));
     }
   });
 });
