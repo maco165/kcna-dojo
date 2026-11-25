@@ -1,0 +1,2114 @@
+{
+  "id": "rollout",
+  "order": 5,
+  "title": "更新して、巻き戻す",
+  "summary": "Deployment を新しい版に替え、途中の様子と、止まらなかったかを数えます。わざと失敗する更新、巻き戻し、記録の残し方、カナリアと Blue/Green の最小の形まで動かします。",
+  "goal": "Deployment を止めずに更新し、失敗に気付いて巻き戻し、更新のしかたを選んで説明できる",
+  "features": [
+    "更新は、Pod のひな型が変わると始まり、新旧の ReplicaSet が入れ替わる",
+    "maxSurge と maxUnavailable で、余分に要る数と減る数が決まる",
+    "readiness が無いと、使えない Pod に渡してしまう",
+    "失敗した更新は途中で止まるが、自動では戻らない",
+    "巻き戻しも 1 つの更新。ファイルを正にしておくと迷わない"
+  ],
+  "minutes": 140,
+  "needs": [
+    "4 章を終えた仮想マシン kcna (k3s が動き、kubectl が使える)",
+    "インターネットへの接続 (nginx の 3 つの版を取ってきます)",
+    "出力について: 「仮想マシンの中」の出力は、2026-11-25 に Linux の QEMU の上で、Ubuntu 24.04 の公式のクラウドイメージ (x86_64・2 コア・2 GB・20 GB) と k3s v1.36.6+k3s1 で取りました。Multipass を打つ手順は実機で確かめていないので、出力を載せていません。M 系の Mac でも手順は同じです。CPU の種類が出るところだけ arm64 か aarch64 になります。"
+  ],
+  "reads": [
+    {
+      "topic": "application-delivery",
+      "label": "アプリを届ける流れ"
+    },
+    {
+      "topic": "core-concepts",
+      "label": "Kubernetes の中心の考え方"
+    }
+  ],
+  "steps": [
+    {
+      "id": "enter",
+      "text": "4 章を終えた仮想マシンの中に入ります。ホストの端末で打ちます。",
+      "why": "この章のコマンドは、最初と最後のほかは全部、仮想マシンの中で打つためです。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass shell kcna"
+      },
+      "lines": [
+        {
+          "code": "multipass shell kcna",
+          "text": "kcna の中の端末を開く。止まっていれば、動かしてから開く"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "行の頭が ubuntu@kcna:~$ に変われば、中に入っています。",
+      "trouble": [
+        {
+          "symptom": "multipass: command not found、または「認識されません」と出る",
+          "check": "端末を閉じて開き直し、multipass version を打つ",
+          "fix": "開き直しても出るなら、Multipass を入れる手順をもう一度行う"
+        },
+        {
+          "symptom": "kcna が無いと出る",
+          "check": "multipass list で名前を見る",
+          "fix": "0 章から始める"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/shell/"
+    },
+    {
+      "id": "check-host",
+      "text": "仮想マシンの中で、どのマシンにいるかと、クラスターの様子を見ます。hostname が kcna でなければ、先へ進まず multipass shell kcna で入ります。枠は、迷ったら 1 行ずつ貼ります。sudo などのあとの行は、端末によって、まとめて貼ると消えることがあるためです (EOF で終わる書き込みの部分は、EOF まで続けて貼ります)。",
+      "why": "自分の PC の別のクラスターで打たないためです。この章では、わざと失敗する更新もします。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "hostname\nkubectl get nodes"
+      },
+      "lines": [
+        {
+          "code": "hostname",
+          "text": "このマシンの名前を出す"
+        },
+        {
+          "code": "kubectl get nodes",
+          "text": "ノードの一覧を出す"
+        }
+      ],
+      "output": "kcna\nNAME   STATUS   ROLES           AGE   VERSION\nkcna   Ready    control-plane   52m   v1.36.6+k3s1",
+      "read": "kcna と出て、ノードの STATUS が Ready なら進めます。VERSION が v1.36.6+k3s1 でない人は、出力の版を読み替えます。",
+      "trouble": [
+        {
+          "symptom": "kcna ではない名前が出る",
+          "check": "行の頭が ubuntu@kcna かを見る",
+          "fix": "ホストにいる。multipass shell kcna で入り、もう一度打つ"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        },
+        {
+          "symptom": "permission denied や localhost:8080 と出る",
+          "check": "echo $KUBECONFIG を打つ",
+          "fix": "空なら export KUBECONFIG=~/.kube/k3s.yaml を打つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/architecture/nodes/"
+    },
+    {
+      "id": "words",
+      "text": "動いているものを新しい版に替えることを更新、前の版に戻すことを巻き戻し (ロールバック) と呼びます。Deployment は、新しい ReplicaSet を増やしながら、古い ReplicaSet を減らして、止めずに入れ替えます。これをローリングアップデートと呼びます。",
+      "why": "一度に全部替えると、その間止まります。少しずつ替えて、だめなら止まり、戻せる形にするためです。この章では、替わる途中を見て、止まらなかったかを数え、失敗と巻き戻しを体験します。",
+      "source": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"
+    },
+    {
+      "id": "prepare",
+      "text": "作業のフォルダと、練習用の名前空間 ch5 を作ります。",
+      "why": "作るものを、まとめて片付けられるようにするためです。端末を開き直したときや再起動のあとは、cd ~/ch5 を打ちます。SVC_IP のような覚えた値は、端末を閉じると消えるので、それを決めた行も打ち直します。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "mkdir -p ~/ch5\ncd ~/ch5\nkubectl create namespace ch5\nkubectl wait --for=create serviceaccount/default -n ch5 --timeout=60s"
+      },
+      "lines": [
+        {
+          "code": "mkdir -p ~/ch5",
+          "text": "ch5 というフォルダを作る"
+        },
+        {
+          "code": "cd ~/ch5",
+          "text": "ch5 へ移る"
+        },
+        {
+          "code": "kubectl create namespace ch5",
+          "text": "名前空間 ch5 を作る"
+        },
+        {
+          "code": "kubectl wait --for=create serviceaccount/default -n ch5 --timeout=60s",
+          "text": "ch5 の準備ができるまで待つ"
+        }
+      ],
+      "output": "namespace/ch5 created\nserviceaccount/default condition met",
+      "read": "namespace/ch5 created と出れば進めます。",
+      "trouble": [
+        {
+          "symptom": "AlreadyExists と出る",
+          "check": "kubectl get namespaces を打つ",
+          "fix": "もうあるので、そのまま進む"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/"
+    },
+    {
+      "id": "deploy",
+      "text": "1.26 の Web サーバーを 3 つ動かし、Service を置きます。枠を、最後の行までまとめて貼り付けます。",
+      "why": "何から何へ替わったかを、nginx の版で見分けられるようにするためです。変更の理由も、はじめから書いておきます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cat > web.yaml <<'EOF'\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web\n  annotations:\n    kubernetes.io/change-cause: \"1.26 で始める\"\nspec:\n  replicas: 3\n  selector:\n    matchLabels:\n      app: web\n  template:\n    metadata:\n      labels:\n        app: web\n    spec:\n      terminationGracePeriodSeconds: 10\n      containers:\n      - name: web\n        image: nginx:1.26-alpine\n        readinessProbe:\n          httpGet:\n            path: /\n            port: 80\n          periodSeconds: 1\n        lifecycle:\n          preStop:\n            exec:\n              command: ['sleep', '3']\nEOF\nkubectl apply -f web.yaml -n ch5\nkubectl rollout status deployment/web -n ch5 --timeout=180s\nkubectl expose deployment web --port=80 -n ch5\nsleep 5\nSVC_IP=$(kubectl get service web -n ch5 -o jsonpath='{.spec.clusterIP}')\ncurl -sI http://$SVC_IP | grep Server\nkubectl rollout history deployment/web -n ch5"
+      },
+      "lines": [
+        {
+          "code": "cat > web.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま web.yaml というファイルに書く"
+        },
+        {
+          "code": "apiVersion: apps/v1",
+          "text": "使う API の種類と版"
+        },
+        {
+          "code": "kind: Deployment",
+          "text": "作るものの種類"
+        },
+        {
+          "code": "metadata:",
+          "text": "見分けるための情報"
+        },
+        {
+          "code": "  name: web",
+          "text": "名前"
+        },
+        {
+          "code": "  annotations:",
+          "text": "覚え書き"
+        },
+        {
+          "code": "    kubernetes.io/change-cause: \"1.26 で始める\"",
+          "text": "変更の理由。更新の記録に残る"
+        },
+        {
+          "code": "spec:",
+          "text": "ほしい中身"
+        },
+        {
+          "code": "  replicas: 3",
+          "text": "Pod の数"
+        },
+        {
+          "code": "  selector:",
+          "text": "自分の Pod の見分け方"
+        },
+        {
+          "code": "    matchLabels:",
+          "text": "次のラベルが付いたもの"
+        },
+        {
+          "code": "      app: web",
+          "text": "app が web"
+        },
+        {
+          "code": "  template:",
+          "text": "作る Pod のひな型。ここが変わると更新が始まる"
+        },
+        {
+          "code": "    metadata:",
+          "text": "作る Pod の情報"
+        },
+        {
+          "code": "      labels:",
+          "text": "ラベル"
+        },
+        {
+          "code": "        app: web",
+          "text": "app を web にする"
+        },
+        {
+          "code": "    spec:",
+          "text": "作る Pod の中身"
+        },
+        {
+          "code": "      terminationGracePeriodSeconds: 10",
+          "text": "消すときに待つ秒数の上限"
+        },
+        {
+          "code": "      containers:",
+          "text": "コンテナの一覧"
+        },
+        {
+          "code": "      - name: web",
+          "text": "コンテナの名前"
+        },
+        {
+          "code": "        image: nginx:1.26-alpine",
+          "text": "使うイメージと版"
+        },
+        {
+          "code": "        readinessProbe:",
+          "text": "仕事を受けられるかの検査"
+        },
+        {
+          "code": "          httpGet:",
+          "text": "Web の返事で見る"
+        },
+        {
+          "code": "            path: /",
+          "text": "取りに行くページ"
+        },
+        {
+          "code": "            port: 80",
+          "text": "番号"
+        },
+        {
+          "code": "          periodSeconds: 1",
+          "text": "1 秒おきに見る"
+        },
+        {
+          "code": "        lifecycle:",
+          "text": "始めと終わりにすること"
+        },
+        {
+          "code": "          preStop:",
+          "text": "止める前に"
+        },
+        {
+          "code": "            exec:",
+          "text": "コマンドを動かす"
+        },
+        {
+          "code": "              command: ['sleep', '3']",
+          "text": "3 秒待つ。その間に、Service の渡す先から外れる"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "kubectl apply -f web.yaml -n ch5",
+          "text": "Deployment を作る"
+        },
+        {
+          "code": "kubectl rollout status deployment/web -n ch5 --timeout=180s",
+          "text": "更新が終わるまで待つ"
+        },
+        {
+          "code": "kubectl expose deployment web --port=80 -n ch5",
+          "text": "web という Service を作る"
+        },
+        {
+          "code": "sleep 5",
+          "text": "渡す先が入るまで 5 秒待つ"
+        },
+        {
+          "code": "SVC_IP=$(kubectl get service web -n ch5 -o jsonpath='{.spec.clusterIP}')",
+          "text": "Service の住所を覚える。今の端末だけで使える"
+        },
+        {
+          "code": "curl -sI http://$SVC_IP | grep Server",
+          "text": "返事の見出しから、nginx の版を出す"
+        },
+        {
+          "code": "kubectl rollout history deployment/web -n ch5",
+          "text": "更新の記録を出す"
+        }
+      ],
+      "output": "deployment.apps/web created\nWaiting for deployment \"web\" rollout to finish: 0 of 3 updated replicas are available...\nWaiting for deployment \"web\" rollout to finish: 1 of 3 updated replicas are available...\nWaiting for deployment \"web\" rollout to finish: 2 of 3 updated replicas are available...\ndeployment \"web\" successfully rolled out\nservice/web exposed\nServer: nginx/1.26.3\ndeployment.apps/web\nREVISION  CHANGE-CAUSE\n1         1.26 で始める",
+      "read": "Server の後ろが、動いている nginx の版です (1.26 の後ろの数字は、イメージの中身で変わります)。記録は 1 行で、REVISION (番号) が 1、CHANGE-CAUSE が変更の理由です。",
+      "trouble": [
+        {
+          "symptom": "toomanyrequests や 429 と出る",
+          "check": "kubectl describe の Events で、Failed to pull image の行の終わりを見る",
+          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る。短い「429 Too Many Requests」だけのときは、使いすぎを防ぐ別の上限なので、数分待ってからもう一度行う"
+        },
+        {
+          "symptom": "イメージが not found と出る",
+          "check": "Events で、イメージの名前と版 (: の後ろ) を見る",
+          "fix": "つづりが正しいなら、その版はもう配られていない。hub.docker.com でイメージのページを開き、同じ系統の新しい版に替える。この先の出力の版は、替えた版に読み替える"
+        },
+        {
+          "symptom": "curl で何も出ない",
+          "check": "echo $SVC_IP を打つ",
+          "fix": "空なら、SVC_IP=... の行を打ち直す。Service が無ければ deploy の手順の expose の行から"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"
+    },
+    {
+      "id": "set-image",
+      "text": "命令で、イメージを 1.27 に替えます。",
+      "why": "更新は、Pod のひな型 (template) が変わると始まります。数だけを変えても、更新にはなりません。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl set image deployment/web web=nginx:1.27-alpine -n ch5\nkubectl annotate deployment web kubernetes.io/change-cause=\"1.27 に更新\" --overwrite -n ch5\nkubectl rollout status deployment/web -n ch5 --timeout=180s\ncurl -sI http://$SVC_IP | grep Server\nkubectl get replicaset -l app=web -n ch5\nkubectl rollout history deployment/web -n ch5"
+      },
+      "lines": [
+        {
+          "code": "kubectl set image deployment/web web=nginx:1.27-alpine -n ch5",
+          "text": "web というコンテナのイメージを 1.27 に替える"
+        },
+        {
+          "code": "kubectl annotate deployment web kubernetes.io/change-cause=\"1.27 に更新\" --overwrite -n ch5",
+          "text": "変更の理由を書く"
+        },
+        {
+          "code": "kubectl rollout status deployment/web -n ch5 --timeout=180s",
+          "text": "更新が終わるまで待つ"
+        },
+        {
+          "code": "curl -sI http://$SVC_IP | grep Server",
+          "text": "返事の見出しから、nginx の版を出す"
+        },
+        {
+          "code": "kubectl get replicaset -l app=web -n ch5",
+          "text": "web の ReplicaSet を出す"
+        },
+        {
+          "code": "kubectl rollout history deployment/web -n ch5",
+          "text": "更新の記録を出す"
+        }
+      ],
+      "output": "deployment.apps/web image updated\ndeployment.apps/web annotated\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 2 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 2 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 2 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"web\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"web\" rollout to finish: 1 old replicas are pending termination...\ndeployment \"web\" successfully rolled out\nServer: nginx/1.27.5\nNAME             DESIRED   CURRENT   READY   AGE\nweb-54d8757ff5   0         0         0       26s\nweb-6c99889ff4   3         3         3       8s\ndeployment.apps/web\nREVISION  CHANGE-CAUSE\n1         1.26 で始める\n2         1.27 に更新",
+      "read": "ReplicaSet が 2 つになり、古いほうは DESIRED が 0 のまま残っています。これが、戻すときに使う控えです。記録は 2 行になりました。理由を書いておかないと、CHANGE-CAUSE は <none> になるか、前の理由のままになります。",
+      "trouble": [
+        {
+          "symptom": "toomanyrequests や 429 と出る",
+          "check": "kubectl describe の Events で、Failed to pull image の行の終わりを見る",
+          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る。短い「429 Too Many Requests」だけのときは、使いすぎを防ぐ別の上限なので、数分待ってからもう一度行う"
+        },
+        {
+          "symptom": "イメージが not found と出る",
+          "check": "Events で、イメージの名前と版 (: の後ろ) を見る",
+          "fix": "つづりが正しいなら、その版はもう配られていない。hub.docker.com でイメージのページを開き、同じ系統の新しい版に替える。この先の出力の版は、替えた版に読み替える"
+        },
+        {
+          "symptom": "curl で何も出ない",
+          "check": "echo $SVC_IP を打つ",
+          "fix": "空なら、SVC_IP=... の行を打ち直す。Service が無ければ deploy の手順の expose の行から"
+        },
+        {
+          "symptom": "unable to find container と出る",
+          "check": "set image の web= の左を見る",
+          "fix": "= の左はコンテナの名前。web にする"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"
+    },
+    {
+      "id": "revision",
+      "text": "記録の 1 つ 1 つの中身を見ます。",
+      "why": "戻す前に、その番号が何だったかを確かめるためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl rollout history deployment/web --revision=1 -n ch5 | grep -E \"revision|change-cause|Image\"\nkubectl rollout history deployment/web --revision=2 -n ch5 | grep -E \"revision|change-cause|Image\""
+      },
+      "lines": [
+        {
+          "code": "kubectl rollout history deployment/web --revision=1 -n ch5 | grep -E \"revision|change-cause|Image\"",
+          "text": "番号 1 の中身から、目印の行を出す"
+        },
+        {
+          "code": "kubectl rollout history deployment/web --revision=2 -n ch5 | grep -E \"revision|change-cause|Image\"",
+          "text": "番号 2 の中身から、目印の行を出す"
+        }
+      ],
+      "output": "deployment.apps/web with revision #1\n  Annotations:\tkubernetes.io/change-cause: 1.26 で始める\n    Image:\tnginx:1.26-alpine\ndeployment.apps/web with revision #2\n  Annotations:\tkubernetes.io/change-cause: 1.27 に更新\n    Image:\tnginx:1.27-alpine",
+      "read": "番号ごとに、イメージと理由が違います。番号の中身は、残っている ReplicaSet から出しています。",
+      "trouble": [
+        {
+          "symptom": "unable to find the specified revision と出る",
+          "check": "kubectl rollout history deployment/web -n ch5 を打つ",
+          "fix": "巻き戻しのあとは番号が変わる。出ている番号に替えて打つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_rollout/kubectl_rollout_history/"
+    },
+    {
+      "id": "undo",
+      "text": "1 つ前の版に巻き戻します。",
+      "why": "おかしいと気付いたら、まず戻して、直すのは後にするためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl rollout undo deployment/web -n ch5\nkubectl rollout status deployment/web -n ch5 --timeout=180s\nkubectl get deployment web -n ch5 -o jsonpath='{.spec.template.spec.containers[0].image}{\"\\n\"}'\ncurl -sI http://$SVC_IP | grep Server\nkubectl get replicaset -l app=web -n ch5\nkubectl rollout history deployment/web -n ch5"
+      },
+      "lines": [
+        {
+          "code": "kubectl rollout undo deployment/web -n ch5",
+          "text": "1 つ前の番号に戻す"
+        },
+        {
+          "code": "kubectl rollout status deployment/web -n ch5 --timeout=180s",
+          "text": "更新が終わるまで待つ"
+        },
+        {
+          "code": "kubectl get deployment web -n ch5 -o jsonpath='{.spec.template.spec.containers[0].image}{\"\\n\"}'",
+          "text": "Deployment に書かれたイメージを出す"
+        },
+        {
+          "code": "curl -sI http://$SVC_IP | grep Server",
+          "text": "返事の見出しから、nginx の版を出す"
+        },
+        {
+          "code": "kubectl get replicaset -l app=web -n ch5",
+          "text": "web の ReplicaSet を出す"
+        },
+        {
+          "code": "kubectl rollout history deployment/web -n ch5",
+          "text": "更新の記録を出す"
+        }
+      ],
+      "output": "Warning: resource deployments/web was previously managed with 'kubectl apply'. Rolling back will not update the kubectl.kubernetes.io/last-applied-configuration annotation, which may cause unexpected behavior on future 'kubectl apply' operations. Consider using 'kubectl apply' with your previous configuration file instead.\ndeployment.apps/web rolled back\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 2 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 2 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 2 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 2 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"web\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"web\" rollout to finish: 1 old replicas are pending termination...\ndeployment \"web\" successfully rolled out\nnginx:1.26-alpine\nServer: nginx/1.26.3\nNAME             DESIRED   CURRENT   READY   AGE\nweb-54d8757ff5   3         3         3       34s\nweb-6c99889ff4   0         0         0       16s\ndeployment.apps/web\nREVISION  CHANGE-CAUSE\n2         1.27 に更新\n3         1.26 で始める",
+      "read": "Warning は、「apply で作ったものを undo で戻したので、apply の覚え書き (last-applied-configuration) は古いまま」という注意です。次に apply するとき、ファイルと今がずれているかもしれない、と覚えておきます。1.26 に戻りました。新しく作ったのではなく、残っていた ReplicaSet が増えています。番号 1 は無くなり、同じ中身が 3 になりました。戻すことも、1 つの更新です。戻す先を選ぶなら --to-revision=番号 を付けます。",
+      "trouble": [
+        {
+          "symptom": "no rollout history found と出る",
+          "check": "kubectl get replicaset -n ch5 を打つ",
+          "fix": "控えの ReplicaSet が無い。更新を 1 度もしていないか、残す数が 0"
+        },
+        {
+          "symptom": "curl で何も出ない",
+          "check": "echo $SVC_IP を打つ",
+          "fix": "空なら、SVC_IP=... の行を打ち直す。Service が無ければ deploy の手順の expose の行から"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_rollout/kubectl_rollout_undo/"
+    },
+    {
+      "id": "yaml-update",
+      "text": "ファイルを直して、更新します。",
+      "why": "命令の更新は早いのですが、ファイルは古いままです。ふだんは、ファイルを直して渡します。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "sed -i 's/nginx:1.26-alpine/nginx:1.27-alpine/; s/1.26 で始める/1.27 にファイルで更新/' web.yaml\ngrep -E 'image|change-cause' web.yaml\nkubectl diff -f web.yaml -n ch5 | grep -E '^[-+] .*(image|change-cause)'\nkubectl apply -f web.yaml -n ch5\nkubectl rollout status deployment/web -n ch5 --timeout=180s\nkubectl rollout history deployment/web -n ch5"
+      },
+      "lines": [
+        {
+          "code": "sed -i 's/nginx:1.26-alpine/nginx:1.27-alpine/; s/1.26 で始める/1.27 にファイルで更新/' web.yaml",
+          "text": "ファイルのイメージと、理由を書き替える"
+        },
+        {
+          "code": "grep -E 'image|change-cause' web.yaml",
+          "text": "書き替わったかを見る"
+        },
+        {
+          "code": "kubectl diff -f web.yaml -n ch5 | grep -E '^[-+] .*(image|change-cause)'",
+          "text": "何が変わるかを、渡す前に見る"
+        },
+        {
+          "code": "kubectl apply -f web.yaml -n ch5",
+          "text": "渡す"
+        },
+        {
+          "code": "kubectl rollout status deployment/web -n ch5 --timeout=180s",
+          "text": "更新が終わるまで待つ"
+        },
+        {
+          "code": "kubectl rollout history deployment/web -n ch5",
+          "text": "更新の記録を出す"
+        }
+      ],
+      "output": "    kubernetes.io/change-cause: \"1.27 にファイルで更新\"\n        image: nginx:1.27-alpine\n-    kubernetes.io/change-cause: 1.26 で始める\n+    kubernetes.io/change-cause: 1.27 にファイルで更新\n-      - image: nginx:1.26-alpine\n+      - image: nginx:1.27-alpine\ndeployment.apps/web configured\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 2 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 2 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"web\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"web\" rollout to finish: 1 old replicas are pending termination...\ndeployment \"web\" successfully rolled out\ndeployment.apps/web\nREVISION  CHANGE-CAUSE\n3         1.26 で始める\n4         1.27 にファイルで更新",
+      "read": "diff の - が今、+ が渡した後です。理由もファイルに入っているので、書き忘れません。前の番号 2 と同じ中身なので、番号 2 が無くなり、4 になりました。",
+      "trouble": [
+        {
+          "symptom": "diff に何も出ない",
+          "check": "grep image web.yaml を打つ",
+          "fix": "もう 1.27 なら、更新は済んでいる"
+        },
+        {
+          "symptom": "the path ... does not exist と出る",
+          "check": "pwd と ls を打つ",
+          "fix": "作業のフォルダにいない。cd で移ってから打つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"
+    },
+    {
+      "id": "surge",
+      "text": "増やしてから減らす更新 (maxSurge 1、maxUnavailable 0) の途中を見ます。30 秒ほどかかります。",
+      "why": "maxSurge は「決めた数より、いくつ多くてよいか」、maxUnavailable は「いくつまで使えなくてよいか」です。見やすいように、minReadySeconds で「5 秒続けて使えたら、次へ進む」にします。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl patch deployment web -n ch5 -p '{\"spec\":{\"minReadySeconds\":5,\"strategy\":{\"rollingUpdate\":{\"maxSurge\":1,\"maxUnavailable\":0}}}}'\nkubectl set image deployment/web web=nginx:1.28-alpine -n ch5\nkubectl annotate deployment web kubernetes.io/change-cause=\"1.28 に更新 (増やしてから)\" --overwrite -n ch5\nfor i in $(seq 15); do kubectl get deployment web -n ch5 --no-headers -o custom-columns='A:.status.updatedReplicas,B:.status.replicas,C:.status.availableReplicas'; sleep 2; done\nkubectl rollout status deployment/web -n ch5 --timeout=180s"
+      },
+      "lines": [
+        {
+          "code": "kubectl patch deployment web -n ch5 -p '{\"spec\":{\"minReadySeconds\":5,\"strategy\":{\"rollingUpdate\":{\"maxSurge\":1,\"maxUnavailable\":0}}}}'",
+          "text": "更新のしかたを変える。ひな型ではないので、更新は始まらない"
+        },
+        {
+          "code": "kubectl set image deployment/web web=nginx:1.28-alpine -n ch5",
+          "text": "1.28 に替える"
+        },
+        {
+          "code": "kubectl annotate deployment web kubernetes.io/change-cause=\"1.28 に更新 (増やしてから)\" --overwrite -n ch5",
+          "text": "変更の理由を書く"
+        },
+        {
+          "code": "for i in $(seq 15); do kubectl get deployment web -n ch5 --no-headers -o custom-columns='A:.status.updatedReplicas,B:.status.replicas,C:.status.availableReplicas'; sleep 2; done",
+          "text": "2 秒おきに 15 回、新しい Pod の数・全部の数・使える数を出す"
+        },
+        {
+          "code": "kubectl rollout status deployment/web -n ch5 --timeout=180s",
+          "text": "更新が終わるまで待つ"
+        }
+      ],
+      "output": "deployment.apps/web patched\ndeployment.apps/web image updated\ndeployment.apps/web annotated\n1     4     1\n1     4     2\n1     4     3\n1     4     3\n1     4     3\n1     4     3\n1     4     3\n2     4     3\n2     4     3\n3     4     3\n3     4     3\n3     3     3\n3     3     3\n3     3     3\n3     3     3\ndeployment \"web\" successfully rolled out",
+      "read": "左から、新しい Pod の数・全部の数・使える数です。全部の数は 3 から 4 に増え、使える数は 3 を下回りません。1 つ増やす、使えるのを待つ、1 つ減らす、の繰り返しです。途中の並びは、打つ時とイメージを取る速さで変わります。<none> は 0 のことです。",
+      "trouble": [
+        {
+          "symptom": "toomanyrequests や 429 と出る",
+          "check": "kubectl describe の Events で、Failed to pull image の行の終わりを見る",
+          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る。短い「429 Too Many Requests」だけのときは、使いすぎを防ぐ別の上限なので、数分待ってからもう一度行う"
+        },
+        {
+          "symptom": "イメージが not found と出る",
+          "check": "Events で、イメージの名前と版 (: の後ろ) を見る",
+          "fix": "つづりが正しいなら、その版はもう配られていない。hub.docker.com でイメージのページを開き、同じ系統の新しい版に替える。この先の出力の版は、替えた版に読み替える"
+        },
+        {
+          "symptom": "数が動かない",
+          "check": "kubectl get pods -n ch5 を打つ",
+          "fix": "イメージを取っている途中なら待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"
+    },
+    {
+      "id": "unavailable",
+      "text": "減らしてから増やす更新 (maxSurge 0、maxUnavailable 1) と比べます。30 秒ほどかかります。",
+      "why": "空きの無いノードでは、増やしてからは置けません。そのときは、先に減らします。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl patch deployment web -n ch5 -p '{\"spec\":{\"strategy\":{\"rollingUpdate\":{\"maxSurge\":0,\"maxUnavailable\":1}}}}'\nkubectl set image deployment/web web=nginx:1.27-alpine -n ch5\nkubectl annotate deployment web kubernetes.io/change-cause=\"1.27 に更新 (減らしてから)\" --overwrite -n ch5\nfor i in $(seq 15); do kubectl get deployment web -n ch5 --no-headers -o custom-columns='A:.status.updatedReplicas,B:.status.replicas,C:.status.availableReplicas'; sleep 2; done\nkubectl rollout status deployment/web -n ch5 --timeout=180s"
+      },
+      "lines": [
+        {
+          "code": "kubectl patch deployment web -n ch5 -p '{\"spec\":{\"strategy\":{\"rollingUpdate\":{\"maxSurge\":0,\"maxUnavailable\":1}}}}'",
+          "text": "更新のしかたを変える"
+        },
+        {
+          "code": "kubectl set image deployment/web web=nginx:1.27-alpine -n ch5",
+          "text": "1.27 に替える"
+        },
+        {
+          "code": "kubectl annotate deployment web kubernetes.io/change-cause=\"1.27 に更新 (減らしてから)\" --overwrite -n ch5",
+          "text": "変更の理由を書く"
+        },
+        {
+          "code": "for i in $(seq 15); do kubectl get deployment web -n ch5 --no-headers -o custom-columns='A:.status.updatedReplicas,B:.status.replicas,C:.status.availableReplicas'; sleep 2; done",
+          "text": "2 秒おきに 15 回、新しい Pod の数・全部の数・使える数を出す"
+        },
+        {
+          "code": "kubectl rollout status deployment/web -n ch5 --timeout=180s",
+          "text": "更新が終わるまで待つ"
+        }
+      ],
+      "output": "deployment.apps/web patched\ndeployment.apps/web image updated\ndeployment.apps/web annotated\n1     3     2\n1     3     2\n1     3     2\n1     3     2\n2     3     2\n2     3     2\n3     3     2\n3     3     2\n3     3     2\n3     3     3\n3     3     3\n3     3     3\n3     3     3\n3     3     3\n3     3     3\ndeployment \"web\" successfully rolled out",
+      "read": "今度は、全部の数が 3 を超えません。代わりに、使える数が 2 に減る時があります。既定は、どちらも 25% です (3 つなら、maxSurge は切り上げて 1、maxUnavailable は切り捨てて 0)。",
+      "trouble": [
+        {
+          "symptom": "使える数が 2 にならない",
+          "check": "WATCH の行を、set image のすぐ後に打ったかを見る",
+          "fix": "更新が速く終わった。イメージを 1.28 に替えて、もう一度見る"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"
+    },
+    {
+      "id": "reset-strategy",
+      "text": "更新のしかたを、増やしてからに戻します。",
+      "why": "この先の手順を、同じ条件で見るためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl patch deployment web -n ch5 -p '{\"spec\":{\"minReadySeconds\":0,\"strategy\":{\"rollingUpdate\":{\"maxSurge\":1,\"maxUnavailable\":0}}}}'\nkubectl get deployment web -n ch5 -o jsonpath='{.spec.strategy}{\"\\n\"}'"
+      },
+      "lines": [
+        {
+          "code": "kubectl patch deployment web -n ch5 -p '{\"spec\":{\"minReadySeconds\":0,\"strategy\":{\"rollingUpdate\":{\"maxSurge\":1,\"maxUnavailable\":0}}}}'",
+          "text": "増やしてからの形に戻す"
+        },
+        {
+          "code": "kubectl get deployment web -n ch5 -o jsonpath='{.spec.strategy}{\"\\n\"}'",
+          "text": "更新のしかたを出す"
+        }
+      ],
+      "output": "deployment.apps/web patched\n{\"rollingUpdate\":{\"maxSurge\":1,\"maxUnavailable\":0},\"type\":\"RollingUpdate\"}",
+      "read": "maxSurge が 1、maxUnavailable が 0 です。",
+      "trouble": [
+        {
+          "symptom": "patched (no change) と出る",
+          "check": "最後の行の出力を見る",
+          "fix": "もうその形になっている"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_patch/"
+    },
+    {
+      "id": "no-downtime",
+      "text": "更新の間、止まらなかったかを数えます。30 秒ほどかかります。",
+      "why": "「止めずに更新できた」を、数で確かめるためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "SVC_IP=$(kubectl get service web -n ch5 -o jsonpath='{.spec.clusterIP}')\n(for i in $(seq 150); do curl -s -o /dev/null -m 2 -w '%{http_code}\\n' http://$SVC_IP; sleep 0.1; done > good.txt) &\nkubectl set image deployment/web web=nginx:1.28-alpine -n ch5\nkubectl annotate deployment web kubernetes.io/change-cause=\"1.28 に更新 (数えながら)\" --overwrite -n ch5\nkubectl rollout status deployment/web -n ch5 --timeout=180s\nwait\nsort good.txt | uniq -c"
+      },
+      "lines": [
+        {
+          "code": "SVC_IP=$(kubectl get service web -n ch5 -o jsonpath='{.spec.clusterIP}')",
+          "text": "Service の住所を覚える。今の端末だけで使える"
+        },
+        {
+          "code": "(for i in $(seq 150); do curl -s -o /dev/null -m 2 -w '%{http_code}\\n' http://$SVC_IP; sleep 0.1; done > good.txt) &",
+          "text": "裏で、0.1 秒おきに 150 回ページを取り、返事の番号を good.txt に書く"
+        },
+        {
+          "code": "kubectl set image deployment/web web=nginx:1.28-alpine -n ch5",
+          "text": "1.28 に替える"
+        },
+        {
+          "code": "kubectl annotate deployment web kubernetes.io/change-cause=\"1.28 に更新 (数えながら)\" --overwrite -n ch5",
+          "text": "変更の理由を書く"
+        },
+        {
+          "code": "kubectl rollout status deployment/web -n ch5 --timeout=180s",
+          "text": "更新が終わるまで待つ"
+        },
+        {
+          "code": "wait",
+          "text": "裏の仕事が終わるまで待つ"
+        },
+        {
+          "code": "sort good.txt | uniq -c",
+          "text": "返事の番号ごとに数える"
+        }
+      ],
+      "output": "[1] 46983\ndeployment.apps/web image updated\ndeployment.apps/web annotated\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 2 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 2 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 2 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"web\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"web\" rollout to finish: 1 old replicas are pending termination...\ndeployment \"web\" successfully rolled out\n    150 200",
+      "read": "200 は「うまくいった」です。全部 200 なら、止まっていません。readiness で、使える Pod だけに渡すことと、preStop で、消える Pod が渡す先から外れるのを 3 秒待つことの 2 つが効いています。000 が混ざるときは「つなげなかった」です。1 行目の [1] と数字は、裏で動かしたものの番号です。終わると、[1]+ Done という知らせも出ます。",
+      "trouble": [
+        {
+          "symptom": "curl で何も出ない",
+          "check": "echo $SVC_IP を打つ",
+          "fix": "空なら、SVC_IP=... の行を打ち直す。Service が無ければ deploy の手順の expose の行から"
+        },
+        {
+          "symptom": "000 だけになる",
+          "check": "echo $SVC_IP を打つ",
+          "fix": "空なら SVC_IP の行から打ち直す"
+        },
+        {
+          "symptom": "000 が少し混ざる",
+          "check": "kubectl get pods -n ch5 で RESTARTS を見る",
+          "fix": "マシンが忙しいと、外れるのが 3 秒に間に合わないことがある。もう一度行う"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/"
+    },
+    {
+      "id": "break",
+      "text": "ここで休めます。休む人は、exit で出てから、ホストでこの行を打ちます。休まない人は、打たずに印を付けて先へ進みます。",
+      "why": "長い章なので、区切りを置くためです。止めても、作ったものとファイルは残ります。再起動と同じことが起きるので、Pod の中のコンテナは始め直され、Pod の住所も変わります。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass stop kcna"
+      },
+      "lines": [
+        {
+          "code": "multipass stop kcna",
+          "text": "kcna を止める。動いている (Running) ときだけ打てる"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "何もエラーが出なければ止まっています。続けるときは、ホストで multipass shell kcna を打つと、動かして中に入れます。そのあと cd ~/ch5 を打ちます。kubectl get pods -n ch5 で web の 3 つが 1/1 になるまで待ちます。SVC_IP は、次に使う手順で決め直します。戻った直後の 1〜2 分は、一覧が止める前の古い様子のことがあります。少し待ってもう一度見ます。",
+      "trouble": [
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "activating なら、1 分ほど待つ"
+        },
+        {
+          "symptom": "No such file or directory と出る",
+          "check": "pwd を打つ",
+          "fix": "作業のフォルダにいない。cd で移る"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/stop/"
+    },
+    {
+      "id": "readiness-none",
+      "text": "readiness の無い、起動の遅いものを更新して数えます。1 分ほどかかります。",
+      "why": "readiness が無いと、「プロセスが始まった」だけで使えるとみなされます。まだ返事のできない Pod に渡し、古い Pod を消してしまいます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cat > slow.yaml <<'EOF'\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: slow\nspec:\n  replicas: 2\n  selector:\n    matchLabels:\n      app: slow\n  template:\n    metadata:\n      labels:\n        app: slow\n    spec:\n      terminationGracePeriodSeconds: 10\n      containers:\n      - name: web\n        image: nginx:1.27-alpine\n        command: ['sh', '-c', 'sleep 8; exec nginx -g \"daemon off;\"']\n        env:\n        - name: VERSION\n          value: \"1\"\nEOF\nkubectl apply -f slow.yaml -n ch5\nkubectl rollout status deployment/slow -n ch5 --timeout=180s\nkubectl expose deployment slow --port=80 -n ch5\nsleep 15\nSLOW_IP=$(kubectl get service slow -n ch5 -o jsonpath='{.spec.clusterIP}')\n(for i in $(seq 200); do curl -s -o /dev/null -m 2 -w '%{http_code}\\n' http://$SLOW_IP; sleep 0.1; done > none.txt) &\nkubectl set env deployment/slow VERSION=2 -n ch5\nkubectl rollout status deployment/slow -n ch5 --timeout=180s\nwait\nsort none.txt | uniq -c"
+      },
+      "lines": [
+        {
+          "code": "cat > slow.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま slow.yaml というファイルに書く"
+        },
+        {
+          "code": "apiVersion: apps/v1",
+          "text": "使う API の種類と版"
+        },
+        {
+          "code": "kind: Deployment",
+          "text": "作るものの種類"
+        },
+        {
+          "code": "metadata:",
+          "text": "見分けるための情報"
+        },
+        {
+          "code": "  name: slow",
+          "text": "名前"
+        },
+        {
+          "code": "spec:",
+          "text": "ほしい中身"
+        },
+        {
+          "code": "  replicas: 2",
+          "text": "Pod の数"
+        },
+        {
+          "code": "  selector:",
+          "text": "自分の Pod の見分け方"
+        },
+        {
+          "code": "    matchLabels:",
+          "text": "次のラベルが付いたもの"
+        },
+        {
+          "code": "      app: slow",
+          "text": "app が slow"
+        },
+        {
+          "code": "  template:",
+          "text": "作る Pod のひな型"
+        },
+        {
+          "code": "    metadata:",
+          "text": "作る Pod の情報"
+        },
+        {
+          "code": "      labels:",
+          "text": "ラベル"
+        },
+        {
+          "code": "        app: slow",
+          "text": "app を slow にする"
+        },
+        {
+          "code": "    spec:",
+          "text": "作る Pod の中身"
+        },
+        {
+          "code": "      terminationGracePeriodSeconds: 10",
+          "text": "消すときに待つ秒数の上限"
+        },
+        {
+          "code": "      containers:",
+          "text": "コンテナの一覧"
+        },
+        {
+          "code": "      - name: web",
+          "text": "コンテナの名前"
+        },
+        {
+          "code": "        image: nginx:1.27-alpine",
+          "text": "使うイメージ"
+        },
+        {
+          "code": "        command: ['sh', '-c', 'sleep 8; exec nginx -g \"daemon off;\"']",
+          "text": "8 秒かけて起動する"
+        },
+        {
+          "code": "        env:",
+          "text": "環境変数の一覧"
+        },
+        {
+          "code": "        - name: VERSION",
+          "text": "変数の名前"
+        },
+        {
+          "code": "          value: \"1\"",
+          "text": "変数の値。これを変えて更新を起こす"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "kubectl apply -f slow.yaml -n ch5",
+          "text": "Deployment を作る"
+        },
+        {
+          "code": "kubectl rollout status deployment/slow -n ch5 --timeout=180s",
+          "text": "更新が終わるまで待つ"
+        },
+        {
+          "code": "kubectl expose deployment slow --port=80 -n ch5",
+          "text": "Service を作る"
+        },
+        {
+          "code": "sleep 15",
+          "text": "起動し終わるまで 15 秒待つ"
+        },
+        {
+          "code": "SLOW_IP=$(kubectl get service slow -n ch5 -o jsonpath='{.spec.clusterIP}')",
+          "text": "slow の Service の住所を覚える"
+        },
+        {
+          "code": "(for i in $(seq 200); do curl -s -o /dev/null -m 2 -w '%{http_code}\\n' http://$SLOW_IP; sleep 0.1; done > none.txt) &",
+          "text": "裏で、0.1 秒おきに 200 回ページを取り、返事の番号を none.txt に書く"
+        },
+        {
+          "code": "kubectl set env deployment/slow VERSION=2 -n ch5",
+          "text": "環境変数を変えて、更新を起こす"
+        },
+        {
+          "code": "kubectl rollout status deployment/slow -n ch5 --timeout=180s",
+          "text": "更新が終わるまで待つ"
+        },
+        {
+          "code": "wait",
+          "text": "裏の仕事が終わるまで待つ"
+        },
+        {
+          "code": "sort none.txt | uniq -c",
+          "text": "返事の番号ごとに数える"
+        }
+      ],
+      "output": "deployment.apps/slow created\nWaiting for deployment \"slow\" rollout to finish: 0 of 2 updated replicas are available...\nWaiting for deployment \"slow\" rollout to finish: 1 of 2 updated replicas are available...\ndeployment \"slow\" successfully rolled out\nservice/slow exposed\n[1] 48924\ndeployment.apps/slow env updated\nWaiting for deployment \"slow\" rollout to finish: 1 out of 2 new replicas have been updated...\nWaiting for deployment \"slow\" rollout to finish: 1 out of 2 new replicas have been updated...\nWaiting for deployment \"slow\" rollout to finish: 1 out of 2 new replicas have been updated...\nWaiting for deployment \"slow\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"slow\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"slow\" rollout to finish: 1 old replicas are pending termination...\ndeployment \"slow\" successfully rolled out\n     58 000\n    142 200",
+      "read": "更新はすぐに「終わった」と出ます。ところが 000 (つなげない) が混ざります。終わったと言われた時、新しい Pod はまだ起動の途中でした。混ざる数は、打つ時とマシンの速さで変わります。",
+      "trouble": [
+        {
+          "symptom": "全部 200 になる",
+          "check": "echo $SLOW_IP を打ち、もう一度 set env の値を変えて数える",
+          "fix": "VERSION=3 に替え、数える行から打つ"
+        },
+        {
+          "symptom": "AlreadyExists と出る",
+          "check": "kubectl get service -n ch5 を打つ",
+          "fix": "もうあるので、続きの行を打つ"
+        },
+        {
+          "symptom": "toomanyrequests や 429 と出る",
+          "check": "kubectl describe の Events で、Failed to pull image の行の終わりを見る",
+          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る。短い「429 Too Many Requests」だけのときは、使いすぎを防ぐ別の上限なので、数分待ってからもう一度行う"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"
+    },
+    {
+      "id": "readiness-add",
+      "text": "同じものに readiness と preStop を足して、もう一度数えます。1 分ほどかかります。",
+      "why": "違いがその 2 つだけであることを見るためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cat > slow.yaml <<'EOF'\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: slow\nspec:\n  replicas: 2\n  selector:\n    matchLabels:\n      app: slow\n  template:\n    metadata:\n      labels:\n        app: slow\n    spec:\n      terminationGracePeriodSeconds: 10\n      containers:\n      - name: web\n        image: nginx:1.27-alpine\n        command: ['sh', '-c', 'sleep 8; exec nginx -g \"daemon off;\"']\n        readinessProbe:\n          httpGet:\n            path: /\n            port: 80\n          periodSeconds: 1\n        lifecycle:\n          preStop:\n            exec:\n              command: ['sleep', '3']\n        env:\n        - name: VERSION\n          value: \"10\"\nEOF\nkubectl apply -f slow.yaml -n ch5\nkubectl rollout status deployment/slow -n ch5 --timeout=180s\nsleep 15\nSLOW_IP=$(kubectl get service slow -n ch5 -o jsonpath='{.spec.clusterIP}')\n(for i in $(seq 200); do curl -s -o /dev/null -m 2 -w '%{http_code}\\n' http://$SLOW_IP; sleep 0.1; done > good2.txt) &\nkubectl set env deployment/slow VERSION=11 -n ch5\nkubectl rollout status deployment/slow -n ch5 --timeout=180s\nwait\nsort good2.txt | uniq -c\nkubectl delete deployment,service slow -n ch5"
+      },
+      "lines": [
+        {
+          "code": "cat > slow.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま slow.yaml というファイルに書く"
+        },
+        {
+          "code": "apiVersion: apps/v1",
+          "text": "使う API の種類と版"
+        },
+        {
+          "code": "kind: Deployment",
+          "text": "作るものの種類"
+        },
+        {
+          "code": "metadata:",
+          "text": "見分けるための情報"
+        },
+        {
+          "code": "  name: slow",
+          "text": "名前"
+        },
+        {
+          "code": "spec:",
+          "text": "ほしい中身"
+        },
+        {
+          "code": "  replicas: 2",
+          "text": "Pod の数"
+        },
+        {
+          "code": "  selector:",
+          "text": "自分の Pod の見分け方"
+        },
+        {
+          "code": "    matchLabels:",
+          "text": "次のラベルが付いたもの"
+        },
+        {
+          "code": "      app: slow",
+          "text": "app が slow"
+        },
+        {
+          "code": "  template:",
+          "text": "作る Pod のひな型"
+        },
+        {
+          "code": "    metadata:",
+          "text": "作る Pod の情報"
+        },
+        {
+          "code": "      labels:",
+          "text": "ラベル"
+        },
+        {
+          "code": "        app: slow",
+          "text": "app を slow にする"
+        },
+        {
+          "code": "    spec:",
+          "text": "作る Pod の中身"
+        },
+        {
+          "code": "      terminationGracePeriodSeconds: 10",
+          "text": "消すときに待つ秒数の上限"
+        },
+        {
+          "code": "      containers:",
+          "text": "コンテナの一覧"
+        },
+        {
+          "code": "      - name: web",
+          "text": "コンテナの名前"
+        },
+        {
+          "code": "        image: nginx:1.27-alpine",
+          "text": "使うイメージ"
+        },
+        {
+          "code": "        command: ['sh', '-c', 'sleep 8; exec nginx -g \"daemon off;\"']",
+          "text": "8 秒かけて起動する"
+        },
+        {
+          "code": "        readinessProbe:",
+          "text": "仕事を受けられるかの検査"
+        },
+        {
+          "code": "          httpGet:",
+          "text": "Web の返事で見る"
+        },
+        {
+          "code": "            path: /",
+          "text": "取りに行くページ"
+        },
+        {
+          "code": "            port: 80",
+          "text": "番号"
+        },
+        {
+          "code": "          periodSeconds: 1",
+          "text": "1 秒おきに見る"
+        },
+        {
+          "code": "        lifecycle:",
+          "text": "始めと終わりにすること"
+        },
+        {
+          "code": "          preStop:",
+          "text": "止める前に"
+        },
+        {
+          "code": "            exec:",
+          "text": "コマンドを動かす"
+        },
+        {
+          "code": "              command: ['sleep', '3']",
+          "text": "3 秒待つ"
+        },
+        {
+          "code": "        env:",
+          "text": "環境変数の一覧"
+        },
+        {
+          "code": "        - name: VERSION",
+          "text": "変数の名前"
+        },
+        {
+          "code": "          value: \"10\"",
+          "text": "変数の値。これを変えて更新を起こす"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "kubectl apply -f slow.yaml -n ch5",
+          "text": "直したものを渡す"
+        },
+        {
+          "code": "kubectl rollout status deployment/slow -n ch5 --timeout=180s",
+          "text": "更新が終わるまで待つ"
+        },
+        {
+          "code": "sleep 15",
+          "text": "前の Pod が消え終わるまで 15 秒待つ"
+        },
+        {
+          "code": "SLOW_IP=$(kubectl get service slow -n ch5 -o jsonpath='{.spec.clusterIP}')",
+          "text": "slow の Service の住所を覚える"
+        },
+        {
+          "code": "(for i in $(seq 200); do curl -s -o /dev/null -m 2 -w '%{http_code}\\n' http://$SLOW_IP; sleep 0.1; done > good2.txt) &",
+          "text": "裏で、0.1 秒おきに 200 回ページを取り、返事の番号を good2.txt に書く"
+        },
+        {
+          "code": "kubectl set env deployment/slow VERSION=11 -n ch5",
+          "text": "環境変数を変えて、更新を起こす"
+        },
+        {
+          "code": "kubectl rollout status deployment/slow -n ch5 --timeout=180s",
+          "text": "更新が終わるまで待つ"
+        },
+        {
+          "code": "wait",
+          "text": "裏の仕事が終わるまで待つ"
+        },
+        {
+          "code": "sort good2.txt | uniq -c",
+          "text": "返事の番号ごとに数える"
+        },
+        {
+          "code": "kubectl delete deployment,service slow -n ch5",
+          "text": "slow を片付ける"
+        }
+      ],
+      "output": "deployment.apps/slow configured\nWaiting for deployment \"slow\" rollout to finish: 1 out of 2 new replicas have been updated...\nWaiting for deployment \"slow\" rollout to finish: 1 out of 2 new replicas have been updated...\nWaiting for deployment \"slow\" rollout to finish: 1 out of 2 new replicas have been updated...\nWaiting for deployment \"slow\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"slow\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"slow\" rollout to finish: 1 old replicas are pending termination...\ndeployment \"slow\" successfully rolled out\n[1] 51041\ndeployment.apps/slow env updated\nWaiting for deployment \"slow\" rollout to finish: 1 out of 2 new replicas have been updated...\nWaiting for deployment \"slow\" rollout to finish: 1 out of 2 new replicas have been updated...\nWaiting for deployment \"slow\" rollout to finish: 1 out of 2 new replicas have been updated...\nWaiting for deployment \"slow\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"slow\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"slow\" rollout to finish: 1 old replicas are pending termination...\ndeployment \"slow\" successfully rolled out\n    200 200\ndeployment.apps \"slow\" deleted from ch5 namespace\nservice \"slow\" deleted from ch5 namespace",
+      "read": "全部 200 です。更新は前より時間がかかりました。新しい Pod が本当に使えるまで待ってから、古い Pod を消すためです。",
+      "trouble": [
+        {
+          "symptom": "000 が少し混ざる",
+          "check": "kubectl describe pod -l app=slow -n ch5 を見る",
+          "fix": "検査と preStop の字下げを確かめる。マシンが忙しいと少し混ざることがある"
+        },
+        {
+          "symptom": "000 だけになる",
+          "check": "echo $SLOW_IP を打つ",
+          "fix": "空なら SLOW_IP の行から打ち直す"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"
+    },
+    {
+      "id": "bad-tag",
+      "text": "わざと、無い版に更新します。40 秒ほどかかります。",
+      "why": "失敗した更新が、どこで止まるかを見るためです。progressDeadlineSeconds は「この秒数、進まなければ失敗とする」です。既定は 600 秒です。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl patch deployment web -n ch5 -p '{\"spec\":{\"progressDeadlineSeconds\":30}}'\nkubectl set image deployment/web web=nginx:no-such-tag -n ch5\nkubectl annotate deployment web kubernetes.io/change-cause=\"わざと無い版に\" --overwrite -n ch5\nkubectl rollout status deployment/web -n ch5 --timeout=180s\nkubectl get pods -n ch5\nkubectl get deployment web -n ch5 -o jsonpath='{range .status.conditions[*]}{.type}={.status} {.reason}{\"\\n\"}{end}'\nSVC_IP=$(kubectl get service web -n ch5 -o jsonpath='{.spec.clusterIP}')\ncurl -s -o /dev/null -w '%{http_code}\\n' http://$SVC_IP"
+      },
+      "lines": [
+        {
+          "code": "kubectl patch deployment web -n ch5 -p '{\"spec\":{\"progressDeadlineSeconds\":30}}'",
+          "text": "30 秒で失敗とする"
+        },
+        {
+          "code": "kubectl set image deployment/web web=nginx:no-such-tag -n ch5",
+          "text": "無い版に替える"
+        },
+        {
+          "code": "kubectl annotate deployment web kubernetes.io/change-cause=\"わざと無い版に\" --overwrite -n ch5",
+          "text": "変更の理由を書く"
+        },
+        {
+          "code": "kubectl rollout status deployment/web -n ch5 --timeout=180s",
+          "text": "更新が終わるまで待つ"
+        },
+        {
+          "code": "kubectl get pods -n ch5",
+          "text": "一覧を出す"
+        },
+        {
+          "code": "kubectl get deployment web -n ch5 -o jsonpath='{range .status.conditions[*]}{.type}={.status} {.reason}{\"\\n\"}{end}'",
+          "text": "Deployment の状態を出す"
+        },
+        {
+          "code": "SVC_IP=$(kubectl get service web -n ch5 -o jsonpath='{.spec.clusterIP}')",
+          "text": "Service の住所を覚える。今の端末だけで使える"
+        },
+        {
+          "code": "curl -s -o /dev/null -w '%{http_code}\\n' http://$SVC_IP",
+          "text": "返事の番号を出す"
+        }
+      ],
+      "output": "deployment.apps/web patched\ndeployment.apps/web image updated\ndeployment.apps/web annotated\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nerror: deployment \"web\" exceeded its progress deadline\nNAME                   READY   STATUS         RESTARTS   AGE\nweb-75bd5b4d5c-tvwxn   1/1     Running        0          2m30s\nweb-75bd5b4d5c-wsw9k   1/1     Running        0          2m32s\nweb-75bd5b4d5c-zwmnq   1/1     Running        0          2m36s\nweb-7f8cc8667d-f7lts   0/1     ErrImagePull   0          31s\nAvailable=True MinimumReplicasAvailable\nProgressing=False ProgressDeadlineExceeded\n200",
+      "read": "exceeded its progress deadline で、更新は失敗です。新しい Pod は ErrImagePull か ImagePullBackOff で止まり、古い 3 つはそのまま動いています。maxUnavailable が 0 なので、使えるものを減らさないためです。だから返事は 200 です。失敗しても、Deployment は自動では戻しません。",
+      "trouble": [
+        {
+          "symptom": "rollout status が終わらない",
+          "check": "Ctrl キーを押しながら C で止め、続きの行を打つ",
+          "fix": "patch の行を打ち忘れると、600 秒待つ"
+        },
+        {
+          "symptom": "curl で何も出ない",
+          "check": "echo $SVC_IP を打つ",
+          "fix": "空なら、SVC_IP=... の行を打ち直す。Service が無ければ deploy の手順の expose の行から"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"
+    },
+    {
+      "id": "undo-bad",
+      "text": "止まった更新を、巻き戻します。",
+      "why": "だめだったら、まず戻します。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl rollout undo deployment/web -n ch5\nkubectl rollout status deployment/web -n ch5 --timeout=180s\nkubectl get deployment web -n ch5 -o jsonpath='{.spec.template.spec.containers[0].image}{\"\\n\"}'\nkubectl get pods -n ch5"
+      },
+      "lines": [
+        {
+          "code": "kubectl rollout undo deployment/web -n ch5",
+          "text": "1 つ前に戻す"
+        },
+        {
+          "code": "kubectl rollout status deployment/web -n ch5 --timeout=180s",
+          "text": "更新が終わるまで待つ"
+        },
+        {
+          "code": "kubectl get deployment web -n ch5 -o jsonpath='{.spec.template.spec.containers[0].image}{\"\\n\"}'",
+          "text": "Deployment に書かれたイメージを出す"
+        },
+        {
+          "code": "kubectl get pods -n ch5",
+          "text": "一覧を出す"
+        }
+      ],
+      "output": "Warning: resource deployments/web was previously managed with 'kubectl apply'. Rolling back will not update the kubectl.kubernetes.io/last-applied-configuration annotation, which may cause unexpected behavior on future 'kubectl apply' operations. Consider using 'kubectl apply' with your previous configuration file instead.\ndeployment.apps/web rolled back\ndeployment \"web\" successfully rolled out\nnginx:1.28-alpine\nNAME                   READY   STATUS        RESTARTS   AGE\nweb-75bd5b4d5c-tvwxn   1/1     Running       0          2m31s\nweb-75bd5b4d5c-wsw9k   1/1     Running       0          2m33s\nweb-75bd5b4d5c-zwmnq   1/1     Running       0          2m37s\nweb-7f8cc8667d-f7lts   0/1     Terminating   0          32s",
+      "read": "Warning は前と同じ注意です。1.28 に戻り、失敗した Pod は消えます (Terminating で見えることもあります)。動いていた 3 つは、作り直されていません (AGE が続いています)。",
+      "trouble": [
+        {
+          "symptom": "no-such-tag のまま",
+          "check": "kubectl rollout history deployment/web -n ch5 を打つ",
+          "fix": "undo をもう一度打つと、また無い版に行く。--to-revision=番号 で選ぶ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_rollout/kubectl_rollout_undo/"
+    },
+    {
+      "id": "crash-update",
+      "text": "わざと、すぐ終わってしまう版に更新し、戻します。40 秒ほどかかります。",
+      "why": "イメージは取れても、起動に失敗する更新の見え方を知るためです。busybox のイメージは、何も頼まないとすぐ終わります。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl set image deployment/web web=busybox:1.37 -n ch5\nkubectl annotate deployment web kubernetes.io/change-cause=\"わざと起動に失敗する版に\" --overwrite -n ch5\nkubectl rollout status deployment/web -n ch5 --timeout=180s\nkubectl get pods -n ch5\nSVC_IP=$(kubectl get service web -n ch5 -o jsonpath='{.spec.clusterIP}')\ncurl -s -o /dev/null -w '%{http_code}\\n' http://$SVC_IP\nkubectl rollout undo deployment/web -n ch5\nkubectl rollout status deployment/web -n ch5 --timeout=180s\nkubectl get deployment web -n ch5 -o jsonpath='{.spec.template.spec.containers[0].image}{\"\\n\"}'"
+      },
+      "lines": [
+        {
+          "code": "kubectl set image deployment/web web=busybox:1.37 -n ch5",
+          "text": "busybox に替える"
+        },
+        {
+          "code": "kubectl annotate deployment web kubernetes.io/change-cause=\"わざと起動に失敗する版に\" --overwrite -n ch5",
+          "text": "変更の理由を書く"
+        },
+        {
+          "code": "kubectl rollout status deployment/web -n ch5 --timeout=180s",
+          "text": "更新が終わるまで待つ"
+        },
+        {
+          "code": "kubectl get pods -n ch5",
+          "text": "一覧を出す"
+        },
+        {
+          "code": "SVC_IP=$(kubectl get service web -n ch5 -o jsonpath='{.spec.clusterIP}')",
+          "text": "Service の住所を覚える。今の端末だけで使える"
+        },
+        {
+          "code": "curl -s -o /dev/null -w '%{http_code}\\n' http://$SVC_IP",
+          "text": "返事の番号を出す"
+        },
+        {
+          "code": "kubectl rollout undo deployment/web -n ch5",
+          "text": "1 つ前に戻す"
+        },
+        {
+          "code": "kubectl rollout status deployment/web -n ch5 --timeout=180s",
+          "text": "更新が終わるまで待つ"
+        },
+        {
+          "code": "kubectl get deployment web -n ch5 -o jsonpath='{.spec.template.spec.containers[0].image}{\"\\n\"}'",
+          "text": "Deployment に書かれたイメージを出す"
+        }
+      ],
+      "output": "deployment.apps/web image updated\ndeployment.apps/web annotated\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nerror: deployment \"web\" exceeded its progress deadline\nNAME                   READY   STATUS             RESTARTS      AGE\nweb-6df97db7c-pm7j5    0/1     CrashLoopBackOff   2 (15s ago)   31s\nweb-75bd5b4d5c-tvwxn   1/1     Running            0             3m2s\nweb-75bd5b4d5c-wsw9k   1/1     Running            0             3m4s\nweb-75bd5b4d5c-zwmnq   1/1     Running            0             3m8s\n200\nWarning: resource deployments/web was previously managed with 'kubectl apply'. Rolling back will not update the kubectl.kubernetes.io/last-applied-configuration annotation, which may cause unexpected behavior on future 'kubectl apply' operations. Consider using 'kubectl apply' with your previous configuration file instead.\ndeployment.apps/web rolled back\ndeployment \"web\" successfully rolled out\nnginx:1.28-alpine",
+      "read": "新しい Pod が、始まっては終わるを繰り返し、RESTARTS が増えています (STATUS は Completed・CrashLoopBackOff などで、打つ時によります)。それでも古い 3 つが返事をしています。",
+      "trouble": [
+        {
+          "symptom": "toomanyrequests や 429 と出る",
+          "check": "kubectl describe の Events で、Failed to pull image の行の終わりを見る",
+          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る。短い「429 Too Many Requests」だけのときは、使いすぎを防ぐ別の上限なので、数分待ってからもう一度行う"
+        },
+        {
+          "symptom": "curl で何も出ない",
+          "check": "echo $SVC_IP を打つ",
+          "fix": "空なら、SVC_IP=... の行を打ち直す。Service が無ければ deploy の手順の expose の行から"
+        },
+        {
+          "symptom": "戻した先が no-such-tag になる",
+          "check": "kubectl rollout history deployment/web -n ch5 を打つ",
+          "fix": "--to-revision=番号 で、1.28 の番号を選んで戻す"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"
+    },
+    {
+      "id": "pause",
+      "text": "止めておいて、2 つの変更をまとめて更新します。",
+      "why": "変更のたびに Pod が入れ替わると、無駄が増えます。まとめて 1 回にするためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl rollout pause deployment/web -n ch5\nkubectl set env deployment/web MODE=demo -n ch5\nkubectl set image deployment/web web=nginx:1.27-alpine -n ch5\nkubectl annotate deployment web kubernetes.io/change-cause=\"1.27 と MODE をまとめて\" --overwrite -n ch5\nsleep 5\nkubectl get replicaset -l app=web -n ch5 --no-headers | wc -l\nkubectl rollout resume deployment/web -n ch5\nkubectl rollout status deployment/web -n ch5 --timeout=180s\nkubectl get replicaset -l app=web -n ch5 --no-headers | wc -l"
+      },
+      "lines": [
+        {
+          "code": "kubectl rollout pause deployment/web -n ch5",
+          "text": "更新を始めないようにする"
+        },
+        {
+          "code": "kubectl set env deployment/web MODE=demo -n ch5",
+          "text": "1 つ目の変更。環境変数を足す"
+        },
+        {
+          "code": "kubectl set image deployment/web web=nginx:1.27-alpine -n ch5",
+          "text": "2 つ目の変更。イメージを替える"
+        },
+        {
+          "code": "kubectl annotate deployment web kubernetes.io/change-cause=\"1.27 と MODE をまとめて\" --overwrite -n ch5",
+          "text": "変更の理由を書く"
+        },
+        {
+          "code": "sleep 5",
+          "text": "5 秒待つ"
+        },
+        {
+          "code": "kubectl get replicaset -l app=web -n ch5 --no-headers | wc -l",
+          "text": "ReplicaSet の数を数える"
+        },
+        {
+          "code": "kubectl rollout resume deployment/web -n ch5",
+          "text": "更新を始める"
+        },
+        {
+          "code": "kubectl rollout status deployment/web -n ch5 --timeout=180s",
+          "text": "更新が終わるまで待つ"
+        },
+        {
+          "code": "kubectl get replicaset -l app=web -n ch5 --no-headers | wc -l",
+          "text": "ReplicaSet の数を数える"
+        }
+      ],
+      "output": "deployment.apps/web paused\ndeployment.apps/web env updated\ndeployment.apps/web image updated\ndeployment.apps/web annotated\n5\ndeployment.apps/web resumed\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 2 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 2 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 2 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"web\" rollout to finish: 1 old replicas are pending termination...\ndeployment \"web\" successfully rolled out\n6",
+      "read": "止めている間は、2 つ変えても ReplicaSet は増えません。始めると 1 つだけ増えました。止めている間は、巻き戻しもできません。",
+      "trouble": [
+        {
+          "symptom": "更新が始まらない",
+          "check": "kubectl get deployment web -n ch5 -o jsonpath='{.spec.paused}' を打つ",
+          "fix": "true なら resume の行を打つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"
+    },
+    {
+      "id": "limit",
+      "text": "残す記録の数を 2 にします。",
+      "why": "ReplicaSet の控えが増えすぎないようにするためです。既定は 10 です。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl get replicaset -l app=web -n ch5\nkubectl patch deployment web -n ch5 -p '{\"spec\":{\"revisionHistoryLimit\":2}}'\nsleep 5\nkubectl get replicaset -l app=web -n ch5\nkubectl rollout history deployment/web -n ch5"
+      },
+      "lines": [
+        {
+          "code": "kubectl get replicaset -l app=web -n ch5",
+          "text": "web の ReplicaSet を出す"
+        },
+        {
+          "code": "kubectl patch deployment web -n ch5 -p '{\"spec\":{\"revisionHistoryLimit\":2}}'",
+          "text": "残す数を 2 にする"
+        },
+        {
+          "code": "sleep 5",
+          "text": "片付くまで 5 秒待つ"
+        },
+        {
+          "code": "kubectl get replicaset -l app=web -n ch5",
+          "text": "web の ReplicaSet を出す"
+        },
+        {
+          "code": "kubectl rollout history deployment/web -n ch5",
+          "text": "更新の記録を出す"
+        }
+      ],
+      "output": "NAME             DESIRED   CURRENT   READY   AGE\nweb-54d8757ff5   0         0         0       5m17s\nweb-6c99889ff4   0         0         0       4m59s\nweb-6df97db7c    0         0         0       44s\nweb-75bd5b4d5c   0         0         0       4m35s\nweb-75f8ff5756   3         3         3       6s\nweb-7f8cc8667d   0         0         0       76s\ndeployment.apps/web patched\nNAME             DESIRED   CURRENT   READY   AGE\nweb-6df97db7c    0         0         0       50s\nweb-75bd5b4d5c   0         0         0       4m41s\nweb-75f8ff5756   3         3         3       12s\ndeployment.apps/web\nREVISION  CHANGE-CAUSE\n10        わざと起動に失敗する版に\n11        1.28 に更新 (数えながら)\n12        1.27 と MODE をまとめて",
+      "read": "今のもの 1 つと、控え 2 つの、合わせて 3 つになりました。消えた番号には、もう戻れません。0 にすると、まったく戻せなくなります。",
+      "trouble": [
+        {
+          "symptom": "3 つより多い",
+          "check": "10 秒待って、もう一度打つ",
+          "fix": "片付けの途中。更新が終わっていないと、片付かないこともある"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"
+    },
+    {
+      "id": "recreate",
+      "text": "Recreate (全部止めてから始める) で更新し、止まる時間を数えます。30 秒ほどかかります。",
+      "why": "新旧が同時に動いてはいけないもの (同じファイルを書くなど) のための方法です。止まることを、数で見ておきます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl patch deployment web -n ch5 -p '{\"spec\":{\"strategy\":{\"type\":\"Recreate\",\"rollingUpdate\":null}}}'\nSVC_IP=$(kubectl get service web -n ch5 -o jsonpath='{.spec.clusterIP}')\n(for i in $(seq 200); do curl -s -o /dev/null -m 2 -w '%{http_code}\\n' http://$SVC_IP; sleep 0.1; done > re.txt) &\nkubectl set image deployment/web web=nginx:1.28-alpine -n ch5\nkubectl annotate deployment web kubernetes.io/change-cause=\"1.28 に更新 (Recreate)\" --overwrite -n ch5\nkubectl rollout status deployment/web -n ch5 --timeout=180s\nwait\nsort re.txt | uniq -c\nkubectl patch deployment web -n ch5 -p '{\"spec\":{\"strategy\":{\"type\":\"RollingUpdate\",\"rollingUpdate\":{\"maxSurge\":1,\"maxUnavailable\":0}}}}'"
+      },
+      "lines": [
+        {
+          "code": "kubectl patch deployment web -n ch5 -p '{\"spec\":{\"strategy\":{\"type\":\"Recreate\",\"rollingUpdate\":null}}}'",
+          "text": "更新のしかたを Recreate にする"
+        },
+        {
+          "code": "SVC_IP=$(kubectl get service web -n ch5 -o jsonpath='{.spec.clusterIP}')",
+          "text": "Service の住所を覚える。今の端末だけで使える"
+        },
+        {
+          "code": "(for i in $(seq 200); do curl -s -o /dev/null -m 2 -w '%{http_code}\\n' http://$SVC_IP; sleep 0.1; done > re.txt) &",
+          "text": "裏で、0.1 秒おきに 200 回ページを取り、返事の番号を re.txt に書く"
+        },
+        {
+          "code": "kubectl set image deployment/web web=nginx:1.28-alpine -n ch5",
+          "text": "1.28 に替える"
+        },
+        {
+          "code": "kubectl annotate deployment web kubernetes.io/change-cause=\"1.28 に更新 (Recreate)\" --overwrite -n ch5",
+          "text": "変更の理由を書く"
+        },
+        {
+          "code": "kubectl rollout status deployment/web -n ch5 --timeout=180s",
+          "text": "更新が終わるまで待つ"
+        },
+        {
+          "code": "wait",
+          "text": "裏の仕事が終わるまで待つ"
+        },
+        {
+          "code": "sort re.txt | uniq -c",
+          "text": "返事の番号ごとに数える"
+        },
+        {
+          "code": "kubectl patch deployment web -n ch5 -p '{\"spec\":{\"strategy\":{\"type\":\"RollingUpdate\",\"rollingUpdate\":{\"maxSurge\":1,\"maxUnavailable\":0}}}}'",
+          "text": "更新のしかたを戻す"
+        }
+      ],
+      "output": "deployment.apps/web patched\n[1] 55231\ndeployment.apps/web image updated\ndeployment.apps/web annotated\nWaiting for deployment \"web\" rollout to finish: 0 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 0 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 0 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 0 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 0 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 0 of 3 updated replicas are available...\nWaiting for deployment \"web\" rollout to finish: 1 of 3 updated replicas are available...\nWaiting for deployment \"web\" rollout to finish: 2 of 3 updated replicas are available...\ndeployment \"web\" successfully rolled out\n     24 000\n    176 200\ndeployment.apps/web patched",
+      "read": "000 が混ざりました。古いものが全部消えてから、新しいものが使えるまでの間です。混ざる数は、待ち時間の設定とマシンの速さで変わります。",
+      "trouble": [
+        {
+          "symptom": "全部 200 になる",
+          "check": "kubectl get deployment web -n ch5 -o jsonpath='{.spec.strategy.type}' を打つ",
+          "fix": "Recreate でなければ、1 行目から打ち直す"
+        },
+        {
+          "symptom": "curl で何も出ない",
+          "check": "echo $SVC_IP を打つ",
+          "fix": "空なら、SVC_IP=... の行を打ち直す。Service が無ければ deploy の手順の expose の行から"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"
+    },
+    {
+      "id": "yaml-rollback",
+      "text": "ファイルを正にして、巻き戻します。",
+      "why": "手で変え続けると、ファイルと今がずれます。前のファイルを残しておけば、undo を使わず、ファイルを渡すだけで戻せます。git があれば履歴が残りますが、無くてもファイルを分ければできます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl diff -f web.yaml -n ch5 | grep -E '^[-+] .*(image|MODE|name:|value:)'\nmkdir -p history\ncat web.yaml > history/web-1.27.yaml\nsed 's/nginx:1.27-alpine/nginx:1.28-alpine/; s/1.27 にファイルで更新/1.28 にファイルで更新/' history/web-1.27.yaml > web.yaml\nkubectl apply -f web.yaml -n ch5\nkubectl rollout status deployment/web -n ch5 --timeout=180s\ndiff history/web-1.27.yaml web.yaml\ncat history/web-1.27.yaml > web.yaml\nkubectl apply -f web.yaml -n ch5\nkubectl rollout status deployment/web -n ch5 --timeout=180s\nkubectl get deployment web -n ch5 -o jsonpath='{.spec.template.spec.containers[0].image}{\"\\n\"}'\nkubectl get deployment web -n ch5 -o jsonpath='{.spec.template.spec.containers[0].env}{\"\\n\"}'\nkubectl rollout history deployment/web -n ch5"
+      },
+      "lines": [
+        {
+          "code": "kubectl diff -f web.yaml -n ch5 | grep -E '^[-+] .*(image|MODE|name:|value:)'",
+          "text": "今と web.yaml の違いを見る"
+        },
+        {
+          "code": "mkdir -p history",
+          "text": "前のファイルを残すフォルダを作る"
+        },
+        {
+          "code": "cat web.yaml > history/web-1.27.yaml",
+          "text": "今の web.yaml を、名前を変えて残す"
+        },
+        {
+          "code": "sed 's/nginx:1.27-alpine/nginx:1.28-alpine/; s/1.27 にファイルで更新/1.28 にファイルで更新/' history/web-1.27.yaml > web.yaml",
+          "text": "新しい web.yaml を作る"
+        },
+        {
+          "code": "kubectl apply -f web.yaml -n ch5",
+          "text": "1.28 を渡す"
+        },
+        {
+          "code": "kubectl rollout status deployment/web -n ch5 --timeout=180s",
+          "text": "更新が終わるまで待つ"
+        },
+        {
+          "code": "diff history/web-1.27.yaml web.yaml",
+          "text": "2 つのファイルの違いを出す"
+        },
+        {
+          "code": "cat history/web-1.27.yaml > web.yaml",
+          "text": "前のファイルの中身に戻す"
+        },
+        {
+          "code": "kubectl apply -f web.yaml -n ch5",
+          "text": "前のファイルを渡す"
+        },
+        {
+          "code": "kubectl rollout status deployment/web -n ch5 --timeout=180s",
+          "text": "更新が終わるまで待つ"
+        },
+        {
+          "code": "kubectl get deployment web -n ch5 -o jsonpath='{.spec.template.spec.containers[0].image}{\"\\n\"}'",
+          "text": "Deployment に書かれたイメージを出す"
+        },
+        {
+          "code": "kubectl get deployment web -n ch5 -o jsonpath='{.spec.template.spec.containers[0].env}{\"\\n\"}'",
+          "text": "環境変数を出す"
+        },
+        {
+          "code": "kubectl rollout history deployment/web -n ch5",
+          "text": "更新の記録を出す"
+        }
+      ],
+      "output": "-        image: nginx:1.28-alpine\n+        image: nginx:1.27-alpine\ndeployment.apps/web configured\ndeployment \"web\" successfully rolled out\n6c6\n<     kubernetes.io/change-cause: \"1.27 にファイルで更新\"\n---\n>     kubernetes.io/change-cause: \"1.28 にファイルで更新\"\n20c20\n<         image: nginx:1.27-alpine\n---\n>         image: nginx:1.28-alpine\ndeployment.apps/web configured\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 2 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 2 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 2 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"web\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"web\" rollout to finish: 1 old replicas are pending termination...\ndeployment \"web\" successfully rolled out\nnginx:1.27-alpine\n[{\"name\":\"MODE\",\"value\":\"demo\"}]\ndeployment.apps/web\nREVISION  CHANGE-CAUSE\n11        1.28 に更新 (数えながら)\n13        1.28 にファイルで更新\n14        1.27 にファイルで更新",
+      "read": "diff の < が前、> が新しいファイルです。前のファイルを渡すだけで 1.27 に戻り、理由もファイルのものになりました。手で足した MODE は、ファイルに 1 度も書いていないので残ります。これが、ファイルに無いものは apply では消えない、ということです。",
+      "trouble": [
+        {
+          "symptom": "diff の 1 行目で何も出ない",
+          "check": "kubectl get deployment web -n ch5 -o yaml | grep image: を打つ",
+          "fix": "今とファイルが同じ。そのまま進む"
+        },
+        {
+          "symptom": "the path ... does not exist と出る",
+          "check": "pwd と ls を打つ",
+          "fix": "作業のフォルダにいない。cd で移ってから打つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/tasks/manage-kubernetes-objects/declarative-config/"
+    },
+    {
+      "id": "canary",
+      "text": "新しい版を 1 つだけ混ぜます (カナリア)。",
+      "why": "全部を替える前に、一部だけで試すためです。2 つの Deployment に共通のラベルを付け、Service はそのラベルで選びます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cat > stable.yaml <<'EOF'\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: shop-stable\nspec:\n  replicas: 3\n  selector:\n    matchLabels:\n      app: shop\n      track: stable\n  template:\n    metadata:\n      labels:\n        app: shop\n        track: stable\n    spec:\n      containers:\n      - name: web\n        image: nginx:1.27-alpine\nEOF\ncat > canary.yaml <<'EOF'\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: shop-canary\nspec:\n  replicas: 1\n  selector:\n    matchLabels:\n      app: shop\n      track: canary\n  template:\n    metadata:\n      labels:\n        app: shop\n        track: canary\n    spec:\n      containers:\n      - name: web\n        image: nginx:1.28-alpine\nEOF\nkubectl apply -f stable.yaml -f canary.yaml -n ch5\nkubectl rollout status deployment/shop-stable -n ch5 --timeout=180s\nkubectl rollout status deployment/shop-canary -n ch5 --timeout=180s\nkubectl create service clusterip shop --tcp=80:80 -n ch5\nsleep 5\nSHOP_IP=$(kubectl get service shop -n ch5 -o jsonpath='{.spec.clusterIP}')\nfor i in $(seq 40); do curl -sI http://$SHOP_IP | grep Server; done | sort | uniq -c"
+      },
+      "lines": [
+        {
+          "code": "cat > stable.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま stable.yaml というファイルに書く"
+        },
+        {
+          "code": "apiVersion: apps/v1",
+          "text": "使う API の種類と版"
+        },
+        {
+          "code": "kind: Deployment",
+          "text": "作るものの種類"
+        },
+        {
+          "code": "metadata:",
+          "text": "見分けるための情報"
+        },
+        {
+          "code": "  name: shop-stable",
+          "text": "名前"
+        },
+        {
+          "code": "spec:",
+          "text": "ほしい中身"
+        },
+        {
+          "code": "  replicas: 3",
+          "text": "Pod の数"
+        },
+        {
+          "code": "  selector:",
+          "text": "自分の Pod の見分け方"
+        },
+        {
+          "code": "    matchLabels:",
+          "text": "次のラベルが全部付いたもの"
+        },
+        {
+          "code": "      app: shop",
+          "text": "app が shop"
+        },
+        {
+          "code": "      track: stable",
+          "text": "track が stable"
+        },
+        {
+          "code": "  template:",
+          "text": "作る Pod のひな型"
+        },
+        {
+          "code": "    metadata:",
+          "text": "作る Pod の情報"
+        },
+        {
+          "code": "      labels:",
+          "text": "ラベル"
+        },
+        {
+          "code": "        app: shop",
+          "text": "app を shop にする (両方に共通)"
+        },
+        {
+          "code": "        track: stable",
+          "text": "track を stable にする (見分け)"
+        },
+        {
+          "code": "    spec:",
+          "text": "作る Pod の中身"
+        },
+        {
+          "code": "      containers:",
+          "text": "コンテナの一覧"
+        },
+        {
+          "code": "      - name: web",
+          "text": "コンテナの名前"
+        },
+        {
+          "code": "        image: nginx:1.27-alpine",
+          "text": "使うイメージと版"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "cat > canary.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま canary.yaml というファイルに書く"
+        },
+        {
+          "code": "apiVersion: apps/v1",
+          "text": "使う API の種類と版"
+        },
+        {
+          "code": "kind: Deployment",
+          "text": "作るものの種類"
+        },
+        {
+          "code": "metadata:",
+          "text": "見分けるための情報"
+        },
+        {
+          "code": "  name: shop-canary",
+          "text": "名前"
+        },
+        {
+          "code": "spec:",
+          "text": "ほしい中身"
+        },
+        {
+          "code": "  replicas: 1",
+          "text": "Pod の数"
+        },
+        {
+          "code": "  selector:",
+          "text": "自分の Pod の見分け方"
+        },
+        {
+          "code": "    matchLabels:",
+          "text": "次のラベルが全部付いたもの"
+        },
+        {
+          "code": "      app: shop",
+          "text": "app が shop"
+        },
+        {
+          "code": "      track: canary",
+          "text": "track が canary"
+        },
+        {
+          "code": "  template:",
+          "text": "作る Pod のひな型"
+        },
+        {
+          "code": "    metadata:",
+          "text": "作る Pod の情報"
+        },
+        {
+          "code": "      labels:",
+          "text": "ラベル"
+        },
+        {
+          "code": "        app: shop",
+          "text": "app を shop にする (両方に共通)"
+        },
+        {
+          "code": "        track: canary",
+          "text": "track を canary にする (見分け)"
+        },
+        {
+          "code": "    spec:",
+          "text": "作る Pod の中身"
+        },
+        {
+          "code": "      containers:",
+          "text": "コンテナの一覧"
+        },
+        {
+          "code": "      - name: web",
+          "text": "コンテナの名前"
+        },
+        {
+          "code": "        image: nginx:1.28-alpine",
+          "text": "使うイメージと版"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "kubectl apply -f stable.yaml -f canary.yaml -n ch5",
+          "text": "2 つの Deployment を作る"
+        },
+        {
+          "code": "kubectl rollout status deployment/shop-stable -n ch5 --timeout=180s",
+          "text": "stable を待つ"
+        },
+        {
+          "code": "kubectl rollout status deployment/shop-canary -n ch5 --timeout=180s",
+          "text": "canary を待つ"
+        },
+        {
+          "code": "kubectl create service clusterip shop --tcp=80:80 -n ch5",
+          "text": "shop という Service を作る。app=shop の Pod へ渡す"
+        },
+        {
+          "code": "sleep 5",
+          "text": "渡す先が入るまで 5 秒待つ"
+        },
+        {
+          "code": "SHOP_IP=$(kubectl get service shop -n ch5 -o jsonpath='{.spec.clusterIP}')",
+          "text": "shop の Service の住所を覚える"
+        },
+        {
+          "code": "for i in $(seq 40); do curl -sI http://$SHOP_IP | grep Server; done | sort | uniq -c",
+          "text": "40 回取り、返事の版ごとに数える"
+        }
+      ],
+      "output": "deployment.apps/shop-stable created\ndeployment.apps/shop-canary created\nWaiting for deployment \"shop-stable\" rollout to finish: 0 of 3 updated replicas are available...\nWaiting for deployment \"shop-stable\" rollout to finish: 1 of 3 updated replicas are available...\nWaiting for deployment \"shop-stable\" rollout to finish: 2 of 3 updated replicas are available...\ndeployment \"shop-stable\" successfully rolled out\ndeployment \"shop-canary\" successfully rolled out\nservice/shop created\n     27 Server: nginx/1.27.5\n     13 Server: nginx/1.28.3",
+      "read": "1.27 が多く、1.28 が少し混ざります。4 つのうち 1 つなので 4 回に 1 回くらいですが、数は打つたびに変わります。問題が無ければ canary を増やし、stable を減らします。割合を細かく決める方法は、11 章で扱います。",
+      "trouble": [
+        {
+          "symptom": "toomanyrequests や 429 と出る",
+          "check": "kubectl describe の Events で、Failed to pull image の行の終わりを見る",
+          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る。短い「429 Too Many Requests」だけのときは、使いすぎを防ぐ別の上限なので、数分待ってからもう一度行う"
+        },
+        {
+          "symptom": "イメージが not found と出る",
+          "check": "Events で、イメージの名前と版 (: の後ろ) を見る",
+          "fix": "つづりが正しいなら、その版はもう配られていない。hub.docker.com でイメージのページを開き、同じ系統の新しい版に替える。この先の出力の版は、替えた版に読み替える"
+        },
+        {
+          "symptom": "何も出ない",
+          "check": "echo $SHOP_IP と kubectl get endpointslice -n ch5 を打つ",
+          "fix": "空なら SHOP_IP の行から打ち直す"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/workloads/management/"
+    },
+    {
+      "id": "blue-green",
+      "text": "渡す先を、一度に切り替えます (Blue/Green)。",
+      "why": "新しい版を全部用意してから、Service のラベルだけを替えます。戻すのも、ラベルを戻すだけです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl scale deployment shop-canary --replicas=3 -n ch5\nkubectl rollout status deployment/shop-canary -n ch5 --timeout=180s\nSHOP_IP=$(kubectl get service shop -n ch5 -o jsonpath='{.spec.clusterIP}')\nkubectl patch service shop -n ch5 -p '{\"spec\":{\"selector\":{\"app\":\"shop\",\"track\":\"canary\"}}}'\nsleep 3\nfor i in $(seq 40); do curl -sI http://$SHOP_IP | grep Server; done | sort | uniq -c\nkubectl patch service shop -n ch5 -p '{\"spec\":{\"selector\":{\"app\":\"shop\",\"track\":\"stable\"}}}'\nsleep 3\nfor i in $(seq 40); do curl -sI http://$SHOP_IP | grep Server; done | sort | uniq -c"
+      },
+      "lines": [
+        {
+          "code": "kubectl scale deployment shop-canary --replicas=3 -n ch5",
+          "text": "新しい版を 3 つにする"
+        },
+        {
+          "code": "kubectl rollout status deployment/shop-canary -n ch5 --timeout=180s",
+          "text": "使えるようになるまで待つ"
+        },
+        {
+          "code": "SHOP_IP=$(kubectl get service shop -n ch5 -o jsonpath='{.spec.clusterIP}')",
+          "text": "shop の Service の住所を覚える"
+        },
+        {
+          "code": "kubectl patch service shop -n ch5 -p '{\"spec\":{\"selector\":{\"app\":\"shop\",\"track\":\"canary\"}}}'",
+          "text": "渡す先を新しい版だけにする"
+        },
+        {
+          "code": "sleep 3",
+          "text": "伝わるまで 3 秒待つ"
+        },
+        {
+          "code": "for i in $(seq 40); do curl -sI http://$SHOP_IP | grep Server; done | sort | uniq -c",
+          "text": "40 回取り、返事の版ごとに数える"
+        },
+        {
+          "code": "kubectl patch service shop -n ch5 -p '{\"spec\":{\"selector\":{\"app\":\"shop\",\"track\":\"stable\"}}}'",
+          "text": "渡す先を前の版だけにする (戻す)"
+        },
+        {
+          "code": "sleep 3",
+          "text": "3 秒待つ"
+        },
+        {
+          "code": "for i in $(seq 40); do curl -sI http://$SHOP_IP | grep Server; done | sort | uniq -c",
+          "text": "40 回取り、返事の版ごとに数える"
+        }
+      ],
+      "output": "deployment.apps/shop-canary scaled\nWaiting for deployment \"shop-canary\" rollout to finish: 1 of 3 updated replicas are available...\nWaiting for deployment \"shop-canary\" rollout to finish: 2 of 3 updated replicas are available...\ndeployment \"shop-canary\" successfully rolled out\nservice/shop patched\n     40 Server: nginx/1.28.3\nservice/shop patched\n     40 Server: nginx/1.27.5",
+      "read": "1 度目は全部 1.28、2 度目は全部 1.27 です。混ざらずに切り替わり、すぐに戻せました。代わりに、両方の分の空きが要ります。",
+      "trouble": [
+        {
+          "symptom": "混ざる",
+          "check": "数秒待って、数える行を打つ",
+          "fix": "切り替えが伝わる前だった"
+        },
+        {
+          "symptom": "何も出ない",
+          "check": "kubectl get endpointslice -n ch5 を打つ",
+          "fix": "track のつづりが違うと、渡す先が無くなる"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/services-networking/service/"
+    },
+    {
+      "id": "check-before-delete",
+      "text": "消す前に、どのマシンにいるかを見ます。kcna と出なければ、次の手順を打ちません。",
+      "why": "次の手順は名前空間をまるごと消し、元に戻せません。打つ場所を先に確かめます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "hostname"
+      },
+      "lines": [
+        {
+          "code": "hostname",
+          "text": "このマシンの名前を出す"
+        }
+      ],
+      "output": "kcna",
+      "read": "kcna と出れば、仮想マシンの中です。",
+      "trouble": [
+        {
+          "symptom": "kcna ではない名前が出る",
+          "check": "行の頭が ubuntu@kcna かを見る",
+          "fix": "ホストにいる。multipass shell kcna で入り、もう一度打つ"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man1/hostname.1.html"
+    },
+    {
+      "id": "delete-namespace",
+      "text": "名前空間 ch5 を消します。前の手順で kcna と出たときだけ打ちます。",
+      "why": "中に作ったものを、まとめて片付けるためです。次の章は、k3s の部品だけの状態から始めます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cd ~\nkubectl delete namespace ch5\nkubectl get namespaces"
+      },
+      "lines": [
+        {
+          "code": "cd ~",
+          "text": "ホームへ戻る"
+        },
+        {
+          "code": "kubectl delete namespace ch5",
+          "text": "ch5 を、中のものごと消す。終わるまで待つ"
+        },
+        {
+          "code": "kubectl get namespaces",
+          "text": "名前空間の一覧を出す"
+        }
+      ],
+      "output": "namespace \"ch5\" deleted\nNAME              STATUS   AGE\ndefault           Active   59m\nkube-node-lease   Active   59m\nkube-public       Active   59m\nkube-system       Active   59m",
+      "read": "ch5 が消え、default と kube- で始まる 4 つだけになれば、片付いています。手元の ~/ch5 の YAML は残るので、読み返せます。",
+      "trouble": [
+        {
+          "symptom": "消す行がしばらく止まる",
+          "check": "1 分ほど待つ",
+          "fix": "中の Pod が終わるのを待っている。そのまま待つ"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/"
+    },
+    {
+      "id": "leave",
+      "text": "仮想マシンから出ます。",
+      "why": "次は、ホストで控えを取るためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "exit"
+      },
+      "lines": [
+        {
+          "code": "exit",
+          "text": "今の端末を終える。仮想マシンは動き続ける"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "行の頭が、自分の PC のものに戻ります。",
+      "trouble": [
+        {
+          "symptom": "行の頭が ubuntu@kcna のまま",
+          "check": "もう一度見る",
+          "fix": "もう一度 exit を打つ"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man1/bash.1.html"
+    },
+    {
+      "id": "snapshot",
+      "text": "ホストで、この章を終えた状態の控えを ch5-end という名前で取り、仮想マシンに入り直します。",
+      "why": "次の章で失敗しても、ここへ戻れるようにするためです。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass stop kcna\nmultipass snapshot --name ch5-end kcna\nmultipass list --snapshots\nmultipass shell kcna"
+      },
+      "lines": [
+        {
+          "code": "multipass stop kcna",
+          "text": "止める。控えは、止まっているときだけ取れる。stop は動いている (Running) ときだけ打てる"
+        },
+        {
+          "code": "multipass snapshot --name ch5-end kcna",
+          "text": "今の状態を ch5-end という名前で控える"
+        },
+        {
+          "code": "multipass list --snapshots",
+          "text": "控えの一覧を出す"
+        },
+        {
+          "code": "multipass shell kcna",
+          "text": "止まっている kcna を動かし、中に入り直す"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "一覧に ch5-end が並べば取れています。戻すときは、止めてから multipass restore kcna.ch5-end を打ちます。今の状態も控えるかを聞かれたら、要らなければ no と答えます。最後の行で、行の頭が ubuntu@kcna:~$ に変わります。課題と後片付けは、この中で続けます。",
+      "trouble": [
+        {
+          "symptom": "止まっていないので取れないと出る",
+          "check": "multipass list で State を見る",
+          "fix": "multipass stop kcna で止めてから取る"
+        },
+        {
+          "symptom": "ch5-end がもうあると出る",
+          "check": "multipass list --snapshots を打つ",
+          "fix": "前の控えを使うか、--name ch5-endb のように別の名前にする"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/snapshot/"
+    }
+  ],
+  "cleanup": [
+    {
+      "id": "check-vm",
+      "text": "仮想マシンの中で、どのマシンにいるかを見ます。kcna と出なければ止まり、multipass shell kcna で入ります。",
+      "why": "次の手順は、つないでいるクラスターのものを消します。自分の PC の別のクラスターで打たないためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "hostname"
+      },
+      "lines": [
+        {
+          "code": "hostname",
+          "text": "このマシンの名前を出す"
+        }
+      ],
+      "output": "kcna",
+      "read": "kcna と出れば、仮想マシンの中です。",
+      "trouble": [
+        {
+          "symptom": "kcna ではない名前が出る",
+          "check": "行の頭が ubuntu@kcna かを見る",
+          "fix": "ホストにいる。multipass shell kcna で入り、もう一度打つ"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man1/hostname.1.html"
+    },
+    {
+      "id": "delete-practice",
+      "text": "仮想マシンの中で、課題で作った名前空間を消します。課題をしていなければ、何も起きません。",
+      "why": "次の章を、k3s の部品だけの状態から始めるためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl delete namespace practice --ignore-not-found\nkubectl get namespaces"
+      },
+      "lines": [
+        {
+          "code": "kubectl delete namespace practice --ignore-not-found",
+          "text": "practice を消す。無くてもエラーにしない (--ignore-not-found)"
+        },
+        {
+          "code": "kubectl get namespaces",
+          "text": "名前空間の一覧を出す"
+        }
+      ],
+      "output": "namespace \"practice\" deleted\nNAME              STATUS   AGE\ndefault           Active   60m\nkube-node-lease   Active   60m\nkube-public       Active   60m\nkube-system       Active   60m",
+      "read": "default と kube- で始まる 4 つだけになれば、片付いています。k3s は消しません。",
+      "trouble": [
+        {
+          "symptom": "消す行がしばらく止まる",
+          "check": "1 分ほど待つ",
+          "fix": "中の Pod が終わるのを待っている。そのまま待つ"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_delete/"
+    },
+    {
+      "id": "rest",
+      "text": "今日はここまでにするときは、exit で出てから、ホストで仮想マシンを止めます。止まっていれば (Stopped)、打ちません。",
+      "why": "動いている間は PC のメモリを使うためです。次の章でも使うので、消しません。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass stop kcna"
+      },
+      "lines": [
+        {
+          "code": "multipass stop kcna",
+          "text": "kcna を止める"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "続けるときは multipass shell kcna で、動かして中に入れます。k3s は自分で始まります。",
+      "trouble": [
+        {
+          "symptom": "止まったか分からない",
+          "check": "multipass list で State を見る",
+          "fix": "Stopped なら止まっている。Running なら、もう一度止める"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/stop/"
+    }
+  ],
+  "challenges": [
+    {
+      "task": "仮想マシンの中で、practice という名前空間に nginx:1.26-alpine の Deployment shop を 3 つで作り、1.27 に更新してから、1 つ前に巻き戻してください。",
+      "hint": "create・set image・rollout undo の順です。コンテナの名前は nginx です。",
+      "answer": "kubectl create namespace practice\nkubectl create deployment shop --image=nginx:1.26-alpine --replicas=3 -n practice\nkubectl rollout status deployment/shop -n practice --timeout=180s\nkubectl set image deployment/shop nginx=nginx:1.27-alpine -n practice\nkubectl rollout status deployment/shop -n practice --timeout=180s\nkubectl rollout undo deployment/shop -n practice\nkubectl rollout status deployment/shop -n practice --timeout=180s",
+      "verify": "kubectl get deployment shop -n practice -o wide で、IMAGES が nginx:1.26-alpine なら正解です。"
+    },
+    {
+      "task": "仮想マシンの中で、shop を更新の理由つきで 1.28 に替え、記録に理由が出ることを確かめてください。",
+      "hint": "kubernetes.io/change-cause の覚え書きを付けます。",
+      "answer": "kubectl set image deployment/shop nginx=nginx:1.28-alpine -n practice\nkubectl annotate deployment shop kubernetes.io/change-cause=\"1.28 に更新\" --overwrite -n practice\nkubectl rollout status deployment/shop -n practice --timeout=180s",
+      "verify": "kubectl rollout history deployment/shop -n practice で、最後の行の CHANGE-CAUSE が 1.28 に更新 なら正解です。"
+    },
+    {
+      "task": "仮想マシンの中で、shop に無い版 (nginx:bad) を指定し、止まっている間も使える Pod の数が減りすぎないことを見てから、巻き戻してください。",
+      "hint": "既定の更新のしかたは、3 つなら maxUnavailable が 0 です。",
+      "answer": "kubectl set image deployment/shop nginx=nginx:bad -n practice\nsleep 15\nkubectl get deployment shop -n practice\nkubectl rollout undo deployment/shop -n practice\nkubectl rollout status deployment/shop -n practice --timeout=180s",
+      "verify": "途中の READY が 3/3 のままで、kubectl get deployment shop -n practice -o wide の IMAGES が nginx:1.28-alpine に戻れば正解です。"
+    }
+  ],
+  "sources": [
+    {
+      "label": "Kubernetes: Deployments",
+      "url": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"
+    },
+    {
+      "label": "Kubernetes: Managing Workloads (カナリア)",
+      "url": "https://kubernetes.io/docs/concepts/workloads/management/"
+    },
+    {
+      "label": "Kubernetes: Container Lifecycle Hooks",
+      "url": "https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/"
+    },
+    {
+      "label": "Kubernetes: Pod Lifecycle (終わり方)",
+      "url": "https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/"
+    },
+    {
+      "label": "Kubernetes: Liveness, Readiness and Startup Probes",
+      "url": "https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/"
+    },
+    {
+      "label": "Kubernetes: Declarative Management",
+      "url": "https://kubernetes.io/docs/tasks/manage-kubernetes-objects/declarative-config/"
+    },
+    {
+      "label": "Kubernetes: Service",
+      "url": "https://kubernetes.io/docs/concepts/services-networking/service/"
+    },
+    {
+      "label": "kubectl set image",
+      "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_set/kubectl_set_image/"
+    },
+    {
+      "label": "kubectl rollout status",
+      "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_rollout/kubectl_rollout_status/"
+    },
+    {
+      "label": "kubectl rollout history",
+      "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_rollout/kubectl_rollout_history/"
+    },
+    {
+      "label": "kubectl rollout undo",
+      "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_rollout/kubectl_rollout_undo/"
+    },
+    {
+      "label": "kubectl rollout pause",
+      "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_rollout/kubectl_rollout_pause/"
+    },
+    {
+      "label": "kubectl patch",
+      "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_patch/"
+    },
+    {
+      "label": "Docker Hub: 取得の上限",
+      "url": "https://docs.docker.com/docker-hub/usage/"
+    },
+    {
+      "label": "Multipass: snapshot",
+      "url": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/snapshot/"
+    }
+  ]
+}
