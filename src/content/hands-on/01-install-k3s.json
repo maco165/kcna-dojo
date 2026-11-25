@@ -104,7 +104,7 @@
           "text": "ファイアウォール (通信を止める仕組み) の ufw が動いているかを見る"
         }
       ],
-      "output": "@@",
+      "output": "2\n               total        used        free      shared  buff/cache   available\nMem:           1.9Gi       360Mi       1.4Gi       1.0Mi       322Mi       1.6Gi\nSwap:             0B          0B          0B\nx86_64\nStatus: inactive",
       "read": "コアは 2、Mem の total は 1.9Gi なら進めます (2G のうち、カーネルの使う分が引かれて出ます)。ufw は inactive (動いていない) が、k3s の勧める状態です。M 系の Mac では uname -m が aarch64 になりますが、k3s は対応しています。",
       "trouble": [
         {
@@ -135,7 +135,7 @@
           "text": "スクリプトを取ってきて、動かさずに、INSTALL_K3S_VERSION のある行だけを番号付きで出す"
         }
       ],
-      "output": "@@",
+      "output": "39:#   - INSTALL_K3S_VERSION\n368:    elif [ -n \"${INSTALL_K3S_VERSION}\" ]; then\n369:        VERSION_K3S=${INSTALL_K3S_VERSION}",
       "read": "INSTALL_K3S_VERSION に値があれば、それを版として使う、と書いてあります。何も書かないと stable (安定版) の版になり、2026-11-25 では v1.37.2+k3s1 です。行の番号は、スクリプトが新しくなると変わります。",
       "trouble": [
         {
@@ -161,7 +161,7 @@
           "text": "公式のスクリプトを取ってきて (curl)、そのままシェルに渡して動かす (| sh -)。-sfL は「余計な表示をしない・取れなければ失敗にする・移転先へたどる」。INSTALL_K3S_VERSION で版を決める"
         }
       ],
-      "output": "@@",
+      "output": "[INFO]  Using v1.36.6+k3s1 as release\n[INFO]  Downloading hash https://github.com/k3s-io/k3s/releases/download/v1.36.6%2Bk3s1/sha256sum-amd64.txt\n[INFO]  Downloading binary https://github.com/k3s-io/k3s/releases/download/v1.36.6%2Bk3s1/k3s\n[INFO]  Verifying binary download\n[INFO]  Installing k3s to /usr/local/bin/k3s\n[INFO]  Skipping installation of SELinux RPM\n[INFO]  Creating /usr/local/bin/kubectl symlink to k3s\n[INFO]  Creating /usr/local/bin/crictl symlink to k3s\n[INFO]  Creating /usr/local/bin/ctr symlink to k3s\n[INFO]  Creating killall script /usr/local/bin/k3s-killall.sh\n[INFO]  Creating uninstall script /usr/local/bin/k3s-uninstall.sh\n[INFO]  env: Creating environment file /etc/systemd/system/k3s.service.env\n[INFO]  systemd: Creating service file /etc/systemd/system/k3s.service\n[INFO]  systemd: Enabling k3s unit\nCreated symlink /etc/systemd/system/multi-user.target.wants/k3s.service → /etc/systemd/system/k3s.service.\n[INFO]  systemd: Starting k3s",
       "read": "Downloading binary で k3s を取り、Verifying で壊れていないかを確かめ、kubectl と crictl を置き、最後に systemd: Starting k3s で動かしています。[ERROR] の行が無ければ成功です。systemd は、Linux でサービス (裏で動き続けるプログラム) を世話する仕組みです。",
       "trouble": [
         {
@@ -205,7 +205,7 @@
           "text": "親のプロセスの番号 (MainPID) と、始めるときに打つコマンド (ExecStart) を出す。長いので、cut で行の頭の 80 字だけにする"
         }
       ],
-      "output": "@@",
+      "output": "active\nenabled\nMainPID=1606\nExecStart={ path=/usr/local/bin/k3s ; argv[]=/usr/local/bin/k3s server ; ignore_",
       "read": "active が「動いている」、enabled が「次の起動でも自動で始まる」です。ExecStart の path から、/usr/local/bin/k3s が動かされていると分かります。",
       "trouble": [
         {
@@ -245,7 +245,7 @@
           "text": "ノードの一覧を頼む"
         }
       ],
-      "output": "@@",
+      "output": "-rw------- 1 root root 2941 Nov 25 02:17 /etc/rancher/k3s/k3s.yaml\ntime=\"2026-11-25T02:17:39Z\" level=warning msg=\"Unable to read /etc/rancher/k3s/k3s.yaml, please start server with --write-kubeconfig-mode or --write-kubeconfig-group to modify kube config permissions\"\nerror: error loading config file \"/etc/rancher/k3s/k3s.yaml\": open /etc/rancher/k3s/k3s.yaml: permission denied",
       "read": "ファイルは -rw------- で、持ち主は root です。読めるのは root だけなので、permission denied と断られます。文に --write-kubeconfig-mode で読めるようにする案が出ますが、誰でも読めるようにはせず、次の手順で自分用に写します。",
       "trouble": [
         {
@@ -300,7 +300,7 @@
           "text": "写しの権限と持ち主を見る"
         }
       ],
-      "output": "@@",
+      "output": "-rw------- 1 ubuntu ubuntu 2941 Nov 25 02:17 /home/ubuntu/.kube/k3s.yaml",
       "read": "-rw------- で、持ち主が ubuntu に変わっています。echo の行を何度も打つと ~/.bashrc に同じ行が増えるので、1 回だけ打ちます。",
       "trouble": [
         {
@@ -343,7 +343,7 @@
           "text": "kubectl (Client) と、クラスター (Server) の版を出す"
         }
       ],
-      "output": "@@",
+      "output": "node/kcna condition met\nnode/kcna condition met\nNAME   STATUS   ROLES           AGE   VERSION        INTERNAL-IP   EXTERNAL-IP   OS-IMAGE             KERNEL-VERSION              CONTAINER-RUNTIME\nkcna   Ready    control-plane   3s    v1.36.6+k3s1   10.0.2.15     <none>        Ubuntu 24.04.5 LTS   6.8.0-147-generic (amd64)   containerd://2.3.7-k3s1.36\nClient Version: v1.36.6+k3s1\nKustomize Version: v5.8.1\nServer Version: v1.36.6+k3s1",
       "read": "STATUS が Ready、VERSION が v1.36.6+k3s1 なら成功です。CONTAINER-RUNTIME は、コンテナを動かす部品が containerd だという印です。登録された直後は ROLES が <none> で、少しすると control-plane (クラスターを管理する側) に変わります。INTERNAL-IP は仮想マシンの住所で、PC ごとに違います。",
       "trouble": [
         {
@@ -396,7 +396,7 @@
           "text": "kube-system という名前空間の Pod を出す"
         }
       ],
-      "output": "@@",
+      "output": "deployment.apps/traefik condition met\njob.batch/helm-install-traefik condition met\njob.batch/helm-install-traefik-crd condition met\ndeployment \"coredns\" successfully rolled out\ndeployment \"local-path-provisioner\" successfully rolled out\ndeployment \"metrics-server\" successfully rolled out\nWaiting for deployment \"traefik\" rollout to finish: 0 of 1 updated replicas are available...\ndeployment \"traefik\" successfully rolled out\nNAME                                      READY   STATUS      RESTARTS      AGE\ncoredns-7cfb7bc9c7-9xvrz                  1/1     Running     0             86s\nhelm-install-traefik-9lvnl                0/1     Completed   2 (43s ago)   86s\nhelm-install-traefik-crd-4w8b4            0/1     Completed   0             86s\nlocal-path-provisioner-5598c9cb4c-9jtzb   1/1     Running     0             86s\nmetrics-server-6dc596dfb8-gcr9z           1/1     Running     0             86s\nsvclb-traefik-14e2b168-gcbrx              2/2     Running     0             27s\ntraefik-7c8677d4d9-w844k                  1/1     Running     0             27s",
       "read": "coredns は名前から住所を引く部品、traefik は外からの入口、local-path-provisioner は保存場所を用意する部品、metrics-server は使用量を集める部品です。svclb-traefik は入口の番号 (80 と 443) を受ける部品です。helm-install- で始まる Pod は、traefik を入れる作業が終わったものなので、Completed が正常です。RESTARTS の数が 0 でなくても、Running か Completed なら進めます。",
       "trouble": [
         {
@@ -445,7 +445,7 @@
           "text": "待ち受けている番号 (ポート) のうち、Kubernetes の部品の 4 つを出す。6443 は API サーバー、10250 は kubelet、10257 は controller-manager、10259 は scheduler"
         }
       ],
-      "output": "@@",
+      "output": "    PID USER     COMMAND\n   1606 root     /usr/local/bin/k3s server\nLISTEN 0      4096       127.0.0.1:10259      0.0.0.0:*    users:((\"k3s-server\",pid=1606,fd=227))                \nLISTEN 0      4096       127.0.0.1:10257      0.0.0.0:*    users:((\"k3s-server\",pid=1606,fd=172))                \nLISTEN 0      4096               *:6443             *:*    users:((\"k3s-server\",pid=1606,fd=12))                 \nLISTEN 0      4096               *:10250            *:*    users:((\"k3s-server\",pid=1606,fd=176))                ",
       "read": "pgrep は何も出しません。kube-apiserver などの別のプロセスは無く、4 つのポートは全部、k3s-server という 1 つのプロセス (pid が同じ) が持っています。部品は無いのではなく、1 つの中に入っています。",
       "trouble": [
         {
@@ -476,7 +476,7 @@
           "text": "記録の置き場所の中身を、大きさと一緒に出す"
         }
       ],
-      "output": "@@",
+      "output": "total 17M\n-rw-r--r-- 1 root root  12M Nov 25 02:19 state.db\n-rw-r--r-- 1 root root  32K Nov 25 02:19 state.db-shm\n-rw-r--r-- 1 root root 5.6M Nov 25 02:19 state.db-wal",
       "read": "state.db が記録の本体です。SQLite という、1 つのファイルに収まるデータベースです。ノードが 1 台の k3s は、これを使います。大きな構成では、etcd という別のデータベースを使います。",
       "trouble": [
         {
@@ -510,7 +510,7 @@
           "text": "取ってきたイメージ (コンテナのもと) を出す"
         }
       ],
-      "output": "@@",
+      "output": "    PID USER     COMMAND\n   1632 root     containerd \nCONTAINER           IMAGE               CREATED              STATE               NAME                     ATTEMPT             POD ID              POD                                       NAMESPACE\n72e5436ca10a3       6cfd9663a5d35       11 seconds ago       Running             traefik                  0                   9d0355e1cbe36       traefik-7c8677d4d9-w844k                  kube-system\n2e15e99215d2e       eaa1212a2b456       19 seconds ago       Running             lb-tcp-443               0                   bdb5cc0eaf846       svclb-traefik-14e2b168-gcbrx              kube-system\n15e822e9ca693       eaa1212a2b456       19 seconds ago       Running             lb-tcp-80                0                   bdb5cc0eaf846       svclb-traefik-14e2b168-gcbrx              kube-system\n5cadd95441487       d7b01abacd67f       About a minute ago   Running             metrics-server           0                   2228747a50141       metrics-server-6dc596dfb8-gcr9z           kube-system\n86fdf90ba49c3       97efff2babf85       About a minute ago   Running             coredns                  0                   a3118e1b82368       coredns-7cfb7bc9c7-9xvrz                  kube-system\n678c6d0da01e7       683316f41426e       About a minute ago   Running             local-path-provisioner   0                   fcc9d792ba3c8       local-path-provisioner-5598c9cb4c-9jtzb   kube-system\nIMAGE                                        TAG                     IMAGE ID            SIZE\ndocker.io/rancher/klipper-helm               v0.13.3-build20261021   4c0594a917215       77.5MB\ndocker.io/rancher/klipper-lb                 v0.4.17                 eaa1212a2b456       5.28MB\ndocker.io/rancher/local-path-provisioner     v0.0.37                 683316f41426e       15.1MB\ndocker.io/rancher/mirrored-coredns-coredns   1.14.7                  97efff2babf85       24.3MB\ndocker.io/rancher/mirrored-library-traefik   3.7.15                  6cfd9663a5d35       55.4MB\ndocker.io/rancher/mirrored-metrics-server    v0.9.0                  d7b01abacd67f       23.3MB\ndocker.io/rancher/mirrored-pause             3.10.2                  4a83b15d3ecfe       321kB",
       "read": "POD の列の名前は、さっきの Pod の名前と同じです。svclb-traefik の Pod には、lb-tcp-80 と lb-tcp-443 の 2 つのコンテナがあります。1 つの Pod に、コンテナが 2 つ入ることもあるためです。イメージの pause は、Pod の土台になる小さなコンテナのものです。",
       "trouble": [
         {
@@ -545,7 +545,7 @@
           "text": "名前空間の一覧を出す"
         }
       ],
-      "output": "@@",
+      "output": "namespace/first-k3s created\nNAME              STATUS   AGE\ndefault           Active   97s\nfirst-k3s         Active   0s\nkube-node-lease   Active   97s\nkube-public       Active   97s\nkube-system       Active   97s",
       "read": "first-k3s が Active で並べば成功です。default は何も書かないときの場所、kube-system は k3s の部品の場所です。kube-public と kube-node-lease も、最初からあります。",
       "trouble": [
         {
@@ -589,7 +589,7 @@
           "text": "Pod の一覧を、詳しい列まで出す"
         }
       ],
-      "output": "@@",
+      "output": "pod/web created\npod/web condition met\nNAME   READY   STATUS    RESTARTS   AGE   IP          NODE   NOMINATED NODE   READINESS GATES\nweb    1/1     Running   0          10s   10.42.0.9   kcna   <none>           <none>",
       "read": "READY の 1/1 は、コンテナ 1 つのうち 1 つが使えるという意味です。IP は Pod の住所で、10.42. で始まります。NODE は、動いているノードです。",
       "trouble": [
         {
@@ -635,7 +635,7 @@
           "text": "Pod の詳しい説明のうち、Events の行から後ろだけを出す"
         }
       ],
-      "output": "@@",
+      "output": "Events:\n  Type    Reason     Age   From               Message\n  ----    ------     ----  ----               -------\n  Normal  Scheduled  9s    default-scheduler  Successfully assigned first-k3s/web to kcna\n  Normal  Pulling    9s    kubelet            spec.containers{web}: Pulling image \"nginx:1.27-alpine\"\n  Normal  Pulled     1s    kubelet            spec.containers{web}: Successfully pulled image \"nginx:1.27-alpine\" in 8.154s (8.154s including waiting). Image size: 20984244 bytes.\n  Normal  Created    1s    kubelet            spec.containers{web}: Container created\n  Normal  Started    0s    kubelet            spec.containers{web}: Container started",
       "read": "Scheduled (置くノードが決まった)、Pulling (イメージを取る)、Pulled (取れた)、Created (コンテナを作った)、Started (始めた) の順です。From の列は、誰がしたかです。置き場所を決めるのは scheduler、動かすのは kubelet です。イメージを前に取っていると、Pulling の行は出ず、already present と出ます。",
       "trouble": [
         {
@@ -686,7 +686,7 @@
           "text": "仮想マシンから見た nginx のプロセス"
         }
       ],
-      "output": "@@",
+      "output": "PRETTY_NAME=\"Alpine Linux v3.21\"\nPRETTY_NAME=\"Ubuntu 24.04.5 LTS\"\n6.8.0-147-generic\n6.8.0-147-generic\nPID   USER     TIME  COMMAND\n    1 root      0:00 nginx: master process nginx -g daemon off;\n   30 nginx     0:00 nginx: worker process\n   31 nginx     0:00 nginx: worker process\n   44 root      0:00 ps\n    PID USER     COMMAND\n   4263 root     nginx: master process nginx -g daemon off;\n   4324 message+ nginx: worker process\n   4325 message+ nginx: worker process",
       "read": "OS の名前は Alpine と Ubuntu で違います (ファイルが別)。カーネルの版は同じです (カーネルは共通)。同じ nginx でも、中からは 1 番、仮想マシンからは別の番号に見えます (プロセスの見え方が別)。仮想マシンの側の利用者の名前が変わって見えるのは、同じ番号に、別の名前が付いているためです。",
       "trouble": [
         {
@@ -717,7 +717,7 @@
           "text": "web のコンテナの記録を、最後の 5 行だけ出す"
         }
       ],
-      "output": "@@",
+      "output": "2026/11/25 02:19:22 [notice] 1#1: OS: Linux 6.8.0-147-generic\n2026/11/25 02:19:22 [notice] 1#1: getrlimit(RLIMIT_NOFILE): 1048576:1048576\n2026/11/25 02:19:22 [notice] 1#1: start worker processes\n2026/11/25 02:19:22 [notice] 1#1: start worker process 30\n2026/11/25 02:19:22 [notice] 1#1: start worker process 31",
       "read": "start worker process は、nginx が働くプロセスを始めたという記録です。",
       "trouble": [
         {
@@ -756,7 +756,7 @@
           "text": "その住所からページを取り、title の行だけを出す"
         }
       ],
-      "output": "@@",
+      "output": "10.42.0.9\n<title>Welcome to nginx!</title>",
       "read": "Welcome to nginx! が返れば、Pod が返事をしています。この住所は、クラスターの中だけで通じます。ホストのブラウザでは開けません。",
       "trouble": [
         {
@@ -799,7 +799,7 @@
           "text": "bad を消す"
         }
       ],
-      "output": "@@",
+      "output": "pod/bad created\npod/bad condition met\nREASON   MESSAGE\nFailed   Failed to pull image \"nginx:no-such-tag\": rpc error: code = NotFound desc = failed to pull and unpack image \"docker.io/library/nginx:no-such-tag\": failed to resolve reference \"docker.io/library/nginx:no-such-tag\": docker.io/library/nginx:no-such-tag: not found\nFailed   Error: ErrImagePull\nFailed   Error: ImagePullBackOff\npod \"bad\" deleted from first-k3s namespace",
       "read": "Failed to pull image の行の最後に、not found と読めます。名前かタグが間違っている、という意味です。STATUS は ErrImagePull と、しばらく待つ ImagePullBackOff を行き来します。直し方は、正しいタグで作り直すことです。",
       "trouble": [
         {
@@ -843,7 +843,7 @@
           "text": "仮想マシンから見た nginx のプロセスを出す"
         }
       ],
-      "output": "@@",
+      "output": "pod \"web\" deleted from first-k3s namespace\nNo resources found in first-k3s namespace.\n    PID TTY          TIME CMD",
       "read": "No resources found と出て、nginx のプロセスも見出しだけになります。",
       "trouble": [
         {
@@ -886,7 +886,7 @@
           "text": "ページを取る"
         }
       ],
-      "output": "@@",
+      "output": "pod/keep created\npod/keep condition met\n<title>Welcome to nginx!</title>",
       "read": "イメージは前に取ってあるので、今度は早く動きます。",
       "trouble": [
         {
@@ -917,7 +917,7 @@
           "text": "k3s を止めるよう頼む。< /dev/null は、パスワードを聞かれても何も入力しないようにする書き方"
         }
       ],
-      "output": "@@",
+      "output": "Failed to stop k3s.service: Interactive authentication required.\nSee system logs and 'systemctl status k3s.service' for details.",
       "read": "Interactive authentication required は「本人か確かめないとできない」という意味です。k3s は止まっていません。",
       "trouble": [
         {
@@ -959,7 +959,7 @@
           "text": "Pod に、ページを取りに行く"
         }
       ],
-      "output": "@@",
+      "output": "inactive\nThe connection to the server 127.0.0.1:6443 was refused - did you specify the right host or port?\n    PID TTY          TIME CMD\n<title>Welcome to nginx!</title>",
       "read": "is-active は inactive です。kubectl は API サーバーにつなげず、refused と断られます。k3s が始めた containerd も止まります。それでも、最後の curl は返事をもらえます。k3s の文書のとおり、k3s を止めても Pod のコンテナは動き続けます。",
       "trouble": [
         {
@@ -998,7 +998,7 @@
           "text": "Pod の一覧を出す"
         }
       ],
-      "output": "@@",
+      "output": "active\nNAME   READY   STATUS    RESTARTS   AGE\nkeep   1/1     Running   0          16s",
       "read": "RESTARTS が 0 のままなら、コンテナは止まらずに続いていました。AGE も続きから数えています。",
       "trouble": [
         {
@@ -1033,7 +1033,7 @@
           "text": "マシンを再起動する"
         }
       ],
-      "output": "@@",
+      "output": "2026-11-25 02:16:45",
       "read": "出た時刻を覚えておきます。reboot のあと、端末が切れて、ホストの行の頭に戻ります。",
       "trouble": [
         {
@@ -1084,7 +1084,7 @@
           "text": "Pod の一覧を出す"
         }
       ],
-      "output": "@@",
+      "output": "2026-11-25 02:19:55\nactive\npod/keep condition met\npod/keep condition met\nNAME   READY   STATUS    RESTARTS      AGE\nkeep   1/1     Running   1 (56s ago)   73s",
       "read": "時刻が新しくなり、k3s は active です。RESTARTS は 1 です。マシンごと止まるとコンテナも止まるので、kubelet が同じ Pod のコンテナを始め直しました。直後は、止まる前の古い状態 (RESTARTS 0 の Running) がしばらく見えることがあります。",
       "trouble": [
         {
@@ -1128,7 +1128,7 @@
           "text": "消える前の Pod を出す"
         }
       ],
-      "output": "@@",
+      "output": "crictl\nctr\nk3s\nk3s-killall.sh\nk3s-uninstall.sh\nkubectl\n/etc/rancher:\nk3s\nnode\n\n/var/lib/rancher:\nk3s\nNAME   READY   STATUS    RESTARTS      AGE\nkeep   1/1     Running   1 (57s ago)   74s",
       "read": "k3s-uninstall.sh が、消すためのスクリプトです。k3s-killall.sh は、k3s と Pod を全部止めるスクリプトです。",
       "trouble": [
         {
@@ -1158,7 +1158,7 @@
           "text": "そのファイルの、最後の 2 行を出す"
         }
       ],
-      "output": "@@",
+      "output": "+ remove_uninstall\n+ rm -f /usr/local/bin/k3s-uninstall.sh",
       "read": "最後に、スクリプトが自分自身を消しています (rm -f /usr/local/bin/k3s-uninstall.sh)。+ で始まる行は、スクリプトが打ったコマンドです。",
       "trouble": [
         {
@@ -1213,7 +1213,7 @@
           "text": "kubectl を打つ"
         }
       ],
-      "output": "@@",
+      "output": "inactive\n    PID TTY          TIME CMD\n/etc/rancher:\nnode\n\n/var/lib/rancher:\n/home/ubuntu/.kube/k3s.yaml\nexport KUBECONFIG=~/.kube/k3s.yaml\nbash: /usr/local/bin/kubectl: No such file or directory",
       "read": "1 つ目の ls は何も出ません。コマンド・サービス・Pod・クラスターの記録が消えました。残ったのは、自分で作った ~/.kube/k3s.yaml と ~/.bashrc の行です。公式の文書は、ノードの設定も消えると書いていますが、この版の実機では /etc/rancher/node (ノードの合言葉) と、空の /var/lib/rancher が残りました。",
       "trouble": [
         {
@@ -1248,7 +1248,7 @@
           "text": "動いているかを出す"
         }
       ],
-      "output": "@@",
+      "output": "[INFO]  Using v1.36.6+k3s1 as release\n[INFO]  Downloading hash https://github.com/k3s-io/k3s/releases/download/v1.36.6%2Bk3s1/sha256sum-amd64.txt\n[INFO]  Downloading binary https://github.com/k3s-io/k3s/releases/download/v1.36.6%2Bk3s1/k3s\n[INFO]  Verifying binary download\n[INFO]  Installing k3s to /usr/local/bin/k3s\n[INFO]  Skipping installation of SELinux RPM\n[INFO]  Creating /usr/local/bin/kubectl symlink to k3s\n[INFO]  Creating /usr/local/bin/crictl symlink to k3s\n[INFO]  Creating /usr/local/bin/ctr symlink to k3s\n[INFO]  Creating killall script /usr/local/bin/k3s-killall.sh\n[INFO]  Creating uninstall script /usr/local/bin/k3s-uninstall.sh\n[INFO]  env: Creating environment file /etc/systemd/system/k3s.service.env\n[INFO]  systemd: Creating service file /etc/systemd/system/k3s.service\n[INFO]  systemd: Enabling k3s unit\nCreated symlink /etc/systemd/system/multi-user.target.wants/k3s.service → /etc/systemd/system/k3s.service.\n[INFO]  systemd: Starting k3s\nactive",
       "read": "最後に active と出れば、動いています。",
       "trouble": [
         {
@@ -1279,7 +1279,7 @@
           "text": "ノードの一覧を頼む"
         }
       ],
-      "output": "@@",
+      "output": "Unable to connect to the server: tls: failed to verify certificate: x509: certificate signed by unknown authority",
       "read": "certificate signed by unknown authority は「知らない発行元の証明書だ」です。つなぐ先は同じでも、写しの中の発行元が、前のクラスターのものだからです。",
       "trouble": [
         {
@@ -1334,7 +1334,7 @@
           "text": "名前空間の一覧を出す"
         }
       ],
-      "output": "@@",
+      "output": "node/kcna condition met\nnode/kcna condition met\nNAME   STATUS   ROLES    AGE   VERSION\nkcna   Ready    <none>   1s    v1.36.6+k3s1\nNAME              STATUS   AGE\ndefault           Active   3s\nkube-node-lease   Active   3s\nkube-public       Active   4s\nkube-system       Active   4s",
       "read": "ノードは Ready、版は v1.36.6+k3s1 です。first-k3s はありません。前のクラスターの記録ごと消えたためです。",
       "trouble": [
         {
@@ -1377,7 +1377,7 @@
           "text": "全部の名前空間の Pod を出す (-A)"
         }
       ],
-      "output": "@@",
+      "output": "deployment.apps/traefik condition met\njob.batch/helm-install-traefik condition met\njob.batch/helm-install-traefik-crd condition met\ndeployment \"coredns\" successfully rolled out\ndeployment \"local-path-provisioner\" successfully rolled out\ndeployment \"metrics-server\" successfully rolled out\nWaiting for deployment \"traefik\" rollout to finish: 0 of 1 updated replicas are available...\ndeployment \"traefik\" successfully rolled out\nNAMESPACE     NAME                                      READY   STATUS      RESTARTS      AGE\nkube-system   coredns-7cfb7bc9c7-8jphh                  1/1     Running     0             75s\nkube-system   helm-install-traefik-crd-ddckn            0/1     Completed   0             75s\nkube-system   helm-install-traefik-nwdtl                0/1     Completed   2 (44s ago)   75s\nkube-system   local-path-provisioner-5598c9cb4c-zjc5l   1/1     Running     0             75s\nkube-system   metrics-server-6dc596dfb8-xkkk7           1/1     Running     0             75s\nkube-system   svclb-traefik-4e0d19f6-xrfxw              2/2     Running     0             29s\nkube-system   traefik-7c8677d4d9-l9hgk                  1/1     Running     0             29s",
       "read": "kube-system の Pod だけが並び、Running か Completed になれば準備完了です。",
       "trouble": [
         {
@@ -1488,7 +1488,7 @@
           "text": "名前空間の一覧を出す"
         }
       ],
-      "output": "@@",
+      "output": "namespace \"practice\" deleted\nNAME              STATUS   AGE\ndefault           Active   107s\nkube-node-lease   Active   107s\nkube-public       Active   108s\nkube-system       Active   108s",
       "read": "default と kube- で始まる 4 つだけになれば、片付いています。k3s は消しません。",
       "trouble": [
         {
@@ -1523,7 +1523,7 @@
           "text": "ホームの中身を出す"
         }
       ],
-      "output": "@@",
+      "output": "practice\nwork",
       "read": "uninstall.log が無ければ消えています。0 章で作ったものは残ります。",
       "trouble": [
         {

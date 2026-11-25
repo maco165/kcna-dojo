@@ -399,7 +399,7 @@
           "text": "自分のホーム (/home/ubuntu) へ戻る"
         }
       ],
-      "output": "total 4\n-rw-rw-r-- 1 ubuntu ubuntu 6 Nov 25 01:47 memo.txt\nhello",
+      "output": "total 4\n-rw-rw-r-- 1 ubuntu ubuntu 6 Nov 25 02:17 memo.txt\nhello",
       "read": "-rw で始まる行が memo.txt です。左から、権限・数・持ち主・グループ・大きさ・日時・名前です。total は、ディスクで使う量です。最後の行の hello がファイルの中身です。",
       "trouble": [
         {
@@ -504,7 +504,7 @@
           "text": "いちばん上のフォルダ / が載っているディスクの大きさと空きを出す"
         }
       ],
-      "output": "2\n               total        used        free      shared  buff/cache   available\nMem:           1.9Gi       322Mi       1.4Gi       1.0Mi       321Mi       1.6Gi\nSwap:             0B          0B          0B\nFilesystem      Size  Used Avail Use% Mounted on\n/dev/vda1        19G  1.7G   17G   9% /",
+      "output": "2\n               total        used        free      shared  buff/cache   available\nMem:           1.9Gi       367Mi       1.4Gi       1.0Mi       321Mi       1.6Gi\nSwap:             0B          0B          0B\nFilesystem      Size  Used Avail Use% Mounted on\n/dev/vda1        19G  1.7G   17G   9% /",
       "read": "コアは 2、Mem の total は 1.9Gi です。Linux のカーネルが使う分が引かれるので、2G と書いても少し小さく出ます。available が、これから使える量です。ディスクは Size が 20G より少し小さく、Avail の列が空きです。",
       "trouble": [
         {
@@ -543,7 +543,7 @@
           "text": "そのファイルを読もうとする"
         }
       ],
-      "output": "1000\n-rw-r----- 1 root shadow 842 Nov 25 01:46 /etc/shadow\ncat: /etc/shadow: Permission denied",
+      "output": "1000\n-rw-r----- 1 root shadow 842 Nov 25 02:16 /etc/shadow\ncat: /etc/shadow: Permission denied",
       "read": "自分の番号は 1000 です。-rw-r----- は、持ち主 (root) は読み書き、グループ (shadow) は読むだけ、ほかの人は何もできないという意味です。そのため Permission denied (許可が無い) と断られます。",
       "trouble": [
         {
