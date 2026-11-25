@@ -52,7 +52,8 @@ export const COLOR_MODES: readonly ColorMode[] = ['system', 'light', 'dark'];
  * 受験日 (examDate) は利用者が決めるまで持たない (決めていない人に試験までの日数を出さない)。
  * 学習の開始日 (startDate) は週の日付を数える起点で、決めていなければ初めて学んだ日 (planStart)
  */
-export type Profile = { dailyGoalXp: number; examDate?: string; startDate?: string; colorMode?: ColorMode; weeklyDays?: number };
+export type Profile = { dailyGoalXp: number; examDate?: string; startDate?: string; colorMode?: ColorMode; weeklyDays?: number; /** 実践の章で手順を出し分ける OS */ os?: 'windows' | 'mac' | 'linux' };
+const OS_VALUES = ['windows', 'mac', 'linux'];
 
 /** 週の目標 (週に何日学ぶか) に選べる値。既定は決めない (無ければホームに出さない) */
 export const WEEKLY_DAY_CHOICES = [1, 2, 3, 4, 5, 6, 7] as const;
@@ -70,6 +71,12 @@ export const MAX_EXAM_RECORDS = 20;
 export type HandbookRecord = { seen: number; done?: boolean; at: string };
 
 /**
+ * 実践の章ごとの記録。steps は印を付けた手順の id、done は完了。redo は、完了したあと印を消してもう一度やっている途中
+ * (旧い実習と同じく、もう一度全部やれば XP が入る。押し直しただけでは入らない)
+ */
+export type HandsOnRecord = { steps: string[]; done?: true; redo?: true; at: string };
+
+/**
  * 連続日数。freezes は休みの札の数 (0〜MAX_FREEZES)、toNext は次の札まで学んだ日の数 (0〜6)、
  * used は札を使った日 (古い順に最大 MAX_USED 件)。札の欄が無い前の版の記録は 0 個から数える
  */
@@ -84,6 +91,8 @@ export const MAX_USED = 14;
 export type Progress = {
   v: 1;
   handbook?: Record<string, HandbookRecord>;
+  /** 実践の章の記録。前の版の記録には無い */
+  handsOn?: Record<string, HandsOnRecord>;
   profile?: Profile;
   exams?: ExamRecord[];
   streak: Streak;
@@ -144,9 +153,10 @@ function unknownFields(raw: Record<string, unknown>, known: readonly string[]): 
 }
 
 const KNOWN = {
-  top: ['v', 'handbook', 'profile', 'exams', 'streak', 'xp', 'lessons', 'answers', 'solved'],
+  top: ['v', 'handbook', 'handsOn', 'profile', 'exams', 'streak', 'xp', 'lessons', 'answers', 'solved'],
   streak: ['count', 'lastDay', 'freezes', 'toNext', 'used'],
-  profile: ['dailyGoalXp', 'examDate', 'startDate', 'colorMode', 'weeklyDays'],
+  profile: ['dailyGoalXp', 'examDate', 'startDate', 'colorMode', 'weeklyDays', 'os'],
+  handsOn: ['steps', 'done', 'redo', 'at'],
   answer: ['right', 'wrong', 'last', 'stage', 'nextReview', 'run'],
 } as const;
 
@@ -222,6 +232,13 @@ export function normalizeProgress(raw: unknown): Progress | null {
   );
   for (const k of Object.keys(handbook)) if (!/^[a-z0-9-]+$/.test(k)) delete handbook[k];
   if (Object.keys(handbook).length > 0) out.handbook = handbook;
+  const handsOn = cleanRecords(raw.handsOn, (v): HandsOnRecord | null => {
+    const steps = Array.isArray(v.steps) ? [...new Set(v.steps.filter((s): s is string => typeof s === 'string' && /^[a-z0-9-]+$/.test(s)))] : [];
+    if (steps.length === 0 && v.done !== true) return null;
+    return { ...(unknownFields(v, KNOWN.handsOn) as object), steps, ...(v.done === true ? { done: true as const, ...(v.redo === true ? { redo: true as const } : {}) } : {}), at: typeof v.at === 'string' ? v.at : '' };
+  });
+  for (const k of Object.keys(handsOn)) if (!/^[a-z0-9-]+$/.test(k)) delete handsOn[k];
+  if (Object.keys(handsOn).length > 0) out.handsOn = handsOn;
   if (profile) {
     out.profile = {
       ...(unknownFields(profile, KNOWN.profile) as object),
@@ -231,6 +248,7 @@ export function normalizeProgress(raw: unknown): Progress | null {
     if (isValidDay(profile.examDate)) out.profile.examDate = profile.examDate;
     if (isValidDay(profile.startDate)) out.profile.startDate = profile.startDate;
     if ((WEEKLY_DAY_CHOICES as readonly unknown[]).includes(profile.weeklyDays)) out.profile.weeklyDays = profile.weeklyDays as number;
+    if (OS_VALUES.includes(profile.os as string)) out.profile.os = profile.os as Profile['os'];
     if ((COLOR_MODES as readonly unknown[]).includes(profile.colorMode) && profile.colorMode !== 'system') out.profile.colorMode = profile.colorMode as ColorMode;
   }
   return out;
@@ -381,6 +399,29 @@ function addActivity(p: Progress, xpGained: number, now: Date): Progress {
   };
 }
 
+/** 実践の章の手順に印を付ける・外す (完了した章は、印を外しても完了のまま) */
+export function markHandsOnStep(p: Progress, chapterId: string, stepId: string, on: boolean, now: Date): Progress {
+  const cur = p.handsOn?.[chapterId] ?? { steps: [], at: '' };
+  const steps = cur.steps.filter((s) => s !== stepId);
+  if (on) steps.push(stepId);
+  return { ...p, handsOn: { ...p.handsOn, [chapterId]: { ...cur, steps, at: now.toISOString() } } };
+}
+
+/** 実践の章を終えた: 完了を残し、XP を足し、連続日数を進める。もう一度やっている途中でなければ、2 回目の XP は足さない */
+export function completeHandsOn(p: Progress, chapterId: string, xpGained: number, now: Date): Progress {
+  const cur = p.handsOn?.[chapterId] ?? { steps: [], at: '' };
+  if (cur.done && !cur.redo) return p;
+  const { redo: _redo, ...kept } = cur;
+  return { ...addActivity(p, xpGained, now), handsOn: { ...p.handsOn, [chapterId]: { ...kept, done: true, at: now.toISOString() } } };
+}
+
+/** 完了した章の印を消して、もう一度やる (完了は残す) */
+export function restartHandsOn(p: Progress, chapterId: string, now: Date): Progress {
+  const cur = p.handsOn?.[chapterId];
+  if (!cur?.done) return p;
+  return { ...p, handsOn: { ...p.handsOn, [chapterId]: { ...cur, steps: [], redo: true, at: now.toISOString() } } };
+}
+
 /** 今日の復習を終えた: XP を足し、連続日数を進める (レッスンの完了は付けない) */
 export function completeReview(p: Progress, xpGained: number, now: Date): Progress {
   return addActivity(p, xpGained, now);
@@ -445,7 +486,7 @@ export function daysToExam(p: Progress, now: Date): number | null {
   return d ? daysBetween(dayKey(now), d) : null;
 }
 
-/** 初めて学んだ日 (XP・レッスン・答え・模擬試験・ハンドブックの記録のいちばん古い日)。記録が無ければ null */
+/** 初めて学んだ日 (XP・レッスン・答え・模擬試験・ハンドブック・実践の記録のいちばん古い日)。記録が無ければ null */
 export function firstStudyDay(p: Progress): string | null {
   const days: string[] = Object.keys(p.xp.byDay);
   const fromIso = (iso: string) => {
@@ -456,6 +497,7 @@ export function firstStudyDay(p: Progress): string | null {
   for (const a of Object.values(p.answers)) fromIso(a.last);
   for (const e of p.exams ?? []) fromIso(e.at);
   for (const h of Object.values(p.handbook ?? {})) fromIso(h.at);
+  for (const h of Object.values(p.handsOn ?? {})) fromIso(h.at);
   return days.length > 0 ? days.sort()[0] : null;
 }
 
@@ -491,6 +533,7 @@ export function setProfile(p: Progress, change: Partial<Profile>): Progress {
   if (!next.examDate) delete next.examDate;
   if (!next.startDate) delete next.startDate;
   if (!next.weeklyDays) delete next.weeklyDays;
+  if (!next.os) delete next.os;
   return { ...p, profile: next };
 }
 
@@ -509,7 +552,7 @@ export function setHandbookDone(p: Progress, topicId: string, done: boolean, now
   return { ...p, handbook: { ...p.handbook, [topicId]: next } };
 }
 
-/** 記録を消す。目標・受験日・開始日・画面の色の設定は残す */
+/** 記録を消す。目標・受験日・開始日・画面の色・実践の OS の設定は残す */
 export function resetProgress(p: Progress): Progress {
   const next = emptyProgress();
   if (p.profile) next.profile = { ...p.profile };

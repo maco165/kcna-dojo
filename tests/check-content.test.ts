@@ -5,11 +5,12 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const SCRIPT = join(__dirname, '../scripts/check-content.mjs');
+const CHAPTER = join(__dirname, 'fixtures/hands-on/sample.json');
 const WEEK1 = join(__dirname, '../src/content/week1.json');
 
-function run(file?: string): { code: number; out: string } {
+function run(...args: string[]): { code: number; out: string } {
   try {
-    const out = execFileSync('node', [SCRIPT, ...(file ? [file] : [])], { encoding: 'utf8' });
+    const out = execFileSync('node', [SCRIPT, ...args], { encoding: 'utf8' });
     return { code: 0, out };
   } catch (e) {
     const err = e as { status: number; stdout: string };
@@ -17,8 +18,8 @@ function run(file?: string): { code: number; out: string } {
   }
 }
 
-function mutate(name: string, fn: (d: any) => void, sub?: string): string {
-  const data = JSON.parse(readFileSync(WEEK1, 'utf8'));
+function mutate(name: string, fn: (d: any) => void, sub?: string, from = WEEK1): string {
+  const data = JSON.parse(readFileSync(from, 'utf8'));
   fn(data);
   const dir = join(mkdtempSync(join(tmpdir(), 'kcna-content-')), sub ?? '');
   mkdirSync(dir, { recursive: true });
@@ -117,5 +118,59 @@ describe('check-content', { timeout: 30_000 }, () => {
     const r = run(mutate('three-questions', (d) => (d.lessons[0].questions = d.lessons[0].questions.slice(0, 3))));
     expect(r.code).toBe(1);
     expect(r.out).toMatch(/w1-l1: questions は 5 問以上要ります \(3 問\)/);
+  });
+});
+
+describe('check-content: 実践の章', { timeout: 120_000 }, () => {
+  const chapter = (name: string, fn: (d: any) => void) => mutate(name, fn, 'hands-on', CHAPTER);
+  /** code のある手順 (見本の 4 つ目) */
+  const step = (d: any) => d.steps[3];
+
+  it('全部の欄を持つ見本は OK', () => {
+    const r = run(CHAPTER);
+    expect(r.out).toContain('OK');
+    expect(r.code).toBe(0);
+  });
+
+  // [名前, 変異, 出るはずの理由]
+  const cases: [string, (d: any) => void, RegExp][] = [
+    ...['id', 'title', 'summary', 'goal', 'features', 'minutes', 'needs', 'reads', 'steps', 'cleanup', 'challenges', 'sources', 'order'].map((k): [string, (d: any) => void, RegExp] => [`章の ${k} が無い`, (d) => delete d[k], new RegExp(k)]),
+    ...['id', 'text', 'why', 'lines', 'output', 'read', 'trouble', 'source'].map((k): [string, (d: any) => void, RegExp] => [`手順の ${k} が無い`, (d) => delete step(d)[k], new RegExp(`steps\\[3\\].*${k}`)]),
+    ...['symptom', 'check', 'fix'].map((k): [string, (d: any) => void, RegExp] => [`trouble の ${k} が無い`, (d) => delete step(d).trouble[0][k], new RegExp(`trouble\\[0\\] に ${k}`)]),
+    ...['task', 'hint', 'answer', 'verify'].map((k): [string, (d: any) => void, RegExp] => [`課題の ${k} が無い`, (d) => delete d.challenges[0][k], new RegExp(`challenges\\[0\\] に ${k}`)]),
+    ['trouble が 0 件', (d) => (step(d).trouble = []), /trouble/],
+    ['code の文が無い', (d) => delete step(d).code.text, /code は language/],
+    ['知らない言語', (d) => (step(d).code.language = 'ruby'), /code は language/],
+    ['lines が 1 行足りない', (d) => step(d).lines.pop(), /lines は code の全部の行/],
+    ['lines の並びが違う', (d) => step(d).lines.reverse(), /lines は code の全部の行/],
+    ['lines に意味が無い', (d) => (step(d).lines[0].text = ''), /lines は code の全部の行/],
+    ['手順の id が重複', (d) => (d.cleanup[0].id = d.steps[0].id), /id check-memory が章の中で重複/],
+    ['手順の出典が http', (d) => (step(d).source = 'http://example.com/'), /source/],
+    ['章の出典が http', (d) => (d.sources[0].url = 'http://example.com/'), /sources\[0\]/],
+    ['無いトピック', (d) => (d.reads[0].topic = 'no-such'), /no-such というハンドブックのトピックはありません/],
+    ['知らない OS', (d) => (step(d).os = 'bsd'), /os は/],
+    ['知らない端末', (d) => (step(d).where = 'cloud'), /where は/],
+    ['空の unverified では output を省けない', (d) => { delete step(d).output; step(d).unverified = ' '; }, /unverified は空でない/],
+    ['知らない欄 (つづりの間違い)', (d) => (step(d).outputs = 'x'), /outputs という欄は使いません/],
+    ['code の無い手順に output', (d) => (d.steps[0].output = 'x'), /code のある手順にだけ/],
+    ['長い題名に short が無い', (d) => (d.title = 'あ'.repeat(36)), /short/],
+    ['後片付けの手順も同じ検査', (d) => (d.cleanup[0].code = { language: 'bash', text: 'exit' }), /cleanup\[0\].*lines/],
+  ];
+  it.each(cases)('%s と NG', (_, fn, why) => {
+    const r = run(chapter('broken', fn));
+    expect(r.code).toBe(1);
+    expect(r.out).toMatch(why);
+  });
+
+  it('unverified があれば output を省ける', () => {
+    const file = chapter('unverified', (d) => { delete step(d).output; step(d).unverified = '実機では確かめていません'; });
+    expect(run(file)).toMatchObject({ code: 0 });
+  });
+
+  it('章の id と番号は、ほかの章と重ねない', () => {
+    const r = run(CHAPTER, chapter('same', () => {}));
+    expect(r.out).toMatch(/sample: id が重複しています/);
+    expect(r.out).toMatch(/order 0 が重複しています/);
+    expect(run(CHAPTER, chapter('other', (d) => { d.id = 'other'; d.order = 1; })).code).toBe(0);
   });
 });
