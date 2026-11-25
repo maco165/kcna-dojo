@@ -992,6 +992,29 @@ async function run(browser, name, width, height) {
     check((await page.locator('h1').innerText()).trim() === 'chmod' && (await page.locator('a[href="/kcna-dojo/handbook/setup-k3s/"]').count()) >= 1, `${tag} コマンドのページへ移り、k3s の入れ方へ戻れる`);
   }
 
+  // 15. 畳んだ意味: その段のコードの行だけを持ち、開くと吹き出しが出て、閉じると消える
+  {
+    await page.goto(`${BASE}handbook/administration/`);
+    await page.locator('.hb-lines').first().waitFor();
+    const off = await page.locator('.hb-step').evaluateAll((els) =>
+      els.flatMap((el) => {
+        const code = (el.querySelector('pre')?.textContent ?? el.textContent ?? '').replace(/\u200b/g, '');
+        return [...el.querySelectorAll('.hb-lines dt')].map((d) => d.textContent).filter((t) => !el.textContent.replace(/\u200b/g, '').split('コマンドの意味')[0].includes(t) && !code.includes(t));
+      }),
+    );
+    check(off.length === 0, `${tag} コマンドの意味は、その段のコードの行 (${off.slice(0, 3).join(' / ')})`);
+    const folded = page.locator('.hb-try[open] details.hb-lines').first();
+    await page.locator('.hb-try:not([open]) > summary').first().click();
+    await folded.locator('summary').scrollIntoViewIfNeeded();
+    check((await folded.locator('summary').boundingBox()).height >= 24, `${tag} 畳んだ意味の見出しの高さは 24px 以上`);
+    await folded.locator('summary').click();
+    await folded.locator('a.hb-cmd').first().hover();
+    await page.locator('.term-tip').waitFor();
+    await folded.locator('summary').click();
+    await page.waitForTimeout(400);
+    check((await page.locator('.term-tip').count()) === 0 && !(await folded.evaluate((el) => el.open)), `${tag} 畳んだ意味を開くと吹き出しが出て、閉じると消える`);
+  }
+
   // 15a. 用語の短い意味の吹き出し: カーソルとフォーカスで出る・Esc で消える・吹き出しへカーソルを移せる・はみ出さない
   {
     await page.goto(`${BASE}handbook/core-concepts/`);

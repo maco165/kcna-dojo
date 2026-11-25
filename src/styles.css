@@ -2385,6 +2385,8 @@ body {
 }
 
 .hb-lines > summary {
+  margin: -10px 0;
+  padding: 10px 0;
   cursor: pointer;
   font-weight: 600;
 }

@@ -8,18 +8,29 @@ function dropComment(line: string): string {
   let quote = '';
   for (let i = 0; i < line.length; i += 1) {
     const ch = line[i];
-    if (quote) quote = ch === quote ? '' : quote;
+    if (ch === '\\' && quote !== "'") i += 1;
+    else if (quote) quote = ch === quote ? '' : quote;
     else if (ch === "'" || ch === '"') quote = ch;
     else if (ch === '#' && (i === 0 || /\s/.test(line[i - 1]))) return line.slice(0, i).trimEnd();
   }
   return line.trimEnd();
 }
 
-/** コードを、打つコマンドの行に分ける。コメントと空の行、ヒアドキュメント (<<EOF) の中身は除く */
+/** ヒアドキュメント (<<EOF) の終わりの語。引用符の中・<<< (ヒアストリング)・$(( )) の中の << は除く */
+function hereDocEnd(line: string): string | null {
+  const bare = line.replace(/\$\(\(.*?\)\)/g, '').replace(/<<</g, '');
+  for (const m of bare.matchAll(/<<-?\s*(?:'([\w-]+)'|"([\w-]+)"|([\w-]+))/g)) {
+    const before = bare.slice(0, m.index).replace(/\\./g, '').replace(/'[^']*'/g, '').replace(/"[^"]*"/g, '');
+    if (!/['"]/.test(before)) return m[1] ?? m[2] ?? m[3];
+  }
+  return null;
+}
+
+/** コードを、打つコマンドの行に分ける。行末の \ は次の行とつなぐ。コメントと空の行、ヒアドキュメント (<<EOF) の中身は除く */
 export function commandRows(code: string): string[] {
   const out: string[] = [];
   let end: string | null = null;
-  for (const raw of code.split('\n')) {
+  for (const raw of code.replace(/[ \t]*\\\n\s*/g, ' ').split('\n')) {
     if (end !== null) {
       if (raw.trim() === end) end = null;
       continue;
@@ -27,15 +38,24 @@ export function commandRows(code: string): string[] {
     const line = dropComment(raw).trim();
     if (!line) continue;
     out.push(line);
-    end = line.match(/<<-?\s*['"]?(\w+)['"]?/)?.[1] ?? null;
+    end = hereDocEnd(line);
   }
+  // 終わりが無いまま後ろの行を黙って捨てない
+  if (end !== null) throw new Error(`ヒアドキュメントの終わり ${end} がありません`);
   return out;
+}
+
+const sorted = new WeakMap<CommandBrief[], CommandBrief[]>();
+/** 長い名前を先に試す (kubectl create namespace を kubectl より先に)。並べ替えは一覧ごとに 1 回だけ */
+function byLength(commands: CommandBrief[]): CommandBrief[] {
+  const had = sorted.get(commands) ?? [...commands].sort((a, b) => b.command.length - a.command.length);
+  sorted.set(commands, had);
+  return had;
 }
 
 /** 行を切り分ける。見つからなかったコマンドの名前は unknown に入れる (検査で落とす) */
 export function linkShell(line: string, commands: CommandBrief[]): { pieces: ShellPiece[]; unknown: string[] } {
-  // 長い名前を先に試す (kubectl create namespace を kubectl より先に)
-  const names = [...commands].sort((a, b) => b.command.length - a.command.length);
+  const names = byLength(commands);
   const pieces: ShellPiece[] = [];
   const unknown: string[] = [];
   let plain = '';
@@ -44,6 +64,7 @@ export function linkShell(line: string, commands: CommandBrief[]): { pieces: She
   let head = true;
   // いま二重引用符の中か ($( ) に入るたびに積む。中の | や ; は文字だが、$( ) の中はコマンド)
   const inDouble: boolean[] = [false];
+  let inBacktick = false;
   while (i < line.length) {
     const rest = line.slice(i);
     if (head && /^\s/.test(rest)) {
@@ -68,9 +89,14 @@ export function linkShell(line: string, commands: CommandBrief[]): { pieces: She
     }
     const dq = inDouble[inDouble.length - 1];
     let take = rest[0];
-    if (rest.startsWith('$(') || rest[0] === '`') {
-      take = rest[0] === '`' ? '`' : '$(';
-      if (take === '$(') inDouble.push(false);
+    if (rest[0] === '\\') take = rest.slice(0, 2);
+    else if (rest[0] === '`') {
+      // 開くほうの後ろだけがコマンド
+      inBacktick = !inBacktick;
+      head = inBacktick;
+    } else if (rest.startsWith('$(')) {
+      take = '$(';
+      inDouble.push(false);
       head = true;
     } else if (rest[0] === '"') inDouble[inDouble.length - 1] = !dq;
     else if (!dq) {

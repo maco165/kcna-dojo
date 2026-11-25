@@ -27,11 +27,17 @@ describe('コマンドの行の中のコマンドをページへつなぐ', () =
     expect(ids('echo "a; cp b | sh"')).toEqual(['echo']);
     expect(ids('cp sh id')).toEqual(['cp']);
     expect(ids('cat a 2>&1 | grep b')).toEqual(['cat', 'grep']);
+    expect(ids('cp a `id -u` sh')).toEqual(['cp', 'id']);
+    expect(ids('echo "a \\"; cp b"')).toEqual(['echo']);
     expect(linkShell('cpx a', COMMAND_BRIEFS).unknown).toEqual(['cpx']);
     expect(linkShell('sh/x a', COMMAND_BRIEFS).unknown).toEqual(['sh/x']);
   });
   it('コードを打つ行に分ける (コメント・行末のコメント・ヒアドキュメントの中身は除く)', () => {
     expect(commandRows("# 説明\nkubectl get pods   # a; cp b\n\ncat > f <<'EOF'\nid\n# x\nEOF\necho 'a # b'")).toEqual(['kubectl get pods', "cat > f <<'EOF'", "echo 'a # b'"]);
+    expect(commandRows('grep a <<< foo\ncp a b\necho $((1<<2))\nid\necho "<<EOF"\nid -u')).toHaveLength(6);
+    expect(commandRows("cat <<'END-1'\nx\nEND-1\nid")).toEqual(["cat <<'END-1'", 'id']);
+    expect(commandRows('kubectl run a \\\n  --image=b\nid')).toEqual(['kubectl run a --image=b', 'id']);
+    expect(() => commandRows('cat <<EOF\nid')).toThrow(/終わり/);
   });
 });
 
