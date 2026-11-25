@@ -58,6 +58,10 @@ describe('コマンドの意味', () => {
       }
     expect(missing).toEqual([]);
   });
+  it('コマンド (bash) のあるトピックは、すべて意味を付け終えている', () => {
+    const left = HANDBOOK_TOPICS.filter((t) => !LINE_NOTE_TOPICS.has(t.id) && rowsOf(t).length > 0).map((t) => t.id);
+    expect(left).toEqual([]);
+  });
   it('使われない意味・2 つのファイルに同じ行が無い', async () => {
     const used = new Set(TOPICS.flatMap(rowsOf));
     expect([...LINE_NOTES.keys()].filter((k) => !used.has(k))).toEqual([]);
