@@ -14,6 +14,7 @@ export const COVERED_LABS: Record<string, readonly ChapterRef[]> = {
     { id: 'install-k3s', order: 1, title: 'k3s を入れて、最初のコンテナを動かす' },
     { id: 'self-healing', order: 3, title: '壊れても戻る仕組みを見る' },
   ],
+  'w4-lab': [{ id: 'scaling', order: 4, title: '増やす、減らす' }],
 };
 
 /** 初めに進める章。章は前の章で作った仮想マシンを使うので、週の画面から章へ送るときは先頭に置く */
