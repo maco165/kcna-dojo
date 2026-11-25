@@ -29,6 +29,9 @@ describe('コマンドの行の中のコマンドをページへつなぐ', () =
     expect(ids('cat a 2>&1 | grep b')).toEqual(['cat', 'grep']);
     expect(ids('cp a `id -u` sh')).toEqual(['cp', 'id']);
     expect(ids('echo "a \\"; cp b"')).toEqual(['echo']);
+    expect(ids('curl a | K3S_URL=https://x:6443 K3S_TOKEN=t sh -')).toEqual(['curl', 'sh']);
+    for (const l of ['A="$(id) x" cp b', 'A=$(id -u) cp b', 'A=a\\ cp b', 'A=(cp id)']) expect(linkShell(l, COMMAND_BRIEFS).unknown.length, l).toBeGreaterThan(0);
+    expect(ids('A="a\\" cp b" id')).toEqual(['id']);
     expect(linkShell('cpx a', COMMAND_BRIEFS).unknown).toEqual(['cpx']);
     expect(linkShell('sh/x a', COMMAND_BRIEFS).unknown).toEqual(['sh/x']);
   });
@@ -39,6 +42,10 @@ describe('コマンドの行の中のコマンドをページへつなぐ', () =
     expect(commandRows('kubectl run a \\\n  --image=b\nid')).toEqual(['kubectl run a --image=b', 'id']);
     expect(commandRows('echo a # c \\\nid')).toEqual(['echo a', 'id']);
     expect(commandRows('cat <<EOF\nfoo \\\nEOF\nid')).toEqual(['cat <<EOF', 'id']);
+    expect(commandRows('echo "a \\\n # b"\nid')).toEqual(['echo "a # b"', 'id']);
+    expect(commandRows('echo a \\ # c\nid')).toEqual(['echo a \\', 'id']);
+    expect(commandRows('echo a\\\\\nid')).toEqual(['echo a\\\\', 'id']);
+    expect(commandRows('echo a \\\n\nid')).toEqual(['echo a', 'id']);
     expect(() => commandRows('cat <<EOF\nid')).toThrow(/終わり/);
   });
 });
@@ -56,6 +63,10 @@ describe('コマンドの意味', () => {
         for (const p of pieces) if (typeof p !== 'string' && !findCommandPage(p.id)) missing.push(`${p.id} のページが無い`);
       }
     expect(missing).toEqual([]);
+  });
+  it('コマンド (bash) のあるトピックは、すべて意味を付け終えている', () => {
+    const left = HANDBOOK_TOPICS.filter((t) => !LINE_NOTE_TOPICS.has(t.id) && rowsOf(t).length > 0).map((t) => t.id);
+    expect(left).toEqual([]);
   });
   it('使われない意味・2 つのファイルに同じ行が無い', async () => {
     const used = new Set(TOPICS.flatMap(rowsOf));

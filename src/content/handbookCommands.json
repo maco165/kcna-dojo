@@ -45,8 +45,16 @@
         "label": "コンテナ化: イメージ・ランタイム・CRI"
       },
       {
+        "topic": "k3s-vs-kubernetes",
+        "label": "k3s と Kubernetes (upstream) の違い"
+      },
+      {
         "topic": "setup-k3s",
         "label": "ハンドブックを試すための k3s の入れ方"
+      },
+      {
+        "topic": "container-internals",
+        "label": "コンテナの仕組み: chroot から namespaces・cgroups、OCI、CRI まで"
       }
     ]
   },
@@ -93,6 +101,10 @@
       }
     ],
     "usedIn": [
+      {
+        "topic": "application-delivery",
+        "label": "アプリを届ける流れ (CI/CD・GitOps・Helm・Kustomize)"
+      },
       {
         "topic": "setup-k3s",
         "label": "ハンドブックを試すための k3s の入れ方"
@@ -434,6 +446,10 @@
     ],
     "usedIn": [
       {
+        "topic": "k3s-vs-kubernetes",
+        "label": "k3s と Kubernetes (upstream) の違い"
+      },
+      {
         "topic": "setup-k3s",
         "label": "ハンドブックを試すための k3s の入れ方"
       }
@@ -559,6 +575,26 @@
         "label": "ストレージ: ボリューム・PV・PVC・StorageClass"
       },
       {
+        "topic": "application-delivery",
+        "label": "アプリを届ける流れ (CI/CD・GitOps・Helm・Kustomize)"
+      },
+      {
+        "topic": "debugging",
+        "label": "動かないアプリの原因を探す"
+      },
+      {
+        "topic": "observability",
+        "label": "オブザーバビリティ: ログ・メトリクス・トレースで中を知る"
+      },
+      {
+        "topic": "cloud-native-principles",
+        "label": "クラウドネイティブの考え方と、それを支える標準・オートスケール"
+      },
+      {
+        "topic": "cloud-native-community",
+        "label": "クラウドネイティブのコミュニティと、一緒に作る仕組み"
+      },
+      {
         "topic": "setup-k3s",
         "label": "ハンドブックを試すための k3s の入れ方"
       }
@@ -641,6 +677,18 @@
       {
         "topic": "troubleshooting",
         "label": "障害対応: 状態・イベント・ログの順に読む"
+      },
+      {
+        "topic": "application-delivery",
+        "label": "アプリを届ける流れ (CI/CD・GitOps・Helm・Kustomize)"
+      },
+      {
+        "topic": "debugging",
+        "label": "動かないアプリの原因を探す"
+      },
+      {
+        "topic": "cloud-native-principles",
+        "label": "クラウドネイティブの考え方と、それを支える標準・オートスケール"
       },
       {
         "topic": "setup-k3s",
@@ -833,6 +881,14 @@
       {
         "topic": "administration",
         "label": "クラスタの管理: kubectl・kubeconfig・資源の上限"
+      },
+      {
+        "topic": "kubectl-internals",
+        "label": "kubectl の中身: コマンドが HTTP の要求になるまで"
+      },
+      {
+        "topic": "authn-authz-basics",
+        "label": "認証と認可の基本: 証明書・TLS・OAuth 2.0・OpenID Connect と Kubernetes"
       }
     ]
   },
@@ -1023,6 +1079,10 @@
       {
         "topic": "storage",
         "label": "ストレージ: ボリューム・PV・PVC・StorageClass"
+      },
+      {
+        "topic": "debugging",
+        "label": "動かないアプリの原因を探す"
       }
     ]
   },
@@ -1075,6 +1135,10 @@
       {
         "topic": "containerization",
         "label": "コンテナ化: イメージ・ランタイム・CRI"
+      },
+      {
+        "topic": "container-internals",
+        "label": "コンテナの仕組み: chroot から namespaces・cgroups、OCI、CRI まで"
       }
     ]
   },
@@ -1199,6 +1263,22 @@
       {
         "topic": "containerization",
         "label": "コンテナ化: イメージ・ランタイム・CRI"
+      },
+      {
+        "topic": "application-delivery",
+        "label": "アプリを届ける流れ (CI/CD・GitOps・Helm・Kustomize)"
+      },
+      {
+        "topic": "linux-history",
+        "label": "Linux の歴史: UNIX・GNU・Linux カーネル・ディストリビューション"
+      },
+      {
+        "topic": "linux-internals",
+        "label": "Linux の内部: カーネル・システムコール・プロセス・/proc"
+      },
+      {
+        "topic": "container-internals",
+        "label": "コンテナの仕組み: chroot から namespaces・cgroups、OCI、CRI まで"
       }
     ]
   },
@@ -1288,6 +1368,10 @@
       {
         "topic": "containerization",
         "label": "コンテナ化: イメージ・ランタイム・CRI"
+      },
+      {
+        "topic": "application-delivery",
+        "label": "アプリを届ける流れ (CI/CD・GitOps・Helm・Kustomize)"
       }
     ]
   },
@@ -1346,6 +1430,30 @@
       {
         "topic": "troubleshooting",
         "label": "障害対応: 状態・イベント・ログの順に読む"
+      },
+      {
+        "topic": "application-delivery",
+        "label": "アプリを届ける流れ (CI/CD・GitOps・Helm・Kustomize)"
+      },
+      {
+        "topic": "debugging",
+        "label": "動かないアプリの原因を探す"
+      },
+      {
+        "topic": "observability",
+        "label": "オブザーバビリティ: ログ・メトリクス・トレースで中を知る"
+      },
+      {
+        "topic": "cloud-native-community",
+        "label": "クラウドネイティブのコミュニティと、一緒に作る仕組み"
+      },
+      {
+        "topic": "k3s-vs-kubernetes",
+        "label": "k3s と Kubernetes (upstream) の違い"
+      },
+      {
+        "topic": "container-internals",
+        "label": "コンテナの仕組み: chroot から namespaces・cgroups、OCI、CRI まで"
       }
     ]
   },
@@ -1674,6 +1782,800 @@
       {
         "topic": "storage",
         "label": "ストレージ: ボリューム・PV・PVC・StorageClass"
+      },
+      {
+        "topic": "debugging",
+        "label": "動かないアプリの原因を探す"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-rollout-history",
+    "command": "kubectl rollout history",
+    "tool": "kubectl",
+    "summary": "Deployment などの、入れ替えの履歴 (リビジョン) を一覧します。",
+    "detail": "戻したい番号を調べるのに使います。--revision を付けると、その番号のときの Pod のひな形を出します。",
+    "usage": "kubectl rollout history (<種類> <名前> | <種類>/<名前>) [オプション]",
+    "flags": [
+      {
+        "flags": [
+          "--revision"
+        ],
+        "text": "その番号の中身を出す"
+      }
+    ],
+    "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_rollout/kubectl_rollout_history/",
+    "inside": [
+      "Deployment では、kubectl が、その Deployment の持つ ReplicaSet を API サーバーから読みます。古い版の ReplicaSet が、履歴の正体です。",
+      "ReplicaSet に付いた番号 (リビジョン) の順に並べ、CHANGE-CAUSE の欄には、アノテーション kubernetes.io/change-cause の値を出します。書いていなければ <none> です。",
+      "古い版を残しておく数は revisionHistoryLimit (既定は 10。今の版は別) で決まり、超えた分はあとで片付けられます。"
+    ],
+    "api": [
+      {
+        "method": "GET",
+        "path": "/apis/apps/v1/namespaces/<名前空間>/replicasets",
+        "note": "古い版を読む (Deployment の場合)"
+      }
+    ],
+    "examples": [
+      {
+        "title": "履歴を見る (形の例)",
+        "code": "$ kubectl rollout history deployment/web -n try-kcna",
+        "output": "deployment.apps/web\nREVISION  CHANGE-CAUSE\n1         <none>\n2         <none>",
+        "note": "2 回目の入れ替えまで終わった形です。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "Kubernetes: Deployments (Checking Rollout History)",
+        "url": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"
+      }
+    ],
+    "usedIn": [
+      {
+        "topic": "application-delivery",
+        "label": "アプリを届ける流れ (CI/CD・GitOps・Helm・Kustomize)"
+      },
+      {
+        "topic": "cicd-pipeline",
+        "label": "CI/CD をもう一歩: コミットから本番までの流れ"
+      }
+    ]
+  },
+  {
+    "id": "helm-create",
+    "command": "helm create",
+    "tool": "helm",
+    "summary": "チャート (Helm の包み) のひな形を、フォルダとして作ります。",
+    "detail": "nginx を動かす見本が最初から入っているので、そのまま helm install で試せます。クラスタには何も作りません。",
+    "usage": "helm create <名前> [オプション]",
+    "flags": [
+      {
+        "flags": [
+          "-p",
+          "--starter"
+        ],
+        "text": "使うひな形を選ぶ"
+      }
+    ],
+    "source": "https://helm.sh/docs/helm/helm_create/",
+    "inside": [
+      "手元に <名前> のフォルダを作り、Chart.yaml (名札)、values.yaml (既定の値)、templates (マニフェストのひな形)、charts (ほかのチャートを置く所) などを書きます。",
+      "同じ名前のフォルダやファイルがすでにあると、中のファイルが上書きされることがあります。",
+      "手元のファイルだけの作業なので、API サーバーにはつなぎません。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "ひな形を作る (形の例)",
+        "code": "$ helm create hello",
+        "output": "Creating hello",
+        "note": "hello フォルダの中に、Chart.yaml・values.yaml・charts・templates などができます。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "helm.sh の Charts",
+        "url": "https://helm.sh/docs/topics/charts/"
+      }
+    ],
+    "usedIn": [
+      {
+        "topic": "application-delivery",
+        "label": "アプリを届ける流れ (CI/CD・GitOps・Helm・Kustomize)"
+      }
+    ]
+  },
+  {
+    "id": "helm-uninstall",
+    "command": "helm uninstall",
+    "tool": "helm",
+    "summary": "リリース (入れたもの) を外します。",
+    "detail": "そのリリースが作ったリソースを消し、履歴も消します。名前空間そのものは消しません。フックで作ったもの・残す印 (helm.sh/resource-policy: keep) の付いたもの・CRD は残ることがあります。履歴を残したいときは --keep-history を付けます。",
+    "usage": "helm uninstall <リリース名> [オプション]",
+    "flags": [
+      {
+        "flags": [
+          "--keep-history"
+        ],
+        "text": "リソースは消し、履歴は残す"
+      },
+      {
+        "flags": [
+          "--dry-run"
+        ],
+        "text": "外さずに試す"
+      },
+      {
+        "flags": [
+          "--wait"
+        ],
+        "text": "消え終わるのを待つ"
+      }
+    ],
+    "source": "https://helm.sh/docs/helm/helm_uninstall/",
+    "inside": [
+      "helm が、名前空間にある、そのリリースの記録 (既定では Secret) を読み、最後の版で作ったリソースを調べます。",
+      "そのリソースを API サーバーに頼んで消します。",
+      "履歴の記録も消します。--keep-history なら記録を残し、外した印だけを付けます。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "外す (形の例)",
+        "code": "$ helm uninstall hello -n try-kcna",
+        "output": "release \"hello\" uninstalled"
+      }
+    ],
+    "sources": [
+      {
+        "label": "helm.sh の Using Helm",
+        "url": "https://helm.sh/docs/intro/using_helm/"
+      },
+      {
+        "label": "helm.sh の Advanced Helm Techniques (記録の置き場所)",
+        "url": "https://helm.sh/docs/topics/advanced/"
+      },
+      {
+        "label": "helm.sh の Chart Hooks",
+        "url": "https://helm.sh/docs/topics/charts_hooks/"
+      }
+    ],
+    "usedIn": [
+      {
+        "topic": "application-delivery",
+        "label": "アプリを届ける流れ (CI/CD・GitOps・Helm・Kustomize)"
+      }
+    ]
+  },
+  {
+    "id": "printf",
+    "command": "printf",
+    "tool": "Linux",
+    "summary": "形を決めて、文字を出します。",
+    "detail": "\\n と書くと改行になるので、複数の行を 1 行のコマンドで書けます。> と組み合わせると、ファイルに書けます。echo と違い、最後に改行を付けません。",
+    "usage": "printf <形> [値...]",
+    "flags": [],
+    "source": "https://man7.org/linux/man-pages/man1/printf.1.html",
+    "inside": [
+      "形の中の \\n (改行) などの印を読み替え、%s などの所に後ろの値を入れて、標準出力に書きます。",
+      "最後の改行も自分で書きます。書かないと、次の表示が同じ行に続きます。",
+      "多くのシェルでは、シェルの中の命令として動きます。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "2 行のファイルを書く (このページのために打った例)",
+        "code": "$ printf 'resources:\\n  - deployment.yaml\\n' > k.yaml\n$ cat k.yaml",
+        "output": "resources:\n  - deployment.yaml",
+        "note": "\\n の所で改行されています。"
+      }
+    ],
+    "sources": [],
+    "usedIn": [
+      {
+        "topic": "application-delivery",
+        "label": "アプリを届ける流れ (CI/CD・GitOps・Helm・Kustomize)"
+      }
+    ]
+  },
+  {
+    "id": "head",
+    "command": "head",
+    "tool": "Linux",
+    "summary": "最初の数行だけを出します。",
+    "detail": "何も付けなければ最初の 10 行です。-n 3 のように行数を決めます (-3 は古い書き方です)。長い出力の、先頭だけを確かめたいときに使います。",
+    "usage": "head [オプション] [ファイル...]",
+    "flags": [
+      {
+        "flags": [
+          "-n",
+          "--lines"
+        ],
+        "text": "出す行数"
+      }
+    ],
+    "source": "https://man7.org/linux/man-pages/man1/head.1.html",
+    "inside": [
+      "先頭から順に読み、決めた行数を出したら終わります。",
+      "パイプの右で先に終わると、左のコマンドは書く先が無くなり、そこで止まることがあります。左が途中で止まるのは異常ではありません。",
+      "ファイルを書かなければ、標準入力 (パイプの左の出力) を読みます。反対に、最後だけを見るコマンドは tail です。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "最初の 2 行 (このページのために打った例)",
+        "code": "$ printf '1\\n2\\n3\\n4\\n' | head -2",
+        "output": "1\n2"
+      }
+    ],
+    "sources": [
+      {
+        "label": "man7.org の pipe(7)",
+        "url": "https://man7.org/linux/man-pages/man7/pipe.7.html"
+      }
+    ],
+    "usedIn": [
+      {
+        "topic": "observability",
+        "label": "オブザーバビリティ: ログ・メトリクス・トレースで中を知る"
+      },
+      {
+        "topic": "cloud-native-principles",
+        "label": "クラウドネイティブの考え方と、それを支える標準・オートスケール"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-version",
+    "command": "kubectl version",
+    "tool": "kubectl",
+    "summary": "kubectl と、API サーバーの版を出します。",
+    "detail": "版の差が大きいと、使えない機能が出ます。公式では、kubectl と API サーバーの差は minor の版で 1 つまで (古くても新しくても) が対応の範囲です。",
+    "usage": "kubectl version [オプション]",
+    "flags": [
+      {
+        "flags": [
+          "--client"
+        ],
+        "text": "手元の kubectl の版だけを出す (クラスタが無くても出る)"
+      },
+      {
+        "flags": [
+          "-o",
+          "--output"
+        ],
+        "text": "出力の形 (yaml か json)"
+      }
+    ],
+    "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_version/",
+    "inside": [
+      "kubectl が、自分に書き込まれた版 (Client Version) と、組み込みの Kustomize の版を出します。",
+      "API サーバーの /version を読み、Server Version を出します。つながらなければ、ここで失敗します。"
+    ],
+    "api": [
+      {
+        "method": "GET",
+        "path": "/version",
+        "note": "API サーバーの版を読む"
+      }
+    ],
+    "examples": [
+      {
+        "title": "手元の版だけを見る (このページのために打った例)",
+        "code": "$ kubectl version --client",
+        "output": "Client Version: v1.37.2\nKustomize Version: v5.8.1",
+        "note": "版は環境で変わります。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "Kubernetes: Version Skew Policy",
+        "url": "https://kubernetes.io/releases/version-skew-policy/"
+      }
+    ],
+    "usedIn": [
+      {
+        "topic": "cloud-native-community",
+        "label": "クラウドネイティブのコミュニティと、一緒に作る仕組み"
+      },
+      {
+        "topic": "kubernetes-history",
+        "label": "Kubernetes の歴史と版の数え方"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-api-versions",
+    "command": "kubectl api-versions",
+    "tool": "kubectl",
+    "summary": "API サーバーが受け付ける、API のグループと版を一覧します。",
+    "detail": "「グループ/版」の形で並びます。マニフェストの apiVersion に書く形と同じです (読むだけの API も混ざります)。",
+    "usage": "kubectl api-versions",
+    "flags": [],
+    "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_api-versions/",
+    "inside": [
+      "kubectl が、API サーバーに、どんな API のグループと版があるかを聞きます。",
+      "「グループ/版」の形に並べて出します。v1 のように / の無いものは、Pod や Service のある最初からのグループ (コア) です。",
+      "拡張 (CRD など) を入れたクラスタでは、その分も並びます。"
+    ],
+    "api": [
+      {
+        "method": "GET",
+        "path": "/apis",
+        "note": "グループと版を読む"
+      },
+      {
+        "method": "GET",
+        "path": "/api",
+        "note": "コアの版を読む"
+      }
+    ],
+    "examples": [
+      {
+        "title": "オートスケールの API の版を見る (このページのために打った例)",
+        "code": "$ kubectl api-versions | grep '^autoscaling/'",
+        "output": "autoscaling/v1\nautoscaling/v2",
+        "note": "HPA には 2 つの版があります。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "Kubernetes: The Kubernetes API (API groups)",
+        "url": "https://kubernetes.io/docs/concepts/overview/kubernetes-api/"
+      }
+    ],
+    "usedIn": [
+      {
+        "topic": "cloud-native-community",
+        "label": "クラウドネイティブのコミュニティと、一緒に作る仕組み"
+      }
+    ]
+  },
+  {
+    "id": "ps",
+    "command": "ps",
+    "tool": "Linux",
+    "summary": "動いているプロセス (プログラム) を一覧します。",
+    "detail": "ふつうの Linux では、何も付けなければ、その端末で自分が動かしているものだけです (BusyBox の ps は、見えるプロセスを全部出します)。-ef で全部を、-o で出す列を選べます。",
+    "usage": "ps [オプション]",
+    "flags": [
+      {
+        "flags": [
+          "-e"
+        ],
+        "text": "全部のプロセスを出す"
+      },
+      {
+        "flags": [
+          "-f"
+        ],
+        "text": "詳しい形で出す (親の番号や、打たれたコマンドの全体)"
+      },
+      {
+        "flags": [
+          "-o"
+        ],
+        "text": "出す列を選ぶ (pid は番号、ppid は親の番号、comm は名前)"
+      }
+    ],
+    "source": "https://man7.org/linux/man-pages/man1/ps.1.html",
+    "inside": [
+      "ps は /proc の中の、プロセスごとのフォルダを読みます。カーネルが、今のプロセスの情報をファイルの形で見せている所です。",
+      "選んだ列に並べて出します。ps が読んだ一瞬の様子なので、もう一度打つと変わることがあります。",
+      "コンテナの中で打つと、ふつうはそのコンテナのプロセスだけが見えます。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "番号・親の番号・名前を出す (形の例)",
+        "code": "$ ps -o pid,ppid,comm",
+        "output": "    PID    PPID COMMAND\n   2101    2100 bash\n   2150    2101 ps",
+        "note": "番号は環境で変わります。PPID が親の番号で、ps の親は、打ったシェル (bash) です。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "man7.org の proc(5)",
+        "url": "https://man7.org/linux/man-pages/man5/proc.5.html"
+      }
+    ],
+    "usedIn": [
+      {
+        "topic": "debugging",
+        "label": "動かないアプリの原因を探す"
+      },
+      {
+        "topic": "k3s-vs-kubernetes",
+        "label": "k3s と Kubernetes (upstream) の違い"
+      },
+      {
+        "topic": "linux-internals",
+        "label": "Linux の内部: カーネル・システムコール・プロセス・/proc"
+      },
+      {
+        "topic": "container-internals",
+        "label": "コンテナの仕組み: chroot から namespaces・cgroups、OCI、CRI まで"
+      }
+    ]
+  },
+  {
+    "id": "exit",
+    "command": "exit",
+    "tool": "Linux",
+    "summary": "シェルを終わります。",
+    "detail": "kubectl exec や kubectl debug で入ったコンテナの中では、外 (手元のシェル) へ戻るのに使います。手元のシェルで打つと、その端末が閉じることがあります。数を付けると、その終了コードで終わります。",
+    "usage": "exit [終了コード]",
+    "flags": [],
+    "source": "https://man7.org/linux/man-pages/man1/exit.1p.html",
+    "inside": [
+      "exit は別のプログラムではなく、シェルの中の命令です。シェルが、付けた数を終了コードにして終わります。付けなければ、直前のコマンドの終了コードです。",
+      "0 は成功、そのほかは失敗を表します。コンテナの最初のプロセスが 0 でない数で終わると、Kubernetes は失敗と見ます。",
+      "スクリプトの中では、そこでスクリプトが終わります。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "終了コードを決めて終わる (このページのために打った例)",
+        "code": "$ sh -c 'exit 3'; echo \"rc=$?\"",
+        "output": "rc=3",
+        "note": "$? は直前のコマンドの終了コードです。"
+      }
+    ],
+    "sources": [],
+    "usedIn": [
+      {
+        "topic": "debugging",
+        "label": "動かないアプリの原因を探す"
+      }
+    ]
+  },
+  {
+    "id": "ls",
+    "command": "ls",
+    "tool": "Linux",
+    "summary": "フォルダの中のファイルを一覧します。",
+    "detail": "list の略です。フォルダを書かなければ、今いるフォルダの中を出します。-l を付けると、権限・持ち主・大きさ・時刻も出ます。名前が . で始まるものは、-a を付けないと出ません。",
+    "usage": "ls [オプション] [フォルダ...]",
+    "flags": [
+      {
+        "flags": [
+          "-l"
+        ],
+        "text": "詳しい形で出す"
+      },
+      {
+        "flags": [
+          "-a",
+          "--all"
+        ],
+        "text": "名前が . で始まるものも出す"
+      }
+    ],
+    "source": "https://man7.org/linux/man-pages/man1/ls.1.html",
+    "inside": [
+      "フォルダを開いて中の名前を読み、名前の順に並べて出します。",
+      "-l では、ファイルごとに権限・持ち主・大きさ・時刻を、カーネルに聞きます (stat)。",
+      "フォルダを読む権限が無いと失敗します。k3s のデータのフォルダは root しか読めないので、sudo を付けます。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "中を見る (このページのために打った例)",
+        "code": "$ ls dd",
+        "output": "a\nb"
+      }
+    ],
+    "sources": [
+      {
+        "label": "man7.org の stat(2)",
+        "url": "https://man7.org/linux/man-pages/man2/stat.2.html"
+      }
+    ],
+    "usedIn": [
+      {
+        "topic": "k3s-vs-kubernetes",
+        "label": "k3s と Kubernetes (upstream) の違い"
+      },
+      {
+        "topic": "linux-internals",
+        "label": "Linux の内部: カーネル・システムコール・プロセス・/proc"
+      }
+    ]
+  },
+  {
+    "id": "journalctl",
+    "command": "journalctl",
+    "tool": "Linux",
+    "summary": "systemd が集めたログ (journal) を読みます。",
+    "detail": "-u でサービスを選びます。k3s は systemd のサービスとして動くので、k3s そのもののログはここで読めます。systemd の無い機械では使えません。",
+    "usage": "journalctl [オプション]",
+    "flags": [
+      {
+        "flags": [
+          "-u",
+          "--unit"
+        ],
+        "text": "サービスを選ぶ"
+      },
+      {
+        "flags": [
+          "-n",
+          "--lines"
+        ],
+        "text": "最後の何行を出すか"
+      },
+      {
+        "flags": [
+          "--no-pager"
+        ],
+        "text": "1 画面ずつ止めずに、全部続けて出す"
+      },
+      {
+        "flags": [
+          "-f",
+          "--follow"
+        ],
+        "text": "新しいログを出し続ける"
+      }
+    ],
+    "source": "https://man7.org/linux/man-pages/man1/journalctl.1.html",
+    "inside": [
+      "systemd-journald が、サービスの標準出力や標準エラー、カーネルの知らせなどを集めて、ファイルに貯めています。",
+      "journalctl が、条件に合うものを読み、古い順に出します。",
+      "ほかのユーザーやシステムのログを読むには権限が要るので、sudo を付けます。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "k3s のログの最後の 20 行を読む (形の例)",
+        "code": "$ sudo journalctl -u k3s -n 20 --no-pager",
+        "output": "(日時 ホスト名 k3s[番号]: 本文 の形の行が、20 行並びます)",
+        "note": "中身は環境で変わるので、形だけを書いています。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "man7.org の systemd-journald(8)",
+        "url": "https://man7.org/linux/man-pages/man8/systemd-journald.service.8.html"
+      }
+    ],
+    "usedIn": [
+      {
+        "topic": "k3s-vs-kubernetes",
+        "label": "k3s と Kubernetes (upstream) の違い"
+      }
+    ]
+  },
+  {
+    "id": "stat",
+    "command": "stat",
+    "tool": "Linux",
+    "summary": "ファイルやファイルシステムの、詳しい情報を出します。",
+    "detail": "-f を付けると、ファイルではなく、それが置かれたファイルシステムの情報になります。-c で出す項目を選びます。",
+    "usage": "stat [オプション] <ファイル>",
+    "flags": [
+      {
+        "flags": [
+          "-f",
+          "--file-system"
+        ],
+        "text": "ファイルシステムの情報を出す"
+      },
+      {
+        "flags": [
+          "-c",
+          "--format"
+        ],
+        "text": "出す形を選ぶ (-f のとき %T は種類の名前)"
+      }
+    ],
+    "source": "https://man7.org/linux/man-pages/man1/stat.1.html",
+    "inside": [
+      "ファイルなら stat、ファイルシステムなら statfs のシステムコールで、カーネルに情報を聞きます。",
+      "-c に書いた形の、%T などの印を値に置き換えて出します。印の意味は、-f があるかどうかで変わります。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "cgroup の版を見分ける (このページのために打った例)",
+        "code": "$ stat -fc %T /sys/fs/cgroup/",
+        "output": "cgroup2fs",
+        "note": "cgroup2fs なら cgroup v2 です。v1 なら tmpfs と出ます。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "Kubernetes: About cgroup v2",
+        "url": "https://kubernetes.io/docs/concepts/architecture/cgroups/"
+      }
+    ],
+    "usedIn": [
+      {
+        "topic": "linux-internals",
+        "label": "Linux の内部: カーネル・システムコール・プロセス・/proc"
+      }
+    ]
+  },
+  {
+    "id": "findmnt",
+    "command": "findmnt",
+    "tool": "Linux",
+    "summary": "つながっている (マウントされた) ファイルシステムを一覧します。",
+    "detail": "木の形で出るので、どこに何がつながっているかが分かります。-t で種類を絞れます。",
+    "usage": "findmnt [オプション] [場所]",
+    "flags": [
+      {
+        "flags": [
+          "-t",
+          "--types"
+        ],
+        "text": "種類で絞る (カンマで並べる)"
+      }
+    ],
+    "source": "https://man7.org/linux/man-pages/man8/findmnt.8.html",
+    "inside": [
+      "findmnt は、カーネルが見せている、つながっているものの一覧 (ふつう /proc/self/mountinfo) を読みます。",
+      "親子の関係に並べ、つないだ場所 (TARGET)・元 (SOURCE)・種類 (FSTYPE)・つなぎ方 (OPTIONS) を出します。",
+      "見えるのは、打ったプロセスの mount の名前空間の中です。コンテナの中では、違う一覧になります。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "cgroup v2 のつなぎ先を見る (このページのために打った例)",
+        "code": "$ findmnt -t cgroup2",
+        "output": "TARGET         SOURCE  FSTYPE  OPTIONS\n/sys/fs/cgroup cgroup2 cgroup2 rw,nosuid,nodev,noexec,relatime,nsdelegate,memory_recursiveprot,memory_hugetlb_accounting",
+        "note": "OPTIONS は環境で変わります。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "man7.org の proc_pid_mountinfo(5)",
+        "url": "https://man7.org/linux/man-pages/man5/proc_pid_mountinfo.5.html"
+      }
+    ],
+    "usedIn": [
+      {
+        "topic": "linux-internals",
+        "label": "Linux の内部: カーネル・システムコール・プロセス・/proc"
+      }
+    ]
+  },
+  {
+    "id": "lsns",
+    "command": "lsns",
+    "tool": "Linux",
+    "summary": "Linux の namespaces (プロセスから見える範囲の区切り) を一覧します。",
+    "detail": "Kubernetes の Namespace (名前空間) とは別のものです。コンテナは、この区切りを使って、ほかのプロセスから見える範囲を分けています。",
+    "usage": "lsns [オプション] [番号]",
+    "flags": [
+      {
+        "flags": [
+          "-t",
+          "--type"
+        ],
+        "text": "種類で絞る (pid・net・mnt など)"
+      }
+    ],
+    "source": "https://man7.org/linux/man-pages/man8/lsns.8.html",
+    "inside": [
+      "lsns は /proc の中を読み、プロセスごとに、どの namespace に属しているかを集めます。",
+      "同じ namespace のプロセスをまとめ、番号 (NS)・種類 (TYPE)・プロセスの数 (NPROCS)・いちばん小さい PID などを出します。",
+      "root でないと、ほかの人のプロセスの分が見えず、一覧が欠けることがあります。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "pid の namespace を見る (形の例)",
+        "code": "$ lsns -t pid",
+        "output": "        NS TYPE NPROCS   PID USER COMMAND\n4026531836 pid     120  1716 user ...",
+        "note": "番号と数は環境で変わります。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "man7.org の namespaces(7)",
+        "url": "https://man7.org/linux/man-pages/man7/namespaces.7.html"
+      }
+    ],
+    "usedIn": [
+      {
+        "topic": "container-internals",
+        "label": "コンテナの仕組み: chroot から namespaces・cgroups、OCI、CRI まで"
+      }
+    ]
+  },
+  {
+    "id": "k3s-kubectl",
+    "command": "k3s kubectl",
+    "tool": "k3s",
+    "summary": "k3s に入っている kubectl を動かします。",
+    "detail": "ふつうの kubectl と同じ使い方です。KUBECONFIG が無ければ、k3s の管理者の kubeconfig (/etc/rancher/k3s/k3s.yaml) を読もうとします。ふだんは root しか読めないので、sudo を付けます。",
+    "usage": "k3s kubectl <kubectl のコマンド>",
+    "flags": [],
+    "source": "https://docs.k3s.io/cli",
+    "inside": [
+      "k3s のバイナリの中の kubectl が動きます。別に kubectl を入れていなくても使えます。",
+      "KUBECONFIG が設定されていなければ /etc/rancher/k3s/k3s.yaml を読み、そこに書かれた API サーバーへつなぎます。",
+      "あとは kubectl と同じです。sudo で動かすと、自分の環境変数 KUBECONFIG はふつう渡らないので、この管理者のファイルが使われます。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "ノードの一覧を見る (形の例)",
+        "code": "$ sudo k3s kubectl get nodes",
+        "output": "NAME    STATUS   ROLES           AGE   VERSION\nnode1   Ready    control-plane   90s   v1.34.1+k3s1",
+        "note": "名前・時間・版は環境で変わります。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "K3s: Cluster Access",
+        "url": "https://docs.k3s.io/cluster-access"
+      },
+      {
+        "label": "sudo.ws の sudoers (env_reset)",
+        "url": "https://www.sudo.ws/docs/man/sudoers.man/"
+      }
+    ],
+    "usedIn": [
+      {
+        "topic": "k3s-vs-kubernetes",
+        "label": "k3s と Kubernetes (upstream) の違い"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-auth-whoami",
+    "command": "kubectl auth whoami",
+    "tool": "kubectl",
+    "summary": "API サーバーから見た、自分の名前とグループを出します。",
+    "detail": "権限 (RBAC) は、この名前とグループに対して決まります。思いどおりに許可されないとき、まず自分が誰と見られているかを確かめます。",
+    "usage": "kubectl auth whoami [オプション]",
+    "flags": [
+      {
+        "flags": [
+          "-o",
+          "--output"
+        ],
+        "text": "出力の形 (yaml・json など)"
+      }
+    ],
+    "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_auth/kubectl_auth_whoami/",
+    "inside": [
+      "kubectl が、SelfSubjectReview という問い合わせを API サーバーに POST で送ります。",
+      "API サーバーが認証を終えたあとの名前 (Username) とグループ (Groups) を返します。どこにも保存されません。",
+      "kubeconfig に書いた名前ではなく、API サーバーが認めた名前が出ます。"
+    ],
+    "api": [
+      {
+        "method": "POST",
+        "path": "/apis/authentication.k8s.io/v1/selfsubjectreviews",
+        "note": "自分が誰かを聞く"
+      }
+    ],
+    "examples": [
+      {
+        "title": "自分を確かめる (形の例)",
+        "code": "$ kubectl auth whoami",
+        "output": "ATTRIBUTE   VALUE\nUsername    system:admin\nGroups      [system:masters system:authenticated]",
+        "note": "名前とグループは、使う kubeconfig で変わります。このあとに Extra の行が付くことがあります。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "Kubernetes: Authenticating (API access to authentication information for a client)",
+        "url": "https://kubernetes.io/docs/reference/access-authn-authz/authentication/#self-subject-review"
+      }
+    ],
+    "usedIn": [
+      {
+        "topic": "kubectl-internals",
+        "label": "kubectl の中身: コマンドが HTTP の要求になるまで"
+      },
+      {
+        "topic": "authn-authz-basics",
+        "label": "認証と認可の基本: 証明書・TLS・OAuth 2.0・OpenID Connect と Kubernetes"
       }
     ]
   }
