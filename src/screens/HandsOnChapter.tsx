@@ -125,11 +125,16 @@ export function ChapterView({ chapter: c, chapters, progress, updateProgress }: 
   const [confirmRedo, setConfirmRedo] = useState(false);
   const doneText = useRef<HTMLParagraphElement>(null);
   const justDone = useRef(false);
+  const stepsHead = useRef<HTMLHeadingElement>(null);
+  const justRestarted = useRef(false);
   const finished = rec?.done === true && !rec.redo;
   // 完了のボタンは押すと無くなるので、フォーカスを完了の文へ移す (キーボードの位置を失わないように)
   useEffect(() => {
     if (finished && justDone.current) doneText.current?.focus();
     justDone.current = false;
+    // 印を消したあとは、押したボタンも確かめの窓も無くなるので、手順の見出しへ移して初めから進められるようにする
+    if (!finished && justRestarted.current) stepsHead.current?.focus();
+    justRestarted.current = false;
   }, [finished]);
   // 本文の順に、語ごとに最初の 1 回だけリンクにする。章の全文を読むので、章と OS が替わったときだけ作る
   // (印を 1 つ付けるたびに作ると、PC で 18〜45ms、スマホではその数倍かかる)
@@ -195,7 +200,7 @@ export function ChapterView({ chapter: c, chapters, progress, updateProgress }: 
       </section>
 
       <section aria-labelledby="ho-steps" className="hb-section">
-        <h2 id="ho-steps" className="hb-h2">
+        <h2 id="ho-steps" className="hb-h2" ref={stepsHead} tabIndex={-1}>
           手順
         </h2>
         <p className="hb-muted">上から順に 1 つずつ動かし、書いてあるとおりになったら印を付けます。印はこのブラウザに残り、途中で閉じても続きから始められます。</p>
@@ -258,6 +263,7 @@ export function ChapterView({ chapter: c, chapters, progress, updateProgress }: 
           actionLabel="印を消す"
           cancelLabel="やめる"
           onAction={() => {
+            justRestarted.current = true;
             updateProgress((p) => restartHandsOn(p, c.id, new Date()));
             setConfirmRedo(false);
           }}

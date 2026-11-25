@@ -220,6 +220,7 @@ describe('画面', () => {
     expect(v.progress().handsOn!.sample.steps).toHaveLength(3);
     await act(async () => button(/^印を消す$/).click());
     expect(v.progress().handsOn!.sample).toMatchObject({ steps: [], done: true, redo: true });
+    expect(document.activeElement?.id).toBe('ho-steps');
     expect(v.progress().xp.total).toBe(10);
   });
   it('する手順が 1 つも無い章は、完了にできない', async () => {

@@ -153,6 +153,13 @@ async function checkChapterPage(page, width, tag, c, flow) {
   await page.getByRole('button', { name: '印を消してもう一度やる' }).click();
   await page.getByRole('button', { name: 'やめる' }).click();
   check((await page.getByRole('checkbox', { checked: true }).count()) === (await page.getByRole('checkbox').count()), `${tag} 章の印は、確かめるまで消えない`);
+  // 消したあとのフォーカスは、手順の見出しへ (窓が閉じて落ち着くまで待っても、そこにある)
+  await page.getByRole('button', { name: '印を消してもう一度やる' }).click();
+  await page.getByRole('button', { name: '印を消す', exact: true }).click();
+  await page.getByRole('dialog').waitFor({ state: 'hidden' }).catch(() => {});
+  await page.waitForTimeout(600);
+  const focused = await page.evaluate(() => document.activeElement?.id);
+  check(focused === 'ho-steps' && (await page.getByRole('checkbox', { checked: true }).count()) === 0, `${tag} 印を消すと、手順の見出しにフォーカスが移る (${focused})`);
 }
 
 /** 章の本文の幅・書き出した HTML・最初に読まないこと */
