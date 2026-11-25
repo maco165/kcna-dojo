@@ -8,8 +8,8 @@ import { buildPages, renderPage, sitemap } from '../scripts/prerender.mjs';
 import type { HandsOnChapter } from '../src/content/types';
 import { chapterTitle } from '../src/content/handsOn';
 import { handsOnStepText } from '../src/lib/askAi';
-import { chapterStatus, guessOs, markedCount, stepsFor } from '../src/lib/handsOn';
-import { completeHandsOn, emptyProgress, firstStudyDay, loadProgress, markHandsOnStep, normalizeProgress, parseProgressText, resetProgress, restartHandsOn, saveProgress, setProfile, type Progress } from '../src/lib/progress';
+import { canComplete, chapterStatus, guessOs, markedCount, stepsFor } from '../src/lib/handsOn';
+import { completeHandsOn, completeLesson, emptyProgress, firstStudyDay, loadProgress, markHandsOnStep, mergeImported, planStart, normalizeProgress, parseProgressText, resetProgress, restartHandsOn, saveProgress, setProfile, type Progress } from '../src/lib/progress';
 import { BASE, handsOnHref, parseRoute } from '../src/lib/route';
 import { HandsOnIndex } from '../src/screens/HandsOn';
 import { ChapterView } from '../src/screens/HandsOnChapter';
@@ -111,8 +111,25 @@ describe('記録', () => {
     expect(read({ sample: { steps: ['ok'], at: '', later: 1 } })).toEqual({ sample: { steps: ['ok'], at: '', later: 1 } });
     expect(normalizeProgress({ v: 1, profile: { os: 'bsd' } })!.profile!.os).toBeUndefined();
   });
-  it('章の記録も、初めて学んだ日に入る', () => {
-    expect(firstStudyDay(markHandsOnStep(emptyProgress(), 'sample', 'see-id', true, at))).toBe('2026-11-25');
+  it('手順の印は、問題演習の計画の開始日 (初めて学んだ日) を動かさない。章の完了は、実習の完了と同じく学んだ日に入る', () => {
+    const marked = markHandsOnStep(emptyProgress(), 'sample', 'see-id', true, at);
+    expect(firstStudyDay(marked)).toBeNull();
+    expect(planStart(marked, new Date(2026, 11, 1))).toBe('2026-12-01');
+    const lab = completeLesson(emptyProgress(), 'w1-lab', { correct: 1, total: 1 }, 10, at);
+    expect(firstStudyDay(completeHandsOn(emptyProgress(), 'sample', 10, at))).toBe(firstStudyDay(lab));
+  });
+  it('読み込み: 実践の OS は読み込んだ値、無ければ今の値。画面の色は今の端末の値', () => {
+    const now = setProfile(emptyProgress(), { os: 'mac', colorMode: 'dark' });
+    const file = setProfile(emptyProgress(), { examDate: '2027-01-30' });
+    expect(mergeImported(file, now).profile).toMatchObject({ os: 'mac', colorMode: 'dark', examDate: '2027-01-30' });
+    expect(mergeImported(setProfile(file, { os: 'linux' }), now).profile!.os).toBe('linux');
+    expect(mergeImported(emptyProgress(), now).profile).toMatchObject({ os: 'mac', colorMode: 'dark' });
+    expect(mergeImported(emptyProgress(), emptyProgress()).profile).toBeUndefined();
+  });
+  it('する手順が 0 件なら、完了にできない', () => {
+    expect(canComplete({ marked: 0, total: 0 })).toBe(false);
+    expect(canComplete({ marked: 2, total: 3 })).toBe(false);
+    expect(canComplete({ marked: 3, total: 3 })).toBe(true);
   });
   it('一覧の状態', () => {
     const p = emptyProgress();
@@ -133,7 +150,7 @@ describe('画面', () => {
     mounted.splice(0).forEach((f) => f());
     document.body.innerHTML = '';
   });
-  async function mount(start: Progress) {
+  async function mount(start: Progress, chapter: HandsOnChapter = sample) {
     const el = document.createElement('div');
     document.body.appendChild(el);
     const root = createRoot(el);
@@ -141,11 +158,11 @@ describe('画面', () => {
     function Host() {
       const [p, set] = useState(start);
       current = p;
-      return <ChapterView chapter={sample} chapters={[sample]} progress={p} updateProgress={(fn) => set(fn)} />;
+      return <ChapterView chapter={chapter} chapters={[chapter]} progress={p} updateProgress={(fn) => set(fn)} />;
     }
     await act(async () => root.render(<Host />));
     mounted.push(() => act(() => root.unmount()));
-    const finish = () => [...el.querySelectorAll('button')].find((b) => /完了にする|もう一度やる/.test(b.textContent ?? ''))!;
+    const finish = () => [...el.querySelectorAll('button')].find((b) => /完了にする/.test(b.textContent ?? ''))!;
     const disabled = () => finish().disabled || finish().getAttribute('aria-disabled') === 'true';
     const boxes = () => [...el.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')];
     return { el, finish, disabled, boxes, progress: () => current };
@@ -163,8 +180,57 @@ describe('画面', () => {
     expect(v.disabled()).toBe(false);
     await act(async () => v.finish().click());
     expect(v.progress()).toMatchObject({ xp: { total: 10 }, handsOn: { sample: { done: true } } });
-    expect(v.finish().textContent).toContain('もう一度やる');
     expect(v.progress().handsOn!.sample.steps.every((s) => ids.includes(s))).toBe(true);
+  });
+  it('OS を選び直すと、手順と、完了にできるかが替わる', async () => {
+    const v = await mount(macUser());
+    const pick = async (label: string) => {
+      const radio = [...v.el.querySelectorAll<HTMLElement>('[role="radio"], input[type="radio"]')].find((r) => (r.textContent || r.getAttribute('aria-label') || r.closest('label')?.textContent) === label)!;
+      await act(async () => radio.click());
+    };
+    // Linux の手順 (OS の無い 2 つ) だけに印を付けると、Mac では足りず、Linux では完了にできる
+    await act(async () => v.boxes()[0].click());
+    await act(async () => v.boxes()[2].click());
+    expect(v.disabled()).toBe(true);
+    await pick('Linux');
+    expect(v.progress().profile!.os).toBe('linux');
+    expect(v.boxes()).toHaveLength(2);
+    expect(v.el.textContent).not.toContain('brew install');
+    expect(v.disabled()).toBe(false);
+    await pick('Windows');
+    expect(v.boxes()).toHaveLength(3);
+    expect(v.el.textContent).toContain('winget install');
+    expect(v.disabled()).toBe(true);
+  });
+  it('完了のボタンは消え、印は、確かめてからでないと消えない', async () => {
+    // jsdom の dialog には showModal / close が無い
+    HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) { this.open = true; };
+    HTMLDialogElement.prototype.close ??= function (this: HTMLDialogElement) { this.open = false; };
+    const v = await mount(macUser());
+    for (const b of v.boxes()) await act(async () => b.click());
+    const complete = v.finish();
+    await act(async () => complete.click());
+    // 同じ要素が「もう一度やる」に替わらない (二度押ししても印は残る)
+    expect(complete.isConnected).toBe(false);
+    await act(async () => complete.click());
+    expect(v.progress().handsOn!.sample.steps).toHaveLength(3);
+    expect(document.activeElement?.textContent).toContain('完了しました');
+    const button = (re: RegExp) => [...document.querySelectorAll('button')].find((b) => re.test(b.textContent ?? ''))!;
+    await act(async () => button(/もう一度やる/).click());
+    expect(v.progress().handsOn!.sample.steps).toHaveLength(3);
+    await act(async () => button(/^印を消す$/).click());
+    expect(v.progress().handsOn!.sample).toMatchObject({ steps: [], done: true, redo: true });
+    expect(v.progress().xp.total).toBe(10);
+  });
+  it('する手順が 1 つも無い章は、完了にできない', async () => {
+    const v = await mount(macUser(), { ...sample, steps: sample.steps.filter((s) => s.os === 'windows') });
+    expect(v.boxes()).toHaveLength(0);
+    expect(v.disabled()).toBe(true);
+  });
+  it('同じ行が 2 回ある手順でも、行の意味を全部出す', async () => {
+    const s = { ...sample.steps[3], lines: [{ code: 'id -u', text: '1 回目' }, { code: 'id -u', text: '2 回目' }] };
+    const v = await mount(macUser(), { ...sample, steps: [s] });
+    expect([...v.el.querySelectorAll('.hb-lines dd')].map((x) => x.textContent)).toEqual(['1 回目', '2 回目']);
   });
   it('途中で閉じても、開き直すと印が残っている', async () => {
     const v = await mount(markHandsOnStep(macUser(), 'sample', 'install-mac', true, at));

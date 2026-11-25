@@ -26,6 +26,9 @@ export function markedCount(chapter: Pick<HandsOnMeta, 'steps'>, rec: HandsOnRec
   return { marked: mine.filter((s) => rec?.steps.includes(s.id)).length, total: mine.length };
 }
 
+/** 完了にできるか: その OS の人がする手順が 1 つ以上あり、全部に印がある */
+export const canComplete = (n: { marked: number; total: number }) => n.total > 0 && n.marked >= n.total;
+
 /** 一覧に出す章の状態 */
 export function chapterStatus(chapter: Pick<HandsOnMeta, 'id' | 'steps'>, p: Progress, os: HandsOnOs): { done: boolean; text: string } {
   const rec = p.handsOn?.[chapter.id];

@@ -3297,6 +3297,10 @@ html[data-loading='true'] body::before {
   gap: 8px;
 }
 
+.ho-done {
+  margin: 0;
+}
+
 .ho-steps {
   gap: 32px;
 }

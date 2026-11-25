@@ -1,6 +1,7 @@
 // 実践の章 (/hands-on/<id>/)。手順ごとに、なぜ・コマンド・1 行ずつの意味・実機の出力・読み方・つまずいた時・出典を出し、
 // 印を全部付けると完了にできる。印は章の途中で閉じても残る (kcna.v1 の handsOn)。OS ごとの手順は、選んだ OS の分だけ出す
-import { useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { AlertDialog } from '@astryxdesign/core/AlertDialog';
 import { AppShell } from '@astryxdesign/core/AppShell';
 import { Button } from '@astryxdesign/core/Button';
 import { CheckboxInput } from '@astryxdesign/core/CheckboxInput';
@@ -25,7 +26,7 @@ import { HANDS_ON_CHAPTERS } from '../content/handsOnChapters';
 import type { HandsOnChapter as Chapter, HandsOnOs, HandsOnStep } from '../content/types';
 import { handsOnStepText } from '../lib/askAi';
 import { XP_PER_LAB } from '../lib/grade';
-import { OS_CHOICES, OS_LABEL, WHERE_LABEL, handsOnOs, markedCount, stepsFor } from '../lib/handsOn';
+import { OS_CHOICES, OS_LABEL, WHERE_LABEL, canComplete, handsOnOs, markedCount, stepsFor } from '../lib/handsOn';
 import { completeHandsOn, goalXp, markHandsOnStep, restartHandsOn, setProfile, todayXp, type Progress } from '../lib/progress';
 import { handbookHref, handsOnHref } from '../lib/route';
 import { SITE_NAME } from '../lib/site';
@@ -118,17 +119,25 @@ function StepBody({ step, text, why, ask }: { step: HandsOnStep; text: TermPiece
 export function ChapterView({ chapter: c, chapters, progress, updateProgress }: { chapter: Chapter; chapters: Chapter[]; progress: Progress; updateProgress: Update }) {
   const os = handsOnOs(progress);
   const rec = progress.handsOn?.[c.id];
-  const steps = stepsFor(c.steps, os);
-  const cleanup = stepsFor(c.cleanup, os);
   const hasOs = [...c.steps, ...c.cleanup].some((s) => s.os);
   const { marked, total } = markedCount(c, rec, os);
+  const ready = canComplete({ marked, total });
+  const [confirmRedo, setConfirmRedo] = useState(false);
+  const doneText = useRef<HTMLParagraphElement>(null);
+  const justDone = useRef(false);
   const finished = rec?.done === true && !rec.redo;
-  // 本文の順に、語ごとに最初の 1 回だけリンクにする
-  const link = makeTermLinker(TERM_NAMES);
-  const summary = link(c.summary);
-  const prose = (s: HandsOnStep) => ({ step: s, text: link(s.text), why: link(s.why) });
-  const stepProse = steps.map(prose);
-  const cleanupProse = cleanup.map(prose);
+  // 完了のボタンは押すと無くなるので、フォーカスを完了の文へ移す (キーボードの位置を失わないように)
+  useEffect(() => {
+    if (finished && justDone.current) doneText.current?.focus();
+    justDone.current = false;
+  }, [finished]);
+  // 本文の順に、語ごとに最初の 1 回だけリンクにする。章の全文を読むので、章と OS が替わったときだけ作る
+  // (印を 1 つ付けるたびに作ると、PC で 18〜45ms、スマホではその数倍かかる)
+  const { summary, stepProse, cleanupProse } = useMemo(() => {
+    const link = makeTermLinker(TERM_NAMES);
+    const prose = (s: HandsOnStep) => ({ step: s, text: link(s.text), why: link(s.why) });
+    return { summary: link(c.summary), stepProse: stepsFor(c.steps, os).map(prose), cleanupProse: stepsFor(c.cleanup, os).map(prose) };
+  }, [c, os]);
   const at = chapters.findIndex((x) => x.id === c.id);
   const prev = chapters[at - 1];
   const next = chapters[at + 1];
@@ -216,18 +225,43 @@ export function ChapterView({ chapter: c, chapters, progress, updateProgress }: 
         <h2 id="ho-done" className="hb-h2">
           完了
         </h2>
-        <HStack gap={3} vAlign="center" wrap="wrap">
-          {finished && <StatusDot variant="success" label="完了" />}
-          <Text type={finished ? undefined : 'supporting'} aria-live="polite">
-            {finished ? `完了しました · 今日 ${todayXp(progress, now)} / ${goalXp(progress)} XP` : `印 ${marked} / ${total} 手順`}
-          </Text>
-          <Button
-            variant={finished ? 'secondary' : 'primary'}
-            label={finished ? '印を消してもう一度やる' : `完了にする (+${XP_PER_LAB} XP)`}
-            isDisabled={!finished && marked < total}
-            onClick={() => updateProgress((p) => (finished ? restartHandsOn(p, c.id, new Date()) : completeHandsOn(p, c.id, XP_PER_LAB, new Date())))}
-          />
-        </HStack>
+        {finished ? (
+          <>
+            <HStack gap={3} vAlign="center" wrap="wrap">
+              <StatusDot variant="success" label="完了" />
+              <p ref={doneText} tabIndex={-1} className="ho-done" aria-live="polite">{`完了しました · 今日 ${todayXp(progress, now)} / ${goalXp(progress)} XP`}</p>
+            </HStack>
+            {/* 完了のボタンと同じ所に出さない (二度押しで印が消えないように)。押しても、確かめてから消す */}
+            <div>
+              <Button variant="ghost" size="sm" label="印を消してもう一度やる" onClick={() => setConfirmRedo(true)} />
+            </div>
+          </>
+        ) : (
+          <HStack gap={3} vAlign="center" wrap="wrap">
+            <Text type="supporting" aria-live="polite">{`印 ${marked} / ${total} 手順`}</Text>
+            <Button
+              variant="primary"
+              label={`完了にする (+${XP_PER_LAB} XP)`}
+              isDisabled={!ready}
+              onClick={() => {
+                justDone.current = true;
+                updateProgress((p) => completeHandsOn(p, c.id, XP_PER_LAB, new Date()));
+              }}
+            />
+          </HStack>
+        )}
+        <AlertDialog
+          isOpen={confirmRedo}
+          onOpenChange={setConfirmRedo}
+          title="印を消してもう一度やりますか?"
+          description="この章の手順の印を全部消します。完了の記録と XP は残ります。"
+          actionLabel="印を消す"
+          cancelLabel="やめる"
+          onAction={() => {
+            updateProgress((p) => restartHandsOn(p, c.id, new Date()));
+            setConfirmRedo(false);
+          }}
+        />
       </section>
 
       <section aria-labelledby="ho-challenges" className="hb-section">
