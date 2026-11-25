@@ -69,7 +69,8 @@ function CalendarPlan({ weeklyDays }: { weeklyDays: number | undefined }) {
   );
 }
 
-function summary(p: Progress) {
+/** 記録のまとめの 1 行。完了した実践は、一覧から外した実習 (章が覆ったもの) も、記録のとおり数える */
+export function summary(p: Progress) {
   const doneIds = Object.keys(p.lessons).filter((id) => p.lessons[id].done);
   // 実習 (id が w1-lab の形) は実践として数える
   const labs = doneIds.filter((id) => /^w\d+-lab$/.test(id)).length;

@@ -133,14 +133,18 @@ describe('構造化データとパンくず', { timeout: 30_000 }, () => {
     const l2 = docs.find((d) => d.page.path.startsWith('lesson/w2-'))!;
     expect([...l2.doc.querySelectorAll('#root nav a')].map((a) => a.getAttribute('href'))).toEqual(['/kcna-dojo/', '/kcna-dojo/week/2/']);
   });
-  it('実習のパンくずは実践の下。週のページには問題演習だけを並べ、実習は実践へのリンクにする', () => {
+  /** 章が覆った実習の週は、実習でなく章へ送る */
+  const WEEK_LINKS: Record<number, string[]> = { 1: ['hands-on/vm-setup/', 'hands-on/run-containers/'], 2: ['hands-on/vm-setup/', 'hands-on/install-k3s/', 'hands-on/self-healing/'] };
+  it('実習のパンくずは実践の下。週のページには問題演習だけを並べ、実習 (覆われていれば章) は実践へのリンクにする', () => {
     for (let w = 1; w <= 8; w++) {
       const lab = docs.find((d) => d.page.path === `lesson/w${w}-lab/`)!;
       expect([...lab.doc.querySelectorAll('#root nav a')].map((a) => a.getAttribute('href'))).toEqual(['/kcna-dojo/', '/kcna-dojo/hands-on/']);
       const week = docs.find((d) => d.page.path === `week/${w}/`)!.doc;
       expect([...week.querySelectorAll('h3 a')].map((a) => a.getAttribute('href')).filter((h) => h!.includes('-lab'))).toEqual([]);
+      expect(week.querySelector('#root')!.textContent!.includes('章は 0 章から順に進めます')).toBe(w in WEEK_LINKS);
       const all = [...week.querySelectorAll('#root li a')].map((a) => a.getAttribute('href'));
-      expect(all).toEqual(expect.arrayContaining([`/kcna-dojo/lesson/w${w}-lab/`, '/kcna-dojo/hands-on/']));
+      expect(all.filter((h) => h!.includes('-lab/'))).toEqual(WEEK_LINKS[w] ? [] : [`/kcna-dojo/lesson/w${w}-lab/`]);
+      expect(all).toEqual(expect.arrayContaining([...(WEEK_LINKS[w] ?? [`lesson/w${w}-lab/`]).map((p) => `/kcna-dojo/${p}`), '/kcna-dojo/hands-on/']));
     }
   });
 });

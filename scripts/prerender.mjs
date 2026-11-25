@@ -316,9 +316,10 @@ export async function buildPages(load, { chapters } = {}) {
   const handsOn = await load('/src/content/handsOn.ts');
   const { HANDS_ON_CHAPTERS } = await load('/src/content/handsOnChapters.ts');
   const { OS_LABEL, WHERE_LABEL } = await load('/src/lib/handsOn.ts');
-  const { exercisesOf, labsOf } = await load('/src/lib/lessonStatus.ts');
+  const { exercisesOf } = await load('/src/lib/lessonStatus.ts');
+  const { COVERED_LEAD, COVERED_REST, chapterNo, chaptersOfLab, handsOnLabel, handsOnLinks, listedLabs, restLabs, REST_LEAD } = await load('/src/content/coveredLabs.ts');
   const chapterList = chapters ?? HANDS_ON_CHAPTERS;
-  const labList = WEEKS.flatMap((w) => labsOf(w).map((lab) => ({ lab, week: w.week })));
+  const labList = listedLabs(WEEKS);
   pages.push({
     path: 'hands-on/',
     title: handsOn.HANDS_ON_TITLE,
@@ -329,9 +330,9 @@ export async function buildPages(load, { chapters } = {}) {
       `<p>${esc(handsOn.HANDS_ON_WHO)} ${link('', '問題演習へ')}</p>`,
       '<h2>章</h2>',
       `<p>${esc(chapterList.length > 0 ? handsOn.CHAPTERS_LEAD : handsOn.NO_CHAPTERS)}</p>`,
-      chapterList.length > 0 ? `<ul>${chapterList.map((c) => `<li>${esc(handsOn.chapterNo(c))}: ${link(`hands-on/${c.id}/`, c.title)} (約 ${c.minutes} 分): ${esc(c.summary)}</li>`).join('')}</ul>` : '',
+      chapterList.length > 0 ? `<ul>${chapterList.map((c) => `<li>${esc(chapterNo(c))}: ${link(`hands-on/${c.id}/`, c.title)} (約 ${c.minutes} 分): ${esc(c.summary)}</li>`).join('')}</ul>` : '',
       '<h2>週ごとの実習</h2>',
-      `<p>${esc(handsOn.LABS_LEAD)}</p>`,
+      `<p>${esc(handsOn.LABS_LEAD)}${restLabs(WEEKS).map((l) => ` ${esc(REST_LEAD)} ${link(`lesson/${l.id}/`, l.title)}`).join('')}</p>`,
       `<ul>${labList.map(({ lab, week }) => `<li>第 ${week} 週: ${link(`lesson/${lab.id}/`, lab.title)}: ${esc(lab.goal)}</li>`).join('')}</ul>`,
     ]
       .filter(Boolean)
@@ -365,7 +366,7 @@ export async function buildPages(load, { chapters } = {}) {
       entity: article(c.title, [...c.sources, ...[...c.steps, ...c.cleanup].filter((s) => s.source && !c.sources.some((x) => x.url === s.source)).map((s) => ({ label: new URL(s.source).hostname, url: s.source }))]),
       body: [
         `<h1>${esc(c.title)}</h1>`,
-        `<p>${esc(handsOn.chapterNo(c))} · 約 ${c.minutes} 分</p>`,
+        `<p>${esc(chapterNo(c))} · 約 ${c.minutes} 分</p>`,
         `<p>${esc(c.summary)}</p>`,
         '<h2>始める前に</h2>',
         `<h3>この章でできるようになること</h3><p>${esc(c.goal)}</p>`,
@@ -418,7 +419,7 @@ export async function buildPages(load, { chapters } = {}) {
       title: `第 ${w.week} 週 ${w.title}`,
       description: clip(`第 ${w.week} 週 ${w.title} (${w.domain}・${w.area})。この週で説明できるようにすること: ${w.goals.join('・')}`),
       // 第 1 週はトップと同じ画面なので、h1 も画面と同じサイト名にし、週の名前は h2 にする
-      body: [w.week === 1 ? `<h1>${esc(SITE_TITLE)}</h1>\n<h2>第 1 週 ${esc(w.title)}</h2>` : `<h1>第 ${w.week} 週 ${esc(w.title)}</h1>`, `<p>${esc(w.domain)} · ${esc(w.area)}</p>`, '<h2>この週で説明できるようにすること</h2>', `<ol>${w.goals.map((g) => `<li>${esc(g)}</li>`).join('')}</ol>`, '<h2>先に読む</h2>', `<ul>${w.read.map((r) => `<li>${link(`handbook/${r.topic}/`, r.label)}</li>`).join('')}</ul>`, '<h2>問題演習</h2>', exercisesOf({ content: { lessons: ls } }).map(weekLessonHtml).join('\n'), `<h2>動かして確かめる</h2><ul>${labsOf(w).map((l) => `<li>${link(`lesson/${l.id}/`, l.title)}</li>`).join('')}<li>${link('hands-on/', '実践の一覧')}</li></ul>`].join('\n'),
+      body: [w.week === 1 ? `<h1>${esc(SITE_TITLE)}</h1>\n<h2>第 1 週 ${esc(w.title)}</h2>` : `<h1>第 ${w.week} 週 ${esc(w.title)}</h1>`, `<p>${esc(w.domain)} · ${esc(w.area)}</p>`, '<h2>この週で説明できるようにすること</h2>', `<ol>${w.goals.map((g) => `<li>${esc(g)}</li>`).join('')}</ol>`, '<h2>先に読む</h2>', `<ul>${w.read.map((r) => `<li>${link(`handbook/${r.topic}/`, r.label)}</li>`).join('')}</ul>`, '<h2>問題演習</h2>', exercisesOf({ content: { lessons: ls } }).map(weekLessonHtml).join('\n'), `<h2>${esc(handsOnLabel(w))}</h2><ul>${handsOnLinks(w).map((l) => `<li>${link(l.path, l.label)}</li>`).join('')}<li>${link('hands-on/', '実践の一覧')}</li></ul>`].join('\n'),
     });
     for (const l of ls) {
       const qs = l.kind === 'quiz' ? l.questions : [];
@@ -432,6 +433,7 @@ export async function buildPages(load, { chapters } = {}) {
           `<h1>${esc(l.title)}</h1>`,
           `<p>${esc(l.summary)}</p>`,
           `<p>第 ${w.week} 週「${esc(w.title)}」(${esc(w.domain)} · ${esc(w.area)}) の${l.kind === 'lab' ? '実習です。家のクラスタ (k3s) で手順を順に打ち、全部の手順を確かめたら完了にします' : `レッスンです。${quizShape(qs)}を順に解きます。1 問解くごとに、解説と公式の文書の出典が出ます`}。</p>`,
+          ...(chaptersOfLab(l.id).length > 0 ? [`<p>${esc(COVERED_LEAD)} ${chaptersOfLab(l.id).map((c) => link(`hands-on/${c.id}/`, `${chapterNo(c)}「${c.title}」`)).join('、')}${COVERED_REST[l.id] ? esc(`。${COVERED_REST[l.id]}`) : ''}</p>`] : []),
           l.kind === 'lab'
             ? `<h2>この実習で分かること</h2><p>${esc(l.goal)}</p><h2>用意するもの</h2><ul>${l.needs.map((n) => `<li>${esc(n)}</li>`).join('')}</ul><h2>手順</h2><ol>${l.steps.map((s) => `<li><p>${esc(s.text)}</p>${s.command ? `<pre><code>${esc(s.command)}</code></pre>` : ''}</li>`).join('')}</ol>`
             : `<h2>問題</h2><ol>${qs.map(questionHtml).join('')}</ol>`,

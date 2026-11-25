@@ -314,12 +314,12 @@ async function run(browser, name, width, height) {
   await page.getByRole('heading', { name: 'コンテナの基礎' }).waitFor();
   const startLinks = page.getByRole('link', { name: '開始' });
   const lessonLinks = await page.evaluate(() => [...new Set([...document.querySelectorAll('a[href^="/kcna-dojo/lesson/"]')].map((a) => a.getAttribute('href')))]);
-  check(lessonLinks.length === week1.lessons.length, `${tag} 空の記録でも全部のレッスンと、その週の実習を開ける (${lessonLinks.length} / ${week1.lessons.length})`);
+  check(lessonLinks.length === exercises.length, `${tag} 空の記録でも全部のレッスンを開ける (${lessonLinks.length} / ${exercises.length})`);
   // 週の一覧と数は問題演習だけ。実習は「この週の実践」の小さなリンク
   const listed = await page.evaluate(() => [...new Set([...document.querySelectorAll('.rows a[href*="/lesson/"], table a[href*="/lesson/"]')].map((a) => a.getAttribute('href')))]);
   check(JSON.stringify(listed) === JSON.stringify(exercises.map((l) => `/kcna-dojo/lesson/${l.id}/`)), `${tag} 週の一覧は問題演習だけ (${listed.length})`);
   const weekLabs = page.getByRole('navigation', { name: 'この週の実践' });
-  check(JSON.stringify(await weekLabs.locator('a').evaluateAll((as) => as.map((a) => a.getAttribute('href')))) === JSON.stringify([`/kcna-dojo/lesson/${lab.id}/`, '/kcna-dojo/hands-on/']), `${tag} 週の画面から、その週の実習と実践の一覧へ行ける`);
+  check(JSON.stringify(await weekLabs.locator('a').evaluateAll((as) => as.map((a) => a.getAttribute('href')))) === JSON.stringify(['/kcna-dojo/hands-on/vm-setup/', '/kcna-dojo/hands-on/run-containers/', '/kcna-dojo/hands-on/']), `${tag} 週の画面から、0 章・その週の実習を覆った章・実践の一覧へ行ける`);
   if (width < 768) {
     check(await page.getByText(`0/${exercises.length} 完了`).isVisible(), `${tag} 週の完了の数は問題演習だけ`);
     // 下のタブは 5 つ。どの幅でも字がタブからはみ出さない (復習の数が 2 桁のときも)
@@ -559,15 +559,18 @@ async function run(browser, name, width, height) {
   await page.getByRole('link', { name: '一覧へ戻る' }).click();
   await page.getByRole('heading', { name: '実践', level: 1 }).waitFor();
   check(new URL(page.url()).pathname === '/kcna-dojo/hands-on/', `${tag} 実習の「一覧へ戻る」は実践の一覧`);
-  check(await page.getByText('1 / 8 完了').isVisible(), `${tag} 実践の一覧に、週ごとの実習の完了の数が出る`);
-  check((await page.locator('a.cmp-card[href^="/kcna-dojo/lesson/w"]').count()) === 8 && (await page.locator('a.cmp-card[href^="/kcna-dojo/hands-on/"]').count()) === chapters.length, `${tag} 実践の一覧に、章 ${chapters.length} と実習 8 本が並ぶ`);
+  check(await page.getByText('0 / 6 完了').isVisible(), `${tag} 章が覆った実習は、完了していても一覧の数に入れない`);
+  check((await page.locator('a.cmp-card[href^="/kcna-dojo/lesson/w"]').count()) === 6 && (await page.locator('a.cmp-card[href^="/kcna-dojo/hands-on/"]').count()) === chapters.length, `${tag} 実践の一覧に、章 ${chapters.length} と、章が覆っていない実習 6 本が並ぶ`);
+  check((await page.locator('p a[href="/kcna-dojo/lesson/w2-lab/"]').count()) === 1, `${tag} 実践の一覧の説明から、複数のノードの実習へ行ける`);
   check((await page.title()) === '実践 | クラネイ', `${tag} 実践の一覧の題名 (${await page.title()})`);
   await noHorizontalOverflow(page, width, `${tag} 実践の一覧`);
   await page.goto(`${BASE}lesson/${lab.id}/`);
   check((await page.getByRole('link', { name: 'レッスンを閉じる' }).getAttribute('href')) === '/kcna-dojo/hands-on/', `${tag} 実習を閉じる先は実践の一覧`);
+  await page.waitForFunction(() => !document.querySelector('#root > main.prerender'));
+  check((await page.locator('.lesson__main a[href="/kcna-dojo/hands-on/run-containers/"]').count()) === 1, `${tag} 章が覆った実習の頭に、章へのリンクが出る`);
   await page.goto(`${BASE}progress/`);
   await page.getByRole('heading', { name: '週ごとの進み具合 (問題演習)' }).waitFor();
-  check((await page.getByRole('listitem').filter({ hasText: '第 1 週 コンテナの基礎' }).last().innerText()).includes(`/ ${exercises.length}`) && (await page.getByRole('listitem').filter({ hasText: '週ごとの実習' }).last().innerText()).includes('1 / 8'), `${tag} 進捗は、問題演習と実践を別に数える`);
+  check((await page.getByRole('listitem').filter({ hasText: '第 1 週 コンテナの基礎' }).last().innerText()).includes(`/ ${exercises.length}`) && (await page.getByRole('listitem').filter({ hasText: '週ごとの実習' }).last().innerText()).includes('0 / 6'), `${tag} 進捗は、問題演習と実践を別に数える`);
   // 無い章は「見つかりませんでした」と一覧へのリンク
   await page.goto(`${BASE}hands-on/no-such-chapter/`);
   await page.getByRole('heading', { name: '見つかりませんでした' }).waitFor();

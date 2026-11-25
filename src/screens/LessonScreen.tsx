@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { Fragment, useCallback, useMemo, useState, type ReactNode } from 'react';
 import { Button } from '@astryxdesign/core/Button';
 import { CheckboxList, CheckboxListItem } from '@astryxdesign/core/CheckboxList';
 import { Link } from '@astryxdesign/core/Link';
@@ -17,6 +17,7 @@ import { labStepText } from '../lib/askAi';
 import { XP_PER_CORRECT, XP_PER_LAB } from '../lib/grade';
 import { answerHistory, completeLesson, currentStreak, goalXp, recordAnswer, todayXp, type Progress } from '../lib/progress';
 import { shuffleChoices } from '../lib/shuffle';
+import { COVERED_LEAD, COVERED_REST, chapterNo, chaptersOfLab } from '../content/coveredLabs';
 import { WEEKS } from '../content/curriculum';
 import { handbookHref, handsOnHref, lessonHref, weekHref } from '../lib/route';
 import ShareButton from '../components/ShareButton';
@@ -207,13 +208,30 @@ export function QuestionRun({
   );
 }
 
+/** 章が覆った実習に出す、章へのリンク (頭と結果の画面) */
+function CoveredNote({ labId }: { labId: string }) {
+  const chapters = chaptersOfLab(labId);
+  if (chapters.length === 0) return null;
+  return (
+    <p className="hb-lead">
+      {COVERED_LEAD}{' '}
+      {chapters.map((c, i) => (
+        <Fragment key={c.id}>
+          {i > 0 && '、'}
+          <Link href={handsOnHref(c.id)}>{`${chapterNo(c)}「${c.title}」`}</Link>
+        </Fragment>
+      ))}
+      {COVERED_REST[labId] && `。${COVERED_REST[labId]}`}
+    </p>
+  );
+}
+
 function LabRun({ lesson, week, progress, updateProgress }: Props & { lesson: LabLesson }) {
   const [checked, setChecked] = useState<string[]>([]);
   const [finished, setFinished] = useState(false);
   const total = lesson.steps.length;
   const allDone = checked.length === total;
   const read = WEEKS.find((w) => w.week === week)?.read ?? [];
-
   const finish = () => {
     updateProgress((p) => completeLesson(p, lesson.id, { correct: 1, total: 1 }, XP_PER_LAB, new Date()));
     setFinished(true);
@@ -232,6 +250,7 @@ function LabRun({ lesson, week, progress, updateProgress }: Props & { lesson: La
         ]}
         progress={progress}
         rows={[]}
+        note={chaptersOfLab(lesson.id).length > 0 && <CoveredNote labId={lesson.id} />}
         share={{ text: lessonShareText(total, total).replace('問正解', '手順'), url: shareUrl(lessonHref(lesson.id)) }}
       />
     );
@@ -245,6 +264,7 @@ function LabRun({ lesson, week, progress, updateProgress }: Props & { lesson: La
           <QuestionHeadingLevel.Provider value={2}>
             <QuestionHead kind="実習 · 家のクラスタ (k3s) で動かす" domain={lesson.domain} prompt={lesson.title} />
           </QuestionHeadingLevel.Provider>
+          <CoveredNote labId={lesson.id} />
           <section className="lab-prep" aria-labelledby="lab-prep-title">
             <h2 id="lab-prep-title" className="h-sm">
               始める前に
@@ -330,7 +350,10 @@ function ResultView({
   rows,
   onRetry,
   share,
+  note,
 }: {
+  /** 問題ごとの結果の下、ボタンの上に出す文 (覆った実習の章へのリンク) */
+  note?: ReactNode;
   share?: ShareData;
   backHref: string;
   onBack?: () => void;
@@ -391,6 +414,8 @@ function ResultView({
           </div>
         </>
       )}
+
+      {note && <div className="result__note">{note}</div>}
 
       <div className="result__actions">
         {share && (

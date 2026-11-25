@@ -12,11 +12,8 @@ export const HANDS_ON_TITLE = '実践';
 export const HANDS_ON_LEAD = '読んだことや問題で覚えたことを、自分の端末で動かして確かめるページです。完了の数は問題演習とは別に数えます。';
 export const HANDS_ON_WHO = 'Kubernetes が初めての人は、問題演習と実践の両方を進めます。問題だけ解きたい人は、問題演習だけで進められます。どちらも好きな順に開けます。';
 export const CHAPTERS_LEAD = '手順ごとに、なぜするのか・コマンドの意味・出力の読み方・つまずいた時の直し方まで書いた章です。';
-export const LABS_LEAD = '問題演習の週に合わせた、短い実習です。k3s のクラスタを用意してから始めます。';
+export const LABS_LEAD = '問題演習の週に合わせた、短い実習です。k3s のクラスタを用意してから始めます。中身を章に入れた実習は、ここには並べません。';
 export const NO_CHAPTERS = '章は準備中です。';
-
-/** 章の番号 ("0 章") */
-export const chapterNo = (c: { order: number }) => `${c.order} 章`;
 
 /** 章のページの短い題名 (画面・書き出す HTML で共通) */
 export const chapterTitle = (id: string, chapters: Pick<HandsOnMeta, 'id' | 'title' | 'short'>[] = HANDS_ON) => {
