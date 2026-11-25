@@ -1,7 +1,10 @@
-// 実践の章の軽い一覧 (?meta: 手順は id と OS だけ)。実践の一覧・進捗・題名が読む。章の全文は handsOnChapters.ts (章を開いたときだけ読む)
+// 実践の章の軽い一覧 (?meta: 手順は id と OS だけ)。実践の一覧・進捗・題名が読む。章の全文は handsOnChapters.ts (開いた章の分だけ読む)
 import type { HandsOnMeta } from './types';
 
 const FILES = import.meta.glob<HandsOnMeta>('./hands-on/*.json', { eager: true, import: 'default', query: '?meta' });
+
+/** 章の id → ファイルの道 (handsOnChapters.ts が、開いた章のファイルを引く) */
+export const HANDS_ON_FILES: ReadonlyMap<string, string> = new Map(Object.entries(FILES).map(([file, c]) => [c.id, file]));
 
 /** 章の並び。1 章も無くても空の配列になる */
 export const HANDS_ON: HandsOnMeta[] = Object.values(FILES).sort((a, b) => a.order - b.order);
