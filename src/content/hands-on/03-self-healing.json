@@ -996,7 +996,7 @@
       "where": "vm",
       "code": {
         "language": "bash",
-        "text": "kubectl expose deployment web --port=80 -n ch3\nkubectl wait --for=create endpointslice -l kubernetes.io/service-name=web -n ch3 --timeout=60s\nsleep 3\nkubectl get endpointslice -l kubernetes.io/service-name=web -n ch3 -o jsonpath='{range .items[*].endpoints[*]}{.targetRef.name} {.addresses[0]} ready={.conditions.ready}{\"\\n\"}{end}'\nSVC_IP=$(kubectl get service web -n ch3 -o jsonpath='{.spec.clusterIP}')\ncurl -s http://$SVC_IP | grep title"
+        "text": "kubectl expose deployment web --port=80 -n ch3\nkubectl wait --for=create endpointslice -l kubernetes.io/service-name=web -n ch3 --timeout=60s\nfor i in $(seq 60); do [ \"$(kubectl get endpointslice -l kubernetes.io/service-name=web -n ch3 -o jsonpath='{.items[*].endpoints[*].conditions.ready}' | grep -o true | wc -l)\" -ge 2 ] && break; sleep 2; done\nsleep 3\nkubectl get endpointslice -l kubernetes.io/service-name=web -n ch3 -o jsonpath='{range .items[*].endpoints[*]}{.targetRef.name} {.addresses[0]} ready={.conditions.ready}{\"\\n\"}{end}'\nSVC_IP=$(kubectl get service web -n ch3 -o jsonpath='{.spec.clusterIP}')\ncurl -s http://$SVC_IP | grep title"
       },
       "lines": [
         {
@@ -1008,8 +1008,12 @@
           "text": "渡す先の一覧 (EndpointSlice) ができるまで待つ"
         },
         {
+          "code": "for i in $(seq 60); do [ \"$(kubectl get endpointslice -l kubernetes.io/service-name=web -n ch3 -o jsonpath='{.items[*].endpoints[*].conditions.ready}' | grep -o true | wc -l)\" -ge 2 ] && break; sleep 2; done",
+          "text": "受けられる渡す先が 2 つ入るまで、2 秒おきに見て待つ (最大 120 秒。休んだあとは、少しかかる)"
+        },
+        {
           "code": "sleep 3",
-          "text": "渡す先が入るまで 3 秒待つ"
+          "text": "伝わるまで 3 秒待つ"
         },
         {
           "code": "kubectl get endpointslice -l kubernetes.io/service-name=web -n ch3 -o jsonpath='{range .items[*].endpoints[*]}{.targetRef.name} {.addresses[0]} ready={.conditions.ready}{\"\\n\"}{end}'",

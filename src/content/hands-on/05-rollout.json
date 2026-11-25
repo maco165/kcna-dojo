@@ -66,7 +66,7 @@
       "where": "vm",
       "code": {
         "language": "bash",
-        "text": "hostname\nkubectl get nodes"
+        "text": "hostname\nkubectl get nodes\nkubectl describe node kcna | grep Taints\nkubectl get node kcna -L disktype"
       },
       "lines": [
         {
@@ -76,10 +76,18 @@
         {
           "code": "kubectl get nodes",
           "text": "ノードの一覧を出す"
+        },
+        {
+          "code": "kubectl describe node kcna | grep Taints",
+          "text": "ノードの印 (taint) を出す"
+        },
+        {
+          "code": "kubectl get node kcna -L disktype",
+          "text": "ノードの disktype のラベルの列も出す"
         }
       ],
-      "output": "kcna\nNAME   STATUS   ROLES           AGE   VERSION\nkcna   Ready    control-plane   52m   v1.36.6+k3s1",
-      "read": "kcna と出て、ノードの STATUS が Ready なら進めます。VERSION が v1.36.6+k3s1 でない人は、出力の版を読み替えます。",
+      "output": "kcna\nNAME   STATUS   ROLES           AGE   VERSION\nkcna   Ready    control-plane   46m   v1.36.6+k3s1\nTaints:             <none>\nNAME   STATUS   ROLES           AGE   VERSION        DISKTYPE\nkcna   Ready    control-plane   46m   v1.36.6+k3s1",
+      "read": "kcna と出て、ノードの STATUS が Ready なら進めます。VERSION が v1.36.6+k3s1 でない人は、出力の版を読み替えます。Taints が <none> で、DISKTYPE の列が空なら、4 章の練習の跡は残っていません。",
       "trouble": [
         {
           "symptom": "kcna ではない名前が出る",
@@ -95,6 +103,11 @@
           "symptom": "permission denied や localhost:8080 と出る",
           "check": "echo $KUBECONFIG を打つ",
           "fix": "空なら export KUBECONFIG=~/.kube/k3s.yaml を打つ"
+        },
+        {
+          "symptom": "Taints に demo=yes:NoSchedule が出る、または DISKTYPE に ssd が出る",
+          "check": "4 章の taint か selector の手順を、途中でやめたかを思い出す",
+          "fix": "kubectl taint nodes kcna demo=yes:NoSchedule- と kubectl label node kcna disktype- を打って戻す。無いほうは not found などと出るが、かまわない"
         }
       ],
       "source": "https://kubernetes.io/docs/concepts/architecture/nodes/"
@@ -367,7 +380,7 @@
           "text": "更新の記録を出す"
         }
       ],
-      "output": "deployment.apps/web image updated\ndeployment.apps/web annotated\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 2 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 2 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 2 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"web\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"web\" rollout to finish: 1 old replicas are pending termination...\ndeployment \"web\" successfully rolled out\nServer: nginx/1.27.5\nNAME             DESIRED   CURRENT   READY   AGE\nweb-54d8757ff5   0         0         0       26s\nweb-6c99889ff4   3         3         3       8s\ndeployment.apps/web\nREVISION  CHANGE-CAUSE\n1         1.26 で始める\n2         1.27 に更新",
+      "output": "deployment.apps/web image updated\ndeployment.apps/web annotated\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 2 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 2 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 2 old replicas are pending termination...\nWaiting for deployment \"web\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"web\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"web\" rollout to finish: 1 old replicas are pending termination...\ndeployment \"web\" successfully rolled out\nServer: nginx/1.27.5\nNAME             DESIRED   CURRENT   READY   AGE\nweb-54d8757ff5   0         0         0       27s\nweb-6c99889ff4   3         3         3       9s\ndeployment.apps/web\nREVISION  CHANGE-CAUSE\n1         1.26 で始める\n2         1.27 に更新",
       "read": "ReplicaSet が 2 つになり、古いほうは DESIRED が 0 のまま残っています。これが、戻すときに使う控えです。記録は 2 行になりました。理由を書いておかないと、CHANGE-CAUSE は <none> になるか、前の理由のままになります。",
       "trouble": [
         {
@@ -458,7 +471,7 @@
           "text": "更新の記録を出す"
         }
       ],
-      "output": "Warning: resource deployments/web was previously managed with 'kubectl apply'. Rolling back will not update the kubectl.kubernetes.io/last-applied-configuration annotation, which may cause unexpected behavior on future 'kubectl apply' operations. Consider using 'kubectl apply' with your previous configuration file instead.\ndeployment.apps/web rolled back\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 2 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 2 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 2 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 2 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"web\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"web\" rollout to finish: 1 old replicas are pending termination...\ndeployment \"web\" successfully rolled out\nnginx:1.26-alpine\nServer: nginx/1.26.3\nNAME             DESIRED   CURRENT   READY   AGE\nweb-54d8757ff5   3         3         3       34s\nweb-6c99889ff4   0         0         0       16s\ndeployment.apps/web\nREVISION  CHANGE-CAUSE\n2         1.27 に更新\n3         1.26 で始める",
+      "output": "Warning: resource deployments/web was previously managed with 'kubectl apply'. Rolling back will not update the kubectl.kubernetes.io/last-applied-configuration annotation, which may cause unexpected behavior on future 'kubectl apply' operations. Consider using 'kubectl apply' with your previous configuration file instead.\ndeployment.apps/web rolled back\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 2 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 2 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 2 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"web\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"web\" rollout to finish: 1 old replicas are pending termination...\ndeployment \"web\" successfully rolled out\nnginx:1.26-alpine\nServer: nginx/1.26.3\nNAME             DESIRED   CURRENT   READY   AGE\nweb-54d8757ff5   3         3         3       36s\nweb-6c99889ff4   0         0         0       18s\ndeployment.apps/web\nREVISION  CHANGE-CAUSE\n2         1.27 に更新\n3         1.26 で始める",
       "read": "Warning は、「apply で作ったものを undo で戻したので、apply の覚え書き (last-applied-configuration) は古いまま」という注意です。次に apply するとき、ファイルと今がずれているかもしれない、と覚えておきます。1.26 に戻りました。新しく作ったのではなく、残っていた ReplicaSet が増えています。番号 1 は無くなり、同じ中身が 3 になりました。戻すことも、1 つの更新です。戻す先を選ぶなら --to-revision=番号 を付けます。",
       "trouble": [
         {
@@ -509,7 +522,7 @@
           "text": "更新の記録を出す"
         }
       ],
-      "output": "    kubernetes.io/change-cause: \"1.27 にファイルで更新\"\n        image: nginx:1.27-alpine\n-    kubernetes.io/change-cause: 1.26 で始める\n+    kubernetes.io/change-cause: 1.27 にファイルで更新\n-      - image: nginx:1.26-alpine\n+      - image: nginx:1.27-alpine\ndeployment.apps/web configured\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 2 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 2 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"web\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"web\" rollout to finish: 1 old replicas are pending termination...\ndeployment \"web\" successfully rolled out\ndeployment.apps/web\nREVISION  CHANGE-CAUSE\n3         1.26 で始める\n4         1.27 にファイルで更新",
+      "output": "    kubernetes.io/change-cause: \"1.27 にファイルで更新\"\n        image: nginx:1.27-alpine\n-    kubernetes.io/change-cause: 1.26 で始める\n+    kubernetes.io/change-cause: 1.27 にファイルで更新\n-      - image: nginx:1.26-alpine\n+      - image: nginx:1.27-alpine\ndeployment.apps/web configured\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 2 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 2 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 2 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"web\" rollout to finish: 1 old replicas are pending termination...\ndeployment \"web\" successfully rolled out\ndeployment.apps/web\nREVISION  CHANGE-CAUSE\n3         1.26 で始める\n4         1.27 にファイルで更新",
       "read": "diff の - が今、+ が渡した後です。理由もファイルに入っているので、書き忘れません。前の番号 2 と同じ中身なので、番号 2 が無くなり、4 になりました。",
       "trouble": [
         {
@@ -527,17 +540,25 @@
     },
     {
       "id": "surge",
-      "text": "増やしてから減らす更新 (maxSurge 1、maxUnavailable 0) の途中を見ます。30 秒ほどかかります。",
+      "text": "増やしてから減らす更新 (maxSurge 1、maxUnavailable 0) の途中を見ます。50 秒ほどかかります。",
       "why": "maxSurge は「決めた数より、いくつ多くてよいか」、maxUnavailable は「いくつまで使えなくてよいか」です。見やすいように、minReadySeconds で「5 秒続けて使えたら、次へ進む」にします。",
       "where": "vm",
       "code": {
         "language": "bash",
-        "text": "kubectl patch deployment web -n ch5 -p '{\"spec\":{\"minReadySeconds\":5,\"strategy\":{\"rollingUpdate\":{\"maxSurge\":1,\"maxUnavailable\":0}}}}'\nkubectl set image deployment/web web=nginx:1.28-alpine -n ch5\nkubectl annotate deployment web kubernetes.io/change-cause=\"1.28 に更新 (増やしてから)\" --overwrite -n ch5\nfor i in $(seq 15); do kubectl get deployment web -n ch5 --no-headers -o custom-columns='A:.status.updatedReplicas,B:.status.replicas,C:.status.availableReplicas'; sleep 2; done\nkubectl rollout status deployment/web -n ch5 --timeout=180s"
+        "text": "kubectl patch deployment web -n ch5 -p '{\"spec\":{\"minReadySeconds\":5,\"strategy\":{\"rollingUpdate\":{\"maxSurge\":1,\"maxUnavailable\":0}}}}'\nsleep 10\nkubectl wait --for=jsonpath='{.status.availableReplicas}'=3 deployment/web -n ch5 --timeout=60s\nkubectl set image deployment/web web=nginx:1.28-alpine -n ch5\nkubectl annotate deployment web kubernetes.io/change-cause=\"1.28 に更新 (増やしてから)\" --overwrite -n ch5\nfor i in $(seq 15); do kubectl get deployment web -n ch5 --no-headers -o custom-columns='A:.status.updatedReplicas,B:.status.replicas,C:.status.availableReplicas'; sleep 2; done\nkubectl rollout status deployment/web -n ch5 --timeout=180s"
       },
       "lines": [
         {
           "code": "kubectl patch deployment web -n ch5 -p '{\"spec\":{\"minReadySeconds\":5,\"strategy\":{\"rollingUpdate\":{\"maxSurge\":1,\"maxUnavailable\":0}}}}'",
           "text": "更新のしかたを変える。ひな型ではないので、更新は始まらない"
+        },
+        {
+          "code": "sleep 10",
+          "text": "今の Pod が 5 秒続けて使えたとみなされるまで 10 秒待つ"
+        },
+        {
+          "code": "kubectl wait --for=jsonpath='{.status.availableReplicas}'=3 deployment/web -n ch5 --timeout=60s",
+          "text": "使える数が 3 になるまで待つ"
         },
         {
           "code": "kubectl set image deployment/web web=nginx:1.28-alpine -n ch5",
@@ -556,8 +577,8 @@
           "text": "更新が終わるまで待つ"
         }
       ],
-      "output": "deployment.apps/web patched\ndeployment.apps/web image updated\ndeployment.apps/web annotated\n1     4     1\n1     4     2\n1     4     3\n1     4     3\n1     4     3\n1     4     3\n1     4     3\n2     4     3\n2     4     3\n3     4     3\n3     4     3\n3     3     3\n3     3     3\n3     3     3\n3     3     3\ndeployment \"web\" successfully rolled out",
-      "read": "左から、新しい Pod の数・全部の数・使える数です。全部の数は 3 から 4 に増え、使える数は 3 を下回りません。1 つ増やす、使えるのを待つ、1 つ減らす、の繰り返しです。途中の並びは、打つ時とイメージを取る速さで変わります。<none> は 0 のことです。",
+      "output": "deployment.apps/web patched\ndeployment.apps/web condition met\ndeployment.apps/web image updated\ndeployment.apps/web annotated\n1     4     3\n1     4     3\n1     4     3\n1     4     3\n1     4     3\n1     4     3\n1     3     3\n2     4     3\n2     4     3\n3     4     3\n3     4     3\n3     4     4\n3     3     3\n3     3     3\n3     3     3\ndeployment \"web\" successfully rolled out",
+      "read": "左から、新しい Pod の数・全部の数・使える数です。全部の数は 3 から 4 に増え、使える数は 3 を下回りません。先に 10 秒待ったのは、minReadySeconds を変えた直後は、動いている Pod も「まだ 5 秒たっていない」と数え直されて、使える数が一時的に減って見えるためです。1 つ増やす、使えるのを待つ、1 つ減らす、の繰り返しです。途中の並びは、打つ時とイメージを取る速さで変わります。<none> は 0 のことです。",
       "trouble": [
         {
           "symptom": "toomanyrequests や 429 と出る",
@@ -608,12 +629,12 @@
           "text": "更新が終わるまで待つ"
         }
       ],
-      "output": "deployment.apps/web patched\ndeployment.apps/web image updated\ndeployment.apps/web annotated\n1     3     2\n1     3     2\n1     3     2\n1     3     2\n2     3     2\n2     3     2\n3     3     2\n3     3     2\n3     3     2\n3     3     3\n3     3     3\n3     3     3\n3     3     3\n3     3     3\n3     3     3\ndeployment \"web\" successfully rolled out",
+      "output": "deployment.apps/web patched\ndeployment.apps/web image updated\ndeployment.apps/web annotated\n1     3     2\n1     3     2\n1     3     2\n2     3     2\n2     3     2\n2     3     2\n3     3     2\n3     3     2\n3     3     2\n3     3     3\n3     3     3\n3     3     3\n3     3     3\n3     3     3\n3     3     3\ndeployment \"web\" successfully rolled out",
       "read": "今度は、全部の数が 3 を超えません。代わりに、使える数が 2 に減る時があります。既定は、どちらも 25% です (3 つなら、maxSurge は切り上げて 1、maxUnavailable は切り捨てて 0)。",
       "trouble": [
         {
           "symptom": "使える数が 2 にならない",
-          "check": "WATCH の行を、set image のすぐ後に打ったかを見る",
+          "check": "2 秒おきに数を出す行を、set image のすぐ後に打ったかを見る",
           "fix": "更新が速く終わった。イメージを 1.28 に替えて、もう一度見る"
         }
       ],
@@ -688,7 +709,7 @@
           "text": "返事の番号ごとに数える"
         }
       ],
-      "output": "[1] 46983\ndeployment.apps/web image updated\ndeployment.apps/web annotated\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 2 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 2 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 2 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"web\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"web\" rollout to finish: 1 old replicas are pending termination...\ndeployment \"web\" successfully rolled out\n    150 200",
+      "output": "[1] 41173\ndeployment.apps/web image updated\ndeployment.apps/web annotated\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 2 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 2 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 2 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"web\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"web\" rollout to finish: 1 old replicas are pending termination...\ndeployment \"web\" successfully rolled out\n    150 200",
       "read": "200 は「うまくいった」です。全部 200 なら、止まっていません。readiness で、使える Pod だけに渡すことと、preStop で、消える Pod が渡す先から外れるのを 3 秒待つことの 2 つが効いています。000 が混ざるときは「つなげなかった」です。1 行目の [1] と数字は、裏で動かしたものの番号です。終わると、[1]+ Done という知らせも出ます。",
       "trouble": [
         {
@@ -707,7 +728,7 @@
           "fix": "マシンが忙しいと、外れるのが 3 秒に間に合わないことがある。もう一度行う"
         }
       ],
-      "source": "https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/"
+      "source": "https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/"
     },
     {
       "id": "break",
@@ -887,8 +908,8 @@
           "text": "返事の番号ごとに数える"
         }
       ],
-      "output": "deployment.apps/slow created\nWaiting for deployment \"slow\" rollout to finish: 0 of 2 updated replicas are available...\nWaiting for deployment \"slow\" rollout to finish: 1 of 2 updated replicas are available...\ndeployment \"slow\" successfully rolled out\nservice/slow exposed\n[1] 48924\ndeployment.apps/slow env updated\nWaiting for deployment \"slow\" rollout to finish: 1 out of 2 new replicas have been updated...\nWaiting for deployment \"slow\" rollout to finish: 1 out of 2 new replicas have been updated...\nWaiting for deployment \"slow\" rollout to finish: 1 out of 2 new replicas have been updated...\nWaiting for deployment \"slow\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"slow\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"slow\" rollout to finish: 1 old replicas are pending termination...\ndeployment \"slow\" successfully rolled out\n     58 000\n    142 200",
-      "read": "更新はすぐに「終わった」と出ます。ところが 000 (つなげない) が混ざります。終わったと言われた時、新しい Pod はまだ起動の途中でした。混ざる数は、打つ時とマシンの速さで変わります。",
+      "output": "deployment.apps/slow created\nWaiting for deployment \"slow\" rollout to finish: 0 of 2 updated replicas are available...\nWaiting for deployment \"slow\" rollout to finish: 1 of 2 updated replicas are available...\ndeployment \"slow\" successfully rolled out\nservice/slow exposed\n[1] 43450\ndeployment.apps/slow env updated\nWaiting for deployment \"slow\" rollout to finish: 1 out of 2 new replicas have been updated...\nWaiting for deployment \"slow\" rollout to finish: 1 out of 2 new replicas have been updated...\nWaiting for deployment \"slow\" rollout to finish: 1 out of 2 new replicas have been updated...\nWaiting for deployment \"slow\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"slow\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"slow\" rollout to finish: 1 old replicas are pending termination...\ndeployment \"slow\" successfully rolled out\n     58 000\n    142 200",
+      "read": "更新はすぐに「終わった」と出ます。ところが 000 (つなげない) が混ざります。理由は 2 つあります。終わったと言われた時、新しい Pod はまだ起動の途中でした (readiness が無い)。それを「使える」とみなして、動いていた古い Pod も先に消されました。混ざる数は、打つ時とマシンの速さで変わります。",
       "trouble": [
         {
           "symptom": "全部 200 になる",
@@ -1091,7 +1112,7 @@
           "text": "slow を片付ける"
         }
       ],
-      "output": "deployment.apps/slow configured\nWaiting for deployment \"slow\" rollout to finish: 1 out of 2 new replicas have been updated...\nWaiting for deployment \"slow\" rollout to finish: 1 out of 2 new replicas have been updated...\nWaiting for deployment \"slow\" rollout to finish: 1 out of 2 new replicas have been updated...\nWaiting for deployment \"slow\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"slow\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"slow\" rollout to finish: 1 old replicas are pending termination...\ndeployment \"slow\" successfully rolled out\n[1] 51041\ndeployment.apps/slow env updated\nWaiting for deployment \"slow\" rollout to finish: 1 out of 2 new replicas have been updated...\nWaiting for deployment \"slow\" rollout to finish: 1 out of 2 new replicas have been updated...\nWaiting for deployment \"slow\" rollout to finish: 1 out of 2 new replicas have been updated...\nWaiting for deployment \"slow\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"slow\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"slow\" rollout to finish: 1 old replicas are pending termination...\ndeployment \"slow\" successfully rolled out\n    200 200\ndeployment.apps \"slow\" deleted from ch5 namespace\nservice \"slow\" deleted from ch5 namespace",
+      "output": "deployment.apps/slow configured\nWaiting for deployment \"slow\" rollout to finish: 1 out of 2 new replicas have been updated...\nWaiting for deployment \"slow\" rollout to finish: 1 out of 2 new replicas have been updated...\nWaiting for deployment \"slow\" rollout to finish: 1 out of 2 new replicas have been updated...\nWaiting for deployment \"slow\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"slow\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"slow\" rollout to finish: 1 old replicas are pending termination...\ndeployment \"slow\" successfully rolled out\n[1] 45478\ndeployment.apps/slow env updated\nWaiting for deployment \"slow\" rollout to finish: 1 out of 2 new replicas have been updated...\nWaiting for deployment \"slow\" rollout to finish: 1 out of 2 new replicas have been updated...\nWaiting for deployment \"slow\" rollout to finish: 1 out of 2 new replicas have been updated...\nWaiting for deployment \"slow\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"slow\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"slow\" rollout to finish: 1 old replicas are pending termination...\ndeployment \"slow\" successfully rolled out\n    200 200\ndeployment.apps \"slow\" deleted from ch5 namespace\nservice \"slow\" deleted from ch5 namespace",
       "read": "全部 200 です。更新は前より時間がかかりました。新しい Pod が本当に使えるまで待ってから、古い Pod を消すためです。",
       "trouble": [
         {
@@ -1150,7 +1171,7 @@
           "text": "返事の番号を出す"
         }
       ],
-      "output": "deployment.apps/web patched\ndeployment.apps/web image updated\ndeployment.apps/web annotated\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nerror: deployment \"web\" exceeded its progress deadline\nNAME                   READY   STATUS         RESTARTS   AGE\nweb-75bd5b4d5c-tvwxn   1/1     Running        0          2m30s\nweb-75bd5b4d5c-wsw9k   1/1     Running        0          2m32s\nweb-75bd5b4d5c-zwmnq   1/1     Running        0          2m36s\nweb-7f8cc8667d-f7lts   0/1     ErrImagePull   0          31s\nAvailable=True MinimumReplicasAvailable\nProgressing=False ProgressDeadlineExceeded\n200",
+      "output": "deployment.apps/web patched\ndeployment.apps/web image updated\ndeployment.apps/web annotated\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nerror: deployment \"web\" exceeded its progress deadline\nNAME                   READY   STATUS             RESTARTS   AGE\nweb-75bd5b4d5c-9mxzj   1/1     Running            0          2m35s\nweb-75bd5b4d5c-tgnl8   1/1     Running            0          2m40s\nweb-75bd5b4d5c-zjgjf   1/1     Running            0          2m38s\nweb-7f8cc8667d-q7pw4   0/1     ImagePullBackOff   0          31s\nAvailable=True MinimumReplicasAvailable\nProgressing=False ProgressDeadlineExceeded\n200",
       "read": "exceeded its progress deadline で、更新は失敗です。新しい Pod は ErrImagePull か ImagePullBackOff で止まり、古い 3 つはそのまま動いています。maxUnavailable が 0 なので、使えるものを減らさないためです。だから返事は 200 です。失敗しても、Deployment は自動では戻しません。",
       "trouble": [
         {
@@ -1193,7 +1214,7 @@
           "text": "一覧を出す"
         }
       ],
-      "output": "Warning: resource deployments/web was previously managed with 'kubectl apply'. Rolling back will not update the kubectl.kubernetes.io/last-applied-configuration annotation, which may cause unexpected behavior on future 'kubectl apply' operations. Consider using 'kubectl apply' with your previous configuration file instead.\ndeployment.apps/web rolled back\ndeployment \"web\" successfully rolled out\nnginx:1.28-alpine\nNAME                   READY   STATUS        RESTARTS   AGE\nweb-75bd5b4d5c-tvwxn   1/1     Running       0          2m31s\nweb-75bd5b4d5c-wsw9k   1/1     Running       0          2m33s\nweb-75bd5b4d5c-zwmnq   1/1     Running       0          2m37s\nweb-7f8cc8667d-f7lts   0/1     Terminating   0          32s",
+      "output": "Warning: resource deployments/web was previously managed with 'kubectl apply'. Rolling back will not update the kubectl.kubernetes.io/last-applied-configuration annotation, which may cause unexpected behavior on future 'kubectl apply' operations. Consider using 'kubectl apply' with your previous configuration file instead.\ndeployment.apps/web rolled back\ndeployment \"web\" successfully rolled out\nnginx:1.28-alpine\nNAME                   READY   STATUS        RESTARTS   AGE\nweb-75bd5b4d5c-9mxzj   1/1     Running       0          2m37s\nweb-75bd5b4d5c-tgnl8   1/1     Running       0          2m42s\nweb-75bd5b4d5c-zjgjf   1/1     Running       0          2m40s\nweb-7f8cc8667d-q7pw4   0/1     Terminating   0          33s",
       "read": "Warning は前と同じ注意です。1.28 に戻り、失敗した Pod は消えます (Terminating で見えることもあります)。動いていた 3 つは、作り直されていません (AGE が続いています)。",
       "trouble": [
         {
@@ -1211,7 +1232,7 @@
       "where": "vm",
       "code": {
         "language": "bash",
-        "text": "kubectl set image deployment/web web=busybox:1.37 -n ch5\nkubectl annotate deployment web kubernetes.io/change-cause=\"わざと起動に失敗する版に\" --overwrite -n ch5\nkubectl rollout status deployment/web -n ch5 --timeout=180s\nkubectl get pods -n ch5\nSVC_IP=$(kubectl get service web -n ch5 -o jsonpath='{.spec.clusterIP}')\ncurl -s -o /dev/null -w '%{http_code}\\n' http://$SVC_IP\nkubectl rollout undo deployment/web -n ch5\nkubectl rollout status deployment/web -n ch5 --timeout=180s\nkubectl get deployment web -n ch5 -o jsonpath='{.spec.template.spec.containers[0].image}{\"\\n\"}'"
+        "text": "kubectl set image deployment/web web=busybox:1.37 -n ch5\nkubectl annotate deployment web kubernetes.io/change-cause=\"わざと起動に失敗する版に\" --overwrite -n ch5\nkubectl rollout status deployment/web -n ch5 --timeout=180s\nkubectl get pods -n ch5\nSVC_IP=$(kubectl get service web -n ch5 -o jsonpath='{.spec.clusterIP}')\ncurl -s -o /dev/null -w '%{http_code}\\n' http://$SVC_IP\nkubectl rollout undo deployment/web -n ch5\nkubectl rollout status deployment/web -n ch5 --timeout=180s\nkubectl get deployment web -n ch5 -o jsonpath='{.spec.template.spec.containers[0].image}{\"\\n\"}'\nkubectl patch deployment web -n ch5 -p '{\"spec\":{\"progressDeadlineSeconds\":600}}'"
       },
       "lines": [
         {
@@ -1249,9 +1270,13 @@
         {
           "code": "kubectl get deployment web -n ch5 -o jsonpath='{.spec.template.spec.containers[0].image}{\"\\n\"}'",
           "text": "Deployment に書かれたイメージを出す"
+        },
+        {
+          "code": "kubectl patch deployment web -n ch5 -p '{\"spec\":{\"progressDeadlineSeconds\":600}}'",
+          "text": "失敗とするまでの秒数を、既定の 600 に戻す"
         }
       ],
-      "output": "deployment.apps/web image updated\ndeployment.apps/web annotated\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nerror: deployment \"web\" exceeded its progress deadline\nNAME                   READY   STATUS             RESTARTS      AGE\nweb-6df97db7c-pm7j5    0/1     CrashLoopBackOff   2 (15s ago)   31s\nweb-75bd5b4d5c-tvwxn   1/1     Running            0             3m2s\nweb-75bd5b4d5c-wsw9k   1/1     Running            0             3m4s\nweb-75bd5b4d5c-zwmnq   1/1     Running            0             3m8s\n200\nWarning: resource deployments/web was previously managed with 'kubectl apply'. Rolling back will not update the kubectl.kubernetes.io/last-applied-configuration annotation, which may cause unexpected behavior on future 'kubectl apply' operations. Consider using 'kubectl apply' with your previous configuration file instead.\ndeployment.apps/web rolled back\ndeployment \"web\" successfully rolled out\nnginx:1.28-alpine",
+      "output": "deployment.apps/web image updated\ndeployment.apps/web annotated\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nerror: deployment \"web\" exceeded its progress deadline\nNAME                   READY   STATUS             RESTARTS      AGE\nweb-6df97db7c-6287z    0/1     CrashLoopBackOff   2 (14s ago)   31s\nweb-75bd5b4d5c-9mxzj   1/1     Running            0             3m8s\nweb-75bd5b4d5c-tgnl8   1/1     Running            0             3m13s\nweb-75bd5b4d5c-zjgjf   1/1     Running            0             3m11s\n200\nWarning: resource deployments/web was previously managed with 'kubectl apply'. Rolling back will not update the kubectl.kubernetes.io/last-applied-configuration annotation, which may cause unexpected behavior on future 'kubectl apply' operations. Consider using 'kubectl apply' with your previous configuration file instead.\ndeployment.apps/web rolled back\ndeployment \"web\" successfully rolled out\nnginx:1.28-alpine\ndeployment.apps/web patched",
       "read": "新しい Pod が、始まっては終わるを繰り返し、RESTARTS が増えています (STATUS は Completed・CrashLoopBackOff などで、打つ時によります)。それでも古い 3 つが返事をしています。",
       "trouble": [
         {
@@ -1361,7 +1386,7 @@
           "text": "更新の記録を出す"
         }
       ],
-      "output": "NAME             DESIRED   CURRENT   READY   AGE\nweb-54d8757ff5   0         0         0       5m17s\nweb-6c99889ff4   0         0         0       4m59s\nweb-6df97db7c    0         0         0       44s\nweb-75bd5b4d5c   0         0         0       4m35s\nweb-75f8ff5756   3         3         3       6s\nweb-7f8cc8667d   0         0         0       76s\ndeployment.apps/web patched\nNAME             DESIRED   CURRENT   READY   AGE\nweb-6df97db7c    0         0         0       50s\nweb-75bd5b4d5c   0         0         0       4m41s\nweb-75f8ff5756   3         3         3       12s\ndeployment.apps/web\nREVISION  CHANGE-CAUSE\n10        わざと起動に失敗する版に\n11        1.28 に更新 (数えながら)\n12        1.27 と MODE をまとめて",
+      "output": "NAME             DESIRED   CURRENT   READY   AGE\nweb-54d8757ff5   0         0         0       5m42s\nweb-6c99889ff4   0         0         0       5m24s\nweb-6df97db7c    0         0         0       45s\nweb-75bd5b4d5c   0         0         0       4m44s\nweb-75f8ff5756   3         3         3       7s\nweb-7f8cc8667d   0         0         0       78s\ndeployment.apps/web patched\nNAME             DESIRED   CURRENT   READY   AGE\nweb-6df97db7c    0         0         0       50s\nweb-75bd5b4d5c   0         0         0       4m49s\nweb-75f8ff5756   3         3         3       12s\ndeployment.apps/web\nREVISION  CHANGE-CAUSE\n10        わざと起動に失敗する版に\n11        1.28 に更新 (数えながら)\n12        1.27 と MODE をまとめて",
       "read": "今のもの 1 つと、控え 2 つの、合わせて 3 つになりました。消えた番号には、もう戻れません。0 にすると、まったく戻せなくなります。",
       "trouble": [
         {
@@ -1419,7 +1444,7 @@
           "text": "更新のしかたを戻す"
         }
       ],
-      "output": "deployment.apps/web patched\n[1] 55231\ndeployment.apps/web image updated\ndeployment.apps/web annotated\nWaiting for deployment \"web\" rollout to finish: 0 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 0 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 0 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 0 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 0 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 0 of 3 updated replicas are available...\nWaiting for deployment \"web\" rollout to finish: 1 of 3 updated replicas are available...\nWaiting for deployment \"web\" rollout to finish: 2 of 3 updated replicas are available...\ndeployment \"web\" successfully rolled out\n     24 000\n    176 200\ndeployment.apps/web patched",
+      "output": "deployment.apps/web patched\n[1] 49635\ndeployment.apps/web image updated\ndeployment.apps/web annotated\nWaiting for deployment \"web\" rollout to finish: 0 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 0 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 0 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 0 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 0 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 0 of 3 updated replicas are available...\nWaiting for deployment \"web\" rollout to finish: 1 of 3 updated replicas are available...\nWaiting for deployment \"web\" rollout to finish: 2 of 3 updated replicas are available...\ndeployment \"web\" successfully rolled out\n      8 000\n    192 200\ndeployment.apps/web patched",
       "read": "000 が混ざりました。古いものが全部消えてから、新しいものが使えるまでの間です。混ざる数は、待ち時間の設定とマシンの速さで変わります。",
       "trouble": [
         {
@@ -1499,7 +1524,7 @@
         }
       ],
       "output": "-        image: nginx:1.28-alpine\n+        image: nginx:1.27-alpine\ndeployment.apps/web configured\ndeployment \"web\" successfully rolled out\n6c6\n<     kubernetes.io/change-cause: \"1.27 にファイルで更新\"\n---\n>     kubernetes.io/change-cause: \"1.28 にファイルで更新\"\n20c20\n<         image: nginx:1.27-alpine\n---\n>         image: nginx:1.28-alpine\ndeployment.apps/web configured\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 1 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 2 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 2 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 2 out of 3 new replicas have been updated...\nWaiting for deployment \"web\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"web\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"web\" rollout to finish: 1 old replicas are pending termination...\ndeployment \"web\" successfully rolled out\nnginx:1.27-alpine\n[{\"name\":\"MODE\",\"value\":\"demo\"}]\ndeployment.apps/web\nREVISION  CHANGE-CAUSE\n11        1.28 に更新 (数えながら)\n13        1.28 にファイルで更新\n14        1.27 にファイルで更新",
-      "read": "diff の < が前、> が新しいファイルです。前のファイルを渡すだけで 1.27 に戻り、理由もファイルのものになりました。手で足した MODE は、ファイルに 1 度も書いていないので残ります。これが、ファイルに無いものは apply では消えない、ということです。",
+      "read": "diff の < が前、> が新しいファイルです。前のファイルを渡すだけで 1.27 に戻り、理由もファイルのものになりました。手で足した MODE は、ファイルに 1 度も書いていないので残ります。apply が消すのは、前に apply で書いて、ファイルから消したものだけです。",
       "trouble": [
         {
           "symptom": "diff の 1 行目で何も出ない",
@@ -1721,7 +1746,7 @@
           "text": "40 回取り、返事の版ごとに数える"
         }
       ],
-      "output": "deployment.apps/shop-stable created\ndeployment.apps/shop-canary created\nWaiting for deployment \"shop-stable\" rollout to finish: 0 of 3 updated replicas are available...\nWaiting for deployment \"shop-stable\" rollout to finish: 1 of 3 updated replicas are available...\nWaiting for deployment \"shop-stable\" rollout to finish: 2 of 3 updated replicas are available...\ndeployment \"shop-stable\" successfully rolled out\ndeployment \"shop-canary\" successfully rolled out\nservice/shop created\n     27 Server: nginx/1.27.5\n     13 Server: nginx/1.28.3",
+      "output": "deployment.apps/shop-stable created\ndeployment.apps/shop-canary created\nWaiting for deployment \"shop-stable\" rollout to finish: 0 of 3 updated replicas are available...\nWaiting for deployment \"shop-stable\" rollout to finish: 1 of 3 updated replicas are available...\nWaiting for deployment \"shop-stable\" rollout to finish: 2 of 3 updated replicas are available...\ndeployment \"shop-stable\" successfully rolled out\ndeployment \"shop-canary\" successfully rolled out\nservice/shop created\n     28 Server: nginx/1.27.5\n     12 Server: nginx/1.28.3",
       "read": "1.27 が多く、1.28 が少し混ざります。4 つのうち 1 つなので 4 回に 1 回くらいですが、数は打つたびに変わります。問題が無ければ canary を増やし、stable を減らします。割合を細かく決める方法は、11 章で扱います。",
       "trouble": [
         {
@@ -1790,7 +1815,7 @@
         }
       ],
       "output": "deployment.apps/shop-canary scaled\nWaiting for deployment \"shop-canary\" rollout to finish: 1 of 3 updated replicas are available...\nWaiting for deployment \"shop-canary\" rollout to finish: 2 of 3 updated replicas are available...\ndeployment \"shop-canary\" successfully rolled out\nservice/shop patched\n     40 Server: nginx/1.28.3\nservice/shop patched\n     40 Server: nginx/1.27.5",
-      "read": "1 度目は全部 1.28、2 度目は全部 1.27 です。混ざらずに切り替わり、すぐに戻せました。代わりに、両方の分の空きが要ります。",
+      "read": "1 度目は全部 1.28、2 度目は全部 1.27 です。混ざらずに切り替わり、すぐに戻せました。代わりに、両方の分の空きが要ります。切り替えるのは新しい接続だけです。前からつながっている接続は、切れるまで前の Pod のままのことがあります。",
       "trouble": [
         {
           "symptom": "混ざる",
@@ -1854,7 +1879,7 @@
           "text": "名前空間の一覧を出す"
         }
       ],
-      "output": "namespace \"ch5\" deleted\nNAME              STATUS   AGE\ndefault           Active   59m\nkube-node-lease   Active   59m\nkube-public       Active   59m\nkube-system       Active   59m",
+      "output": "namespace \"ch5\" deleted\nNAME              STATUS   AGE\ndefault           Active   53m\nkube-node-lease   Active   53m\nkube-public       Active   53m\nkube-system       Active   53m",
       "read": "ch5 が消え、default と kube- で始まる 4 つだけになれば、片付いています。手元の ~/ch5 の YAML は残るので、読み返せます。",
       "trouble": [
         {
@@ -1986,7 +2011,7 @@
           "text": "名前空間の一覧を出す"
         }
       ],
-      "output": "namespace \"practice\" deleted\nNAME              STATUS   AGE\ndefault           Active   60m\nkube-node-lease   Active   60m\nkube-public       Active   60m\nkube-system       Active   60m",
+      "output": "namespace \"practice\" deleted\nNAME              STATUS   AGE\ndefault           Active   54m\nkube-node-lease   Active   54m\nkube-public       Active   54m\nkube-system       Active   54m",
       "read": "default と kube- で始まる 4 つだけになれば、片付いています。k3s は消しません。",
       "trouble": [
         {
