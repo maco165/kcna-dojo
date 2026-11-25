@@ -3,6 +3,7 @@
 // 使い方: node scripts/check-content.mjs [ファイル ...]   (省略すると全部。置き場所が exam/ なら模擬試験用の問題、hands-on/ なら実践の章として見る)
 // 通れば "OK <ファイル>" を出して終了コード 0。1 つでも違えば "NG <ファイル> <id>: <理由>" を出して終了コード 1。
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { privateWords } from './private-words.mjs';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 
 const ROOT = new URL('..', import.meta.url).pathname;
@@ -59,8 +60,12 @@ const CODE_ONLY_KEYS = ['lines', 'output', 'read', 'trouble', 'unverified'];
 const CODE_LANGUAGES = ['bash', 'powershell', 'yaml', 'text'];
 /** ページの題名の上限 (src/lib/pageTitle.ts の TITLE_MAX) */
 const TITLE_MAX = 35;
+const OSES = ['windows', 'mac', 'linux'];
 const seenOrders = new Map(); // order -> file
 const topicIds = new Set(readdirSync(join(CONTENT_DIR, 'handbook')).filter((f) => f.endsWith('.json')).flatMap((f) => JSON.parse(readFileSync(join(CONTENT_DIR, 'handbook', f), 'utf8')).topics.map((t) => t.id)));
+
+/** 中の文字列を全部集める (JSON の \\n などの書き方に惑わされないよう、読み込んだ値で見る) */
+const strings = (v) => (typeof v === 'string' ? [v] : isObject(v) || Array.isArray(v) ? Object.values(v).flatMap(strings) : []);
 
 function checkChapter(c, name, ng, claimId) {
   if (!isObject(c)) return ng('-', '章のオブジェクトにします');
@@ -106,7 +111,7 @@ function checkChapter(c, name, ng, claimId) {
       else if (stepIds.has(s.id)) ng(cid, `${w} の id ${s.id} が章の中で重複しています`);
       else stepIds.add(s.id);
       for (const k of ['text', 'why']) if (!isNonEmptyString(s[k])) ng(cid, `${w} に ${k} がありません`);
-      if (s.os !== undefined && !['windows', 'mac', 'linux'].includes(s.os)) ng(cid, `${w} の os は windows / mac / linux のどれかにします`);
+      if (s.os !== undefined && !OSES.includes(s.os)) ng(cid, `${w} の os は windows / mac / linux のどれかにします`);
       if (s.where !== undefined && !['host', 'vm'].includes(s.where)) ng(cid, `${w} の where は host か vm にします`);
       for (const k of ['output', 'read', 'unverified']) if (s[k] !== undefined && !isNonEmptyString(s[k])) ng(cid, `${w} の ${k} は空でない文字列にします`);
       if (s.source !== undefined && !isHttpsUrl(s.source)) ng(cid, `${w} の source は https の URL にします`);
@@ -128,6 +133,7 @@ function checkChapter(c, name, ng, claimId) {
       }
       for (const l of got) if (isObject(l)) unknown(l, ['code', 'text'], `${w} の lines の `);
       if (s.output === undefined && s.unverified === undefined) ng(cid, `${w} に output (実機の出力) がありません。実機で確かめていなければ unverified に書きます`);
+      if (s.output !== undefined && s.unverified !== undefined) ng(cid, `${w} は output (実機の出力) と unverified (実機で未確認) を両方持てません`);
       if (s.read === undefined) ng(cid, `${w} に read (出力の読み方) がありません`);
       if (s.source === undefined) ng(cid, `${w} に source (出典の https の URL) がありません`);
       if (!Array.isArray(s.trouble) || s.trouble.length === 0) ng(cid, `${w} に trouble (つまずいた時) が 1 件以上要ります`);
@@ -137,6 +143,12 @@ function checkChapter(c, name, ng, claimId) {
       }
     }
   }
+
+  // どの OS を選んでも、する手順があること (0 件だと、何もせずに完了にできてしまう)
+  if (Array.isArray(c.steps)) {
+    for (const os of OSES) if (!c.steps.some((s) => s?.os === undefined || s?.os === os)) ng(cid, `${os} の人がする手順 (steps) が 1 つもありません`);
+  }
+  for (const w of privateWords(strings(c).join('\n'))) ng(cid, `載せてはいけない名前・住所があります: ${w}`);
 
   if (!Array.isArray(c.challenges) || c.challenges.length === 0) ng(cid, 'challenges (課題) が 1 つ以上要ります');
   for (const [i, x] of (Array.isArray(c.challenges) ? c.challenges : []).entries()) {

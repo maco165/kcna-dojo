@@ -4,6 +4,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
+// @ts-expect-error 検査の規則は JS
+import { privateWords } from '../scripts/private-words.mjs';
+
 const SCRIPT = join(__dirname, '../scripts/check-content.mjs');
 const CHAPTER = join(__dirname, 'fixtures/hands-on/sample.json');
 const WEEK1 = join(__dirname, '../src/content/week1.json');
@@ -153,6 +156,15 @@ describe('check-content: 実践の章', { timeout: 120_000 }, () => {
     ['空の unverified では output を省けない', (d) => { delete step(d).output; step(d).unverified = ' '; }, /unverified は空でない/],
     ['知らない欄 (つづりの間違い)', (d) => (step(d).outputs = 'x'), /outputs という欄は使いません/],
     ['code の無い手順に output', (d) => (d.steps[0].output = 'x'), /code のある手順にだけ/],
+    ['Linux の人がする手順が無い', (d) => (d.steps = d.steps.filter((s: any) => s.os)), /linux の人がする手順/],
+    ['output と unverified の両方', (d) => (step(d).unverified = '未確認'), /両方持てません/],
+    ['家のネットワークの住所', (d) => (step(d).output = '192.168.0.5'), /載せてはいけない.*192\.168/],
+    ['家のクラスタの名前', (d) => (d.challenges[0].answer = 'ssh slave-1'), /載せてはいけない.*slave-1/],
+    ['Linux のログイン名', (d) => (step(d).output = '/home/taro/.kube'), /載せてはいけない.*\/home\/taro/],
+    ['Mac のログイン名', (d) => (step(d).lines[0].text = '/Users/taro を見る'), /載せてはいけない.*\/Users\/taro/],
+    ['Windows のログイン名', (d) => (step(d).output = 'PS C:\\Users\\taro>'), /載せてはいけない.*Users/],
+    ['端末の行頭の利用者名', (d) => (step(d).output = 'taro@kcna:~$ id -u'), /載せてはいけない.*taro@kcna/],
+    ['端末の行頭のホスト名', (d) => (step(d).output = 'ubuntu@mypc:~$ id -u\n1000'), /載せてはいけない.*ubuntu@mypc/],
     ['長い題名に short が無い', (d) => (d.title = 'あ'.repeat(36)), /short/],
     ['後片付けの手順も同じ検査', (d) => (d.cleanup[0].code = { language: 'bash', text: 'exit' }), /cleanup\[0\].*lines/],
   ];
@@ -160,6 +172,12 @@ describe('check-content: 実践の章', { timeout: 120_000 }, () => {
     const r = run(chapter('broken', fn));
     expect(r.code).toBe(1);
     expect(r.out).toMatch(why);
+  });
+
+  it('章の仮想マシンの名前は通し、走らせている端末の名前は落とす', () => {
+    expect(run(chapter('vm', (d) => (step(d).output = 'ubuntu@kcna:~$ id -u\n1000\n/home/ubuntu\nroot@kcna:~# macOS'))).code).toBe(0);
+    expect(privateWords('node-Taro-pc ready', ['taro-pc'])).toHaveLength(1);
+    expect(privateWords('macOS と maco165', ['maco'])).toEqual([]);
   });
 
   it('unverified があれば output を省ける', () => {
