@@ -37,8 +37,11 @@ export function commandRows(code: string): string[] {
       if (raw.trim() === end) end = null;
       continue;
     }
-    const line = `${joined}${joined && ' '}${dropComment(raw).trim()}`;
-    if (/\\$/.test(line) && /\\\s*$/.test(raw)) {
+    // 続きの行は、つないでからコメントを落とす (行をまたぐ引用符の中の # を落とさないように)。
+    // 続くのは、奇数個の \ が行末ちょうどにあり、コメントの中でないときだけ
+    const whole = `${joined}${joined && ' '}${raw.trimStart()}`;
+    const line = dropComment(whole).trim();
+    if ((raw.match(/\\+$/)?.[0].length ?? 0) % 2 === 1 && line.endsWith('\\')) {
       joined = line.slice(0, -1).trimEnd();
       continue;
     }
@@ -81,7 +84,7 @@ export function linkShell(line: string, commands: CommandBrief[]): { pieces: She
       continue;
     }
     // コマンドの前の「名前=値」(そのコマンドにだけ渡す環境変数) は飛ばす
-    const env = head ? rest.match(/^[A-Za-z_]\w*=(?:'[^']*'|"[^"$`]*"|[^\s'"$`|;&]*)\s+/)?.[0] : undefined;
+    const env = head ? rest.match(/^[A-Za-z_]\w*=(?:'[^']*'|"(?:\\.|[^"\\$`])*"|[^\s'"$`|;&\\()]*)\s+/)?.[0] : undefined;
     if (env) {
       plain += env;
       i += env.length;
