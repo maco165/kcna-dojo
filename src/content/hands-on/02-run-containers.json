@@ -66,7 +66,7 @@
     },
     {
       "id": "check-host",
-      "text": "仮想マシンの中で、どのマシンにいるかと、クラスターの様子を見ます。hostname が kcna でなければ、先へ進まず multipass shell kcna で入ります。枠は、端末によって、まとめて貼れるものと、1 行ずつ貼るほうがよいものがあります。0 章の sudo の手順で 2 行目が動かなかった人は、1 行ずつ貼ります (EOF で終わる書き込みの部分は、EOF まで続けて貼ります)。",
+      "text": "仮想マシンの中で、どのマシンにいるかと、クラスターの様子を見ます。hostname が kcna でなければ、先へ進まず multipass shell kcna で入ります。枠は、迷ったら 1 行ずつ貼ります。sudo などのあとの行は、端末によって、まとめて貼ると消えることがあるためです (EOF で終わる書き込みの部分は、EOF まで続けて貼ります)。",
       "why": "自分の PC の別のクラスターで打たないためです。",
       "where": "vm",
       "code": {
@@ -1851,7 +1851,7 @@
         },
         {
           "symptom": "timed out waiting for the condition と出る",
-          "check": "kubectl get pod web -n ch2 -o custom-columns='NAME:.metadata.name,IMAGE:.spec.containers[0].image' と kubectl get pod web -n ch2 を打つ",
+          "check": "kubectl get pod web -n ch2 -o custom-columns='NAME:.metadata.name,IMAGE:.status.containerStatuses[0].image' と kubectl get pod web -n ch2 を打つ",
           "fix": "IMAGE が替えた版で、1/1 の Running なら、待つ行の版の書き間違いなので、そのまま次の行へ進む。1/1 でなければ、kubectl describe pod web -n ch2 の Events を見て、イメージを取り終えるのを待つ"
         }
       ],
