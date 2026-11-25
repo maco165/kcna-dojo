@@ -521,7 +521,7 @@
         }
       ],
       "output": "2\n               total        used        free      shared  buff/cache   available\nMem:           1.9Gi       333Mi       1.4Gi       1.0Mi       322Mi       1.6Gi\nSwap:             0B          0B          0B\nFilesystem      Size  Used Avail Use% Mounted on\n/dev/vda1        19G  1.7G   17G   9% /",
-      "read": "コアは 2、Mem の total は 1.9Gi です。Linux のカーネルが使う分が引かれるので、2G と書いても少し小さく出ます。available が、これから使える量です。ディスクは Size が 20G より少し小さく、Avail の列が空きです。",
+      "read": "コアは 2、Mem の total は 1.9Gi です。Linux のカーネルが使う分が引かれるので、2G と書いても少し小さく出ます。available が、これから使える量です。ディスクは Size が 20G より少し小さく、Avail の列が空きです。 /dev/vda1 の名前は、仮想マシンの作り方で違うことがあります。",
       "trouble": [
         {
           "symptom": "nproc が 1 になる",
