@@ -15,10 +15,13 @@ import RepoLink from '../components/RepoLink';
 import SiteLogo from '../components/SiteLogo';
 import StatusIcon from '../components/StatusIcon';
 import { WEEKS, type WeekMeta } from '../content/curriculum';
-import type { LessonMeta as Lesson } from '../content/types';
+import type { LabLesson, QuizLessonMeta as Lesson } from '../content/types';
 import {
   DOMAINS,
   domainAccuracy,
+  doneLessons,
+  exercisesOf,
+  labsOf,
   lessonCaption,
   lessonCorrect,
   lessonCount,
@@ -29,7 +32,7 @@ import {
 import { downloadProgress } from '../lib/download';
 import { SITE_NAME, SITE_TAGLINE } from '../lib/site';
 import { addDays, currentStreak, daysToExam, freezeStatus, freezeText, goalXp, planStart, todayXp, weekProgress, weekStartDay, type Progress } from '../lib/progress';
-import { aboutHref, compareHref, examHref, glossaryHref, guideHref, handbookHref, lessonHref, reviewHref, settingsHref, weekHref } from '../lib/route';
+import { aboutHref, compareHref, examHref, glossaryHref, guideHref, handbookHref, handsOnHref, lessonHref, reviewHref, settingsHref, weekHref } from '../lib/route';
 import { dueQuestions, dueReviewCount } from '../content';
 import { WIDE_QUERY, useMediaQuery } from '../lib/useMediaQuery';
 
@@ -38,14 +41,10 @@ function formatDate(day: string): string {
   return `${m}/${d}`;
 }
 
-
-function doneCount(w: WeekMeta, progress: Progress): number {
-  return (w.content?.lessons ?? []).filter((l) => progress.lessons[l.id]?.done).length;
-}
-
 type Summary = {
   meta: WeekMeta;
   lessons: Lesson[];
+  labs: LabLesson[];
   statuses: LessonStatus[];
   today: number;
   streak: number;
@@ -63,10 +62,11 @@ type Summary = {
 function summarize(week: number, progress: Progress): Summary {
   const now = new Date();
   const meta = WEEKS.find((w) => w.week === week) ?? WEEKS[0];
-  const lessons = meta.content?.lessons ?? [];
+  const lessons = exercisesOf(meta);
   return {
     meta,
     lessons,
+    labs: labsOf(meta),
     statuses: lessonStatuses(lessons, progress),
     today: todayXp(progress, now),
     streak: currentStreak(progress, now),
@@ -147,6 +147,23 @@ function PreRead({ meta }: { meta: WeekMeta }) {
   );
 }
 
+/** その週の実習 (実践のページ) への小さなリンク。週の数には入れない */
+function WeekLabs({ labs }: { labs: LabLesson[] }) {
+  return (
+    <nav className="pre-read" aria-label="この週の実践">
+      <span className="pre-read__label">動かして確かめる</span>
+      {labs.map((l) => (
+        <a key={l.id} className="gloss-chip" href={lessonHref(l.id)}>
+          {l.title}
+        </a>
+      ))}
+      <a className="gloss-chip" href={handsOnHref()}>
+        実践の一覧
+      </a>
+    </nav>
+  );
+}
+
 /* ---------- スマホ ---------- */
 
 function PhoneHome({ s, progress }: { s: Summary; progress: Progress }) {
@@ -184,7 +201,7 @@ function PhoneHome({ s, progress }: { s: Summary; progress: Progress }) {
             {meta.week !== 1 && <Crumbs items={[{ name: `第 ${meta.week} 週 ${meta.title}` }]} />}
             <SiteHeading meta={meta} />
             <Text type="supporting">
-              第 {meta.week} 週 · {meta.area} · {doneCount(meta, progress)}/{lessons.length} 完了
+              第 {meta.week} 週 · {meta.area} · {doneLessons(lessons, progress)}/{lessons.length} 完了
             </Text>
             <WeekHeading meta={meta} />
           </VStack>
@@ -207,6 +224,10 @@ function PhoneHome({ s, progress }: { s: Summary; progress: Progress }) {
               <Text type="supporting">この週の問題は準備中です。</Text>
             </div>
           )}
+        </div>
+
+        <div className="week-labs">
+          <WeekLabs labs={s.labs} />
         </div>
 
         {nextWeek && (
@@ -323,7 +344,7 @@ function LessonRow({ lesson, status }: { lesson: Lesson; status: LessonStatus })
       href={lessonHref(lesson.id)}
       label={lesson.title}
       description={caption}
-      startContent={<StatusIcon status={status} isLab={lesson.kind === 'lab'} isDecorative />}
+      startContent={<StatusIcon status={status} isDecorative />}
       endContent={
         status === 'done' ? (
           <Text type="supporting" color="inherit">
@@ -373,7 +394,7 @@ function DesktopHome({ s, progress }: { s: Summary; progress: Progress }) {
       width: proportional(2),
       renderCell: (r) => (
         <Text type="supporting">
-          {lessonFormat(r.lesson)} · {lessonCount(r.lesson)} {r.lesson.kind === 'lab' ? '手順' : '問'}
+          {lessonFormat(r.lesson)} · {lessonCount(r.lesson)} 問
         </Text>
       ),
     },
@@ -461,6 +482,7 @@ function DesktopHome({ s, progress }: { s: Summary; progress: Progress }) {
                 </div>
               )}
             </Card>
+            <WeekLabs labs={s.labs} />
             <Goals meta={meta} />
           </main>
 

@@ -1,6 +1,6 @@
 // 問題を Claude や ChatGPT に聞くためのリンク。入力欄に問題文を入れた状態で開く (?q= に渡す)。
 // サイトからは何も送らない。開いた先で送るかどうかは使う人が決める。
-import type { LabLesson, Question } from '../content/types';
+import type { HandsOnStep, LabLesson, Question } from '../content/types';
 
 /** 長すぎる URL は開けないことがあるので、文はこの長さで切る */
 export const MAX_PROMPT_LENGTH = 1500;
@@ -55,6 +55,20 @@ export function labStepText(lab: Pick<LabLesson, 'title' | 'steps'>, index: numb
   lines.push(
     '',
     step.command ? 'このコマンドが何をしているかを、Kubernetes が初めての人に向けて、オプションごとに説明してください。' : 'この手順で何をすればよいかを、Kubernetes が初めての人に向けて説明してください。',
+    'うまくいかないときは、出たエラーをこのあとに貼ります。そのときは原因と、最初に確かめることを教えてください。',
+  );
+  return clip(lines.join('\n'));
+}
+
+/** 実践の章の 1 手順を、AI にそのまま貼れる文にする (頼むことは実習と同じ) */
+export function handsOnStepText(chapterTitle: string, step: Pick<HandsOnStep, 'text' | 'where' | 'code'>, index: number, os: string): string {
+  const lines: string[] = ['Kubernetes の勉強で、自分の PC の中の仮想マシンを使った実践をしています。次の手順について日本語で教えてください。', ''];
+  lines.push(`章: ${chapterTitle}`, `PC: ${os}`, `手順 ${index + 1}: ${step.text}`);
+  if (step.where) lines.push(`打つ場所: ${step.where === 'vm' ? '仮想マシンの中' : '自分の PC'}`);
+  if (step.code) lines.push('', '```' + step.code.language, step.code.text, '```');
+  lines.push(
+    '',
+    step.code ? 'このコードが何をしているかを、初めての人に向けて 1 行ずつ説明してください。' : 'この手順で何をすればよいかを、初めての人に向けて説明してください。',
     'うまくいかないときは、出たエラーをこのあとに貼ります。そのときは原因と、最初に確かめることを教えてください。',
   );
   return clip(lines.join('\n'));

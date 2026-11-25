@@ -27,6 +27,13 @@ function lightLessons(): Plugin {
         const list: { id: string; command: string; summary: string; absent?: boolean }[] = Array.isArray(data) ? data : data.commands;
         return { code: jsonModule(list.filter((c) => !c.absent).map(({ id: cid, command, summary }) => ({ id: cid, command, summary }))), moduleType: 'js' };
       }
+      // ?meta は実践の章の一覧と題名に使う軽い形 (手順は id と OS だけ)。形は src/content/types.ts の HandsOnMeta
+      if (query === 'meta' && file.endsWith('.json')) {
+        this.addWatchFile(file);
+        const c = JSON.parse(await readFile(file, 'utf8')) as Record<string, unknown> & { steps: { id: string; os?: string }[] };
+        const { id: cid, order, title, short, summary, minutes } = c;
+        return { code: jsonModule({ id: cid, order, title, short, summary, minutes, steps: c.steps.map((s) => ({ id: s.id, os: s.os })) }), moduleType: 'js' };
+      }
       if ((query !== 'light' && query !== 'ids') || !file.endsWith('.json')) return null;
       this.addWatchFile(file);
       const week = JSON.parse(await readFile(file, 'utf8')) as { week: number; lessons: Lesson[] & { domain?: string }[] };

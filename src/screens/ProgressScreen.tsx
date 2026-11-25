@@ -17,9 +17,11 @@ import { useMemo, useState } from 'react';
 import SummaryCard from '../components/SummaryCard';
 import { masteryByDomain } from '../lib/mastery';
 import { WEEKS } from '../content/curriculum';
-import { DOMAINS, domainAccuracy, planStatus, weeklyXp } from '../lib/lessonStatus';
+import { HANDS_ON } from '../content/handsOn';
+import { doneChapters } from '../lib/handsOn';
+import { DOMAINS, domainAccuracy, doneLessons, exercisesOf, labsOf, planStatus, weeklyXp } from '../lib/lessonStatus';
 import { FREEZE_EVERY, MAX_FREEZES, currentStreak, daysToExam, freezeStatus, freezeText, type Progress } from '../lib/progress';
-import { examHref, reviewHref, settingsHref, weekHref } from '../lib/route';
+import { examHref, handsOnHref, reviewHref, settingsHref, weekHref } from '../lib/route';
 import { SITE_NAME } from '../lib/site';
 import { WIDE_QUERY, useMediaQuery } from '../lib/useMediaQuery';
 
@@ -35,9 +37,9 @@ function Body({ progress }: { progress: Progress }) {
   const due = dueReviewCount(progress, now);
   const freeze = freezeStatus(progress, now);
   const mastery = useMemo(() => masteryByDomain(progress), [progress]);
-  const labsNote = plan.labsLeft > 0 ? ` (実習 ${plan.labsLeft} つ残り)` : '';
+  const labs = WEEKS.flatMap(labsOf);
   const planText =
-    plan.expected === 0 ? 'これから' : plan.done >= plan.expected ? `予定どおり${labsNote}` : `${plan.expected - plan.done} レッスン遅れ${labsNote}`;
+    plan.expected === 0 ? 'これから' : plan.done >= plan.expected ? '予定どおり' : `${plan.expected - plan.done} レッスン遅れ`;
   const dayName = (day: string, isToday: boolean) => {
     if (isToday) return '今日';
     const d = new Date(day + 'T00:00:00');
@@ -150,10 +152,10 @@ function Body({ progress }: { progress: Progress }) {
 
       <ReviewForecast progress={progress} now={now} isKnown={(id) => isExamQuestionId(id) || isKnownQuestion(id)} />
 
-      <List hasDividers header={<h2 className="h-sm">週ごとの進み具合</h2>}>
+      <List hasDividers header={<h2 className="h-sm">週ごとの進み具合 (問題演習)</h2>}>
         {WEEKS.map((w) => {
-          const lessons = w.content?.lessons ?? [];
-          const done = lessons.filter((l) => progress.lessons[l.id]?.done).length;
+          const lessons = exercisesOf(w);
+          const done = doneLessons(lessons, progress);
           return (
             <ListItem
               key={w.week}
@@ -164,6 +166,11 @@ function Body({ progress }: { progress: Progress }) {
             />
           );
         })}
+      </List>
+
+      <List hasDividers header={<h2 className="h-sm">実践</h2>}>
+        <ListItem href={handsOnHref()} label="章" endContent={<Text type="supporting">{HANDS_ON.length > 0 ? `${doneChapters(HANDS_ON, progress)} / ${HANDS_ON.length}` : '準備中'}</Text>} />
+        <ListItem href={handsOnHref()} label="週ごとの実習" endContent={<Text type="supporting">{`${doneLessons(labs, progress)} / ${labs.length}`}</Text>} />
       </List>
     </VStack>
   );

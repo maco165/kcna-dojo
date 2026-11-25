@@ -9,9 +9,10 @@
 //   6. 実習は全部の手順に印を付けると完了にできる
 //   7. AI に聞くリンクに問題文が入っている (答える前は正解を入れない)
 //   8. どの画面も横にはみ出さない
+//      実践の一覧・章 (src/content/hands-on/ に 1 つでもあれば、最初の章の画面) と、実習から一覧へ戻る先
 //   9. リポジトリへのリンク、このサイトについての画面、サイト名の横の印
 import { spawn } from 'node:child_process';
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { gzipSync } from 'node:zlib';
 
@@ -25,6 +26,9 @@ const l1 = week1.lessons[0];
 const l2 = week1.lessons[1];
 const l3 = week1.lessons[2];
 const lab = week1.lessons.find((l) => l.kind === 'lab');
+const exercises = week1.lessons.filter((l) => l.kind === 'quiz');
+const CHAPTER_DIR = new URL('../src/content/hands-on/', import.meta.url);
+const chapters = existsSync(CHAPTER_DIR) ? readdirSync(CHAPTER_DIR).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(readFileSync(new URL(f, CHAPTER_DIR), 'utf8'))).sort((a, b) => a.order - b.order) : [];
 
 let failures = 0;
 function check(cond, label) {
@@ -108,6 +112,67 @@ function checkSpeedBuild() {
   const data = assets.filter((f) => /^(lessons|handbook|glossary|commandPages|examBank)-/.test(f));
   const literal = data.filter((f) => !/JSON\.parse\(/.test(read(f).slice(0, 400)));
   check(data.length >= 5 && literal.length === 0, `大きなデータのチャンクは JSON.parse で読む (${data.length} ファイル、そうでないもの ${literal.join(',')})`);
+}
+
+/**
+ * 実践の章の画面: OS を選ぶと手順が替わり、印は開き直しても残り、その OS の手順に全部印を付けると完了にできる。
+ * 書き出した HTML には全部の OS の手順がある。手順の出し分けと横はみ出しは全部の章、印と完了の流れ (flow) は最初の章だけ
+ */
+async function checkChapterPage(page, width, tag, c, flow) {
+  await page.goto(`${BASE}hands-on/${c.id}/`);
+  await page.getByRole('heading', { name: '手順', exact: true }).waitFor();
+  await page.waitForFunction(() => !document.querySelector('#root > main.prerender'));
+  const osNames = { windows: 'Windows', mac: 'Mac', linux: 'Linux' };
+  const hasOs = [...c.steps, ...c.cleanup].some((s) => s.os);
+  for (const [os, label] of Object.entries(osNames)) {
+    if (hasOs) await page.getByRole('radio', { name: label }).click();
+    const mine = c.steps.filter((s) => !s.os || s.os === os);
+    check((await page.getByRole('checkbox').count()) === mine.length, `${tag} 章の ${label} の手順は ${mine.length}`);
+    await noHorizontalOverflow(page, width, `${tag} 章 ${c.id} ${label}`);
+  }
+  if (width < 768) {
+    await page.setViewportSize({ width: 320, height: 844 });
+    await noHorizontalOverflow(page, 320, `${tag} 章 ${c.id} 320`);
+    await page.setViewportSize({ width, height: 844 });
+  }
+  await checkChapterText(page, tag, c);
+  if (!flow) return;
+  const finish = page.getByRole('button', { name: /^完了にする/ });
+  check(await finish.isDisabled(), `${tag} 章は印を付けるまで完了にできない`);
+  await page.getByRole('checkbox').first().check();
+  await page.reload();
+  await page.waitForFunction(() => !document.querySelector('#root > main.prerender'));
+  check(await page.getByRole('checkbox').first().isChecked(), `${tag} 章の印は開き直しても残る`);
+  const xp = () => page.evaluate(() => JSON.parse(localStorage.getItem('kcna.v1')).xp.total);
+  const before = await xp();
+  for (const box of await page.getByRole('checkbox').all()) await box.check();
+  await finish.click();
+  await page.getByText(/^完了しました/).waitFor();
+  check((await xp()) === before + 10, `${tag} 章を完了すると 10 XP`);
+  // 二度押しで印が消えないよう、もう一度やるのは別のボタンで、確かめてから
+  await page.getByRole('button', { name: '印を消してもう一度やる' }).click();
+  await page.getByRole('button', { name: 'やめる' }).click();
+  check((await page.getByRole('checkbox', { checked: true }).count()) === (await page.getByRole('checkbox').count()), `${tag} 章の印は、確かめるまで消えない`);
+  // 消したあとのフォーカスは、手順の見出しへ (窓が閉じて落ち着くまで待っても、そこにある)
+  await page.getByRole('button', { name: '印を消してもう一度やる' }).click();
+  await page.getByRole('button', { name: '印を消す', exact: true }).click();
+  await page.getByRole('dialog').waitFor({ state: 'hidden' }).catch(() => {});
+  await page.waitForTimeout(600);
+  const focused = await page.evaluate(() => document.activeElement?.id);
+  check(focused === 'ho-steps' && (await page.getByRole('checkbox', { checked: true }).count()) === 0, `${tag} 印を消すと、手順の見出しにフォーカスが移る (${focused})`);
+}
+
+/** 章の本文の幅・書き出した HTML・最初に読まないこと */
+async function checkChapterText(page, tag, c) {
+  const wide = await page.evaluate(() => [...document.querySelectorAll('.hb-step__text, .ho-note, .ho-more, .hb-lead')].filter((e) => e.getBoundingClientRect().width > parseFloat(getComputedStyle(e).fontSize) * 40 + 1).length);
+  check(wide === 0, `${tag} 章の本文は 1 行 40 字まで (${wide})`);
+  const html = await (await fetch(`${BASE}hands-on/${c.id}/`)).text();
+  const escd = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  check(c.steps.every((s) => html.includes(escd(s.text))), `${tag} 書き出した章には全部の OS の手順がある`);
+  // 章のデータは、章の画面を開いたときだけ読む
+  const home = readFileSync(new URL('../dist/index.html', import.meta.url), 'utf8');
+  const first = [...new Set([...home.matchAll(/\/kcna-dojo\/assets\/([^"]+\.js)/g)].map((m) => m[1]))].map((f) => readFileSync(new URL(`../dist/assets/${f}`, import.meta.url), 'utf8')).join('\n');
+  check(!first.includes(c.steps[0].why), `${tag} 章のデータは最初に読まない`);
 }
 
 /**
@@ -249,7 +314,34 @@ async function run(browser, name, width, height) {
   await page.getByRole('heading', { name: 'コンテナの基礎' }).waitFor();
   const startLinks = page.getByRole('link', { name: '開始' });
   const lessonLinks = await page.evaluate(() => [...new Set([...document.querySelectorAll('a[href^="/kcna-dojo/lesson/"]')].map((a) => a.getAttribute('href')))]);
-  check(lessonLinks.length === week1.lessons.length, `${tag} 空の記録でも全部のレッスンを開ける (${lessonLinks.length} / ${week1.lessons.length})`);
+  check(lessonLinks.length === week1.lessons.length, `${tag} 空の記録でも全部のレッスンと、その週の実習を開ける (${lessonLinks.length} / ${week1.lessons.length})`);
+  // 週の一覧と数は問題演習だけ。実習は「この週の実践」の小さなリンク
+  const listed = await page.evaluate(() => [...new Set([...document.querySelectorAll('.rows a[href*="/lesson/"], table a[href*="/lesson/"]')].map((a) => a.getAttribute('href')))]);
+  check(JSON.stringify(listed) === JSON.stringify(exercises.map((l) => `/kcna-dojo/lesson/${l.id}/`)), `${tag} 週の一覧は問題演習だけ (${listed.length})`);
+  const weekLabs = page.getByRole('navigation', { name: 'この週の実践' });
+  check(JSON.stringify(await weekLabs.locator('a').evaluateAll((as) => as.map((a) => a.getAttribute('href')))) === JSON.stringify([`/kcna-dojo/lesson/${lab.id}/`, '/kcna-dojo/hands-on/']), `${tag} 週の画面から、その週の実習と実践の一覧へ行ける`);
+  if (width < 768) {
+    check(await page.getByText(`0/${exercises.length} 完了`).isVisible(), `${tag} 週の完了の数は問題演習だけ`);
+    // 下のタブは 5 つ。どの幅でも字がタブからはみ出さない (復習の数が 2 桁のときも)
+    for (const w of [320, 390]) {
+      await page.setViewportSize({ width: w, height });
+      const over = await page.evaluate(() => {
+        const badge = document.createElement('span');
+        badge.className = 'tabs__badge';
+        badge.textContent = '88';
+        document.querySelector('.tabs a[href$="/review/"] span').appendChild(badge);
+        const items = [...document.querySelectorAll('.tabs__item')];
+        const bad = items.filter((i) => i.scrollWidth > i.clientWidth || [...i.children].some((c) => c.getBoundingClientRect().right > i.getBoundingClientRect().right + 0.5 || c.getBoundingClientRect().height > 24)).map((i) => i.textContent);
+        badge.remove();
+        return { n: items.length, bad };
+      });
+      check(over.n === 5 && over.bad.length === 0, `${tag} 下のタブは 5 つで、${w} 幅で字がはみ出さず折り返さない (${over.n} / ${over.bad.join(',')})`);
+      await noHorizontalOverflow(page, w, `${tag} ホーム ${w}`);
+    }
+    await page.setViewportSize({ width, height });
+  } else {
+    check(await page.getByRole('link', { name: new RegExp(`^1 コンテナの基礎.*0/${exercises.length}`) }).count() === 1, `${tag} 左の一覧の週の数は問題演習だけ`);
+  }
   check((await startLinks.count()) === 1, `${tag} ホームの「開始」は 1 つだけ`);
   check((await startLinks.first().getAttribute('href')) === `/kcna-dojo/lesson/${l1.id}/`, `${tag} 「開始」は最初のレッスン`);
   check(await page.getByText('0 / 30 XP').isVisible(), `${tag} 今日の目標は 0 / 30 XP`);
@@ -463,6 +555,24 @@ async function run(browser, name, width, height) {
   const labStored = await page.evaluate((id) => JSON.parse(localStorage.getItem('kcna.v1') ?? 'null')?.lessons?.[id]?.done, lab.id);
   check(labStored === true, `${tag} 実習を全部の印で完了にすると記録が残る`);
   await noHorizontalOverflow(page, width, `${tag} 実習の完了`);
+  // 実習を終えて一覧へ戻る先と、閉じる先は、実践の一覧。週の問題演習の数には入らない
+  await page.getByRole('link', { name: '一覧へ戻る' }).click();
+  await page.getByRole('heading', { name: '実践', level: 1 }).waitFor();
+  check(new URL(page.url()).pathname === '/kcna-dojo/hands-on/', `${tag} 実習の「一覧へ戻る」は実践の一覧`);
+  check(await page.getByText('1 / 8 完了').isVisible(), `${tag} 実践の一覧に、週ごとの実習の完了の数が出る`);
+  check((await page.locator('a.cmp-card[href^="/kcna-dojo/lesson/w"]').count()) === 8 && (await page.locator('a.cmp-card[href^="/kcna-dojo/hands-on/"]').count()) === chapters.length, `${tag} 実践の一覧に、章 ${chapters.length} と実習 8 本が並ぶ`);
+  check((await page.title()) === '実践 | クラネイ', `${tag} 実践の一覧の題名 (${await page.title()})`);
+  await noHorizontalOverflow(page, width, `${tag} 実践の一覧`);
+  await page.goto(`${BASE}lesson/${lab.id}/`);
+  check((await page.getByRole('link', { name: 'レッスンを閉じる' }).getAttribute('href')) === '/kcna-dojo/hands-on/', `${tag} 実習を閉じる先は実践の一覧`);
+  await page.goto(`${BASE}progress/`);
+  await page.getByRole('heading', { name: '週ごとの進み具合 (問題演習)' }).waitFor();
+  check((await page.getByRole('listitem').filter({ hasText: '第 1 週 コンテナの基礎' }).last().innerText()).includes(`/ ${exercises.length}`) && (await page.getByRole('listitem').filter({ hasText: '週ごとの実習' }).last().innerText()).includes('1 / 8'), `${tag} 進捗は、問題演習と実践を別に数える`);
+  // 無い章は「見つかりませんでした」と一覧へのリンク
+  await page.goto(`${BASE}hands-on/no-such-chapter/`);
+  await page.getByRole('heading', { name: '見つかりませんでした' }).waitFor();
+  check(true, `${tag} 無い章を開いても壊れない`);
+  for (const [i, c] of chapters.entries()) await checkChapterPage(page, width, tag, c, i === 0);
 
   // 9. このサイトについて と リポジトリへのリンク
   await page.goto(BASE);
@@ -1342,7 +1452,7 @@ async function run(browser, name, width, height) {
   }
 
   // 描画後の h1 は、書き出した HTML の h1 と同じ (ホームはサイト名、週は「第 n 週 …」、レッスンはレッスン名、用語のページは語の名前)。h1 は 1 つだけ
-  for (const p of ['', 'week/1/', 'week/2/', 'lesson/w2-l1/', 'glossary/etcd/']) {
+  for (const p of ['', 'week/1/', 'week/2/', 'lesson/w2-l1/', 'glossary/etcd/', 'hands-on/', ...chapters.map((c) => `hands-on/${c.id}/`)]) {
     const html = await (await fetch(`${BASE}${p}`)).text();
     const written = html.match(/<h1>([^<]*)<\/h1>/)?.[1].replace(/&amp;/g, '&') ?? '(無し)';
     await page.goto(`${BASE}${p}`);

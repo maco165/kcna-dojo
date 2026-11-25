@@ -1,0 +1,62 @@
+{
+  "id": "sample",
+  "order": 0,
+  "title": "見本の章: 仮想マシンを用意する",
+  "summary": "自分の PC の中に仮想マシンを 1 台作り、Pod を動かす前の準備をします。",
+  "goal": "自分の PC の中で、Linux の端末を 1 つ開けるようになる",
+  "features": ["仮想マシンは自分の PC から切り離されている", "消せば元に戻る"],
+  "minutes": 20,
+  "needs": ["メモリ 8 GB 以上の PC", "インターネットへの接続"],
+  "reads": [{ "topic": "containerization", "label": "コンテナ化" }],
+  "steps": [
+    {
+      "id": "check-memory",
+      "text": "PC のメモリの大きさを見ます。",
+      "why": "仮想マシンに 2 GB を分けるので、足りないと PC ごと重くなるためです。"
+    },
+    {
+      "id": "install-windows",
+      "text": "Windows に仮想マシンの道具を入れます。",
+      "why": "Linux の端末を作るためです。",
+      "os": "windows",
+      "where": "host",
+      "code": { "language": "powershell", "text": "winget install Canonical.Multipass" },
+      "lines": [{ "code": "winget install Canonical.Multipass", "text": "Multipass を公式の配布元から入れる" }],
+      "unverified": "Windows の実機では確かめていません。公式の手順のとおりです。",
+      "read": "入れ終わったことを知らせる行が出れば成功です。",
+      "trouble": [{ "symptom": "winget が見つからないと出る", "check": "winget --version を打つ", "fix": "Microsoft Store でアプリ インストーラーを更新する" }],
+      "source": "https://documentation.ubuntu.com/multipass/latest/"
+    },
+    {
+      "id": "install-mac",
+      "text": "Mac に仮想マシンの道具を入れます。",
+      "why": "Linux の端末を作るためです。",
+      "os": "mac",
+      "where": "host",
+      "code": { "language": "bash", "text": "brew install --cask multipass" },
+      "lines": [{ "code": "brew install --cask multipass", "text": "Homebrew で Multipass を入れる" }],
+      "unverified": "Mac の実機では確かめていません。公式の手順のとおりです。",
+      "read": "最後に入れた名前が出れば成功です。",
+      "trouble": [{ "symptom": "brew が見つからないと出る", "check": "brew --version を打つ", "fix": "Homebrew を入れる" }],
+      "source": "https://documentation.ubuntu.com/multipass/latest/"
+    },
+    {
+      "id": "see-id",
+      "text": "仮想マシンの中で、自分が誰かを見ます。",
+      "why": "管理者でないことを確かめるためです。",
+      "where": "vm",
+      "code": { "language": "bash", "text": "# 自分の番号を見る\nid -u\nsudo id -u" },
+      "lines": [
+        { "code": "id -u", "text": "自分の利用者の番号を出す" },
+        { "code": "sudo id -u", "text": "管理者として同じことをする" }
+      ],
+      "output": "1000\n0",
+      "read": "1 行目が自分、2 行目が管理者 (0) です。",
+      "trouble": [{ "symptom": "1 行目も 0 になる", "check": "whoami を打つ", "fix": "exit で管理者の端末を抜ける" }],
+      "source": "https://documentation.ubuntu.com/multipass/latest/"
+    }
+  ],
+  "cleanup": [{ "id": "stop", "text": "仮想マシンの窓を閉じます。", "why": "次の章でも使うので、消さずに残すためです。" }],
+  "challenges": [{ "task": "仮想マシンをもう 1 台作ります。", "hint": "名前を変えます。", "answer": "multipass launch --name second", "verify": "multipass list に 2 台出ます。" }],
+  "sources": [{ "label": "Multipass documentation", "url": "https://documentation.ubuntu.com/multipass/latest/" }]
+}

@@ -1,18 +1,19 @@
 import { Badge } from '@astryxdesign/core/Badge';
 import { SideNav, SideNavHeading, SideNavItem, SideNavSection } from '@astryxdesign/core/SideNav';
 import { Text } from '@astryxdesign/core/Text';
-import { AcademicCapIcon, AdjustmentsHorizontalIcon, ArrowPathIcon, BookOpenIcon, ChartBarIcon, CodeBracketIcon, CommandLineIcon, InformationCircleIcon, QueueListIcon, TableCellsIcon } from '@heroicons/react/24/outline';
+import { AcademicCapIcon, AdjustmentsHorizontalIcon, ArrowPathIcon, BookOpenIcon, ChartBarIcon, CodeBracketIcon, CommandLineIcon, InformationCircleIcon, WrenchScrewdriverIcon, QueueListIcon, TableCellsIcon } from '@heroicons/react/24/outline';
 import { WEEKS } from '../content/curriculum';
+import { doneLessons, exercisesOf } from '../lib/lessonStatus';
 import SiteLogo from './SiteLogo';
 import type { Progress } from '../lib/progress';
 import { dueReviewCount } from '../content';
 import { REPO_URL } from '../lib/links';
 import { SITE_NAME, SITE_TAGLINE } from '../lib/site';
-import { aboutHref, commandsHref, compareHref, examHref, glossaryHref, guideHref, handbookHref, progressHref, reviewHref, settingsHref, weekHref } from '../lib/route';
+import { aboutHref, commandsHref, compareHref, examHref, glossaryHref, guideHref, handbookHref, handsOnHref, progressHref, reviewHref, settingsHref, weekHref } from '../lib/route';
 import { ExternalAnchor, GitHubMark } from './RepoLink';
 
 /** PC の左の一覧 */
-export default function AppSideNav({ current, week, progress }: { current: 'learn' | 'about' | 'settings' | 'review' | 'progress' | 'exam' | 'glossary' | 'guide' | 'handbook' | 'compare' | 'commands'; week?: number; progress: Progress }) {
+export default function AppSideNav({ current, week, progress }: { current: 'learn' | 'handsOn' | 'about' | 'settings' | 'review' | 'progress' | 'exam' | 'glossary' | 'guide' | 'handbook' | 'compare' | 'commands'; week?: number; progress: Progress }) {
   const reviewCount = dueReviewCount(progress, new Date());
   return (
     <SideNav
@@ -25,7 +26,8 @@ export default function AppSideNav({ current, week, progress }: { current: 'lear
       }
     >
       <SideNavSection title="メニュー" isHeaderHidden>
-        <SideNavItem label="学習" icon={QueueListIcon} href={weekHref(week ?? 1)} isSelected={current === 'learn'} />
+        <SideNavItem label="問題演習" icon={QueueListIcon} href={weekHref(week ?? 1)} isSelected={current === 'learn'} />
+        <SideNavItem label="実践" icon={WrenchScrewdriverIcon} href={handsOnHref()} isSelected={current === 'handsOn'} />
         <SideNavItem
           label="復習"
           icon={ArrowPathIcon}
@@ -46,8 +48,8 @@ export default function AppSideNav({ current, week, progress }: { current: 'lear
       </SideNavSection>
       <SideNavSection title="週">
         {WEEKS.map((w) => {
-          const lessons = w.content?.lessons ?? [];
-          const done = lessons.filter((l) => progress.lessons[l.id]?.done).length;
+          const lessons = exercisesOf(w);
+          const done = doneLessons(lessons, progress);
           return (
             <SideNavItem
               key={w.week}
