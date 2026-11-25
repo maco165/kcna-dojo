@@ -151,7 +151,8 @@ it('AI に渡す文に、章・手順・打つ場所・コードを入れる', (
   for (const x of [sample.title, '手順 3', '仮想マシンの中', 'PC: Mac', 'sudo id -u']) expect(t).toContain(x);
 });
 
-describe('画面', () => {
+// 負荷が高いと 5 秒を超えることがある (章の画面は部品が多い)
+describe('画面', { timeout: 30_000 }, () => {
   const mounted: (() => void)[] = [];
   afterEach(() => {
     mounted.splice(0).forEach((f) => f());
