@@ -511,7 +511,7 @@ export function weekStartDay(start: string, week: number): string {
 }
 
 /**
- * 今週 (月曜から今日まで) に学んだ日 (レッスン・復習・模擬試験を終えた日。連続日数と同じ数え方) の数と、週の目標。
+ * 今週 (月曜から今日まで) に学んだ日 (レッスン・実習・実践の章・復習・模擬試験を終えた日。連続日数と同じ数え方) の数と、週の目標。
  * 目標を決めていなければ goal は undefined
  */
 export function weekProgress(p: Progress, now: Date): { days: number; goal: number | undefined } {
