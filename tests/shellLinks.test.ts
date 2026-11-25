@@ -37,6 +37,8 @@ describe('コマンドの行の中のコマンドをページへつなぐ', () =
     expect(commandRows('grep a <<< foo\ncp a b\necho $((1<<2))\nid\necho "<<EOF"\nid -u')).toHaveLength(6);
     expect(commandRows("cat <<'END-1'\nx\nEND-1\nid")).toEqual(["cat <<'END-1'", 'id']);
     expect(commandRows('kubectl run a \\\n  --image=b\nid')).toEqual(['kubectl run a --image=b', 'id']);
+    expect(commandRows('echo a # c \\\nid')).toEqual(['echo a', 'id']);
+    expect(commandRows('cat <<EOF\nfoo \\\nEOF\nid')).toEqual(['cat <<EOF', 'id']);
     expect(() => commandRows('cat <<EOF\nid')).toThrow(/終わり/);
   });
 });

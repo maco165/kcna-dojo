@@ -30,16 +30,24 @@ function hereDocEnd(line: string): string | null {
 export function commandRows(code: string): string[] {
   const out: string[] = [];
   let end: string | null = null;
-  for (const raw of code.replace(/[ \t]*\\\n\s*/g, ' ').split('\n')) {
+  // 行末が \ の行の続き待ち (ヒアドキュメントの中とコメントの \ は続きではない)
+  let joined = '';
+  for (const raw of code.split('\n')) {
     if (end !== null) {
       if (raw.trim() === end) end = null;
       continue;
     }
-    const line = dropComment(raw).trim();
+    const line = `${joined}${joined && ' '}${dropComment(raw).trim()}`;
+    if (/\\$/.test(line) && /\\\s*$/.test(raw)) {
+      joined = line.slice(0, -1).trimEnd();
+      continue;
+    }
+    joined = '';
     if (!line) continue;
     out.push(line);
     end = hereDocEnd(line);
   }
+  if (joined) out.push(joined);
   // 終わりが無いまま後ろの行を黙って捨てない
   if (end !== null) throw new Error(`ヒアドキュメントの終わり ${end} がありません`);
   return out;
