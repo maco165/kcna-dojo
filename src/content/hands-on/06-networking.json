@@ -1228,7 +1228,7 @@
         }
       ],
       "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
-      "read": "何もエラーが出なければ止まっています。続けるときは、ホストで multipass shell kcna を打つと、動かして中に入れます。続けるときは、ホストで multipass shell kcna を打ち、cd ~/ch6 を打ちます。kubectl get pods -A で ch6 と ch6b の Pod が 1/1 になるまで待ちます。SVC_IP と NODE_IP は、次に使う手順で決め直します。戻った直後の 1〜2 分は、一覧が止める前の古い様子のことがあります。少し待ってもう一度見ます。",
+      "read": "何もエラーが出なければ止まっています。続けるときは、ホストで multipass shell kcna を打つと、動かして中に入れます。そのあと cd ~/ch6 を打ちます。kubectl get pods -A で ch6 と ch6b の Pod が 1/1 になるまで待ちます。SVC_IP と NODE_IP は、次に使う手順で決め直します。戻った直後の 1〜2 分は、一覧が止める前の古い様子のことがあります。少し待ってもう一度見ます。",
       "trouble": [
         {
           "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
@@ -1415,7 +1415,7 @@
     },
     {
       "id": "path",
-      "text": "道 (パス) で、別の Service へ分けます。",
+      "text": "道 (パス) で、別の Service へ分けます。足す行 (patch) は、1 度だけ打ちます。2 度打つと、同じ道が 2 つ並びます。",
       "why": "1 つのホスト名の下に、別々に作ったものを並べるためです。",
       "where": "vm",
       "code": {
@@ -1597,6 +1597,11 @@
           "symptom": "404 Not Found (nginx) と出る",
           "check": "kubectl logs deployment/api -n ch6 を打つ",
           "fix": "Pod に /api/ のページが無い。command の行を見直す"
+        },
+        {
+          "symptom": "/api/ の道が 2 つ並ぶ",
+          "check": "kubectl get ingress web -n ch6 -o jsonpath='{.spec.rules[0].http.paths[*].path}' を打つ",
+          "fix": "patch を 2 度打った。kubectl apply -f ingress.yaml -n ch6 で / だけに戻し、patch を 1 度打ち直す (tls の手順の後なら、tls の patch も打ち直す)"
         }
       ],
       "source": "https://kubernetes.io/docs/concepts/services-networking/ingress/"
@@ -2318,7 +2323,7 @@
         }
       ],
       "output": "networkpolicy.networking.k8s.io/client-out created\nwget: bad address 'web:8080'\ncommand terminated with exit code 1",
-      "read": "web は許したはずなのに、bad address (名前を引けない) です。web へ行く前の、DNS への問い合わせが止まっているためです。",
+      "read": "web は許したはずなのに、bad address (名前を引けない) です。web へ行く前の、DNS への問い合わせが止まっているためです。deny-all-in も残っているので、client へ入ってくる通信も止まったままです。",
       "trouble": [
         {
           "symptom": "client の Pod が見つからないと出る",
@@ -2535,14 +2540,14 @@
         {
           "symptom": "何も出ない",
           "check": "kubectl get service web -n ch6 を打つ",
-          "fix": "Service が無いか、仕組みが iptables でない版になっている"
+          "fix": "Service が無いか、仕組みが iptables ではない。仕組みは設定で選び (iptables・ipvs・nftables)、Kubernetes の今の既定は iptables だが、将来は nftables に変わる予定と公式にある"
         }
       ],
       "source": "https://kubernetes.io/docs/reference/networking/virtual-ips/"
     },
     {
       "id": "cni",
-      "text": "最後に、言葉だけ押さえます。Pod に住所を配り、Pod どうしをつなぐ部品を CNI プラグインと呼びます。Kubernetes は「どの Pod からどの Pod へも、住所を変えずに届く」ことだけを決めていて、やり方は部品に任せています。k3s は flannel を使い、ノードが何台もある時は、ノードの間を VXLAN という包みで運びます。NetworkPolicy を守らせるのも部品の仕事で、対応していない部品では、書いても何も起きません。",
+      "text": "最後に、言葉だけ押さえます。Pod に住所を配り、Pod どうしをつなぐ部品を CNI プラグインと呼びます。Kubernetes は「どの Pod からどの Pod へも、住所を変えずに届く」ことだけを決めていて、やり方は部品に任せています。k3s は flannel を使い、ノードが何台もある時は、ノードの間を VXLAN という包みで運びます。NetworkPolicy を守らせるのも部品の仕事です。k3s では flannel とは別の部品 (k3s に埋め込まれた kube-router の一部) が受け持ちます。対応していない部品では、書いても何も起きません。",
       "why": "部品を替えると、できることが変わります。この VM では k3s の既定のままなので、決まりが効きました。",
       "source": "https://docs.k3s.io/networking/basic-network-options"
     },
