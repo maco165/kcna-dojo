@@ -1927,7 +1927,7 @@
       "where": "vm",
       "code": {
         "language": "bash",
-        "text": "kubectl get networkpolicy -A\nfor i in $(seq 60); do [ \"$(kubectl get endpointslice -l kubernetes.io/service-name=web -n ch6 -o jsonpath='{.items[*].endpoints[*].conditions.ready}' | grep -o true | wc -l)\" -ge 2 ] && break; sleep 2; done\nkubectl wait --for=condition=Ready pod/client -n ch6 --timeout=120s\nkubectl exec client -n ch6 -- wget -qO- -T 5 http://web:8080\nkubectl exec other -n ch6b -- wget -qO- -T 5 http://web.ch6:8080"
+        "text": "kubectl get networkpolicy -A\nfor i in $(seq 60); do [ \"$(kubectl get endpointslice -l kubernetes.io/service-name=web -n ch6 -o jsonpath='{.items[*].endpoints[*].conditions.ready}' | grep -o true | wc -l)\" -ge 2 ] && break; sleep 2; done\nfor i in $(seq 60); do kubectl exec client -n ch6 -- nslookup kubernetes.default.svc.cluster.local. > /dev/null 2>&1 && kubectl exec other -n ch6b -- true 2> /dev/null && break; sleep 2; done\nkubectl exec client -n ch6 -- wget -qO- -T 5 http://web:8080\nkubectl exec other -n ch6b -- wget -qO- -T 5 http://web.ch6:8080"
       },
       "lines": [
         {
@@ -1939,8 +1939,8 @@
           "text": "受けられる渡す先が 2 つ以上になるまで見て待つ (最大 2 分で先へ進む)"
         },
         {
-          "code": "kubectl wait --for=condition=Ready pod/client -n ch6 --timeout=120s",
-          "text": "client が使えるようになるまで待つ"
+          "code": "for i in $(seq 60); do kubectl exec client -n ch6 -- nslookup kubernetes.default.svc.cluster.local. > /dev/null 2>&1 && kubectl exec other -n ch6b -- true 2> /dev/null && break; sleep 2; done",
+          "text": "client と other に入れて、名前も引けるまで見て待つ (最大 2 分余りで先へ進む。休んだあとは少しかかる)"
         },
         {
           "code": "kubectl exec client -n ch6 -- wget -qO- -T 5 http://web:8080",
@@ -1951,13 +1951,18 @@
           "text": "別の名前空間の other から"
         }
       ],
-      "output": "No resources found\npod/client condition met\nweb-687f6fbb85-b2tbl\nweb-687f6fbb85-b2tbl",
+      "output": "No resources found\nweb-687f6fbb85-b2tbl\nweb-687f6fbb85-b2tbl",
       "read": "1 行目は No resources found (決まりは無い) です。どちらからも届きます。",
       "trouble": [
         {
           "symptom": "client の Pod が見つからないと出る",
           "check": "kubectl get pods -n ch6 を打つ",
           "fix": "無ければ、client を作る手順の run の行から打ち直す"
+        },
+        {
+          "symptom": "container not found と出る",
+          "check": "kubectl get pods -n ch6 と -n ch6b を打つ",
+          "fix": "休んだあとは、一覧が Running でもコンテナがまだ始まっていないことがある。1 分待って打ち直す"
         }
       ],
       "source": "https://kubernetes.io/docs/concepts/services-networking/network-policies/"
