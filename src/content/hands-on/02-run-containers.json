@@ -66,7 +66,7 @@
     },
     {
       "id": "check-host",
-      "text": "仮想マシンの中で、どのマシンにいるかと、クラスターの様子を見ます。hostname が kcna でなければ、先へ進まず multipass shell kcna で入ります。",
+      "text": "仮想マシンの中で、どのマシンにいるかと、クラスターの様子を見ます。hostname が kcna でなければ、先へ進まず multipass shell kcna で入ります。枠は、端末によって、まとめて貼れるものと、1 行ずつ貼るほうがよいものがあります。0 章の sudo の手順で 2 行目が動かなかった人は、1 行ずつ貼ります (EOF で終わる書き込みの部分は、EOF まで続けて貼ります)。",
       "why": "自分の PC の別のクラスターで打たないためです。",
       "where": "vm",
       "code": {
@@ -825,7 +825,7 @@
     },
     {
       "id": "check-before-repo",
-      "text": "Docker の配布元を足すの前に、どのマシンにいるかを見ます。kcna と出なければ、次の手順を打ちません。",
+      "text": "Docker の配布元を足す前に、どのマシンにいるかを見ます。kcna と出なければ、次の手順を打ちません。",
       "why": "管理者の権限で、マシンの設定を変えるためです。自分の PC で打つと、PC のほうが変わります。",
       "where": "vm",
       "code": {
@@ -934,7 +934,7 @@
     },
     {
       "id": "check-before-docker",
-      "text": "Docker を入れるの前に、どのマシンにいるかを見ます。kcna と出なければ、次の手順を打ちません。",
+      "text": "Docker を入れる前に、どのマシンにいるかを見ます。kcna と出なければ、次の手順を打ちません。",
       "why": "マシンの設定を書き、新しいサービスを動かすためです。",
       "where": "vm",
       "code": {
@@ -1022,7 +1022,7 @@
         {
           "symptom": "conflicts や held broken packages と出る",
           "check": "cat ~/docker-install.log で、ぶつかったものの名前を見る",
-          "fix": "docker.io や containerd、runc が入っている。この仮想マシンで自分が入れたのでなければ、exit で出てからホストで multipass stop kcna、multipass restore kcna.k3s-v136 の順に打ち、1 章の終わりへ戻してやり直す (今の状態も控えるかを聞かれたら no)"
+          "fix": "docker.io や containerd、runc が、この仮想マシンに先に入っている。0 章で作った仮想マシンには入っていないので、あとから入れたもの。要らなければ、控えへ戻すのが早い。exit で出てから、ホストで multipass stop kcna、multipass restore kcna.k3s-v136 の順に打ち (今の状態も控えるかを聞かれたら no)、この章の最初からやり直す"
         },
         {
           "symptom": "Docker が前から動いていて、住所の範囲が変わらない",
@@ -1287,7 +1287,7 @@
     },
     {
       "id": "check-before-docker-off",
-      "text": "Docker を止めるの前に、どのマシンにいるかを見ます。kcna と出なければ、次の手順を打ちません。",
+      "text": "Docker を止める前に、どのマシンにいるかを見ます。kcna と出なければ、次の手順を打ちません。",
       "why": "自分の PC で打つと、PC の Docker が止まるためです。",
       "where": "vm",
       "code": {
@@ -1318,7 +1318,7 @@
       "where": "vm",
       "code": {
         "language": "bash",
-        "text": "sudo systemctl disable --now docker.socket docker.service containerd.service\nrm ~/docker-install.log ~/ch2/hello.tar\nps -C containerd -o pid,args\ncurl -s http://$HELLO_IP"
+        "text": "sudo systemctl disable --now docker.socket docker.service containerd.service\nrm ~/docker-install.log\nsudo rm ~/ch2/hello.tar\nps -C containerd -o pid,args\ncurl -s http://$HELLO_IP"
       },
       "lines": [
         {
@@ -1326,8 +1326,12 @@
           "text": "Docker と、一緒に入った containerd を止め、自動で始まらないようにする。k3s の containerd は別なので止まらない"
         },
         {
-          "code": "rm ~/docker-install.log ~/ch2/hello.tar",
-          "text": "入れたときの記録と、取り込み終えたファイルを消す"
+          "code": "rm ~/docker-install.log",
+          "text": "入れたときの記録を消す"
+        },
+        {
+          "code": "sudo rm ~/ch2/hello.tar",
+          "text": "取り込み終えたファイルを消す。sudo docker save で作ったので、持ち主は root。sudo を付けないと、消してよいかを聞かれて止まる"
         },
         {
           "code": "ps -C containerd -o pid,args",
@@ -1342,6 +1346,11 @@
       "read": "Removed の行は、自動で始める印を消したという意味です。Disabling の 2 行は、止める順のうえでの知らせで、問題ありません。k3s の containerd だけが残り、ページも返ります。また作るときは sudo systemctl start docker を打ちます。",
       "trouble": [
         {
+          "symptom": "rm: remove write-protected regular file と聞かれて止まる",
+          "check": "rm の前に sudo があるかを見る",
+          "fix": "n を打って Enter キーを押し、sudo rm ~/ch2/hello.tar を打つ"
+        },
+        {
           "symptom": "ps が見出しだけになる",
           "check": "systemctl is-active k3s を打つ",
           "fix": "k3s を止めてしまった。sudo systemctl start k3s で始める"
@@ -1351,25 +1360,21 @@
     },
     {
       "id": "break",
-      "text": "ここで休めます。休む人は、exit で出てから、ホストで 1 行目を打ちます。続けるときに、2 行目を打ちます。休まない人は、打たずに印を付けて先へ進みます。",
+      "text": "ここで休めます。休む人は、exit で出てから、ホストでこの行を打ちます。休まない人は、打たずに印を付けて先へ進みます。",
       "why": "長い章なので、区切りを置くためです。止めても、作ったものとファイルは残ります。再起動と同じことが起きるので、Pod の中のコンテナは始め直され、Pod の住所も変わります。",
       "where": "host",
       "code": {
         "language": "bash",
-        "text": "multipass stop kcna\nmultipass shell kcna"
+        "text": "multipass stop kcna"
       },
       "lines": [
         {
           "code": "multipass stop kcna",
           "text": "kcna を止める。動いている (Running) ときだけ打てる"
-        },
-        {
-          "code": "multipass shell kcna",
-          "text": "止まっている kcna を動かし、中に入る"
         }
       ],
       "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
-      "read": "2 行目のあと、行の頭が ubuntu@kcna:~$ に変われば戻れています。そのあと cd ~/ch2 を打ちます。Pod の一覧は kubectl get pods -n ch2 で見ます。RESTARTS が増えているのは、マシンを止めたためです。",
+      "read": "何もエラーが出なければ止まっています。続けるときは、ホストで multipass shell kcna を打つと、動かして中に入れます。そのあと cd ~/ch2 を打ちます。Pod の一覧は kubectl get pods -n ch2 で見ます。RESTARTS が増えているのは、マシンを止めたためです。戻った直後の 1〜2 分は、一覧が止める前の古い様子のことがあります。少し待ってもう一度見ます。",
       "trouble": [
         {
           "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
@@ -1411,9 +1416,9 @@
       "read": "CPU の 200m は、0.2 コアです (1000m が 1 コア)。Requests の % が、予約した割合です。top の使用量とは別の数です。Limits は合計が 100% を超えてもよく、超えた分を約束しているわけではありません。",
       "trouble": [
         {
-          "symptom": "metrics not available yet と出る",
+          "symptom": "Metrics API not available や metrics not available yet と出る",
           "check": "kubectl get pods -n kube-system を打つ",
-          "fix": "metrics-server が動いてから 1 分ほどで数が出る"
+          "fix": "起動したあとや休んだあとは、metrics-server が動いて数が出るまで 1〜2 分かかる。待ってから kubectl top node だけをもう一度打つ"
         },
         {
           "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
@@ -1837,7 +1842,7 @@
         {
           "symptom": "イメージが not found と出る",
           "check": "Events で、イメージの名前と版 (: の後ろ) を見る",
-          "fix": "つづりが正しいなら、その版はもう配られていない。hub.docker.com でイメージのページを開き、同じ系統の新しい版に替える。この先の出力の版は、替えた版に読み替える"
+          "fix": "つづりが正しいなら、その版はもう配られていない。hub.docker.com でイメージのページを開き、同じ系統の新しい版に替える。この先の出力の版は、替えた版に読み替える。このときは、sed の行と、動いているイメージを待つ行の 2 か所を、同じ版に替える"
         },
         {
           "symptom": "開き直した・再起動したあとで、web3.yaml が作れない",
@@ -1846,8 +1851,8 @@
         },
         {
           "symptom": "timed out waiting for the condition と出る",
-          "check": "kubectl describe pod web -n ch2 の Events を見る",
-          "fix": "新しいイメージを取っている途中なら待つ"
+          "check": "kubectl get pod web -n ch2 -o custom-columns='NAME:.metadata.name,IMAGE:.spec.containers[0].image' と kubectl get pod web -n ch2 を打つ",
+          "fix": "IMAGE が替えた版で、1/1 の Running なら、待つ行の版の書き間違いなので、そのまま次の行へ進む。1/1 でなければ、kubectl describe pod web -n ch2 の Events を見て、イメージを取り終えるのを待つ"
         }
       ],
       "source": "https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/"

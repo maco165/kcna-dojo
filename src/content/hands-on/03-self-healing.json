@@ -61,7 +61,7 @@
     },
     {
       "id": "check-host",
-      "text": "仮想マシンの中で、どのマシンにいるかと、クラスターの様子を見ます。hostname が kcna でなければ、先へ進まず multipass shell kcna で入ります。",
+      "text": "仮想マシンの中で、どのマシンにいるかと、クラスターの様子を見ます。hostname が kcna でなければ、先へ進まず multipass shell kcna で入ります。枠は、端末によって、まとめて貼れるものと、1 行ずつ貼るほうがよいものがあります。0 章の sudo の手順で 2 行目が動かなかった人は、1 行ずつ貼ります (EOF で終わる書き込みの部分は、EOF まで続けて貼ります)。",
       "why": "自分の PC の別のクラスターで打たないためです。この章では、何度もわざと壊します。",
       "where": "vm",
       "code": {
@@ -759,6 +759,11 @@
           "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る。短い「429 Too Many Requests」だけのときは、使いすぎを防ぐ別の上限なので、数分待ってからもう一度行う"
         },
         {
+          "symptom": "timed out waiting for the condition と出る",
+          "check": "kubectl get pods once never retry -n ch3 で RESTARTS を見る",
+          "fix": "retry の RESTARTS が 1 以上なら、待つ前にもう進んだだけなので、次の行へ進む。0 なら kubectl describe pod retry -n ch3 の Events を見る"
+        },
+        {
           "symptom": "once が始め直す",
           "check": "kubectl logs once -n ch3 を打つ",
           "fix": "command の exit 0 を直し、消して作り直す"
@@ -955,25 +960,21 @@
     },
     {
       "id": "break",
-      "text": "ここで休めます。休む人は、exit で出てから、ホストで 1 行目を打ちます。続けるときに、2 行目を打ちます。休まない人は、打たずに印を付けて先へ進みます。",
+      "text": "ここで休めます。休む人は、exit で出てから、ホストでこの行を打ちます。休まない人は、打たずに印を付けて先へ進みます。",
       "why": "長い章なので、区切りを置くためです。止めても、作ったものとファイルは残ります。再起動と同じことが起きるので、Pod の中のコンテナは始め直され、Pod の住所も変わります。",
       "where": "host",
       "code": {
         "language": "bash",
-        "text": "multipass stop kcna\nmultipass shell kcna"
+        "text": "multipass stop kcna"
       },
       "lines": [
         {
           "code": "multipass stop kcna",
           "text": "kcna を止める。動いている (Running) ときだけ打てる"
-        },
-        {
-          "code": "multipass shell kcna",
-          "text": "止まっている kcna を動かし、中に入る"
         }
       ],
       "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
-      "read": "2 行目のあと、行の頭が ubuntu@kcna:~$ に変われば戻れています。そのあと cd ~/ch3 を打ちます。kubectl get pods -n ch3 で web の Pod が 2 つとも 1/1 になるまで待ちます。RESTARTS が増えているのは、マシンを止めたためです。",
+      "read": "何もエラーが出なければ止まっています。続けるときは、ホストで multipass shell kcna を打つと、動かして中に入れます。そのあと cd ~/ch3 を打ちます。kubectl get pods -n ch3 で web の Pod が 2 つとも 1/1 になるまで待ちます。RESTARTS が増えているのは、マシンを止めたためです。戻った直後の 1〜2 分は、一覧が止める前の古い様子のことがあります。少し待ってもう一度見ます。",
       "trouble": [
         {
           "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",

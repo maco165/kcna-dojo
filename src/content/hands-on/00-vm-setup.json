@@ -36,19 +36,19 @@
     },
     {
       "id": "open-terminal-windows",
-      "text": "端末を開きます。スタート メニューで PowerShell と打ち、Windows PowerShell を選びます。コマンドは 1 行ずつコピーし、Ctrl+V キーか右クリックで貼り付け、Enter キーを押します。端末では、Ctrl キーを押しながら C を押すのは「コピー」ではなく「動いているコマンドを止める」合図です。",
+      "text": "端末を開きます。スタート メニューで PowerShell と打ち、Windows PowerShell を選びます。コマンドは 1 行ずつコピーし、Ctrl+V キーか右クリックで貼り付け、Enter キーを押します。端末では、Ctrl キーを押しながら C を押すのは「コピー」ではなく「動いているコマンドを止める」合図です。まとめて貼って全部の行が動く端末もありますが、はじめは 1 行ずつにします。",
       "why": "この章では、文字のコマンドで進めるためです。管理者として開くのは、そう書いてある手順だけです。",
       "os": "windows"
     },
     {
       "id": "open-terminal-mac",
-      "text": "端末を開きます。command キーを押しながらスペースキーを押し、「ターミナル」と打って Enter キーを押します。コマンドは 1 行ずつコピーし、command+V キーで貼り付け、Enter キーを押します。端末では、Ctrl キーを押しながら C を押すのは「コピー」ではなく「動いているコマンドを止める」合図です。",
+      "text": "端末を開きます。command キーを押しながらスペースキーを押し、「ターミナル」と打って Enter キーを押します。コマンドは 1 行ずつコピーし、command+V キーで貼り付け、Enter キーを押します。端末では、Ctrl キーを押しながら C を押すのは「コピー」ではなく「動いているコマンドを止める」合図です。まとめて貼って全部の行が動く端末もありますが、はじめは 1 行ずつにします。",
       "why": "この章では、文字のコマンドで進めるためです。",
       "os": "mac"
     },
     {
       "id": "open-terminal-linux",
-      "text": "端末を開きます。アプリの一覧から「端末」(Terminal) を選びます。コマンドは 1 行ずつコピーし、Ctrl+Shift+V キーで貼り付け、Enter キーを押します。端末では、Ctrl キーを押しながら C を押すのは「コピー」ではなく「動いているコマンドを止める」合図です。",
+      "text": "端末を開きます。アプリの一覧から「端末」(Terminal) を選びます。コマンドは 1 行ずつコピーし、Ctrl+Shift+V キーで貼り付け、Enter キーを押します。端末では、Ctrl キーを押しながら C を押すのは「コピー」ではなく「動いているコマンドを止める」合図です。まとめて貼って全部の行が動く端末もありますが、はじめは 1 行ずつにします。",
       "why": "この章では、文字のコマンドで進めるためです。",
       "os": "linux"
     },
@@ -150,19 +150,42 @@
     },
     {
       "id": "install-linux",
-      "text": "Multipass を入れ、版を見ます。下の例は、snap が最初から入っている Ubuntu のホストです。",
-      "why": "Multipass をホストに入れるためです。Linux では snap という形で配られています。snap が無い Linux では、先に snapd を入れます。",
+      "text": "Multipass を入れます。この 1 行だけを打ち、終わるまで待ちます。下の例は、snap が最初から入っている Ubuntu のホストです。",
+      "why": "Multipass をホストに入れるためです。Linux では snap という形で配られています。snap が無い Linux では、先に snapd を入れます。自分のパスワードを聞かれるので、続きの行と一緒に貼らないようにします。",
       "os": "linux",
       "where": "host",
       "code": {
         "language": "bash",
-        "text": "sudo snap install multipass\nmultipass version\nls -l /var/snap/multipass/common/multipass_socket\ngroups"
+        "text": "sudo snap install multipass"
       },
       "lines": [
         {
           "code": "sudo snap install multipass",
           "text": "snap の配布元から Multipass を入れる。sudo は管理者として動かす印"
-        },
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "パスワードを聞かれたら、自分のものを打って Enter キーを押します (打っても文字は出ません)。Multipass の版と installed を含む行が出れば入っています。",
+      "trouble": [
+        {
+          "symptom": "snap: command not found と出る",
+          "check": "command -v snap を打つ。何も出なければ snapd が無い",
+          "fix": "使っている Linux の手順で snapd を入れる"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/how-to-guides/install-multipass/"
+    },
+    {
+      "id": "install-linux-check",
+      "text": "Multipass の版と、使う許可があるかを見ます。",
+      "why": "入ったことと、Multipass と話せることを確かめるためです。入れる行とは分けて打ちます。",
+      "os": "linux",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass version\nls -l /var/snap/multipass/common/multipass_socket\ngroups"
+      },
+      "lines": [
         {
           "code": "multipass version",
           "text": "Multipass の版を出す。入ったかどうかの確かめになる"
@@ -179,11 +202,6 @@
       "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
       "read": "version に 2 行出れば入っています。ls の行の 4 番目の語が、使えるグループです (例: sudo)。その名前が groups の行にもあれば、そのまま使えます。",
       "trouble": [
-        {
-          "symptom": "snap: command not found と出る",
-          "check": "command -v snap を打つ。何も出なければ snapd が無い",
-          "fix": "使っている Linux の手順で snapd を入れる"
-        },
         {
           "symptom": "Multipass を使う許可が無いと出る",
           "check": "ls -l のグループの名前が、groups の行にあるかを見る",
@@ -598,6 +616,11 @@
       "read": "番号は 0 です。0 番の利用者が root (管理者) です。次の行の数は、登録されている利用者の数です。この数は環境で少し変わります。",
       "trouble": [
         {
+          "symptom": "2 行をまとめて貼ると、2 行目が動かない",
+          "check": "2 行目のあとに、数と /etc/shadow が出るかを見る",
+          "fix": "この端末は、まとめて貼ると、前のコマンド (sudo) が続きの行を受け取ってしまう。これから先も、枠は 1 行ずつ貼る"
+        },
+        {
           "symptom": "パスワードを聞かれる",
           "check": "行の頭が ubuntu@kcna かを見る",
           "fix": "Ctrl キーを押しながら C で止め、ホストで multipass shell kcna を打って中に入ってから打つ"
@@ -780,12 +803,12 @@
     },
     {
       "id": "break",
-      "text": "戻す練習のために、止まっている仮想マシンを動かして、ファイルを 1 つ作ります。",
+      "text": "戻す練習のために、止まっている仮想マシンを動かして、ファイルを 1 つ作ります。1 行ずつ打ちます。",
       "why": "控えのあとに変えたものが、戻すと消えることを目で見るためです。",
       "where": "host",
       "code": {
         "language": "bash",
-        "text": "multipass start kcna\nmultipass exec kcna -- touch /home/ubuntu/after.txt\nmultipass exec kcna -- ls /home/ubuntu"
+        "text": "multipass start kcna\nmultipass exec kcna -- touch /home/ubuntu/after.txt"
       },
       "lines": [
         {
@@ -795,7 +818,29 @@
         {
           "code": "multipass exec kcna -- touch /home/ubuntu/after.txt",
           "text": "中に入らずに、kcna の中で touch (空のファイルを作る) を動かす。-- の後ろが中で動くコマンド"
-        },
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "何もエラーが出なければ、作れています。",
+      "trouble": [
+        {
+          "symptom": "kcna が動いていないと出る",
+          "check": "multipass list で State を見る",
+          "fix": "multipass start kcna を打ち、Running になってから打つ"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/exec/"
+    },
+    {
+      "id": "see-after",
+      "text": "作ったファイルがあるかを見ます。",
+      "why": "控えのあとに変えたものを、戻す前に確かめるためです。multipass exec は、続けて貼った行を自分の入力として読むことがあるので、1 行ずつ打ちます。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass exec kcna -- ls /home/ubuntu"
+      },
+      "lines": [
         {
           "code": "multipass exec kcna -- ls /home/ubuntu",
           "text": "kcna の中で ls を動かす"
@@ -804,11 +849,6 @@
       "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
       "read": "after.txt と work が並びます。after.txt は控えのあとに作ったもの、work は控えの前に作ったものです。",
       "trouble": [
-        {
-          "symptom": "kcna が動いていないと出る",
-          "check": "multipass list で State を見る",
-          "fix": "multipass start kcna を打ち、Running になってから打つ"
-        },
         {
           "symptom": "work が出ない",
           "check": "前の手順でファイルを作ったかを見返す",
