@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 // @ts-expect-error 書き出しの手順は JS (scripts/prerender.mjs)
-import { chapterPreloads, renderPage, sitemap } from '../scripts/prerender.mjs';
+import { renderPage, sitemap } from '../scripts/prerender.mjs';
 
 const template = readFileSync(path.resolve(process.cwd(), 'index.html'), 'utf8');
 
@@ -36,24 +36,5 @@ describe('ページの書き出し', () => {
     expect(map).toContain('<loc>https://maco165.github.io/kcna-dojo/</loc>');
     expect(map).toContain('<loc>https://maco165.github.io/kcna-dojo/handbook/</loc>');
     expect(map).not.toMatch(/progress|glossary\/etcd|lastmod/);
-  });
-});
-
-describe('章のページで先に読むチャンク', () => {
-  const manifest = {
-    'src/screens/HandsOnChapter.tsx': { file: 'assets/HandsOnChapter-x.js', imports: ['_a.js', 'index.html'] },
-    '_a.js': { file: 'assets/a-x.js', imports: ['src/screens/HandsOnChapter.tsx'] },
-    'index.html': { file: 'assets/index-x.js' },
-    'src/content/hands-on/00-a.json': { file: 'assets/00-a-x.js' },
-    'src/content/hands-on/01-b.json': { file: 'assets/01-b-x.js' },
-  };
-  it('画面の部品・その取り込み・その章だけ。最初に読むものとほかの章は入れない', () => {
-    expect(chapterPreloads(manifest, './hands-on/00-a.json', '<script src="/kcna-dojo/assets/index-x.js">')).toEqual(['assets/HandsOnChapter-x.js', 'assets/a-x.js', 'assets/00-a-x.js']);
-    expect(() => chapterPreloads(manifest, './hands-on/99-none.json', '')).toThrow(/manifest/);
-  });
-  it('書き出した HTML の head に modulepreload を書く。無いページには足さない', () => {
-    const page = { path: 'hands-on/a/', title: 'a', description: 'a', body: '' };
-    expect(renderPage(template, { ...page, preload: ['assets/x.js'] })).toContain('<link rel="modulepreload" crossorigin href="/kcna-dojo/assets/x.js" />\n  </head>');
-    expect(renderPage(template, page)).not.toContain('modulepreload');
   });
 });

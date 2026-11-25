@@ -141,8 +141,6 @@ function purgeStylex(): Plugin {
 
 export default defineConfig({
   base: BASE,
-  // 書き出し (scripts/prerender.mjs) が、章のページで先に読むチャンクの名前を引く
-  build: { manifest: true },
   plugins: [lightLessons(), jsonParse(), purgeStylex(), react()],
   test: {
     environment: 'jsdom',
