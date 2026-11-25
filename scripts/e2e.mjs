@@ -314,12 +314,12 @@ async function run(browser, name, width, height) {
   await page.getByRole('heading', { name: 'コンテナの基礎' }).waitFor();
   const startLinks = page.getByRole('link', { name: '開始' });
   const lessonLinks = await page.evaluate(() => [...new Set([...document.querySelectorAll('a[href^="/kcna-dojo/lesson/"]')].map((a) => a.getAttribute('href')))]);
-  check(lessonLinks.length === week1.lessons.length, `${tag} 空の記録でも全部のレッスンと、その週の実習を開ける (${lessonLinks.length} / ${week1.lessons.length})`);
+  check(lessonLinks.length === exercises.length, `${tag} 空の記録でも全部のレッスンを開ける (${lessonLinks.length} / ${exercises.length})`);
   // 週の一覧と数は問題演習だけ。実習は「この週の実践」の小さなリンク
   const listed = await page.evaluate(() => [...new Set([...document.querySelectorAll('.rows a[href*="/lesson/"], table a[href*="/lesson/"]')].map((a) => a.getAttribute('href')))]);
   check(JSON.stringify(listed) === JSON.stringify(exercises.map((l) => `/kcna-dojo/lesson/${l.id}/`)), `${tag} 週の一覧は問題演習だけ (${listed.length})`);
   const weekLabs = page.getByRole('navigation', { name: 'この週の実践' });
-  check(JSON.stringify(await weekLabs.locator('a').evaluateAll((as) => as.map((a) => a.getAttribute('href')))) === JSON.stringify([`/kcna-dojo/lesson/${lab.id}/`, '/kcna-dojo/hands-on/']), `${tag} 週の画面から、その週の実習と実践の一覧へ行ける`);
+  check(JSON.stringify(await weekLabs.locator('a').evaluateAll((as) => as.map((a) => a.getAttribute('href')))) === JSON.stringify(['/kcna-dojo/hands-on/run-containers/', '/kcna-dojo/hands-on/']), `${tag} 週の画面から、その週の実習を覆った章と実践の一覧へ行ける`);
   if (width < 768) {
     check(await page.getByText(`0/${exercises.length} 完了`).isVisible(), `${tag} 週の完了の数は問題演習だけ`);
     // 下のタブは 5 つ。どの幅でも字がタブからはみ出さない (復習の数が 2 桁のときも)
@@ -565,7 +565,7 @@ async function run(browser, name, width, height) {
   await noHorizontalOverflow(page, width, `${tag} 実践の一覧`);
   await page.goto(`${BASE}lesson/${lab.id}/`);
   check((await page.getByRole('link', { name: 'レッスンを閉じる' }).getAttribute('href')) === '/kcna-dojo/hands-on/', `${tag} 実習を閉じる先は実践の一覧`);
-  await page.locator('.lesson__main a[href="/kcna-dojo/hands-on/run-containers/"]').waitFor();
+  await page.waitForFunction(() => !document.querySelector('#root > main.prerender'));
   check((await page.locator('.lesson__main a[href="/kcna-dojo/hands-on/run-containers/"]').count()) === 1, `${tag} 章が覆った実習の頭に、章へのリンクが出る`);
   await page.goto(`${BASE}progress/`);
   await page.getByRole('heading', { name: '週ごとの進み具合 (問題演習)' }).waitFor();

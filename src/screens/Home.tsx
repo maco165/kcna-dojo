@@ -14,14 +14,14 @@ import BottomTabs from '../components/BottomTabs';
 import RepoLink from '../components/RepoLink';
 import SiteLogo from '../components/SiteLogo';
 import StatusIcon from '../components/StatusIcon';
+import { handsOnLinks } from '../content/coveredLabs';
 import { WEEKS, type WeekMeta } from '../content/curriculum';
-import type { LabLesson, QuizLessonMeta as Lesson } from '../content/types';
+import type { QuizLessonMeta as Lesson } from '../content/types';
 import {
   DOMAINS,
   domainAccuracy,
   doneLessons,
   exercisesOf,
-  labsOf,
   lessonCaption,
   lessonCorrect,
   lessonCount,
@@ -32,7 +32,7 @@ import {
 import { downloadProgress } from '../lib/download';
 import { SITE_NAME, SITE_TAGLINE } from '../lib/site';
 import { addDays, currentStreak, daysToExam, freezeStatus, freezeText, goalXp, planStart, todayXp, weekProgress, weekStartDay, type Progress } from '../lib/progress';
-import { aboutHref, compareHref, examHref, glossaryHref, guideHref, handbookHref, handsOnHref, lessonHref, reviewHref, settingsHref, weekHref } from '../lib/route';
+import { BASE, aboutHref, compareHref, examHref, glossaryHref, guideHref, handbookHref, handsOnHref, lessonHref, reviewHref, settingsHref, weekHref } from '../lib/route';
 import { dueQuestions, dueReviewCount } from '../content';
 import { WIDE_QUERY, useMediaQuery } from '../lib/useMediaQuery';
 
@@ -44,7 +44,6 @@ function formatDate(day: string): string {
 type Summary = {
   meta: WeekMeta;
   lessons: Lesson[];
-  labs: LabLesson[];
   statuses: LessonStatus[];
   today: number;
   streak: number;
@@ -66,7 +65,6 @@ function summarize(week: number, progress: Progress): Summary {
   return {
     meta,
     lessons,
-    labs: labsOf(meta),
     statuses: lessonStatuses(lessons, progress),
     today: todayXp(progress, now),
     streak: currentStreak(progress, now),
@@ -147,14 +145,14 @@ function PreRead({ meta }: { meta: WeekMeta }) {
   );
 }
 
-/** その週の実習 (実践のページ) への小さなリンク。週の数には入れない */
-function WeekLabs({ labs }: { labs: LabLesson[] }) {
+/** その週の実習か、それを覆った章への小さなリンク。週の数には入れない */
+function WeekLabs({ meta }: { meta: WeekMeta }) {
   return (
     <nav className="pre-read" aria-label="この週の実践">
       <span className="pre-read__label">動かして確かめる</span>
-      {labs.map((l) => (
-        <a key={l.id} className="gloss-chip" href={lessonHref(l.id)}>
-          {l.title}
+      {handsOnLinks(meta).map((l) => (
+        <a key={l.path} className="gloss-chip" href={`${BASE}${l.path}`}>
+          {l.label}
         </a>
       ))}
       <a className="gloss-chip" href={handsOnHref()}>
@@ -227,7 +225,7 @@ function PhoneHome({ s, progress }: { s: Summary; progress: Progress }) {
         </div>
 
         <div className="week-labs">
-          <WeekLabs labs={s.labs} />
+          <WeekLabs meta={meta} />
         </div>
 
         {nextWeek && (
@@ -482,7 +480,7 @@ function DesktopHome({ s, progress }: { s: Summary; progress: Progress }) {
                 </div>
               )}
             </Card>
-            <WeekLabs labs={s.labs} />
+            <WeekLabs meta={meta} />
             <Goals meta={meta} />
           </main>
 

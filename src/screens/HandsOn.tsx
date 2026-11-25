@@ -7,17 +7,18 @@ import Crumbs from '../components/Crumbs';
 import RepoLink from '../components/RepoLink';
 import SiteLogo from '../components/SiteLogo';
 import { dueReviewCount } from '../content';
+import { chapterNo, listedLabs } from '../content/coveredLabs';
 import { WEEKS } from '../content/curriculum';
-import { CHAPTERS_LEAD, HANDS_ON, HANDS_ON_LEAD, HANDS_ON_TITLE, HANDS_ON_WHO, LABS_LEAD, NO_CHAPTERS, chapterNo, isListedLab } from '../content/handsOn';
+import { CHAPTERS_LEAD, HANDS_ON, HANDS_ON_LEAD, HANDS_ON_TITLE, HANDS_ON_WHO, LABS_LEAD, NO_CHAPTERS } from '../content/handsOn';
 import type { HandsOnMeta } from '../content/types';
 import { chapterStatus, doneChapters, handsOnOs } from '../lib/handsOn';
-import { doneLessons, labsOf } from '../lib/lessonStatus';
+import { doneLessons } from '../lib/lessonStatus';
 import type { Progress } from '../lib/progress';
 import { handsOnHref, lessonHref, weekHref } from '../lib/route';
 import { SITE_NAME } from '../lib/site';
 import { WIDE_QUERY, useMediaQuery } from '../lib/useMediaQuery';
 
-const LABS = WEEKS.flatMap((w) => labsOf(w).filter(isListedLab).map((lab) => ({ lab, week: w.week })));
+const LABS = listedLabs(WEEKS);
 
 function Card({ href, kicker, title, lead, done, status }: { href: string; kicker: string; title: string; lead: string; done: boolean; status: string }) {
   return (
