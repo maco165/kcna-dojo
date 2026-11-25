@@ -658,6 +658,7 @@ async function run(browser, name, width, height) {
   check(await page.getByText('0 / 4 完了').isVisible(), `${tag} 章が覆った実習は、完了していても一覧の数に入れない`);
   check((await page.locator('a.cmp-card[href^="/kcna-dojo/lesson/w"]').count()) === 4 && (await page.locator('a.cmp-card[href^="/kcna-dojo/hands-on/"]').count()) === chapters.length, `${tag} 実践の一覧に、章 ${chapters.length} と、章が覆っていない実習 4 本が並ぶ`);
   check((await page.locator('p a[href="/kcna-dojo/lesson/w2-lab/"]').count()) === 1, `${tag} 実践の一覧の説明から、複数のノードの実習へ行ける`);
+  check((await page.locator('p a[href="/kcna-dojo/lesson/w5-lab/"]').count()) === 1, `${tag} 実践の一覧の説明から、クラスターの外から試す実習へ行ける`);
   check((await page.title()) === '実践 | クラネイ', `${tag} 実践の一覧の題名 (${await page.title()})`);
   await noHorizontalOverflow(page, width, `${tag} 実践の一覧`);
   await page.goto(`${BASE}lesson/${lab.id}/`);

@@ -7,7 +7,7 @@ import Crumbs from '../components/Crumbs';
 import RepoLink from '../components/RepoLink';
 import SiteLogo from '../components/SiteLogo';
 import { dueReviewCount } from '../content';
-import { REST_LEAD, chapterNo, listedLabs, restLabs } from '../content/coveredLabs';
+import { chapterNo, listedLabs, restLabs, restLead } from '../content/coveredLabs';
 import { WEEKS } from '../content/curriculum';
 import { CHAPTERS_LEAD, HANDS_ON, HANDS_ON_LEAD, HANDS_ON_TITLE, HANDS_ON_WHO, LABS_LEAD, NO_CHAPTERS } from '../content/handsOn';
 import type { HandsOnMeta } from '../content/types';
@@ -70,7 +70,7 @@ export function HandsOnIndex({ progress, chapters = HANDS_ON }: { progress: Prog
           {restLabs(WEEKS).map((lab) => (
             <span key={lab.id}>
               {' '}
-              {REST_LEAD} <a href={lessonHref(lab.id)}>{lab.title}</a>
+              {restLead(lab.id)} <a href={lessonHref(lab.id)}>{lab.title}</a>
             </span>
           ))}
         </p>

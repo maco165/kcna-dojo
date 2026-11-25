@@ -282,7 +282,7 @@ describe('画面', { timeout: 30_000 }, () => {
     vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} }));
     await act(async () => root.render(<LessonScreen lesson={lesson} week={2} progress={emptyProgress()} updateProgress={() => {}} />));
     expect([...el.querySelectorAll(`a[href^="${BASE}hands-on/"]`)].map((a) => a.getAttribute('href')).filter((h) => h !== `${BASE}hands-on/`)).toEqual([`${BASE}hands-on/install-k3s/`, `${BASE}hands-on/self-healing/`]);
-    expect(Object.keys(COVERED_REST)).toEqual(['w2-lab']);
+    expect(Object.keys(COVERED_REST)).toEqual(['w2-lab', 'w5-lab']);
     expect(el.textContent).toContain(COVERED_REST['w2-lab']);
     // 終えたあとの結果の画面にも、同じ章へのリンク
     for (const b of el.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')) await act(async () => b.click());
@@ -328,7 +328,7 @@ describe('画面', { timeout: 30_000 }, () => {
     expect(counts()).toEqual(['1 / 1 完了', '1 / 4 完了']);
     expect(el.querySelectorAll(`a.cmp-card[href^="${BASE}lesson/w"]`)).toHaveLength(4);
     expect(el.querySelector(`a.cmp-card[href="${BASE}hands-on/sample/"]`)).not.toBeNull();
-    expect([...el.querySelectorAll('p a')].map((a) => a.getAttribute('href'))).toContain(`${BASE}lesson/w2-lab/`);
+    expect([...el.querySelectorAll('p a')].map((a) => a.getAttribute('href'))).toEqual(expect.arrayContaining([`${BASE}lesson/w2-lab/`, `${BASE}lesson/w5-lab/`]));
     await act(async () => root.render(<HandsOnIndex progress={p} chapters={[]} />));
     expect(counts()).toEqual(['1 / 4 完了']);
     expect(el.textContent).toContain('章は準備中です');
@@ -346,9 +346,11 @@ describe('書き出す HTML', { timeout: 60_000 }, () => {
   it('章が覆った実習は、書き出した一覧に並べず、実習のページから章へつなぐ', () => {
     const body = (p: string) => new DOMParser().parseFromString(renderPage(readFileSync(path.resolve(process.cwd(), 'index.html'), 'utf8'), pages.find((x) => x.path === p)), 'text/html');
     const hrefs = [...body('hands-on/').querySelectorAll('#root a')].map((a) => a.getAttribute('href')).filter((h) => h!.includes('-lab/'));
-    // 先頭の w2-lab は、一覧の説明の「複数のノードがある人は」のリンク
-    expect(hrefs).toEqual([2, 3, 6, 7, 8].map((w) => `${BASE}lesson/w${w}-lab/`));
+    // 先頭の w2-lab と w5-lab は、一覧の説明の「この実習も役に立ちます」のリンク
+    expect(hrefs).toEqual([2, 5, 3, 6, 7, 8].map((w) => `${BASE}lesson/w${w}-lab/`));
     expect(body('lesson/w2-lab/').querySelector('#root')!.textContent).toContain(COVERED_REST['w2-lab']);
+    expect(body('lesson/w5-lab/').querySelector('#root')!.textContent).toContain(COVERED_REST['w5-lab']);
+    expect(body('hands-on/').querySelector('#root')!.textContent).toContain('クラスターの外の機械から試したい人は、この実習も役に立ちます:');
     expect(body('lesson/w1-lab/').querySelector('#root')!.textContent).not.toContain('複数のノードがある人');
     expect(body('lesson/w1-lab/').querySelector(`#root a[href="${BASE}hands-on/run-containers/"]`)).not.toBeNull();
     expect(body('lesson/w4-lab/').querySelector(`#root a[href="${BASE}hands-on/scaling/"]`)).not.toBeNull();

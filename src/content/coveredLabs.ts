@@ -44,8 +44,12 @@ export const handsOnLabel = (week: WeekMeta) => `動かして確かめる${labsO
 export const COVERED_LEAD = 'この実習の中身は、実践の章に入りました。初めての人はこちらから:';
 
 /** 章が覆っていない分の残る実習に、章へのリンクの後ろへ足す文 */
-export const COVERED_REST: Record<string, string> = { 'w2-lab': '複数のノードがある人は、この実習も役に立ちます。' };
+export const COVERED_REST: Record<string, string> = {
+  'w2-lab': '複数のノードがある人は、この実習も役に立ちます。',
+  'w5-lab': 'クラスターの外の機械から試したい人は、この実習も役に立ちます。',
+};
 
 /** 覆ったが、まだ役に立つ所の残る実習 (一覧の説明から 1 行でつなぐ) */
 export const restLabs = (weeks: WeekMeta[]): LabLesson[] => weeks.flatMap(labsOf).filter((lab) => lab.id in COVERED_REST);
-export const REST_LEAD = '複数のノードがある人は、この実習も役に立ちます:';
+/** 一覧の説明で、実習へのリンクの前に置く文 */
+export const restLead = (labId: string) => COVERED_REST[labId].replace(/。$/, ':');

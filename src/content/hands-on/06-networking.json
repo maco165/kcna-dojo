@@ -6,7 +6,7 @@
   "goal": "外から Pod までの通り道を説明し、つながらない時に切れ目を順に探し、NetworkPolicy で通信を絞れる",
   "features": [
     "Service は、後ろの Pod が入れ替わっても変わらない住所と名前",
-    "渡す先が空なら選び方、空でなければ番号を疑う",
+    "渡す先が空なら選び方、並んでいるのに届かないなら番号と準備 (ready) を疑う",
     "短い名前は同じ名前空間の中だけ。外は「名前.名前空間」",
     "Ingress は決まりで、受けるのは別の部品 (k3s では Traefik)",
     "NetworkPolicy は初めは全部通し、足し算で許す。出ていく向きを絞るなら DNS を忘れない"
@@ -79,7 +79,7 @@
           "text": "ノードの一覧を出す"
         }
       ],
-      "output": "kcna\nNAME   STATUS   ROLES           AGE   VERSION\nkcna   Ready    control-plane   13m   v1.36.6+k3s1",
+      "output": "kcna\nNAME   STATUS   ROLES           AGE     VERSION\nkcna   Ready    control-plane   5m29s   v1.36.6+k3s1",
       "read": "kcna と出て、ノードの STATUS が Ready なら進めます。VERSION が v1.36.6+k3s1 でない人は、出力の版を読み替えます。",
       "trouble": [
         {
@@ -300,7 +300,7 @@
           "text": "もう一度出す"
         }
       ],
-      "output": "deployment.apps/web created\nWaiting for deployment \"web\" rollout to finish: 0 of 2 updated replicas are available...\nWaiting for deployment \"web\" rollout to finish: 1 of 2 updated replicas are available...\ndeployment \"web\" successfully rolled out\nNAME                   IP\nweb-687f6fbb85-d6lld   10.42.0.14\nweb-687f6fbb85-z9jpt   10.42.0.15\npod \"web-687f6fbb85-d6lld\" deleted from ch6 namespace\npod \"web-687f6fbb85-z9jpt\" deleted from ch6 namespace\ndeployment \"web\" successfully rolled out\nNAME                   IP\nweb-687f6fbb85-9d799   10.42.0.16\nweb-687f6fbb85-dlb7j   10.42.0.17",
+      "output": "deployment.apps/web created\nWaiting for deployment \"web\" rollout to finish: 0 of 2 updated replicas are available...\nWaiting for deployment \"web\" rollout to finish: 1 of 2 updated replicas are available...\ndeployment \"web\" successfully rolled out\nNAME                   IP\nweb-687f6fbb85-87vhs   10.42.0.14\nweb-687f6fbb85-d9825   10.42.0.15\npod \"web-687f6fbb85-87vhs\" deleted from ch6 namespace\npod \"web-687f6fbb85-d9825\" deleted from ch6 namespace\ndeployment \"web\" successfully rolled out\nNAME                   IP\nweb-687f6fbb85-bbs78   10.42.0.16\nweb-687f6fbb85-qc4c9   10.42.0.17",
       "read": "名前も住所も、前と全部違います。呼ぶ側は、この 2 つを追いかけ続けるわけにいきません。",
       "trouble": [
         {
@@ -412,7 +412,7 @@
           "text": "6 回、ページを取る"
         }
       ],
-      "output": "service/web created\nNAME   TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)    AGE\nweb    ClusterIP   10.43.78.147   <none>        8080/TCP   4s\n10.42.0.16 web-687f6fbb85-9d799\n10.42.0.17 web-687f6fbb85-dlb7j\nweb-687f6fbb85-9d799\nweb-687f6fbb85-dlb7j\nweb-687f6fbb85-9d799\nweb-687f6fbb85-9d799\nweb-687f6fbb85-dlb7j\nweb-687f6fbb85-dlb7j",
+      "output": "service/web created\nNAME   TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)    AGE\nweb    ClusterIP   10.43.108.247   <none>        8080/TCP   4s\n10.42.0.16 web-687f6fbb85-bbs78\n10.42.0.17 web-687f6fbb85-qc4c9\nweb-687f6fbb85-qc4c9\nweb-687f6fbb85-bbs78\nweb-687f6fbb85-bbs78\nweb-687f6fbb85-qc4c9\nweb-687f6fbb85-bbs78\nweb-687f6fbb85-qc4c9",
       "read": "TYPE の ClusterIP は「クラスターの中だけの住所」という種類です。渡す先には、今いる 2 つの Pod の住所が並びます。この一覧 (EndpointSlice) は、Pod が入れ替わるたびに自動で直されます。返ってくる名前は、打つたびに並びが変わります。",
       "trouble": [
         {
@@ -422,8 +422,13 @@
         },
         {
           "symptom": "渡す先が出ない",
-          "check": "kubectl get pods -l app=web -n ch6 を打つ",
-          "fix": "READY が 1/1 でない Pod は入らない"
+          "check": "kubectl get pods -n ch6 --show-labels を打つ",
+          "fix": "app=web のラベルの付いた Pod が無いか、まだ住所が無い (IP が <none>)。ラベルを svc.yaml の selector と比べ、住所が付くまで待つ"
+        },
+        {
+          "symptom": "渡す先は並ぶのに、つながらない",
+          "check": "kubectl get endpointslice -l kubernetes.io/service-name=web -n ch6 -o jsonpath='{.items[*].endpoints[*].conditions.ready}' を打つ",
+          "fix": "false は、並んでいるが準備中で、渡されない Pod。READY が 1/1 になるまで待つ"
         }
       ],
       "source": "https://kubernetes.io/docs/concepts/services-networking/endpoint-slices/"
@@ -471,7 +476,7 @@
           "text": "同じ住所から取る"
         }
       ],
-      "output": "10.42.0.16 web-687f6fbb85-9d799\n10.42.0.17 web-687f6fbb85-dlb7j\npod \"web-687f6fbb85-9d799\" deleted from ch6 namespace\npod \"web-687f6fbb85-dlb7j\" deleted from ch6 namespace\nWaiting for deployment \"web\" rollout to finish: 0 of 2 updated replicas are available...\nWaiting for deployment \"web\" rollout to finish: 1 of 2 updated replicas are available...\ndeployment \"web\" successfully rolled out\n10.42.0.18 web-687f6fbb85-b2tbl\n10.42.0.19 web-687f6fbb85-2ll5s\nweb-687f6fbb85-2ll5s",
+      "output": "10.42.0.16 web-687f6fbb85-bbs78\n10.42.0.17 web-687f6fbb85-qc4c9\npod \"web-687f6fbb85-bbs78\" deleted from ch6 namespace\npod \"web-687f6fbb85-qc4c9\" deleted from ch6 namespace\nWaiting for deployment \"web\" rollout to finish: 0 of 2 updated replicas are available...\nWaiting for deployment \"web\" rollout to finish: 1 of 2 updated replicas are available...\ndeployment \"web\" successfully rolled out\n10.42.0.18 web-687f6fbb85-wvh2c\n10.42.0.19 web-687f6fbb85-v2tcx\nweb-687f6fbb85-wvh2c",
       "read": "渡す先は前と違う住所に入れ替わりました。Service の住所は同じままで、返事があります。",
       "trouble": [
         {
@@ -573,7 +578,7 @@
           "text": "Pod のラベルを出す"
         }
       ],
-      "output": "service/typo created\ncurl の終わりの番号は 7\n{\"app\":\"wbe\"}\nNAME                   READY   STATUS    RESTARTS   AGE   LABELS\nweb-687f6fbb85-2ll5s   1/1     Running   0          14s   app=web,pod-template-hash=687f6fbb85\nweb-687f6fbb85-b2tbl   1/1     Running   0          14s   app=web,pod-template-hash=687f6fbb85",
+      "output": "service/typo created\ncurl の終わりの番号は 7\n{\"app\":\"wbe\"}\nNAME                   READY   STATUS    RESTARTS   AGE   LABELS\nweb-687f6fbb85-v2tcx   1/1     Running   0          14s   app=web,pod-template-hash=687f6fbb85\nweb-687f6fbb85-wvh2c   1/1     Running   0          14s   app=web,pod-template-hash=687f6fbb85",
       "read": "渡す先は空です (何も出ません)。終わりの番号が 0 でないので、つながっていません。選び方は wbe、Pod のラベルは web で、合っていないと分かります。作った時にエラーが出ないのが、やっかいなところです。",
       "trouble": [
         {
@@ -619,7 +624,7 @@
           "text": "取る"
         }
       ],
-      "output": "service/typo patched\n10.42.0.18 web-687f6fbb85-b2tbl\n10.42.0.19 web-687f6fbb85-2ll5s\nweb-687f6fbb85-2ll5s",
+      "output": "service/typo patched\n10.42.0.18 web-687f6fbb85-wvh2c\n10.42.0.19 web-687f6fbb85-v2tcx\nweb-687f6fbb85-v2tcx",
       "read": "渡す先に 2 つ入り、ページが返りました。",
       "trouble": [
         {
@@ -669,8 +674,8 @@
           "text": "練習の Service を消す"
         }
       ],
-      "output": "service/typo patched\n10.42.0.19 web-687f6fbb85-2ll5s\n10.42.0.18 web-687f6fbb85-b2tbl\n8888\ncurl: (7) Failed to connect to 10.43.27.60 port 80 after 0 ms: Couldn't connect to server\nservice \"typo\" deleted from ch6 namespace",
-      "read": "渡す先は 2 つありますが、番号が 8888 です。Pod の 8888 番では誰も聞いていないので、断られます。空なら選び方、空でないなら番号と Pod の中身、の順に疑います。",
+      "output": "service/typo patched\n10.42.0.18 web-687f6fbb85-wvh2c\n10.42.0.19 web-687f6fbb85-v2tcx\n8888\ncurl: (7) Failed to connect to 10.43.31.199 port 80 after 0 ms: Couldn't connect to server\nservice \"typo\" deleted from ch6 namespace",
+      "read": "渡す先は 2 つありますが、番号が 8888 です。Pod の 8888 番では誰も聞いていないので、断られます。空なら選び方、空でないなら番号・準備 (ready)・Pod の中身、の順に疑います。",
       "trouble": [
         {
           "symptom": "ページが返る",
@@ -703,7 +708,7 @@
           "text": "client の中から、web という名前の 8080 番を取る (5 秒であきらめる)"
         }
       ],
-      "output": "pod/client created\npod/client condition met\nweb-687f6fbb85-2ll5s",
+      "output": "pod/client created\npod/client condition met\nweb-687f6fbb85-v2tcx",
       "read": "住所を 1 つも書かずに、名前だけで届きました。名前を住所に変えたのが DNS です。",
       "trouble": [
         {
@@ -747,7 +752,7 @@
           "text": "DNS の Service を出す"
         }
       ],
-      "output": "search ch6.svc.cluster.local svc.cluster.local cluster.local\nnameserver 10.43.0.10\noptions ndots:5\nServer:\t\t10.43.0.10\nAddress:\t10.43.0.10:53\n\nName:\tweb.ch6.svc.cluster.local\nAddress: 10.43.78.147\nNAME       TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)                  AGE\nkube-dns   ClusterIP   10.43.0.10   <none>        53/UDP,53/TCP,9153/TCP   14m",
+      "output": "search ch6.svc.cluster.local svc.cluster.local cluster.local\nnameserver 10.43.0.10\noptions ndots:5\nServer:\t\t10.43.0.10\nAddress:\t10.43.0.10:53\n\n\nName:\tweb.ch6.svc.cluster.local\nAddress: 10.43.108.247\nNAME       TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)                  AGE\nkube-dns   ClusterIP   10.43.0.10   <none>        53/UDP,53/TCP,9153/TCP   6m10s",
       "read": "search に並ぶ語を、短い名前の後ろに足して引きます。web は web.ch6.svc.cluster.local になります。形は「Service の名前.名前空間.svc.cluster.local」です。nameserver は、kube-dns という Service の住所です。その後ろで CoreDNS の Pod が答えています。",
       "trouble": [
         {
@@ -798,7 +803,7 @@
           "text": "名前空間まで付けて取る"
         }
       ],
-      "output": "namespace/ch6b created\nserviceaccount/default condition met\npod/other created\npod/other condition met\nwget: bad address 'web:8080'\ncommand terminated with exit code 1\nweb-687f6fbb85-b2tbl",
+      "output": "namespace/ch6b created\nserviceaccount/default condition met\npod/other created\npod/other condition met\nwget: bad address 'web:8080'\ncommand terminated with exit code 1\nweb-687f6fbb85-v2tcx",
       "read": "短い名前は bad address (引けない) です。web.ch6 なら届きます。名前空間は、名前の範囲を分けるだけで、通信は止めていないことも分かります。",
       "trouble": [
         {
@@ -901,7 +906,7 @@
           "text": "headless を引く"
         }
       ],
-      "output": "service/web-each created\nServer:\t\t10.43.0.10\nAddress:\t10.43.0.10:53\n\n\nName:\tweb.ch6.svc.cluster.local\nAddress: 10.43.78.147\nServer:\t\t10.43.0.10\nAddress:\t10.43.0.10:53\n\nName:\tweb-each.ch6.svc.cluster.local\nAddress: 10.42.0.18\nName:\tweb-each.ch6.svc.cluster.local\nAddress: 10.42.0.19",
+      "output": "service/web-each created\nServer:\t\t10.43.0.10\nAddress:\t10.43.0.10:53\n\n\nName:\tweb.ch6.svc.cluster.local\nAddress: 10.43.108.247\nServer:\t\t10.43.0.10\nAddress:\t10.43.0.10:53\n\n\nName:\tweb-each.ch6.svc.cluster.local\nAddress: 10.42.0.19\nName:\tweb-each.ch6.svc.cluster.local\nAddress: 10.42.0.18",
       "read": "ふつうのほうは Service の住所が 1 つ、headless は Pod の住所が 2 つ返ります。headless では、どれにつなぐかを呼ぶ側が選び、Service の番号の読み替えもされません。",
       "trouble": [
         {
@@ -1016,7 +1021,7 @@
           "text": "ノードの 30080 番から取る"
         }
       ],
-      "output": "service/web-node created\nNAME       TYPE       CLUSTER-IP     EXTERNAL-IP   PORT(S)        AGE\nweb-node   NodePort   10.43.21.199   <none>        80:30080/TCP   3s\n10.0.2.15\nweb-687f6fbb85-b2tbl",
+      "output": "service/web-node created\nNAME       TYPE       CLUSTER-IP      EXTERNAL-IP   PORT(S)        AGE\nweb-node   NodePort   10.43.196.177   <none>        80:30080/TCP   3s\n10.0.2.15\nweb-687f6fbb85-v2tcx",
       "read": "PORT(S) の 80:30080/TCP は「Service の 80 番と、ノードの 30080 番」です。仮想マシン自身の住所で届きました。住所は、PC ごとに違います。",
       "trouble": [
         {
@@ -1123,8 +1128,8 @@
           "text": "ノードの 8081 番から取る"
         }
       ],
-      "output": "service/web-lb created\nNAME     TYPE           CLUSTER-IP     EXTERNAL-IP   PORT(S)          AGE\nweb-lb   LoadBalancer   10.43.143.83   10.0.2.15     8081:30194/TCP   2s\nsvclb-traefik-0e9ebf3f-vj6h5              2/2     Running     2 (13m ago)   13m   10.42.0.13   kcna   <none>           <none>\nsvclb-web-lb-7749b31b-ggdgw               1/1     Running     0             2s    10.42.0.22   kcna   <none>           <none>\nweb-687f6fbb85-2ll5s",
-      "read": "EXTERNAL-IP にノードの住所が付きました。svclb-web-lb で始まる Pod が、その番号を受けています。svclb-traefik は、次に使う入口のものです。",
+      "output": "service/web-lb created\nNAME     TYPE           CLUSTER-IP     EXTERNAL-IP   PORT(S)          AGE\nweb-lb   LoadBalancer   10.43.47.213   10.0.2.15     8081:30800/TCP   3s\nsvclb-traefik-26b38365-84gsr              2/2     Running     2 (5m14s ago)   5m40s   10.42.0.12   kcna   <none>           <none>\nsvclb-web-lb-7d0f26d9-wpjd5               1/1     Running     0               3s      10.42.0.22   kcna   <none>           <none>\nweb-687f6fbb85-wvh2c",
+      "read": "EXTERNAL-IP にノードの住所が付きました。このノードには外向きの住所 (external IP) が決まっていないので、ServiceLB は内向きの住所を使うためです。EXTERNAL と出ても、インターネットに公開されたわけではありません。この住所に届く所 (ホストと仮想マシン) から使えるだけです。svclb-web-lb で始まる Pod が、その番号を受けています。svclb-traefik は、次に使う入口のものです。",
       "trouble": [
         {
           "symptom": "EXTERNAL-IP が <pending> のまま",
@@ -1170,7 +1175,7 @@
           "text": "消す"
         }
       ],
-      "output": "service/clash created\nNAME    TYPE           CLUSTER-IP     EXTERNAL-IP   PORT(S)        AGE\nclash   LoadBalancer   10.43.78.152   <pending>     80:32591/TCP   15s\nsvclb-clash-d4a25b51-qzthb                0/1     Pending     0             15s\nservice \"clash\" deleted from ch6 namespace",
+      "output": "service/clash created\nNAME    TYPE           CLUSTER-IP   EXTERNAL-IP   PORT(S)        AGE\nclash   LoadBalancer   10.43.7.63   <pending>     80:30555/TCP   15s\nsvclb-clash-05c80ae9-dq7mh                0/1     Pending     0               15s\nservice \"clash\" deleted from ch6 namespace",
       "read": "EXTERNAL-IP は <pending> のまま、Pod も Pending です。80 番は、k3s に最初から入っている入口 (Traefik) が先に使っているためです。",
       "trouble": [
         {
@@ -1196,8 +1201,8 @@
           "text": "kcna の住所 (IPv4) を見る"
         }
       ],
-      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
-      "read": "kcna の IPv4 の住所のうち、10.42 で始まらないものを使います (10.42 は Pod 用の住所です)。PC のブラウザで http://その住所:30080 と http://その住所:8081 を開き、Pod の名前が出れば届いています。",
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。 ただし、Multipass の代わりに、仮想マシンの 2 枚目の口とブリッジでつないだ専用ネットワークのコンテナから、30080 番と 8081 番に届くことは、2026-11-26 に Linux の QEMU で確かめました (Multipass のホストと同じつながり方ではありません)。",
+      "read": "kcna の IPv4 のうち、10.42 で始まらないもの (10.42 は Pod 用) を使います。PC のブラウザで http://その住所:30080 と http://その住所:8081 を開き、Pod の名前が出れば届いています。",
       "trouble": [
         {
           "symptom": "ブラウザで開けない",
@@ -1265,7 +1270,7 @@
           "text": "今ある Ingress を全部出す"
         }
       ],
-      "output": "deployment.apps/traefik condition met\nNAME      TYPE           CLUSTER-IP      EXTERNAL-IP   PORT(S)                      AGE\ntraefik   LoadBalancer   10.43.253.117   10.0.2.15     80:30494/TCP,443:30932/TCP   14m\nNAME                CONTROLLER                      PARAMETERS   AGE\ntraefik (default)   traefik.io/ingress-controller   <none>       14m\nNo resources found",
+      "output": "deployment.apps/traefik condition met\nNAME      TYPE           CLUSTER-IP     EXTERNAL-IP   PORT(S)                      AGE\ntraefik   LoadBalancer   10.43.173.61   10.0.2.15     80:32352/TCP,443:31712/TCP   5m58s\nNAME                CONTROLLER                      PARAMETERS   AGE\ntraefik (default)   traefik.io/ingress-controller   <none>       5m58s\nNo resources found",
       "read": "Traefik は LoadBalancer で、ノードの 80 番と 443 番を受けています。IngressClass の traefik が、Ingress に書く受け持ちの名前です。Ingress は、まだ 1 つもありません。",
       "trouble": [
         {
@@ -1387,7 +1392,7 @@
           "text": "Host を付けずに取る"
         }
       ],
-      "output": "ingress.networking.k8s.io/web created\nNAME   CLASS     HOSTS               ADDRESS     PORTS   AGE\nweb    traefik   site.example.test   10.0.2.15   80      0s\nweb-687f6fbb85-b2tbl\n404 page not found",
+      "output": "ingress.networking.k8s.io/web created\nNAME   CLASS     HOSTS               ADDRESS     PORTS   AGE\nweb    traefik   site.example.test   10.0.2.15   80      1s\nweb-687f6fbb85-wvh2c\n404 page not found",
       "read": "Host を付けると Pod の名前が返り、付けないと 404 page not found です。404 を返しているのは Traefik で、「どの決まりにも当てはまらない」という意味です。.test は、練習用に空けてある名前で、本物の Web には使われません。",
       "trouble": [
         {
@@ -1575,7 +1580,7 @@
           "text": "決まりと行き先を出す"
         }
       ],
-      "output": "deployment.apps/api created\nWaiting for deployment \"api\" rollout to finish: 0 of 1 updated replicas are available...\ndeployment \"api\" successfully rolled out\nservice/api exposed\ningress.networking.k8s.io/web patched\nweb-687f6fbb85-2ll5s\napi by api-6c5b67f559-2pv8g\nRules:\n  Host               Path  Backends\n  ----               ----  --------\n  site.example.test\n                     /       web:http (10.42.0.18:80,10.42.0.19:80)\n                     /api/   api:80 (10.42.0.23:80)\nAnnotations:         <none>",
+      "output": "deployment.apps/api created\nWaiting for deployment \"api\" rollout to finish: 0 of 1 updated replicas are available...\ndeployment \"api\" successfully rolled out\nservice/api exposed\ningress.networking.k8s.io/web patched\nweb-687f6fbb85-wvh2c\napi by api-6c5b67f559-kbwbk\nRules:\n  Host               Path  Backends\n  ----               ----  --------\n  site.example.test\n                     /       web:http (10.42.0.18:80,10.42.0.19:80)\n                     /api/   api:80 (10.42.0.23:80)\nAnnotations:         <none>",
       "read": "/ は web へ、/api/ は api へ行きました。2 つとも当てはまる時は、長く合うほうが使われます。渡される時も道は /api/ のままなので、api の側にその道のページが要ります。",
       "trouble": [
         {
@@ -1643,7 +1648,7 @@
           "text": "手元のファイルを消す"
         }
       ],
-      "output": "secret/site-tls created\ningress.networking.k8s.io/web patched\ncurl: (60) SSL certificate problem: self-signed certificate\nMore details here: https://curl.se/docs/sslcerts.html\n\ncurl failed to verify the legitimacy of the server and therefore could not\nestablish a secure connection to it. To learn more about this situation and\nhow to fix it, please visit the web page mentioned above.\nweb-687f6fbb85-b2tbl\nsubject=CN = site.example.test",
+      "output": "secret/site-tls created\ningress.networking.k8s.io/web patched\ncurl: (60) SSL certificate problem: self-signed certificate\nMore details here: https://curl.se/docs/sslcerts.html\n\ncurl failed to verify the legitimacy of the server and therefore could not\nestablish a secure connection to it. To learn more about this situation and\nhow to fix it, please visit the web page mentioned above.\nweb-687f6fbb85-v2tcx\nsubject=CN = site.example.test",
       "read": "1 回目は self-signed certificate と断られます。知らない発行元の証明書を、curl が信用しないためです。2 回目は -k で確かめずに通りました。練習のほかでは -k を使いません。証明書の名前が site.example.test なら、自分のものが使われています。",
       "trouble": [
         {
@@ -1655,28 +1660,33 @@
           "symptom": "rm で「そのファイルは無い」と出る",
           "check": "ls を打つ",
           "fix": "作る行が失敗している。1 行目から打ち直す"
+        },
+        {
+          "symptom": "途中でやめてしまい、鍵のファイルが残った",
+          "check": "ls ~/ch6 を打つ",
+          "fix": "rm -f ~/ch6/tls-key.pem ~/ch6/tls-cert.pem を打つ。やり直すなら、kubectl delete secret site-tls -n ch6 --ignore-not-found も打ってから 1 行目に戻る"
         }
       ],
       "source": "https://kubernetes.io/docs/concepts/services-networking/ingress/"
     },
     {
       "id": "ing-host-win",
-      "text": "ホストの PowerShell から、ホスト名を付けて取ります。1 行目の住所は、multipass list で見たものに書き替えます。",
+      "text": "ホストで、自分の OS の手順を 1 つだけ打ちます (この枠は、選んだ OS の分です)。1 行目の 192.0.2.10 は、文書の例のための住所で、どこにもつながりません。必ず、multipass list で見た kcna の IPv4 のうち、10.42 で始まらないもの (10.42 は Pod 用) に書き替えてから打ちます。",
       "why": "PC から Ingress を通る道を見るためです。名前の住所を PC に登録しなくても、Host を付ければ試せます。",
       "os": "windows",
       "where": "host",
       "code": {
         "language": "powershell",
-        "text": "$VM_IP = \"10.0.0.5\"\ncurl.exe -s -H \"Host: site.example.test\" http://$VM_IP/"
+        "text": "$VM_IP = \"192.0.2.10\"\ncurl.exe -s -m 5 -H \"Host: site.example.test\" http://$VM_IP/"
       },
       "lines": [
         {
-          "code": "$VM_IP = \"10.0.0.5\"",
-          "text": "仮想マシンの住所を覚える (書き替える)"
+          "code": "$VM_IP = \"192.0.2.10\"",
+          "text": "仮想マシンの住所を覚える (ここを書き替える)"
         },
         {
-          "code": "curl.exe -s -H \"Host: site.example.test\" http://$VM_IP/",
-          "text": "Host を付けて取る。curl.exe と書くと、PowerShell の別の curl と間違えない"
+          "code": "curl.exe -s -m 5 -H \"Host: site.example.test\" http://$VM_IP/",
+          "text": "Host を付けて取る。curl.exe と書くと、PowerShell の別の curl と間違えない。5 秒であきらめる (-m 5)"
         }
       ],
       "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
@@ -1691,31 +1701,36 @@
           "symptom": "404 page not found と出る",
           "check": "Host のつづりを見る",
           "fix": "届いてはいる。名前を site.example.test に直す"
+        },
+        {
+          "symptom": "何も出ずに終わる",
+          "check": "1 行目を書き替えたかを見る",
+          "fix": "192.0.2.10 のままだと、5 秒待って終わる。自分の仮想マシンの住所に書き替える"
         }
       ],
       "source": "https://kubernetes.io/docs/concepts/services-networking/ingress/"
     },
     {
       "id": "ing-host-mac",
-      "text": "ホストの端末から、ホスト名を付けて取ります。1 行目の住所は、multipass list で見たものに書き替えます。",
+      "text": "ホストで、自分の OS の手順を 1 つだけ打ちます (この枠は、選んだ OS の分です)。1 行目の 192.0.2.10 は、文書の例のための住所で、どこにもつながりません。必ず、multipass list で見た kcna の IPv4 のうち、10.42 で始まらないもの (10.42 は Pod 用) に書き替えてから打ちます。",
       "why": "PC から Ingress を通る道を見るためです。名前の住所を PC に登録しなくても、Host を付ければ試せます。",
       "os": "mac",
       "where": "host",
       "code": {
         "language": "bash",
-        "text": "VM_IP=10.0.0.5\ncurl -s -H \"Host: site.example.test\" http://$VM_IP/"
+        "text": "VM_IP=192.0.2.10\ncurl -s -m 5 -H \"Host: site.example.test\" http://$VM_IP/"
       },
       "lines": [
         {
-          "code": "VM_IP=10.0.0.5",
-          "text": "仮想マシンの住所を覚える (書き替える)"
+          "code": "VM_IP=192.0.2.10",
+          "text": "仮想マシンの住所を覚える (ここを書き替える)"
         },
         {
-          "code": "curl -s -H \"Host: site.example.test\" http://$VM_IP/",
-          "text": "Host を付けて取る"
+          "code": "curl -s -m 5 -H \"Host: site.example.test\" http://$VM_IP/",
+          "text": "Host を付けて取る。5 秒であきらめる (-m 5)"
         }
       ],
-      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。 ただし、Multipass の代わりに、仮想マシンの 2 枚目の口とブリッジでつないだ専用ネットワークのコンテナから、同じ形の curl で Ingress に届くことは、2026-11-26 に Linux の QEMU で確かめました (Multipass のホストと同じつながり方ではありません)。",
       "read": "仮想マシンの中と同じように、Pod の名前が返れば届いています。",
       "trouble": [
         {
@@ -1727,31 +1742,36 @@
           "symptom": "404 page not found と出る",
           "check": "Host のつづりを見る",
           "fix": "届いてはいる。名前を site.example.test に直す"
+        },
+        {
+          "symptom": "何も出ずに終わる",
+          "check": "1 行目を書き替えたかを見る",
+          "fix": "192.0.2.10 のままだと、5 秒待って終わる。自分の仮想マシンの住所に書き替える"
         }
       ],
       "source": "https://kubernetes.io/docs/concepts/services-networking/ingress/"
     },
     {
       "id": "ing-host-linux",
-      "text": "ホストの端末から、ホスト名を付けて取ります。1 行目の住所は、multipass list で見たものに書き替えます。",
+      "text": "ホストで、自分の OS の手順を 1 つだけ打ちます (この枠は、選んだ OS の分です)。1 行目の 192.0.2.10 は、文書の例のための住所で、どこにもつながりません。必ず、multipass list で見た kcna の IPv4 のうち、10.42 で始まらないもの (10.42 は Pod 用) に書き替えてから打ちます。",
       "why": "PC から Ingress を通る道を見るためです。名前の住所を PC に登録しなくても、Host を付ければ試せます。",
       "os": "linux",
       "where": "host",
       "code": {
         "language": "bash",
-        "text": "VM_IP=10.0.0.5\ncurl -s -H \"Host: site.example.test\" http://$VM_IP/"
+        "text": "VM_IP=192.0.2.10\ncurl -s -m 5 -H \"Host: site.example.test\" http://$VM_IP/"
       },
       "lines": [
         {
-          "code": "VM_IP=10.0.0.5",
-          "text": "仮想マシンの住所を覚える (書き替える)"
+          "code": "VM_IP=192.0.2.10",
+          "text": "仮想マシンの住所を覚える (ここを書き替える)"
         },
         {
-          "code": "curl -s -H \"Host: site.example.test\" http://$VM_IP/",
-          "text": "Host を付けて取る"
+          "code": "curl -s -m 5 -H \"Host: site.example.test\" http://$VM_IP/",
+          "text": "Host を付けて取る。5 秒であきらめる (-m 5)"
         }
       ],
-      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。 ただし、Multipass の代わりに、仮想マシンの 2 枚目の口とブリッジでつないだ専用ネットワークのコンテナから、同じ形の curl で Ingress に届くことは、2026-11-26 に Linux の QEMU で確かめました (Multipass のホストと同じつながり方ではありません)。",
       "read": "仮想マシンの中と同じように、Pod の名前が返れば届いています。",
       "trouble": [
         {
@@ -1763,6 +1783,11 @@
           "symptom": "404 page not found と出る",
           "check": "Host のつづりを見る",
           "fix": "届いてはいる。名前を site.example.test に直す"
+        },
+        {
+          "symptom": "何も出ずに終わる",
+          "check": "1 行目を書き替えたかを見る",
+          "fix": "192.0.2.10 のままだと、5 秒待って終わる。自分の仮想マシンの住所に書き替える"
         }
       ],
       "source": "https://kubernetes.io/docs/concepts/services-networking/ingress/"
@@ -1798,8 +1823,8 @@
           "text": "5 段目: その住所の Pod"
         }
       ],
-      "output": "NAME      TYPE           CLUSTER-IP      EXTERNAL-IP   PORT(S)                      AGE   SELECTOR\ntraefik   LoadBalancer   10.43.253.117   10.0.2.15     80:30494/TCP,443:30932/TCP   14m   app.kubernetes.io/instance=traefik-kube-system,app.kubernetes.io/name=traefik\n/ -> web\n/api/ -> api\nNAME   TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)    AGE\nweb    ClusterIP   10.43.78.147   <none>        8080/TCP   85s\napi    ClusterIP   10.43.40.121   <none>        80/TCP     13s\n10.42.0.18 web-687f6fbb85-b2tbl\n10.42.0.19 web-687f6fbb85-2ll5s\nNAME                   READY   STATUS    RESTARTS   AGE   IP           NODE   NOMINATED NODE   READINESS GATES\nweb-687f6fbb85-2ll5s   1/1     Running   0          81s   10.42.0.19   kcna   <none>           <none>\nweb-687f6fbb85-b2tbl   1/1     Running   0          81s   10.42.0.18   kcna   <none>           <none>",
-      "read": "入口 → 決まり → Service → 渡す先 → Pod と、名前・番号・住所がつながっています。4 段目 (渡す先) の住所が、5 段目の Pod の IP と同じです。",
+      "output": "NAME      TYPE           CLUSTER-IP     EXTERNAL-IP   PORT(S)                      AGE     SELECTOR\ntraefik   LoadBalancer   10.43.173.61   10.0.2.15     80:32352/TCP,443:31712/TCP   6m12s   app.kubernetes.io/instance=traefik-kube-system,app.kubernetes.io/name=traefik\n/ -> web\n/api/ -> api\nNAME   TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)    AGE\nweb    ClusterIP   10.43.108.247   <none>        8080/TCP   82s\napi    ClusterIP   10.43.45.47     <none>        80/TCP     12s\n10.42.0.18 web-687f6fbb85-wvh2c\n10.42.0.19 web-687f6fbb85-v2tcx\nNAME                   READY   STATUS    RESTARTS   AGE   IP           NODE   NOMINATED NODE   READINESS GATES\nweb-687f6fbb85-v2tcx   1/1     Running   0          79s   10.42.0.19   kcna   <none>           <none>\nweb-687f6fbb85-wvh2c   1/1     Running   0          79s   10.42.0.18   kcna   <none>           <none>",
+      "read": "入口 → 決まり → Service → 渡す先 → Pod と、名前・番号・住所がつながっています。4 段目 (渡す先) の住所が、5 段目の Pod の IP と同じです。段の間を止める NetworkPolicy は、この並びには出ないので、別に見ます。",
       "trouble": [
         {
           "symptom": "途中で食い違う",
@@ -1848,8 +1873,8 @@
           "text": "Ingress を通して"
         }
       ],
-      "output": "web-687f6fbb85-2ll5s\nweb-687f6fbb85-2ll5s\nweb-687f6fbb85-2ll5s\nweb-687f6fbb85-2ll5s",
-      "read": "4 つとも返れば、全部つながっています。1 つ目で切れたら Pod、2 つ目なら Service (選び方・番号)、3 つ目なら DNS、4 つ目なら Ingress を疑います。",
+      "output": "web-687f6fbb85-v2tcx\nweb-687f6fbb85-wvh2c\nweb-687f6fbb85-wvh2c\nweb-687f6fbb85-wvh2c",
+      "read": "4 つとも返れば、全部つながっています。1 つ目で切れたら Pod、2 つ目なら Service (選び方・番号)、3 つ目なら DNS、4 つ目なら Ingress を疑います。どれもおかしくないのに特定の相手からだけ届かないときは、NetworkPolicy (この先で動かします) を kubectl get networkpolicy -A で見ます。",
       "trouble": [
         {
           "symptom": "client の Pod が見つからないと出る",
@@ -1884,7 +1909,7 @@
         }
       ],
       "output": "backendtlspolicies.gateway.networking.k8s.io\ngatewayclasses.gateway.networking.k8s.io\ngateways.gateway.networking.k8s.io\ngrpcroutes.gateway.networking.k8s.io\nhttproutes.gateway.networking.k8s.io\nlistenersets.gateway.networking.k8s.io\nreferencegrants.gateway.networking.k8s.io\ntcproutes.gateway.networking.k8s.io\ntlsroutes.gateway.networking.k8s.io\nudproutes.gateway.networking.k8s.io\nNo resources found",
-      "read": "種類 (gateways や httproutes など) は、k3s の Traefik と一緒に入っています。受け持ち (GatewayClass) はまだありません。k3s では、Traefik の設定で使うと決めると、使えるようになります。この章では、入口の設定を変えないために、見るだけにします。役の分けは、GatewayClass と Gateway が入口、HTTPRoute が道です。",
+      "read": "種類 (gateways や httproutes など) は、k3s の Traefik と一緒に入っています。受け持ち (GatewayClass) はまだありません。k3s では、Traefik の設定 (HelmChartConfig) で providers.kubernetesGateway.enabled を true にすると使えます。種類は、k3s 1.36 までは Traefik と一緒に、1.37 からは gateway-api-crd という別の部品として入ります。この章では、入口の設定を変えないために、見るだけにします。役の分けは、GatewayClass と Gateway が入口、HTTPRoute が道です。",
       "trouble": [
         {
           "symptom": "1 つも出ない",
@@ -1951,7 +1976,7 @@
           "text": "別の名前空間の other から"
         }
       ],
-      "output": "No resources found\nweb-687f6fbb85-b2tbl\nweb-687f6fbb85-b2tbl",
+      "output": "No resources found\nweb-687f6fbb85-v2tcx\nweb-687f6fbb85-v2tcx",
       "read": "1 行目は No resources found (決まりは無い) です。どちらからも届きます。",
       "trouble": [
         {
@@ -2062,7 +2087,7 @@
           "text": "ノードから Pod へ直接"
         }
       ],
-      "output": "networkpolicy.networking.k8s.io/deny-all-in created\nwget: can't connect to remote host (10.43.78.147): Connection refused\ncommand terminated with exit code 1\npod \"web-687f6fbb85-2ll5s\" deleted from ch6 namespace\npod \"web-687f6fbb85-b2tbl\" deleted from ch6 namespace\nWaiting for deployment \"web\" rollout to finish: 0 of 2 updated replicas are available...\nWaiting for deployment \"web\" rollout to finish: 1 of 2 updated replicas are available...\ndeployment \"web\" successfully rolled out\n502\nweb-687f6fbb85-d6n4t",
+      "output": "networkpolicy.networking.k8s.io/deny-all-in created\nwget: can't connect to remote host (10.43.108.247): Connection refused\ncommand terminated with exit code 1\npod \"web-687f6fbb85-v2tcx\" deleted from ch6 namespace\npod \"web-687f6fbb85-wvh2c\" deleted from ch6 namespace\nWaiting for deployment \"web\" rollout to finish: 0 of 2 updated replicas are available...\nWaiting for deployment \"web\" rollout to finish: 1 of 2 updated replicas are available...\ndeployment \"web\" successfully rolled out\n502\nweb-687f6fbb85-8qzqg",
       "read": "client からは断られました (k3s では、すぐに断られます。ほかの部品では時間切れになることもあります)。Ingress も 200 ではなくなりました (504 は「待ったが返事が無い」、502 は「つなげない」、000 は「curl があきらめた」)。Pod を作り直したのは、前からつながっている通信は、決まりを作ったあとも続くことがあるためです。それでも、ノードから Pod へは届きます。Pod のいるノードからの通信は、いつも通すと決まっているためです。だから Pod の動作検査 (probe) も止まりません。この見張りは、k3s の中の NetworkPolicy コントローラーがしています。",
       "trouble": [
         {
@@ -2205,8 +2230,8 @@
           "text": "Ingress を通して"
         }
       ],
-      "output": "networkpolicy.networking.k8s.io/allow-to-web created\nweb-687f6fbb85-d6n4t\nwget: can't connect to remote host (10.43.40.121): Connection refused\ncommand terminated with exit code 1\nwget: can't connect to remote host (10.43.78.147): Connection refused\ncommand terminated with exit code 1\nweb-687f6fbb85-d6n4t",
-      "read": "client と Ingress からは届き、別の名前空間からは断られます。api へも断られます。許したのは web だけだからです。名前空間のラベル kubernetes.io/metadata.name は、Kubernetes が自動で付けています。",
+      "output": "networkpolicy.networking.k8s.io/allow-to-web created\nweb-687f6fbb85-8qzqg\nwget: can't connect to remote host (10.43.45.47): Connection refused\ncommand terminated with exit code 1\nwget: can't connect to remote host (10.43.108.247): Connection refused\ncommand terminated with exit code 1\nweb-687f6fbb85-hrgph",
+      "read": "client と Ingress からは届き、別の名前空間からは断られます。api へも断られます。許したのは web だけだからです。名前空間のラベル kubernetes.io/metadata.name は、Kubernetes が自動で付けています。仮想マシンの外からは、Ingress と 8081 番 (LoadBalancer) は通り、30080 番 (NodePort) は止まります。前の 2 つは kube-system の Pod (Traefik と svclb) を通って来るので、許した相手になるためです (検証用のコンテナから確かめました)。",
       "trouble": [
         {
           "symptom": "Ingress だけ届かない",
@@ -2435,7 +2460,7 @@
           "text": "名前で取る"
         }
       ],
-      "output": "networkpolicy.networking.k8s.io/client-out configured\nweb-687f6fbb85-d6n4t",
+      "output": "networkpolicy.networking.k8s.io/client-out configured\nweb-687f6fbb85-8qzqg",
       "read": "届きました。行き先には Pod を書きます。Service の住所ではありません (Service の住所は、途中で Pod の住所に書き替わるためです)。",
       "trouble": [
         {
@@ -2474,7 +2499,7 @@
           "text": "別の名前空間から取る"
         }
       ],
-      "output": "networkpolicy.networking.k8s.io \"allow-to-web\" deleted from ch6 namespace\nnetworkpolicy.networking.k8s.io \"client-out\" deleted from ch6 namespace\nnetworkpolicy.networking.k8s.io \"deny-all-in\" deleted from ch6 namespace\nweb-687f6fbb85-d6n4t",
+      "output": "networkpolicy.networking.k8s.io \"allow-to-web\" deleted from ch6 namespace\nnetworkpolicy.networking.k8s.io \"client-out\" deleted from ch6 namespace\nnetworkpolicy.networking.k8s.io \"deny-all-in\" deleted from ch6 namespace\nweb-687f6fbb85-hrgph",
       "read": "また届くようになりました。決まりが無くなると、初めの「全部通す」に戻ります。",
       "trouble": [
         {
@@ -2504,7 +2529,7 @@
           "text": "Pod をつなぐ仮想の線 (cni0) を出す"
         }
       ],
-      "output": "-A KUBE-SERVICES -d 10.43.78.147/32 -p tcp -m comment --comment \"ch6/web:http cluster IP\" -m tcp --dport 8080 -j KUBE-SVC-FEZLIV77ES4DNZR2\n-A KUBE-SVC-FEZLIV77ES4DNZR2 -m comment --comment \"ch6/web:http -> 10.42.0.24:80\" -m statistic --mode random --probability 0.50000000000 -j KUBE-SEP-PECSXQE6A65CF6QU\ncni0             UP             10.42.0.1/24 fe80::200b:5eff:fef9:15d7/64",
+      "output": "-A KUBE-SERVICES -d 10.43.108.247/32 -p tcp -m comment --comment \"ch6/web:http cluster IP\" -m tcp --dport 8080 -j KUBE-SVC-FEZLIV77ES4DNZR2\n-A KUBE-SVC-FEZLIV77ES4DNZR2 -m comment --comment \"ch6/web:http -> 10.42.0.24:80\" -m statistic --mode random --probability 0.50000000000 -j KUBE-SEP-PECSXQE6A65CF6QU\ncni0             UP             10.42.0.1/24 fe80::8056:84ff:fe0f:bc6d/64",
       "read": "KUBE-SERVICES の行が「この Service の住所の 8080 番あてなら」という入口です。statistic の行が「この確率で 1 つ目へ」という振り分けです。cni0 は、Pod をつなぐ部品 (CNI。k3s では flannel) が作ったものです。住所や英数字の並びは、マシンごとに違います。",
       "trouble": [
         {
@@ -2554,7 +2579,7 @@
       "where": "vm",
       "code": {
         "language": "bash",
-        "text": "cd ~\nkubectl delete namespace ch6 ch6b\nkubectl get namespaces\nkubectl get service -A | grep -E \"NodePort|LoadBalancer\""
+        "text": "cd ~\nkubectl delete namespace ch6 ch6b\nkubectl get namespaces\nkubectl get service -A | grep -E \"NodePort|LoadBalancer\"\nls ~/ch6 | grep pem || echo \"鍵のファイルは無い\""
       },
       "lines": [
         {
@@ -2572,10 +2597,14 @@
         {
           "code": "kubectl get service -A | grep -E \"NodePort|LoadBalancer\"",
           "text": "外から届く Service の残りを出す"
+        },
+        {
+          "code": "ls ~/ch6 | grep pem || echo \"鍵のファイルは無い\"",
+          "text": "~/ch6 に、証明書と鍵のファイルが残っていないかを見る"
         }
       ],
-      "output": "namespace \"ch6\" deleted\nnamespace \"ch6b\" deleted\nNAME              STATUS   AGE\ndefault           Active   17m\nkube-node-lease   Active   17m\nkube-public       Active   17m\nkube-system       Active   17m\nkube-system   traefik          LoadBalancer   10.43.253.117   10.0.2.15     80:30494/TCP,443:30932/TCP   16m",
-      "read": "初めからある 4 つの名前空間だけになり、外から届く Service は traefik だけになれば片付いています。~/ch6 のファイルは残ります。",
+      "output": "namespace \"ch6\" deleted\nnamespace \"ch6b\" deleted\nNAME              STATUS   AGE\ndefault           Active   8m58s\nkube-node-lease   Active   8m58s\nkube-public       Active   8m58s\nkube-system       Active   8m58s\nkube-system   traefik          LoadBalancer   10.43.173.61   10.0.2.15     80:32352/TCP,443:31712/TCP   8m9s\n鍵のファイルは無い",
+      "read": "初めからある 4 つの名前空間だけになり、外から届く Service は traefik だけになれば片付いています。鍵のファイルが無いことも見ます。ほかの YAML は ~/ch6 に残ります。",
       "trouble": [
         {
           "symptom": "消す行がしばらく止まる",
@@ -2586,6 +2615,11 @@
           "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
           "check": "systemctl is-active k3s を打つ",
           "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        },
+        {
+          "symptom": "pem のファイルの名前が出る",
+          "check": "tls の手順の最後の rm を打ったかを見る",
+          "fix": "rm -f ~/ch6/tls-key.pem ~/ch6/tls-cert.pem を打つ"
         }
       ],
       "source": "https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/"
@@ -2706,7 +2740,7 @@
           "text": "名前空間の一覧を出す"
         }
       ],
-      "output": "namespace \"practice\" deleted\nNAME              STATUS   AGE\ndefault           Active   18m\nkube-node-lease   Active   18m\nkube-public       Active   18m\nkube-system       Active   18m",
+      "output": "namespace \"practice\" deleted\nNAME              STATUS   AGE\ndefault           Active   10m\nkube-node-lease   Active   10m\nkube-public       Active   10m\nkube-system       Active   10m",
       "read": "default と kube- で始まる 4 つだけになれば、片付いています。k3s は消しません。",
       "trouble": [
         {
