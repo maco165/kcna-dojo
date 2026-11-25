@@ -178,6 +178,10 @@ async function checkChapterLoading(context, tag) {
   const bodyOf = (x) => readdirSync(new URL('../dist/assets/', import.meta.url)).filter((f) => f.endsWith('.js') && ownTexts(x).some((t) => readFileSync(new URL(`../dist/assets/${f}`, import.meta.url), 'utf8').includes(t)));
   const chunk = new Map(chapters.map((x) => [x.id, bodyOf(x)]));
   check(chapters.every((x) => ownTexts(x).length >= 10 && chunk.get(x.id).length === 1) && new Set([...chunk.values()].flat()).size === chapters.length, `${tag} 章の本文は 1 章 1 チャンク (${[...chunk.values()].flat().join(' ')})`);
+  // 書き出した章のページは、その章の本文を先に読む (ほかの章のものは書かない)。章でないページには書かない
+  const preloads = (x) => [...readFileSync(new URL(`../dist/${x}index.html`, import.meta.url), 'utf8').matchAll(/<link rel="modulepreload"[^>]*href="[^"]*assets\/([^"]+)"/g)].map((m) => m[1]);
+  const all = [...chunk.values()].flat();
+  check(chapters.every((x) => JSON.stringify(preloads(`hands-on/${x.id}/`).filter((f) => all.includes(f))) === JSON.stringify(chunk.get(x.id))) && preloads('hands-on/').every((f) => !all.includes(f)) && preloads('').every((f) => !all.includes(f)), `${tag} 章のページは、その章の本文だけを先に読む`);
   const p = await context.newPage();
   const texts = [];
   p.on('response', async (r) => {

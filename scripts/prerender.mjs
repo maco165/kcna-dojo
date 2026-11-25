@@ -44,7 +44,7 @@ const SITE_ID = `${ORIGIN}${BASE}#website`;
 const ldJson = (v) => JSON.stringify(v, null, 2).replace(/</g, '\\u003c');
 
 /** dist/index.html を型にして、1 ページ分の HTML を作る。置き換えは関数で渡す ($1 などを置き換えの記号として読ませない) */
-export function renderPage(template, { path: p, title, fullTitle, description, body, noindex = false, canonical, jsonLd, ogImage, ogAlt }) {
+export function renderPage(template, { path: p, title, fullTitle, description, body, preload = [], noindex = false, canonical, jsonLd, ogImage, ogAlt }) {
   // fullTitle は buildPages が画面と同じ関数 (src/lib/pageTitle.ts の withSite) で決める。無ければ同じ形で作る
   const full = fullTitle ?? (title ? `${title} | ${SITE_NAME}` : SITE_TITLE);
   const can = url(canonical ?? p);
@@ -71,6 +71,7 @@ export function renderPage(template, { path: p, title, fullTitle, description, b
     if (!re.test(html)) throw new Error(`prerender: index.html に ${k} の場所が見つかりません (index.html の形が変わったら SLOTS を直す)`);
     html = html.replace(re, set[k]);
   }
+  if (preload.length) html = html.replace('</head>', () => `${preload.map((f) => `    <link rel="modulepreload" crossorigin href="${BASE}${esc(f)}" />\n`).join('')}  </head>`);
   if (noindex) html = html.replace('</title>', () => '</title>\n    <meta name="robots" content="noindex" />');
   return html;
 }
@@ -542,6 +543,26 @@ export function mixById(xs, key) {
   return a;
 }
 
+/**
+ * 章のページで先に読むチャンク: 章の画面の部品とその取り込み、その章の本文 (ほかの章は入れない)。画面の部品を読み終えてから章を読む
+ * 往復を減らすため。トップが最初に読むもの (型の index.html にあるもの) は除く。manifest は vite の build.manifest
+ */
+export function chapterPreloads(manifest, file, template) {
+  const files = new Set();
+  const seen = new Set();
+  const add = (key) => {
+    const e = manifest[key];
+    if (!e) throw new Error(`prerender: manifest に ${key} がありません`);
+    if (seen.has(key)) return;
+    seen.add(key);
+    if (!template.includes(e.file)) files.add(e.file);
+    for (const k of e.imports ?? []) add(k);
+  };
+  add('src/screens/HandsOnChapter.tsx');
+  add(`src/content/${file.replace(/^\.\//, '')}`);
+  return [...files];
+}
+
 /** 検索に載るページか (noindex でなく、canonical を別のページに向けていない) */
 export const isIndexed = (page) => !page.noindex && (page.canonical === undefined || page.canonical === page.path);
 
@@ -579,6 +600,9 @@ async function main() {
       if (name) Object.assign(page, { ogImage: url(`og/${name}`), ogAlt: `${page.heading ?? page.title} — クラネイ (KCNA-JP 対策)` });
     }
     console.log(`og-images: ${og.files.size} 枚・${Math.round(og.bytes / 1024)}KB・${((Date.now() - started) / 1000).toFixed(1)} 秒`);
+    const manifest = JSON.parse(await readFile(path.join(DIST, '.vite/manifest.json'), 'utf8'));
+    const { HANDS_ON_FILES } = await server.ssrLoadModule('/src/content/handsOn.ts');
+    for (const [id, file] of HANDS_ON_FILES) pages.find((x) => x.path === `hands-on/${id}/`).preload = chapterPreloads(manifest, file, template);
     for (const page of pages) {
       const dir = path.join(DIST, page.path);
       await mkdir(dir, { recursive: true });
