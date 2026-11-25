@@ -1,0 +1,2829 @@
+{
+  "id": "networking",
+  "order": 6,
+  "title": "つなぐ",
+  "summary": "入れ替わる Pod の前に Service を置き、名前で呼び、Ingress で外から受けます。わざと切って、つながらない時の調べ方と、通してよい相手の絞り方まで動かします。",
+  "goal": "外から Pod までの通り道を説明し、つながらない時に切れ目を順に探し、NetworkPolicy で通信を絞れる",
+  "features": [
+    "Service は、後ろの Pod が入れ替わっても変わらない住所と名前",
+    "渡す先が空なら選び方、空でなければ番号を疑う",
+    "短い名前は同じ名前空間の中だけ。外は「名前.名前空間」",
+    "Ingress は決まりで、受けるのは別の部品 (k3s では Traefik)",
+    "NetworkPolicy は初めは全部通し、足し算で許す。出ていく向きを絞るなら DNS を忘れない"
+  ],
+  "minutes": 180,
+  "needs": [
+    "5 章を終えた仮想マシン kcna (k3s が動き、kubectl が使える)",
+    "インターネットへの接続 (イメージを取ってきます)",
+    "ホスト (自分の PC) のブラウザか端末",
+    "出力について: 「仮想マシンの中」の出力は、2026-11-26 に Linux の QEMU の上で、Ubuntu 24.04 の公式のクラウドイメージ (x86_64・2 コア・2 GB・20 GB) と k3s v1.36.6+k3s1 で取りました。Multipass を打つ手順は実機で確かめていないので、出力を載せていません。M 系の Mac でも手順は同じです。CPU の種類が出るところだけ arm64 か aarch64 になります。"
+  ],
+  "reads": [
+    {
+      "topic": "networking",
+      "label": "ネットワーク"
+    },
+    {
+      "topic": "debugging",
+      "label": "動かないアプリの原因を探す"
+    }
+  ],
+  "steps": [
+    {
+      "id": "enter",
+      "text": "5 章を終えた仮想マシンの中に入ります。ホストの端末で打ちます。",
+      "why": "この章のコマンドは、最初と最後のほかは全部、仮想マシンの中で打つためです。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass shell kcna"
+      },
+      "lines": [
+        {
+          "code": "multipass shell kcna",
+          "text": "kcna の中の端末を開く。止まっていれば、動かしてから開く"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "行の頭が ubuntu@kcna:~$ に変われば、中に入っています。",
+      "trouble": [
+        {
+          "symptom": "multipass: command not found、または「認識されません」と出る",
+          "check": "端末を閉じて開き直し、multipass version を打つ",
+          "fix": "開き直しても出るなら、Multipass を入れる手順をもう一度行う"
+        },
+        {
+          "symptom": "kcna が無いと出る",
+          "check": "multipass list で名前を見る",
+          "fix": "0 章から始める"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/shell/"
+    },
+    {
+      "id": "check-host",
+      "text": "仮想マシンの中で、どのマシンにいるかと、クラスターの様子を見ます。hostname が kcna でなければ、先へ進まず multipass shell kcna で入ります。枠は、迷ったら 1 行ずつ貼ります。sudo などのあとの行は、端末によって、まとめて貼ると消えることがあるためです (EOF で終わる書き込みの部分は、EOF まで続けて貼ります)。",
+      "why": "自分の PC の別のクラスターで打たないためです。この章では、ノードの 80 番など、マシン全体で 1 つしか使えない番号も使います。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "hostname\nkubectl get nodes"
+      },
+      "lines": [
+        {
+          "code": "hostname",
+          "text": "このマシンの名前を出す"
+        },
+        {
+          "code": "kubectl get nodes",
+          "text": "ノードの一覧を出す"
+        }
+      ],
+      "output": "kcna\nNAME   STATUS   ROLES           AGE   VERSION\nkcna   Ready    control-plane   13m   v1.36.6+k3s1",
+      "read": "kcna と出て、ノードの STATUS が Ready なら進めます。VERSION が v1.36.6+k3s1 でない人は、出力の版を読み替えます。",
+      "trouble": [
+        {
+          "symptom": "kcna ではない名前が出る",
+          "check": "行の頭が ubuntu@kcna かを見る",
+          "fix": "ホストにいる。multipass shell kcna で入り、もう一度打つ"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        },
+        {
+          "symptom": "permission denied や localhost:8080 と出る",
+          "check": "echo $KUBECONFIG を打つ",
+          "fix": "空なら export KUBECONFIG=~/.kube/k3s.yaml を打つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/architecture/nodes/"
+    },
+    {
+      "id": "words",
+      "text": "Pod どうしや、外から Pod へ、どうつながるかを見る章です。出てくる部品は 4 つです。Service は、入れ替わる Pod の前に立つ、変わらない住所と名前です。DNS は、その名前から住所を引く仕組みです。Ingress は、ホスト名や道 (パス) で Web の行き先を分ける決まりです。NetworkPolicy は、通してよい相手を絞る決まりです。",
+      "why": "つながらない時に、どの部品のどこを見ればよいかが分かるようになるためです。1 つずつ足しながら、わざと壊して、調べ方も覚えます。",
+      "source": "https://kubernetes.io/docs/concepts/services-networking/service/"
+    },
+    {
+      "id": "prepare",
+      "text": "作業のフォルダと、練習用の名前空間 ch6 を作ります。",
+      "why": "作るものを、まとめて片付けられるようにするためです。端末を開き直したときや再起動のあとは、cd ~/ch6 を打ちます。SVC_IP や NODE_IP のような覚えた値は、端末を閉じると消えるので、それを決めた行も打ち直します。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "mkdir -p ~/ch6\ncd ~/ch6\nkubectl create namespace ch6\nkubectl wait --for=create serviceaccount/default -n ch6 --timeout=60s"
+      },
+      "lines": [
+        {
+          "code": "mkdir -p ~/ch6",
+          "text": "ch6 というフォルダを作る"
+        },
+        {
+          "code": "cd ~/ch6",
+          "text": "ch6 へ移る"
+        },
+        {
+          "code": "kubectl create namespace ch6",
+          "text": "名前空間 ch6 を作る"
+        },
+        {
+          "code": "kubectl wait --for=create serviceaccount/default -n ch6 --timeout=60s",
+          "text": "ch6 で Pod を作れるようになるまで待つ"
+        }
+      ],
+      "output": "namespace/ch6 created\nserviceaccount/default condition met",
+      "read": "namespace/ch6 created が出れば次へ進めます。",
+      "trouble": [
+        {
+          "symptom": "AlreadyExists と出る",
+          "check": "kubectl get namespaces を打つ",
+          "fix": "前に作ったものがある。そのまま使う"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/"
+    },
+    {
+      "id": "pod-ip",
+      "text": "Web サーバーを 2 つ動かし、消して作り直されると住所が変わることを見ます。",
+      "why": "Pod の住所をどこかに書いておくと、作り直された時につながらなくなります。それが、この章の出発点です。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cat > web.yaml <<'EOF'\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web\nspec:\n  replicas: 2\n  selector:\n    matchLabels:\n      app: web\n  template:\n    metadata:\n      labels:\n        app: web\n    spec:\n      terminationGracePeriodSeconds: 5\n      containers:\n      - name: web\n        image: nginx:1.27-alpine\n        command: ['sh', '-c', 'echo \"$HOSTNAME\" > /usr/share/nginx/html/index.html; exec nginx -g \"daemon off;\"']\n        ports:\n        - name: http\n          containerPort: 80\n        readinessProbe:\n          httpGet:\n            path: /\n            port: http\n          periodSeconds: 2\nEOF\nkubectl apply -f web.yaml -n ch6\nkubectl rollout status deployment/web -n ch6 --timeout=180s\nkubectl get pods -l app=web -n ch6 -o custom-columns='NAME:.metadata.name,IP:.status.podIP'\nkubectl delete pod -l app=web -n ch6\nkubectl rollout status deployment/web -n ch6 --timeout=180s\nkubectl get pods -l app=web -n ch6 -o custom-columns='NAME:.metadata.name,IP:.status.podIP'"
+      },
+      "lines": [
+        {
+          "code": "cat > web.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま web.yaml というファイルに書く"
+        },
+        {
+          "code": "apiVersion: apps/v1",
+          "text": "Deployment のある API"
+        },
+        {
+          "code": "kind: Deployment",
+          "text": "Pod の数を保つ部品"
+        },
+        {
+          "code": "metadata:",
+          "text": "呼び名など"
+        },
+        {
+          "code": "  name: web",
+          "text": "呼び名は web"
+        },
+        {
+          "code": "spec:",
+          "text": "こうしてほしい、の中身"
+        },
+        {
+          "code": "  replicas: 2",
+          "text": "Pod の個数"
+        },
+        {
+          "code": "  selector:",
+          "text": "自分の Pod を見分ける決まり"
+        },
+        {
+          "code": "    matchLabels:",
+          "text": "このラベルの Pod が自分のもの"
+        },
+        {
+          "code": "      app: web",
+          "text": "app=web"
+        },
+        {
+          "code": "  template:",
+          "text": "Pod のひな型"
+        },
+        {
+          "code": "    metadata:",
+          "text": "Pod に付けるもの"
+        },
+        {
+          "code": "      labels:",
+          "text": "Pod のラベル。Service もこれを見る"
+        },
+        {
+          "code": "        app: web",
+          "text": "app=web"
+        },
+        {
+          "code": "    spec:",
+          "text": "Pod の中身"
+        },
+        {
+          "code": "      terminationGracePeriodSeconds: 5",
+          "text": "終わるのを待つ秒数"
+        },
+        {
+          "code": "      containers:",
+          "text": "コンテナたち"
+        },
+        {
+          "code": "      - name: web",
+          "text": "コンテナの呼び名"
+        },
+        {
+          "code": "        image: nginx:1.27-alpine",
+          "text": "元になるイメージ"
+        },
+        {
+          "code": "        command: ['sh', '-c', 'echo \"$HOSTNAME\" > /usr/share/nginx/html/index.html; exec nginx -g \"daemon off;\"']",
+          "text": "自分の名前を表のページに書いてから、nginx を始める"
+        },
+        {
+          "code": "        ports:",
+          "text": "開ける番号たち"
+        },
+        {
+          "code": "        - name: http",
+          "text": "番号に付ける名前"
+        },
+        {
+          "code": "          containerPort: 80",
+          "text": "コンテナが聞いている番号"
+        },
+        {
+          "code": "        readinessProbe:",
+          "text": "仕事を受けられるかの検査"
+        },
+        {
+          "code": "          httpGet:",
+          "text": "Web で確かめる"
+        },
+        {
+          "code": "            path: /",
+          "text": "確かめるページ"
+        },
+        {
+          "code": "            port: http",
+          "text": "名前で番号を指す"
+        },
+        {
+          "code": "          periodSeconds: 2",
+          "text": "2 秒ごと"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "kubectl apply -f web.yaml -n ch6",
+          "text": "Deployment を作る"
+        },
+        {
+          "code": "kubectl rollout status deployment/web -n ch6 --timeout=180s",
+          "text": "2 つとも使えるようになるまで待つ"
+        },
+        {
+          "code": "kubectl get pods -l app=web -n ch6 -o custom-columns='NAME:.metadata.name,IP:.status.podIP'",
+          "text": "名前と住所を出す"
+        },
+        {
+          "code": "kubectl delete pod -l app=web -n ch6",
+          "text": "2 つとも消す"
+        },
+        {
+          "code": "kubectl rollout status deployment/web -n ch6 --timeout=180s",
+          "text": "2 つとも使えるようになるまで待つ"
+        },
+        {
+          "code": "kubectl get pods -l app=web -n ch6 -o custom-columns='NAME:.metadata.name,IP:.status.podIP'",
+          "text": "もう一度出す"
+        }
+      ],
+      "output": "deployment.apps/web created\nWaiting for deployment \"web\" rollout to finish: 0 of 2 updated replicas are available...\nWaiting for deployment \"web\" rollout to finish: 1 of 2 updated replicas are available...\ndeployment \"web\" successfully rolled out\nNAME                   IP\nweb-687f6fbb85-d6lld   10.42.0.14\nweb-687f6fbb85-z9jpt   10.42.0.15\npod \"web-687f6fbb85-d6lld\" deleted from ch6 namespace\npod \"web-687f6fbb85-z9jpt\" deleted from ch6 namespace\ndeployment \"web\" successfully rolled out\nNAME                   IP\nweb-687f6fbb85-9d799   10.42.0.16\nweb-687f6fbb85-dlb7j   10.42.0.17",
+      "read": "名前も住所も、前と全部違います。呼ぶ側は、この 2 つを追いかけ続けるわけにいきません。",
+      "trouble": [
+        {
+          "symptom": "toomanyrequests や 429 と出る",
+          "check": "kubectl describe の Events で、Failed to pull image の行の終わりを見る",
+          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る。短い「429 Too Many Requests」だけのときは、使いすぎを防ぐ別の上限なので、数分待ってからもう一度行う"
+        },
+        {
+          "symptom": "イメージが not found と出る",
+          "check": "Events で、イメージの名前と版 (: の後ろ) を見る",
+          "fix": "つづりが正しいなら、その版はもう配られていない。hub.docker.com でイメージのページを開き、同じ系統の新しい版に替える。この先の出力の版は、替えた版に読み替える"
+        },
+        {
+          "symptom": "rollout status が終わらない",
+          "check": "kubectl get pods -n ch6 を打つ",
+          "fix": "READY が 0/1 なら describe の Events を見る"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/services-networking/service/"
+    },
+    {
+      "id": "clusterip",
+      "text": "Service を置き、8080 番で受けて Pod の http という名前の番号へ渡します。",
+      "why": "受ける番号と、Pod の番号は、違っていてかまいません。Pod の番号を名前で指すと、Pod 側の番号が変わっても Service を直さずに済みます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cat > svc.yaml <<'EOF'\napiVersion: v1\nkind: Service\nmetadata:\n  name: web\nspec:\n  selector:\n    app: web\n  ports:\n  - name: http\n    port: 8080\n    targetPort: http\nEOF\nkubectl apply -f svc.yaml -n ch6\nfor i in $(seq 60); do [ \"$(kubectl get endpointslice -l kubernetes.io/service-name=web -n ch6 -o jsonpath='{.items[*].endpoints[*].conditions.ready}' | grep -o true | wc -l)\" -ge 2 ] && break; sleep 2; done\nsleep 3\nkubectl get service web -n ch6\nkubectl get endpointslice -l kubernetes.io/service-name=web -n ch6 -o jsonpath='{range .items[*].endpoints[*]}{.addresses[0]} {.targetRef.name}{\"\\n\"}{end}'\nSVC_IP=$(kubectl get service web -n ch6 -o jsonpath='{.spec.clusterIP}')\nfor i in 1 2 3 4 5 6; do curl -s http://$SVC_IP:8080; done"
+      },
+      "lines": [
+        {
+          "code": "cat > svc.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま svc.yaml というファイルに書く"
+        },
+        {
+          "code": "apiVersion: v1",
+          "text": "Service のある API"
+        },
+        {
+          "code": "kind: Service",
+          "text": "住所の代わりになる部品"
+        },
+        {
+          "code": "metadata:",
+          "text": "呼び名など"
+        },
+        {
+          "code": "  name: web",
+          "text": "呼び名は web。DNS の名前にもなる"
+        },
+        {
+          "code": "spec:",
+          "text": "中身"
+        },
+        {
+          "code": "  selector:",
+          "text": "渡す先の Pod の選び方"
+        },
+        {
+          "code": "    app: web",
+          "text": "app=web の Pod"
+        },
+        {
+          "code": "  ports:",
+          "text": "受ける番号たち"
+        },
+        {
+          "code": "  - name: http",
+          "text": "番号の名前"
+        },
+        {
+          "code": "    port: 8080",
+          "text": "Service が受ける番号"
+        },
+        {
+          "code": "    targetPort: http",
+          "text": "渡す先の Pod の番号 (名前でもよい)"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "kubectl apply -f svc.yaml -n ch6",
+          "text": "Service を作る"
+        },
+        {
+          "code": "for i in $(seq 60); do [ \"$(kubectl get endpointslice -l kubernetes.io/service-name=web -n ch6 -o jsonpath='{.items[*].endpoints[*].conditions.ready}' | grep -o true | wc -l)\" -ge 2 ] && break; sleep 2; done",
+          "text": "受けられる渡す先が 2 つ以上になるまで見て待つ (最大 2 分で先へ進む)"
+        },
+        {
+          "code": "sleep 3",
+          "text": "ノードに伝わるまで 3 秒待つ"
+        },
+        {
+          "code": "kubectl get service web -n ch6",
+          "text": "Service を出す"
+        },
+        {
+          "code": "kubectl get endpointslice -l kubernetes.io/service-name=web -n ch6 -o jsonpath='{range .items[*].endpoints[*]}{.addresses[0]} {.targetRef.name}{\"\\n\"}{end}'",
+          "text": "web の渡す先の住所と Pod を出す"
+        },
+        {
+          "code": "SVC_IP=$(kubectl get service web -n ch6 -o jsonpath='{.spec.clusterIP}')",
+          "text": "Service の住所を覚える"
+        },
+        {
+          "code": "for i in 1 2 3 4 5 6; do curl -s http://$SVC_IP:8080; done",
+          "text": "6 回、ページを取る"
+        }
+      ],
+      "output": "service/web created\nNAME   TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)    AGE\nweb    ClusterIP   10.43.78.147   <none>        8080/TCP   4s\n10.42.0.16 web-687f6fbb85-9d799\n10.42.0.17 web-687f6fbb85-dlb7j\nweb-687f6fbb85-9d799\nweb-687f6fbb85-dlb7j\nweb-687f6fbb85-9d799\nweb-687f6fbb85-9d799\nweb-687f6fbb85-dlb7j\nweb-687f6fbb85-dlb7j",
+      "read": "TYPE の ClusterIP は「クラスターの中だけの住所」という種類です。渡す先には、今いる 2 つの Pod の住所が並びます。この一覧 (EndpointSlice) は、Pod が入れ替わるたびに自動で直されます。返ってくる名前は、打つたびに並びが変わります。",
+      "trouble": [
+        {
+          "symptom": "curl で何も出ない、または URL がおかしいと出る",
+          "check": "echo $SVC_IP $NODE_IP を打つ",
+          "fix": "空なら、その値を決めた行を打ち直す。端末を開き直すと消えている"
+        },
+        {
+          "symptom": "渡す先が出ない",
+          "check": "kubectl get pods -l app=web -n ch6 を打つ",
+          "fix": "READY が 1/1 でない Pod は入らない"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/services-networking/endpoint-slices/"
+    },
+    {
+      "id": "follow",
+      "text": "もう一度 Pod を消しても、同じ住所で使えることを確かめます。",
+      "why": "Service の値打ちは、後ろが入れ替わっても変わらないことだからです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl get endpointslice -l kubernetes.io/service-name=web -n ch6 -o jsonpath='{range .items[*].endpoints[*]}{.addresses[0]} {.targetRef.name}{\"\\n\"}{end}'\nkubectl delete pod -l app=web -n ch6\nkubectl rollout status deployment/web -n ch6 --timeout=180s\nfor i in $(seq 60); do [ \"$(kubectl get endpointslice -l kubernetes.io/service-name=web -n ch6 -o jsonpath='{.items[*].endpoints[*].conditions.ready}' | grep -o true | wc -l)\" -ge 2 ] && break; sleep 2; done\nsleep 3\nkubectl get endpointslice -l kubernetes.io/service-name=web -n ch6 -o jsonpath='{range .items[*].endpoints[*]}{.addresses[0]} {.targetRef.name}{\"\\n\"}{end}'\nSVC_IP=$(kubectl get service web -n ch6 -o jsonpath='{.spec.clusterIP}')\ncurl -s http://$SVC_IP:8080"
+      },
+      "lines": [
+        {
+          "code": "kubectl get endpointslice -l kubernetes.io/service-name=web -n ch6 -o jsonpath='{range .items[*].endpoints[*]}{.addresses[0]} {.targetRef.name}{\"\\n\"}{end}'",
+          "text": "web の渡す先の住所と Pod を出す"
+        },
+        {
+          "code": "kubectl delete pod -l app=web -n ch6",
+          "text": "2 つとも消す"
+        },
+        {
+          "code": "kubectl rollout status deployment/web -n ch6 --timeout=180s",
+          "text": "2 つとも使えるようになるまで待つ"
+        },
+        {
+          "code": "for i in $(seq 60); do [ \"$(kubectl get endpointslice -l kubernetes.io/service-name=web -n ch6 -o jsonpath='{.items[*].endpoints[*].conditions.ready}' | grep -o true | wc -l)\" -ge 2 ] && break; sleep 2; done",
+          "text": "受けられる渡す先が 2 つ以上になるまで見て待つ (最大 2 分で先へ進む)"
+        },
+        {
+          "code": "sleep 3",
+          "text": "伝わるまで 3 秒待つ"
+        },
+        {
+          "code": "kubectl get endpointslice -l kubernetes.io/service-name=web -n ch6 -o jsonpath='{range .items[*].endpoints[*]}{.addresses[0]} {.targetRef.name}{\"\\n\"}{end}'",
+          "text": "web の渡す先の住所と Pod を出す"
+        },
+        {
+          "code": "SVC_IP=$(kubectl get service web -n ch6 -o jsonpath='{.spec.clusterIP}')",
+          "text": "Service の住所を覚える"
+        },
+        {
+          "code": "curl -s http://$SVC_IP:8080",
+          "text": "同じ住所から取る"
+        }
+      ],
+      "output": "10.42.0.16 web-687f6fbb85-9d799\n10.42.0.17 web-687f6fbb85-dlb7j\npod \"web-687f6fbb85-9d799\" deleted from ch6 namespace\npod \"web-687f6fbb85-dlb7j\" deleted from ch6 namespace\nWaiting for deployment \"web\" rollout to finish: 0 of 2 updated replicas are available...\nWaiting for deployment \"web\" rollout to finish: 1 of 2 updated replicas are available...\ndeployment \"web\" successfully rolled out\n10.42.0.18 web-687f6fbb85-b2tbl\n10.42.0.19 web-687f6fbb85-2ll5s\nweb-687f6fbb85-2ll5s",
+      "read": "渡す先は前と違う住所に入れ替わりました。Service の住所は同じままで、返事があります。",
+      "trouble": [
+        {
+          "symptom": "curl で何も出ない、または URL がおかしいと出る",
+          "check": "echo $SVC_IP $NODE_IP を打つ",
+          "fix": "空なら、その値を決めた行を打ち直す。端末を開き直すと消えている"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/services-networking/service/"
+    },
+    {
+      "id": "empty",
+      "text": "わざと、ラベルを書き間違えた Service を作ります。",
+      "why": "「Service はあるのに、つながらない」の、とても多い形です。渡す先が空かどうかを最初に見ます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cat > typo.yaml <<'EOF'\napiVersion: v1\nkind: Service\nmetadata:\n  name: typo\nspec:\n  selector:\n    app: wbe\n  ports:\n  - name: http\n    port: 80\n    targetPort: http\nEOF\nkubectl apply -f typo.yaml -n ch6\nsleep 5\nkubectl get endpointslice -l kubernetes.io/service-name=typo -n ch6 -o jsonpath='{range .items[*].endpoints[*]}{.addresses[0]} {.targetRef.name}{\"\\n\"}{end}'\nTYPO_IP=$(kubectl get service typo -n ch6 -o jsonpath='{.spec.clusterIP}')\ncurl -s -m 5 http://$TYPO_IP; echo \"curl の終わりの番号は $?\"\nkubectl get service typo -n ch6 -o jsonpath='{.spec.selector}{\"\\n\"}'\nkubectl get pods -n ch6 --show-labels"
+      },
+      "lines": [
+        {
+          "code": "cat > typo.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま typo.yaml というファイルに書く"
+        },
+        {
+          "code": "apiVersion: v1",
+          "text": "Service のある API"
+        },
+        {
+          "code": "kind: Service",
+          "text": "住所の代わりになる部品"
+        },
+        {
+          "code": "metadata:",
+          "text": "呼び名など"
+        },
+        {
+          "code": "  name: typo",
+          "text": "呼び名は typo。DNS の名前にもなる"
+        },
+        {
+          "code": "spec:",
+          "text": "中身"
+        },
+        {
+          "code": "  selector:",
+          "text": "渡す先の Pod の選び方"
+        },
+        {
+          "code": "    app: wbe",
+          "text": "app=wbe の Pod"
+        },
+        {
+          "code": "  ports:",
+          "text": "受ける番号たち"
+        },
+        {
+          "code": "  - name: http",
+          "text": "番号の名前"
+        },
+        {
+          "code": "    port: 80",
+          "text": "Service が受ける番号"
+        },
+        {
+          "code": "    targetPort: http",
+          "text": "渡す先の Pod の番号 (名前でもよい)"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "kubectl apply -f typo.yaml -n ch6",
+          "text": "Service を作る"
+        },
+        {
+          "code": "sleep 5",
+          "text": "5 秒待つ"
+        },
+        {
+          "code": "kubectl get endpointslice -l kubernetes.io/service-name=typo -n ch6 -o jsonpath='{range .items[*].endpoints[*]}{.addresses[0]} {.targetRef.name}{\"\\n\"}{end}'",
+          "text": "typo の渡す先の住所と Pod を出す"
+        },
+        {
+          "code": "TYPO_IP=$(kubectl get service typo -n ch6 -o jsonpath='{.spec.clusterIP}')",
+          "text": "typo の住所を覚える"
+        },
+        {
+          "code": "curl -s -m 5 http://$TYPO_IP; echo \"curl の終わりの番号は $?\"",
+          "text": "取りに行き、終わりの番号を出す"
+        },
+        {
+          "code": "kubectl get service typo -n ch6 -o jsonpath='{.spec.selector}{\"\\n\"}'",
+          "text": "選び方を出す"
+        },
+        {
+          "code": "kubectl get pods -n ch6 --show-labels",
+          "text": "Pod のラベルを出す"
+        }
+      ],
+      "output": "service/typo created\ncurl の終わりの番号は 7\n{\"app\":\"wbe\"}\nNAME                   READY   STATUS    RESTARTS   AGE   LABELS\nweb-687f6fbb85-2ll5s   1/1     Running   0          14s   app=web,pod-template-hash=687f6fbb85\nweb-687f6fbb85-b2tbl   1/1     Running   0          14s   app=web,pod-template-hash=687f6fbb85",
+      "read": "渡す先は空です (何も出ません)。終わりの番号が 0 でないので、つながっていません。選び方は wbe、Pod のラベルは web で、合っていないと分かります。作った時にエラーが出ないのが、やっかいなところです。",
+      "trouble": [
+        {
+          "symptom": "終わりの番号が 0 になる",
+          "check": "echo $TYPO_IP を打つ",
+          "fix": "空だと別の所を見ている。1 行目から打ち直す"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-service/"
+    },
+    {
+      "id": "fix-empty",
+      "text": "選び方を直すと、渡す先が入ることを見ます。",
+      "why": "Pod も Service も作り直さずに済むことを確かめるためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl patch service typo -n ch6 -p '{\"spec\":{\"selector\":{\"app\":\"web\"}}}'\nfor i in $(seq 60); do [ \"$(kubectl get endpointslice -l kubernetes.io/service-name=typo -n ch6 -o jsonpath='{.items[*].endpoints[*].conditions.ready}' | grep -o true | wc -l)\" -ge 2 ] && break; sleep 2; done\nsleep 3\nkubectl get endpointslice -l kubernetes.io/service-name=typo -n ch6 -o jsonpath='{range .items[*].endpoints[*]}{.addresses[0]} {.targetRef.name}{\"\\n\"}{end}'\nTYPO_IP=$(kubectl get service typo -n ch6 -o jsonpath='{.spec.clusterIP}')\ncurl -s http://$TYPO_IP"
+      },
+      "lines": [
+        {
+          "code": "kubectl patch service typo -n ch6 -p '{\"spec\":{\"selector\":{\"app\":\"web\"}}}'",
+          "text": "選び方を app=web に直す"
+        },
+        {
+          "code": "for i in $(seq 60); do [ \"$(kubectl get endpointslice -l kubernetes.io/service-name=typo -n ch6 -o jsonpath='{.items[*].endpoints[*].conditions.ready}' | grep -o true | wc -l)\" -ge 2 ] && break; sleep 2; done",
+          "text": "受けられる渡す先が 2 つ以上になるまで見て待つ (最大 2 分で先へ進む)"
+        },
+        {
+          "code": "sleep 3",
+          "text": "伝わるまで 3 秒待つ"
+        },
+        {
+          "code": "kubectl get endpointslice -l kubernetes.io/service-name=typo -n ch6 -o jsonpath='{range .items[*].endpoints[*]}{.addresses[0]} {.targetRef.name}{\"\\n\"}{end}'",
+          "text": "typo の渡す先の住所と Pod を出す"
+        },
+        {
+          "code": "TYPO_IP=$(kubectl get service typo -n ch6 -o jsonpath='{.spec.clusterIP}')",
+          "text": "住所を覚え直す"
+        },
+        {
+          "code": "curl -s http://$TYPO_IP",
+          "text": "取る"
+        }
+      ],
+      "output": "service/typo patched\n10.42.0.18 web-687f6fbb85-b2tbl\n10.42.0.19 web-687f6fbb85-2ll5s\nweb-687f6fbb85-2ll5s",
+      "read": "渡す先に 2 つ入り、ページが返りました。",
+      "trouble": [
+        {
+          "symptom": "渡す先が空のまま",
+          "check": "kubectl get service typo -n ch6 -o yaml を打つ",
+          "fix": "selector のつづりを見直し、patch の行を打ち直す"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-service/"
+    },
+    {
+      "id": "bad-port",
+      "text": "わざと、渡す先の番号を間違えます。",
+      "why": "渡す先は入っているのに、つながらない形です。「空」と見分けられるようにします。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl patch service typo -n ch6 -p '{\"spec\":{\"ports\":[{\"name\":\"http\",\"port\":80,\"targetPort\":8888}]}}'\nsleep 5\nkubectl get endpointslice -l kubernetes.io/service-name=typo -n ch6 -o jsonpath='{range .items[*].endpoints[*]}{.addresses[0]} {.targetRef.name}{\"\\n\"}{end}'\nkubectl get endpointslice -l kubernetes.io/service-name=typo -n ch6 -o jsonpath='{.items[0].ports[0].port}{\"\\n\"}'\nTYPO_IP=$(kubectl get service typo -n ch6 -o jsonpath='{.spec.clusterIP}')\ncurl -sS -m 5 http://$TYPO_IP\nkubectl delete service typo -n ch6"
+      },
+      "lines": [
+        {
+          "code": "kubectl patch service typo -n ch6 -p '{\"spec\":{\"ports\":[{\"name\":\"http\",\"port\":80,\"targetPort\":8888}]}}'",
+          "text": "渡す先を 8888 番にする"
+        },
+        {
+          "code": "sleep 5",
+          "text": "5 秒待つ"
+        },
+        {
+          "code": "kubectl get endpointslice -l kubernetes.io/service-name=typo -n ch6 -o jsonpath='{range .items[*].endpoints[*]}{.addresses[0]} {.targetRef.name}{\"\\n\"}{end}'",
+          "text": "typo の渡す先の住所と Pod を出す"
+        },
+        {
+          "code": "kubectl get endpointslice -l kubernetes.io/service-name=typo -n ch6 -o jsonpath='{.items[0].ports[0].port}{\"\\n\"}'",
+          "text": "渡す先の番号を出す"
+        },
+        {
+          "code": "TYPO_IP=$(kubectl get service typo -n ch6 -o jsonpath='{.spec.clusterIP}')",
+          "text": "住所を覚え直す"
+        },
+        {
+          "code": "curl -sS -m 5 http://$TYPO_IP",
+          "text": "エラーの文も出して取る"
+        },
+        {
+          "code": "kubectl delete service typo -n ch6",
+          "text": "練習の Service を消す"
+        }
+      ],
+      "output": "service/typo patched\n10.42.0.19 web-687f6fbb85-2ll5s\n10.42.0.18 web-687f6fbb85-b2tbl\n8888\ncurl: (7) Failed to connect to 10.43.27.60 port 80 after 0 ms: Couldn't connect to server\nservice \"typo\" deleted from ch6 namespace",
+      "read": "渡す先は 2 つありますが、番号が 8888 です。Pod の 8888 番では誰も聞いていないので、断られます。空なら選び方、空でないなら番号と Pod の中身、の順に疑います。",
+      "trouble": [
+        {
+          "symptom": "ページが返る",
+          "check": "3 行目の番号を見る",
+          "fix": "80 のままなら、少し待ってから取り直す"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-service/"
+    },
+    {
+      "id": "client",
+      "text": "クラスターの中から試すための Pod を置きます。",
+      "why": "ここまでは仮想マシン (ノード) から試しました。本物の呼ぶ側は、別の Pod です。名前で呼べるのも Pod の中からです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl run client --image=busybox:1.37 --labels=app=client -n ch6 -- sleep 86400\nkubectl wait --for=condition=Ready pod/client -n ch6 --timeout=180s\nkubectl exec client -n ch6 -- wget -qO- -T 5 http://web:8080"
+      },
+      "lines": [
+        {
+          "code": "kubectl run client --image=busybox:1.37 --labels=app=client -n ch6 -- sleep 86400",
+          "text": "何もせずに待つ Pod を作る"
+        },
+        {
+          "code": "kubectl wait --for=condition=Ready pod/client -n ch6 --timeout=180s",
+          "text": "使えるようになるまで待つ"
+        },
+        {
+          "code": "kubectl exec client -n ch6 -- wget -qO- -T 5 http://web:8080",
+          "text": "client の中から、web という名前の 8080 番を取る (5 秒であきらめる)"
+        }
+      ],
+      "output": "pod/client created\npod/client condition met\nweb-687f6fbb85-2ll5s",
+      "read": "住所を 1 つも書かずに、名前だけで届きました。名前を住所に変えたのが DNS です。",
+      "trouble": [
+        {
+          "symptom": "toomanyrequests や 429 と出る",
+          "check": "kubectl describe の Events で、Failed to pull image の行の終わりを見る",
+          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る。短い「429 Too Many Requests」だけのときは、使いすぎを防ぐ別の上限なので、数分待ってからもう一度行う"
+        },
+        {
+          "symptom": "イメージが not found と出る",
+          "check": "Events で、イメージの名前と版 (: の後ろ) を見る",
+          "fix": "つづりが正しいなら、その版はもう配られていない。hub.docker.com でイメージのページを開き、同じ系統の新しい版に替える。この先の出力の版は、替えた版に読み替える"
+        },
+        {
+          "symptom": "bad address と出る",
+          "check": "kubectl get service -n ch6 を打つ",
+          "fix": "web が無ければ、Service を作る手順に戻る"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/"
+    },
+    {
+      "id": "dns",
+      "text": "名前の引き方を、Pod の設定から見ます。",
+      "why": "短い名前で届くわけと、正式な名前 (FQDN) を知っておくと、別の名前空間を呼べます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl exec client -n ch6 -- cat /etc/resolv.conf\nkubectl exec client -n ch6 -- nslookup web.ch6.svc.cluster.local.\nkubectl get service kube-dns -n kube-system"
+      },
+      "lines": [
+        {
+          "code": "kubectl exec client -n ch6 -- cat /etc/resolv.conf",
+          "text": "名前の引き方の設定を見る"
+        },
+        {
+          "code": "kubectl exec client -n ch6 -- nslookup web.ch6.svc.cluster.local.",
+          "text": "正式な名前で住所を引く (最後の . は「これで全部」の印)"
+        },
+        {
+          "code": "kubectl get service kube-dns -n kube-system",
+          "text": "DNS の Service を出す"
+        }
+      ],
+      "output": "search ch6.svc.cluster.local svc.cluster.local cluster.local\nnameserver 10.43.0.10\noptions ndots:5\nServer:\t\t10.43.0.10\nAddress:\t10.43.0.10:53\n\nName:\tweb.ch6.svc.cluster.local\nAddress: 10.43.78.147\nNAME       TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)                  AGE\nkube-dns   ClusterIP   10.43.0.10   <none>        53/UDP,53/TCP,9153/TCP   14m",
+      "read": "search に並ぶ語を、短い名前の後ろに足して引きます。web は web.ch6.svc.cluster.local になります。形は「Service の名前.名前空間.svc.cluster.local」です。nameserver は、kube-dns という Service の住所です。その後ろで CoreDNS の Pod が答えています。",
+      "trouble": [
+        {
+          "symptom": "client の Pod が見つからないと出る",
+          "check": "kubectl get pods -n ch6 を打つ",
+          "fix": "無ければ、client を作る手順の run の行から打ち直す"
+        },
+        {
+          "symptom": "server can't find と出る",
+          "check": "名前のつづりと名前空間を見る",
+          "fix": "正しいのに引けないなら、kubectl get pods -n kube-system で coredns が 1/1 かを見る"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/"
+    },
+    {
+      "id": "dns-namespace",
+      "text": "別の名前空間から呼びます。",
+      "why": "短い名前は、同じ名前空間の中だけで通じます。つまずきやすい所です。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl create namespace ch6b\nkubectl wait --for=create serviceaccount/default -n ch6b --timeout=60s\nkubectl run other --image=busybox:1.37 -n ch6b -- sleep 86400\nkubectl wait --for=condition=Ready pod/other -n ch6b --timeout=180s\nkubectl exec other -n ch6b -- wget -qO- -T 5 http://web:8080\nkubectl exec other -n ch6b -- wget -qO- -T 5 http://web.ch6:8080"
+      },
+      "lines": [
+        {
+          "code": "kubectl create namespace ch6b",
+          "text": "別の名前空間を作る"
+        },
+        {
+          "code": "kubectl wait --for=create serviceaccount/default -n ch6b --timeout=60s",
+          "text": "準備を待つ"
+        },
+        {
+          "code": "kubectl run other --image=busybox:1.37 -n ch6b -- sleep 86400",
+          "text": "そこに Pod を作る"
+        },
+        {
+          "code": "kubectl wait --for=condition=Ready pod/other -n ch6b --timeout=180s",
+          "text": "使えるようになるまで待つ"
+        },
+        {
+          "code": "kubectl exec other -n ch6b -- wget -qO- -T 5 http://web:8080",
+          "text": "短い名前で取る"
+        },
+        {
+          "code": "kubectl exec other -n ch6b -- wget -qO- -T 5 http://web.ch6:8080",
+          "text": "名前空間まで付けて取る"
+        }
+      ],
+      "output": "namespace/ch6b created\nserviceaccount/default condition met\npod/other created\npod/other condition met\nwget: bad address 'web:8080'\ncommand terminated with exit code 1\nweb-687f6fbb85-b2tbl",
+      "read": "短い名前は bad address (引けない) です。web.ch6 なら届きます。名前空間は、名前の範囲を分けるだけで、通信は止めていないことも分かります。",
+      "trouble": [
+        {
+          "symptom": "1 つ目も届く",
+          "check": "打った名前空間を見る",
+          "fix": "-n ch6b の Pod から打っているかを確かめる"
+        },
+        {
+          "symptom": "toomanyrequests や 429 と出る",
+          "check": "kubectl describe の Events で、Failed to pull image の行の終わりを見る",
+          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る。短い「429 Too Many Requests」だけのときは、使いすぎを防ぐ別の上限なので、数分待ってからもう一度行う"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/"
+    },
+    {
+      "id": "headless",
+      "text": "住所を持たない Service (headless) を作り、引いた結果を比べます。",
+      "why": "Pod を 1 つずつ名指ししたい部品 (データベースなど) のための形です。8 章で使います。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cat > headless.yaml <<'EOF'\napiVersion: v1\nkind: Service\nmetadata:\n  name: web-each\nspec:\n  clusterIP: None\n  selector:\n    app: web\n  ports:\n  - name: http\n    port: 80\n    targetPort: http\nEOF\nkubectl apply -f headless.yaml -n ch6\nfor i in $(seq 60); do [ \"$(kubectl get endpointslice -l kubernetes.io/service-name=web-each -n ch6 -o jsonpath='{.items[*].endpoints[*].conditions.ready}' | grep -o true | wc -l)\" -ge 2 ] && break; sleep 2; done\nsleep 5\nkubectl exec client -n ch6 -- nslookup web.ch6.svc.cluster.local.\nkubectl exec client -n ch6 -- nslookup web-each.ch6.svc.cluster.local."
+      },
+      "lines": [
+        {
+          "code": "cat > headless.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま headless.yaml というファイルに書く"
+        },
+        {
+          "code": "apiVersion: v1",
+          "text": "Service のある API"
+        },
+        {
+          "code": "kind: Service",
+          "text": "住所の代わりになる部品"
+        },
+        {
+          "code": "metadata:",
+          "text": "呼び名など"
+        },
+        {
+          "code": "  name: web-each",
+          "text": "呼び名は web-each。DNS の名前にもなる"
+        },
+        {
+          "code": "spec:",
+          "text": "中身"
+        },
+        {
+          "code": "  clusterIP: None",
+          "text": "Service の住所を持たない"
+        },
+        {
+          "code": "  selector:",
+          "text": "渡す先の Pod の選び方"
+        },
+        {
+          "code": "    app: web",
+          "text": "app=web の Pod"
+        },
+        {
+          "code": "  ports:",
+          "text": "受ける番号たち"
+        },
+        {
+          "code": "  - name: http",
+          "text": "番号の名前"
+        },
+        {
+          "code": "    port: 80",
+          "text": "Service が受ける番号"
+        },
+        {
+          "code": "    targetPort: http",
+          "text": "渡す先の Pod の番号 (名前でもよい)"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "kubectl apply -f headless.yaml -n ch6",
+          "text": "Service を作る"
+        },
+        {
+          "code": "for i in $(seq 60); do [ \"$(kubectl get endpointslice -l kubernetes.io/service-name=web-each -n ch6 -o jsonpath='{.items[*].endpoints[*].conditions.ready}' | grep -o true | wc -l)\" -ge 2 ] && break; sleep 2; done",
+          "text": "受けられる渡す先が 2 つ以上になるまで見て待つ (最大 2 分で先へ進む)"
+        },
+        {
+          "code": "sleep 5",
+          "text": "DNS に伝わるまで 5 秒待つ"
+        },
+        {
+          "code": "kubectl exec client -n ch6 -- nslookup web.ch6.svc.cluster.local.",
+          "text": "ふつうの Service を引く"
+        },
+        {
+          "code": "kubectl exec client -n ch6 -- nslookup web-each.ch6.svc.cluster.local.",
+          "text": "headless を引く"
+        }
+      ],
+      "output": "service/web-each created\nServer:\t\t10.43.0.10\nAddress:\t10.43.0.10:53\n\n\nName:\tweb.ch6.svc.cluster.local\nAddress: 10.43.78.147\nServer:\t\t10.43.0.10\nAddress:\t10.43.0.10:53\n\nName:\tweb-each.ch6.svc.cluster.local\nAddress: 10.42.0.18\nName:\tweb-each.ch6.svc.cluster.local\nAddress: 10.42.0.19",
+      "read": "ふつうのほうは Service の住所が 1 つ、headless は Pod の住所が 2 つ返ります。headless では、どれにつなぐかを呼ぶ側が選び、Service の番号の読み替えもされません。",
+      "trouble": [
+        {
+          "symptom": "client の Pod が見つからないと出る",
+          "check": "kubectl get pods -n ch6 を打つ",
+          "fix": "無ければ、client を作る手順の run の行から打ち直す"
+        },
+        {
+          "symptom": "headless が引けない",
+          "check": "最後の行を、10 秒待って打つ",
+          "fix": "渡す先が入った後、DNS に出るまで少しかかる"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/services-networking/service/"
+    },
+    {
+      "id": "nodeport",
+      "text": "ノードの番号で受けます (NodePort)。",
+      "why": "クラスターの外から届くようにする、いちばん簡単な形です。どのノードでも、同じ番号で受けます。番号は、ふつう 30000〜32767 の中から選びます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cat > nodeport.yaml <<'EOF'\napiVersion: v1\nkind: Service\nmetadata:\n  name: web-node\nspec:\n  type: NodePort\n  selector:\n    app: web\n  ports:\n  - name: http\n    port: 80\n    targetPort: http\n    nodePort: 30080\nEOF\nkubectl apply -f nodeport.yaml -n ch6\nfor i in $(seq 60); do [ \"$(kubectl get endpointslice -l kubernetes.io/service-name=web-node -n ch6 -o jsonpath='{.items[*].endpoints[*].conditions.ready}' | grep -o true | wc -l)\" -ge 2 ] && break; sleep 2; done\nsleep 3\nkubectl get service web-node -n ch6\nNODE_IP=$(kubectl get node kcna -o jsonpath='{.status.addresses[?(@.type==\"InternalIP\")].address}')\necho $NODE_IP\ncurl -s http://$NODE_IP:30080"
+      },
+      "lines": [
+        {
+          "code": "cat > nodeport.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま nodeport.yaml というファイルに書く"
+        },
+        {
+          "code": "apiVersion: v1",
+          "text": "Service のある API"
+        },
+        {
+          "code": "kind: Service",
+          "text": "住所の代わりになる部品"
+        },
+        {
+          "code": "metadata:",
+          "text": "呼び名など"
+        },
+        {
+          "code": "  name: web-node",
+          "text": "呼び名は web-node。DNS の名前にもなる"
+        },
+        {
+          "code": "spec:",
+          "text": "中身"
+        },
+        {
+          "code": "  type: NodePort",
+          "text": "種類は NodePort"
+        },
+        {
+          "code": "  selector:",
+          "text": "渡す先の Pod の選び方"
+        },
+        {
+          "code": "    app: web",
+          "text": "app=web の Pod"
+        },
+        {
+          "code": "  ports:",
+          "text": "受ける番号たち"
+        },
+        {
+          "code": "  - name: http",
+          "text": "番号の名前"
+        },
+        {
+          "code": "    port: 80",
+          "text": "Service が受ける番号"
+        },
+        {
+          "code": "    targetPort: http",
+          "text": "渡す先の Pod の番号 (名前でもよい)"
+        },
+        {
+          "code": "    nodePort: 30080",
+          "text": "ノードで受ける番号"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "kubectl apply -f nodeport.yaml -n ch6",
+          "text": "Service を作る"
+        },
+        {
+          "code": "for i in $(seq 60); do [ \"$(kubectl get endpointslice -l kubernetes.io/service-name=web-node -n ch6 -o jsonpath='{.items[*].endpoints[*].conditions.ready}' | grep -o true | wc -l)\" -ge 2 ] && break; sleep 2; done",
+          "text": "受けられる渡す先が 2 つ以上になるまで見て待つ (最大 2 分で先へ進む)"
+        },
+        {
+          "code": "sleep 3",
+          "text": "ノードに伝わるまで 3 秒待つ"
+        },
+        {
+          "code": "kubectl get service web-node -n ch6",
+          "text": "Service を出す"
+        },
+        {
+          "code": "NODE_IP=$(kubectl get node kcna -o jsonpath='{.status.addresses[?(@.type==\"InternalIP\")].address}')",
+          "text": "ノードの住所を覚える。今の端末だけで使える"
+        },
+        {
+          "code": "echo $NODE_IP",
+          "text": "ノードの住所を出す"
+        },
+        {
+          "code": "curl -s http://$NODE_IP:30080",
+          "text": "ノードの 30080 番から取る"
+        }
+      ],
+      "output": "service/web-node created\nNAME       TYPE       CLUSTER-IP     EXTERNAL-IP   PORT(S)        AGE\nweb-node   NodePort   10.43.21.199   <none>        80:30080/TCP   3s\n10.0.2.15\nweb-687f6fbb85-b2tbl",
+      "read": "PORT(S) の 80:30080/TCP は「Service の 80 番と、ノードの 30080 番」です。仮想マシン自身の住所で届きました。住所は、PC ごとに違います。",
+      "trouble": [
+        {
+          "symptom": "curl で何も出ない、または URL がおかしいと出る",
+          "check": "echo $SVC_IP $NODE_IP を打つ",
+          "fix": "空なら、その値を決めた行を打ち直す。端末を開き直すと消えている"
+        },
+        {
+          "symptom": "provided port is already allocated と出る",
+          "check": "kubectl get service -A | grep 30080 を打つ",
+          "fix": "ほかの Service が使っている。nodePort を 30081 などに替える"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/services-networking/service/"
+    },
+    {
+      "id": "loadbalancer",
+      "text": "LoadBalancer の Service を作り、誰が受けているかを見ます。",
+      "why": "クラウドでは、外に置かれた振り分け役が作られます。k3s は、代わりに ServiceLB という仕組みを持っていて、ノードの番号で受ける Pod を置きます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cat > lb.yaml <<'EOF'\napiVersion: v1\nkind: Service\nmetadata:\n  name: web-lb\nspec:\n  type: LoadBalancer\n  selector:\n    app: web\n  ports:\n  - name: http\n    port: 8081\n    targetPort: http\nEOF\nkubectl apply -f lb.yaml -n ch6\nfor i in $(seq 30); do [ -n \"$(kubectl get service web-lb -n ch6 -o jsonpath='{.status.loadBalancer.ingress[0].ip}')\" ] && break; sleep 2; done\nkubectl get service web-lb -n ch6\nkubectl get pods -n kube-system -o wide | grep svclb\nNODE_IP=$(kubectl get node kcna -o jsonpath='{.status.addresses[?(@.type==\"InternalIP\")].address}')\ncurl -s http://$NODE_IP:8081"
+      },
+      "lines": [
+        {
+          "code": "cat > lb.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま lb.yaml というファイルに書く"
+        },
+        {
+          "code": "apiVersion: v1",
+          "text": "Service のある API"
+        },
+        {
+          "code": "kind: Service",
+          "text": "住所の代わりになる部品"
+        },
+        {
+          "code": "metadata:",
+          "text": "呼び名など"
+        },
+        {
+          "code": "  name: web-lb",
+          "text": "呼び名は web-lb。DNS の名前にもなる"
+        },
+        {
+          "code": "spec:",
+          "text": "中身"
+        },
+        {
+          "code": "  type: LoadBalancer",
+          "text": "種類は LoadBalancer"
+        },
+        {
+          "code": "  selector:",
+          "text": "渡す先の Pod の選び方"
+        },
+        {
+          "code": "    app: web",
+          "text": "app=web の Pod"
+        },
+        {
+          "code": "  ports:",
+          "text": "受ける番号たち"
+        },
+        {
+          "code": "  - name: http",
+          "text": "番号の名前"
+        },
+        {
+          "code": "    port: 8081",
+          "text": "Service が受ける番号"
+        },
+        {
+          "code": "    targetPort: http",
+          "text": "渡す先の Pod の番号 (名前でもよい)"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "kubectl apply -f lb.yaml -n ch6",
+          "text": "Service を作る"
+        },
+        {
+          "code": "for i in $(seq 30); do [ -n \"$(kubectl get service web-lb -n ch6 -o jsonpath='{.status.loadBalancer.ingress[0].ip}')\" ] && break; sleep 2; done",
+          "text": "外向きの住所が付くまで見て待つ (最大 1 分)"
+        },
+        {
+          "code": "kubectl get service web-lb -n ch6",
+          "text": "Service を出す"
+        },
+        {
+          "code": "kubectl get pods -n kube-system -o wide | grep svclb",
+          "text": "ServiceLB の Pod を出す"
+        },
+        {
+          "code": "NODE_IP=$(kubectl get node kcna -o jsonpath='{.status.addresses[?(@.type==\"InternalIP\")].address}')",
+          "text": "ノードの住所を覚える。今の端末だけで使える"
+        },
+        {
+          "code": "curl -s http://$NODE_IP:8081",
+          "text": "ノードの 8081 番から取る"
+        }
+      ],
+      "output": "service/web-lb created\nNAME     TYPE           CLUSTER-IP     EXTERNAL-IP   PORT(S)          AGE\nweb-lb   LoadBalancer   10.43.143.83   10.0.2.15     8081:30194/TCP   2s\nsvclb-traefik-0e9ebf3f-vj6h5              2/2     Running     2 (13m ago)   13m   10.42.0.13   kcna   <none>           <none>\nsvclb-web-lb-7749b31b-ggdgw               1/1     Running     0             2s    10.42.0.22   kcna   <none>           <none>\nweb-687f6fbb85-2ll5s",
+      "read": "EXTERNAL-IP にノードの住所が付きました。svclb-web-lb で始まる Pod が、その番号を受けています。svclb-traefik は、次に使う入口のものです。",
+      "trouble": [
+        {
+          "symptom": "EXTERNAL-IP が <pending> のまま",
+          "check": "kubectl get pods -n kube-system を打つ",
+          "fix": "svclb の Pod が Running になるまで待つ"
+        },
+        {
+          "symptom": "curl で何も出ない、または URL がおかしいと出る",
+          "check": "echo $SVC_IP $NODE_IP を打つ",
+          "fix": "空なら、その値を決めた行を打ち直す。端末を開き直すと消えている"
+        }
+      ],
+      "source": "https://docs.k3s.io/networking/networking-services"
+    },
+    {
+      "id": "lb-conflict",
+      "text": "わざと、もう使われている 80 番の LoadBalancer を作ります。15 秒待ちます。",
+      "why": "ServiceLB は、ノードの番号をそのまま使います。1 つの番号は、1 台のノードで 1 つの Service しか使えません。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl create service loadbalancer clash --tcp=80:80 -n ch6\nsleep 15\nkubectl get service clash -n ch6\nkubectl get pods -n kube-system | grep svclb-clash\nkubectl delete service clash -n ch6"
+      },
+      "lines": [
+        {
+          "code": "kubectl create service loadbalancer clash --tcp=80:80 -n ch6",
+          "text": "80 番の LoadBalancer を作る"
+        },
+        {
+          "code": "sleep 15",
+          "text": "15 秒待つ"
+        },
+        {
+          "code": "kubectl get service clash -n ch6",
+          "text": "Service を出す"
+        },
+        {
+          "code": "kubectl get pods -n kube-system | grep svclb-clash",
+          "text": "受けるはずの Pod を出す"
+        },
+        {
+          "code": "kubectl delete service clash -n ch6",
+          "text": "消す"
+        }
+      ],
+      "output": "service/clash created\nNAME    TYPE           CLUSTER-IP     EXTERNAL-IP   PORT(S)        AGE\nclash   LoadBalancer   10.43.78.152   <pending>     80:32591/TCP   15s\nsvclb-clash-d4a25b51-qzthb                0/1     Pending     0             15s\nservice \"clash\" deleted from ch6 namespace",
+      "read": "EXTERNAL-IP は <pending> のまま、Pod も Pending です。80 番は、k3s に最初から入っている入口 (Traefik) が先に使っているためです。",
+      "trouble": [
+        {
+          "symptom": "svclb-clash の行が出ない",
+          "check": "10 秒待って、4 行目から打つ",
+          "fix": "作られる途中だった"
+        }
+      ],
+      "source": "https://docs.k3s.io/networking/networking-services"
+    },
+    {
+      "id": "from-host",
+      "text": "ホスト (自分の PC) から届くことを確かめます。ホストの端末をもう 1 つ開いて打ちます。",
+      "why": "仮想マシンの外の、本物の「外」から見るためです。仮想マシンの中からだけ届く、ということが起きていないかが分かります。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass list"
+      },
+      "lines": [
+        {
+          "code": "multipass list",
+          "text": "kcna の住所 (IPv4) を見る"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "kcna の IPv4 の住所のうち、10.42 で始まらないものを使います (10.42 は Pod 用の住所です)。PC のブラウザで http://その住所:30080 と http://その住所:8081 を開き、Pod の名前が出れば届いています。",
+      "trouble": [
+        {
+          "symptom": "ブラウザで開けない",
+          "check": "仮想マシンの中で curl http://$NODE_IP:30080 を打つ",
+          "fix": "中で届くなら、ホストと仮想マシンの間の通り道の問題。VPN を切り、住所を見直す。中でも届かないなら Service を見直す"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/list/"
+    },
+    {
+      "id": "break",
+      "text": "ここで休めます。休む人は、exit で出てから、ホストでこの行を打ちます。休まない人は、打たずに印を付けて先へ進みます。",
+      "why": "長い章なので、区切りを置くためです。止めても、作ったものとファイルは残ります。再起動と同じことが起きるので、Pod の中のコンテナは始め直され、Pod の住所も変わります。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass stop kcna"
+      },
+      "lines": [
+        {
+          "code": "multipass stop kcna",
+          "text": "kcna を止める。動いている (Running) ときだけ打てる"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "何もエラーが出なければ止まっています。続けるときは、ホストで multipass shell kcna を打つと、動かして中に入れます。続けるときは、ホストで multipass shell kcna を打ち、cd ~/ch6 を打ちます。kubectl get pods -A で ch6 と ch6b の Pod が 1/1 になるまで待ちます。SVC_IP と NODE_IP は、次に使う手順で決め直します。戻った直後の 1〜2 分は、一覧が止める前の古い様子のことがあります。少し待ってもう一度見ます。",
+      "trouble": [
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "activating なら、1 分ほど待つ"
+        },
+        {
+          "symptom": "No such file or directory と出る",
+          "check": "pwd を打つ",
+          "fix": "作業のフォルダにいない。cd で移る"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/stop/"
+    },
+    {
+      "id": "traefik",
+      "text": "k3s に入っている、Web の入口 (Traefik) を見ます。",
+      "why": "Ingress は「こう振り分けて」という決まりを書くだけです。それを読んで実際に受ける部品 (Ingress コントローラー) が要ります。k3s では Traefik がその役です。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl wait --for=condition=Available deployment/traefik -n kube-system --timeout=180s\nkubectl get service traefik -n kube-system\nkubectl get ingressclass\nkubectl get ingress -A"
+      },
+      "lines": [
+        {
+          "code": "kubectl wait --for=condition=Available deployment/traefik -n kube-system --timeout=180s",
+          "text": "Traefik が使えるようになるまで待つ"
+        },
+        {
+          "code": "kubectl get service traefik -n kube-system",
+          "text": "Traefik の Service を出す"
+        },
+        {
+          "code": "kubectl get ingressclass",
+          "text": "受け持ちの名前の一覧を出す"
+        },
+        {
+          "code": "kubectl get ingress -A",
+          "text": "今ある Ingress を全部出す"
+        }
+      ],
+      "output": "deployment.apps/traefik condition met\nNAME      TYPE           CLUSTER-IP      EXTERNAL-IP   PORT(S)                      AGE\ntraefik   LoadBalancer   10.43.253.117   10.0.2.15     80:30494/TCP,443:30932/TCP   14m\nNAME                CONTROLLER                      PARAMETERS   AGE\ntraefik (default)   traefik.io/ingress-controller   <none>       14m\nNo resources found",
+      "read": "Traefik は LoadBalancer で、ノードの 80 番と 443 番を受けています。IngressClass の traefik が、Ingress に書く受け持ちの名前です。Ingress は、まだ 1 つもありません。",
+      "trouble": [
+        {
+          "symptom": "IngressClass が出ない",
+          "check": "kubectl get pods -n kube-system を打つ",
+          "fix": "helm-install-traefik が Completed になるまで待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/services-networking/ingress-controllers/"
+    },
+    {
+      "id": "ingress",
+      "text": "ホスト名で振り分ける Ingress を作ります。",
+      "why": "1 つの番号 (80) で、いくつもの Web を受けるためです。どれ宛てかは、要求の中の Host という見出しで見分けます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cat > ingress.yaml <<'EOF'\napiVersion: networking.k8s.io/v1\nkind: Ingress\nmetadata:\n  name: web\nspec:\n  ingressClassName: traefik\n  rules:\n  - host: site.example.test\n    http:\n      paths:\n      - path: /\n        pathType: Prefix\n        backend:\n          service:\n            name: web\n            port:\n              name: http\nEOF\nkubectl apply -f ingress.yaml -n ch6\nNODE_IP=$(kubectl get node kcna -o jsonpath='{.status.addresses[?(@.type==\"InternalIP\")].address}')\nfor i in $(seq 30); do curl -s -o /dev/null -w '%{http_code}' -m 3 -H 'Host: site.example.test' http://$NODE_IP/ | grep -q 200 && break; sleep 2; done\nkubectl get ingress web -n ch6\ncurl -s -H 'Host: site.example.test' http://$NODE_IP/\ncurl -s http://$NODE_IP/"
+      },
+      "lines": [
+        {
+          "code": "cat > ingress.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま ingress.yaml というファイルに書く"
+        },
+        {
+          "code": "apiVersion: networking.k8s.io/v1",
+          "text": "Ingress のある API"
+        },
+        {
+          "code": "kind: Ingress",
+          "text": "振り分けの決まり"
+        },
+        {
+          "code": "metadata:",
+          "text": "呼び名など"
+        },
+        {
+          "code": "  name: web",
+          "text": "呼び名"
+        },
+        {
+          "code": "spec:",
+          "text": "中身"
+        },
+        {
+          "code": "  ingressClassName: traefik",
+          "text": "受け持ちは traefik"
+        },
+        {
+          "code": "  rules:",
+          "text": "決まりの並び"
+        },
+        {
+          "code": "  - host: site.example.test",
+          "text": "このホスト名あての時"
+        },
+        {
+          "code": "    http:",
+          "text": "Web の決まり"
+        },
+        {
+          "code": "      paths:",
+          "text": "道ごとの行き先"
+        },
+        {
+          "code": "      - path: /",
+          "text": "/ から始まる道"
+        },
+        {
+          "code": "        pathType: Prefix",
+          "text": "前が合えばよい、という比べ方"
+        },
+        {
+          "code": "        backend:",
+          "text": "行き先"
+        },
+        {
+          "code": "          service:",
+          "text": "Service へ渡す"
+        },
+        {
+          "code": "            name: web",
+          "text": "web という Service"
+        },
+        {
+          "code": "            port:",
+          "text": "その番号"
+        },
+        {
+          "code": "              name: http",
+          "text": "名前で指す"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "kubectl apply -f ingress.yaml -n ch6",
+          "text": "Ingress を作る"
+        },
+        {
+          "code": "NODE_IP=$(kubectl get node kcna -o jsonpath='{.status.addresses[?(@.type==\"InternalIP\")].address}')",
+          "text": "ノードの住所を覚える。今の端末だけで使える"
+        },
+        {
+          "code": "for i in $(seq 30); do curl -s -o /dev/null -w '%{http_code}' -m 3 -H 'Host: site.example.test' http://$NODE_IP/ | grep -q 200 && break; sleep 2; done",
+          "text": "効き始めるまで見て待つ (最大 1〜2 分)"
+        },
+        {
+          "code": "kubectl get ingress web -n ch6",
+          "text": "Ingress を出す"
+        },
+        {
+          "code": "curl -s -H 'Host: site.example.test' http://$NODE_IP/",
+          "text": "Host を付けて取る"
+        },
+        {
+          "code": "curl -s http://$NODE_IP/",
+          "text": "Host を付けずに取る"
+        }
+      ],
+      "output": "ingress.networking.k8s.io/web created\nNAME   CLASS     HOSTS               ADDRESS     PORTS   AGE\nweb    traefik   site.example.test   10.0.2.15   80      0s\nweb-687f6fbb85-b2tbl\n404 page not found",
+      "read": "Host を付けると Pod の名前が返り、付けないと 404 page not found です。404 を返しているのは Traefik で、「どの決まりにも当てはまらない」という意味です。.test は、練習用に空けてある名前で、本物の Web には使われません。",
+      "trouble": [
+        {
+          "symptom": "curl で何も出ない、または URL がおかしいと出る",
+          "check": "echo $SVC_IP $NODE_IP を打つ",
+          "fix": "空なら、その値を決めた行を打ち直す。端末を開き直すと消えている"
+        },
+        {
+          "symptom": "Host を付けても 404",
+          "check": "kubectl describe ingress web -n ch6 を打つ",
+          "fix": "host と Host のつづり、ingressClassName を比べる"
+        },
+        {
+          "symptom": "503 や Bad Gateway と出る",
+          "check": "渡す先の一覧を見る",
+          "fix": "Service の渡す先が空。ラベルと番号を見直す"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/services-networking/ingress/"
+    },
+    {
+      "id": "path",
+      "text": "道 (パス) で、別の Service へ分けます。",
+      "why": "1 つのホスト名の下に、別々に作ったものを並べるためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cat > api.yaml <<'EOF'\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: api\nspec:\n  replicas: 1\n  selector:\n    matchLabels:\n      app: api\n  template:\n    metadata:\n      labels:\n        app: api\n    spec:\n      terminationGracePeriodSeconds: 5\n      containers:\n      - name: web\n        image: nginx:1.27-alpine\n        command: ['sh', '-c', 'mkdir -p /usr/share/nginx/html/api; echo \"api by $HOSTNAME\" | tee /usr/share/nginx/html/api/index.html /usr/share/nginx/html/index.html; exec nginx -g \"daemon off;\"']\n        ports:\n        - name: http\n          containerPort: 80\n        readinessProbe:\n          httpGet:\n            path: /\n            port: http\n          periodSeconds: 2\nEOF\nkubectl apply -f api.yaml -n ch6\nkubectl rollout status deployment/api -n ch6 --timeout=180s\nkubectl expose deployment api --port=80 --target-port=http -n ch6\nfor i in $(seq 60); do [ \"$(kubectl get endpointslice -l kubernetes.io/service-name=api -n ch6 -o jsonpath='{.items[*].endpoints[*].conditions.ready}' | grep -o true | wc -l)\" -ge 1 ] && break; sleep 2; done\nkubectl patch ingress web -n ch6 --type=json -p '[{\"op\":\"add\",\"path\":\"/spec/rules/0/http/paths/-\",\"value\":{\"path\":\"/api/\",\"pathType\":\"Prefix\",\"backend\":{\"service\":{\"name\":\"api\",\"port\":{\"number\":80}}}}}]'\nsleep 5\nNODE_IP=$(kubectl get node kcna -o jsonpath='{.status.addresses[?(@.type==\"InternalIP\")].address}')\ncurl -s -H 'Host: site.example.test' http://$NODE_IP/\ncurl -s -H 'Host: site.example.test' http://$NODE_IP/api/\nkubectl describe ingress web -n ch6 | sed -n '/^Rules/,/^Annotations/p'"
+      },
+      "lines": [
+        {
+          "code": "cat > api.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま api.yaml というファイルに書く"
+        },
+        {
+          "code": "apiVersion: apps/v1",
+          "text": "Deployment のある API"
+        },
+        {
+          "code": "kind: Deployment",
+          "text": "Pod の数を保つ部品"
+        },
+        {
+          "code": "metadata:",
+          "text": "呼び名など"
+        },
+        {
+          "code": "  name: api",
+          "text": "呼び名は api"
+        },
+        {
+          "code": "spec:",
+          "text": "こうしてほしい、の中身"
+        },
+        {
+          "code": "  replicas: 1",
+          "text": "Pod の個数"
+        },
+        {
+          "code": "  selector:",
+          "text": "自分の Pod を見分ける決まり"
+        },
+        {
+          "code": "    matchLabels:",
+          "text": "このラベルの Pod が自分のもの"
+        },
+        {
+          "code": "      app: api",
+          "text": "app=api"
+        },
+        {
+          "code": "  template:",
+          "text": "Pod のひな型"
+        },
+        {
+          "code": "    metadata:",
+          "text": "Pod に付けるもの"
+        },
+        {
+          "code": "      labels:",
+          "text": "Pod のラベル。Service もこれを見る"
+        },
+        {
+          "code": "        app: api",
+          "text": "app=api"
+        },
+        {
+          "code": "    spec:",
+          "text": "Pod の中身"
+        },
+        {
+          "code": "      terminationGracePeriodSeconds: 5",
+          "text": "終わるのを待つ秒数"
+        },
+        {
+          "code": "      containers:",
+          "text": "コンテナたち"
+        },
+        {
+          "code": "      - name: web",
+          "text": "コンテナの呼び名"
+        },
+        {
+          "code": "        image: nginx:1.27-alpine",
+          "text": "元になるイメージ"
+        },
+        {
+          "code": "        command: ['sh', '-c', 'mkdir -p /usr/share/nginx/html/api; echo \"api by $HOSTNAME\" | tee /usr/share/nginx/html/api/index.html /usr/share/nginx/html/index.html; exec nginx -g \"daemon off;\"']",
+          "text": "api と分かる文を 2 か所のページに書いてから、nginx を始める"
+        },
+        {
+          "code": "        ports:",
+          "text": "開ける番号たち"
+        },
+        {
+          "code": "        - name: http",
+          "text": "番号に付ける名前"
+        },
+        {
+          "code": "          containerPort: 80",
+          "text": "コンテナが聞いている番号"
+        },
+        {
+          "code": "        readinessProbe:",
+          "text": "仕事を受けられるかの検査"
+        },
+        {
+          "code": "          httpGet:",
+          "text": "Web で確かめる"
+        },
+        {
+          "code": "            path: /",
+          "text": "確かめるページ"
+        },
+        {
+          "code": "            port: http",
+          "text": "名前で番号を指す"
+        },
+        {
+          "code": "          periodSeconds: 2",
+          "text": "2 秒ごと"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "kubectl apply -f api.yaml -n ch6",
+          "text": "api を作る"
+        },
+        {
+          "code": "kubectl rollout status deployment/api -n ch6 --timeout=180s",
+          "text": "使えるようになるまで待つ"
+        },
+        {
+          "code": "kubectl expose deployment api --port=80 --target-port=http -n ch6",
+          "text": "api の Service を作る"
+        },
+        {
+          "code": "for i in $(seq 60); do [ \"$(kubectl get endpointslice -l kubernetes.io/service-name=api -n ch6 -o jsonpath='{.items[*].endpoints[*].conditions.ready}' | grep -o true | wc -l)\" -ge 1 ] && break; sleep 2; done",
+          "text": "受けられる渡す先が 1 つ以上になるまで見て待つ (最大 2 分で先へ進む)"
+        },
+        {
+          "code": "kubectl patch ingress web -n ch6 --type=json -p '[{\"op\":\"add\",\"path\":\"/spec/rules/0/http/paths/-\",\"value\":{\"path\":\"/api/\",\"pathType\":\"Prefix\",\"backend\":{\"service\":{\"name\":\"api\",\"port\":{\"number\":80}}}}}]'",
+          "text": "決まりに /api/ の行き先を足す"
+        },
+        {
+          "code": "sleep 5",
+          "text": "効くまで 5 秒待つ"
+        },
+        {
+          "code": "NODE_IP=$(kubectl get node kcna -o jsonpath='{.status.addresses[?(@.type==\"InternalIP\")].address}')",
+          "text": "ノードの住所を覚える。今の端末だけで使える"
+        },
+        {
+          "code": "curl -s -H 'Host: site.example.test' http://$NODE_IP/",
+          "text": "/ を取る"
+        },
+        {
+          "code": "curl -s -H 'Host: site.example.test' http://$NODE_IP/api/",
+          "text": "/api/ を取る"
+        },
+        {
+          "code": "kubectl describe ingress web -n ch6 | sed -n '/^Rules/,/^Annotations/p'",
+          "text": "決まりと行き先を出す"
+        }
+      ],
+      "output": "deployment.apps/api created\nWaiting for deployment \"api\" rollout to finish: 0 of 1 updated replicas are available...\ndeployment \"api\" successfully rolled out\nservice/api exposed\ningress.networking.k8s.io/web patched\nweb-687f6fbb85-2ll5s\napi by api-6c5b67f559-2pv8g\nRules:\n  Host               Path  Backends\n  ----               ----  --------\n  site.example.test\n                     /       web:http (10.42.0.18:80,10.42.0.19:80)\n                     /api/   api:80 (10.42.0.23:80)\nAnnotations:         <none>",
+      "read": "/ は web へ、/api/ は api へ行きました。2 つとも当てはまる時は、長く合うほうが使われます。渡される時も道は /api/ のままなので、api の側にその道のページが要ります。",
+      "trouble": [
+        {
+          "symptom": "/api/ も web のほうが返る",
+          "check": "もう 5 秒待って取り直す",
+          "fix": "決まりが効く前だった"
+        },
+        {
+          "symptom": "toomanyrequests や 429 と出る",
+          "check": "kubectl describe の Events で、Failed to pull image の行の終わりを見る",
+          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る。短い「429 Too Many Requests」だけのときは、使いすぎを防ぐ別の上限なので、数分待ってからもう一度行う"
+        },
+        {
+          "symptom": "404 Not Found (nginx) と出る",
+          "check": "kubectl logs deployment/api -n ch6 を打つ",
+          "fix": "Pod に /api/ のページが無い。command の行を見直す"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/services-networking/ingress/"
+    },
+    {
+      "id": "tls",
+      "text": "自分で作った証明書で、https にします。",
+      "why": "通り道で中身を読まれないようにするためです。自分で作った証明書 (自己署名) は練習用で、ブラウザは「信頼できない」と言います。本物は、信頼された発行元からもらいます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "openssl req -x509 -newkey rsa:2048 -nodes -days 7 -subj \"/CN=site.example.test\" -addext \"subjectAltName=DNS:site.example.test\" -keyout tls-key.pem -out tls-cert.pem 2> /dev/null\nkubectl create secret tls site-tls --cert=tls-cert.pem --key=tls-key.pem -n ch6\nkubectl patch ingress web -n ch6 --type=merge -p '{\"spec\":{\"tls\":[{\"hosts\":[\"site.example.test\"],\"secretName\":\"site-tls\"}]}}'\nsleep 5\nNODE_IP=$(kubectl get node kcna -o jsonpath='{.status.addresses[?(@.type==\"InternalIP\")].address}')\ncurl -sS -m 5 --resolve site.example.test:443:$NODE_IP https://site.example.test/\ncurl -s -k -m 5 --resolve site.example.test:443:$NODE_IP https://site.example.test/\necho | openssl s_client -connect $NODE_IP:443 -servername site.example.test 2> /dev/null | openssl x509 -noout -subject\nrm tls-key.pem tls-cert.pem"
+      },
+      "lines": [
+        {
+          "code": "openssl req -x509 -newkey rsa:2048 -nodes -days 7 -subj \"/CN=site.example.test\" -addext \"subjectAltName=DNS:site.example.test\" -keyout tls-key.pem -out tls-cert.pem 2> /dev/null",
+          "text": "7 日だけ使える証明書と鍵を、ファイルに作る"
+        },
+        {
+          "code": "kubectl create secret tls site-tls --cert=tls-cert.pem --key=tls-key.pem -n ch6",
+          "text": "証明書と鍵を Secret に入れる (Secret は 7 章で詳しく)"
+        },
+        {
+          "code": "kubectl patch ingress web -n ch6 --type=merge -p '{\"spec\":{\"tls\":[{\"hosts\":[\"site.example.test\"],\"secretName\":\"site-tls\"}]}}'",
+          "text": "Ingress に、この名前は https でも受けると足す"
+        },
+        {
+          "code": "sleep 5",
+          "text": "効くまで 5 秒待つ"
+        },
+        {
+          "code": "NODE_IP=$(kubectl get node kcna -o jsonpath='{.status.addresses[?(@.type==\"InternalIP\")].address}')",
+          "text": "ノードの住所を覚える。今の端末だけで使える"
+        },
+        {
+          "code": "curl -sS -m 5 --resolve site.example.test:443:$NODE_IP https://site.example.test/",
+          "text": "証明書を確かめながら取る (名前の住所はその場で教える)"
+        },
+        {
+          "code": "curl -s -k -m 5 --resolve site.example.test:443:$NODE_IP https://site.example.test/",
+          "text": "確かめずに取る (-k)"
+        },
+        {
+          "code": "echo | openssl s_client -connect $NODE_IP:443 -servername site.example.test 2> /dev/null | openssl x509 -noout -subject",
+          "text": "受けている証明書の名前を出す"
+        },
+        {
+          "code": "rm tls-key.pem tls-cert.pem",
+          "text": "手元のファイルを消す"
+        }
+      ],
+      "output": "secret/site-tls created\ningress.networking.k8s.io/web patched\ncurl: (60) SSL certificate problem: self-signed certificate\nMore details here: https://curl.se/docs/sslcerts.html\n\ncurl failed to verify the legitimacy of the server and therefore could not\nestablish a secure connection to it. To learn more about this situation and\nhow to fix it, please visit the web page mentioned above.\nweb-687f6fbb85-b2tbl\nsubject=CN = site.example.test",
+      "read": "1 回目は self-signed certificate と断られます。知らない発行元の証明書を、curl が信用しないためです。2 回目は -k で確かめずに通りました。練習のほかでは -k を使いません。証明書の名前が site.example.test なら、自分のものが使われています。",
+      "trouble": [
+        {
+          "symptom": "subject が TRAEFIK DEFAULT CERT",
+          "check": "kubectl get secret site-tls -n ch6 と kubectl describe ingress web -n ch6 を打つ",
+          "fix": "Secret の名前と hosts のつづりを見直し、10 秒待つ"
+        },
+        {
+          "symptom": "rm で「そのファイルは無い」と出る",
+          "check": "ls を打つ",
+          "fix": "作る行が失敗している。1 行目から打ち直す"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/services-networking/ingress/"
+    },
+    {
+      "id": "ing-host-win",
+      "text": "ホストの PowerShell から、ホスト名を付けて取ります。1 行目の住所は、multipass list で見たものに書き替えます。",
+      "why": "PC から Ingress を通る道を見るためです。名前の住所を PC に登録しなくても、Host を付ければ試せます。",
+      "os": "windows",
+      "where": "host",
+      "code": {
+        "language": "powershell",
+        "text": "$VM_IP = \"10.0.0.5\"\ncurl.exe -s -H \"Host: site.example.test\" http://$VM_IP/"
+      },
+      "lines": [
+        {
+          "code": "$VM_IP = \"10.0.0.5\"",
+          "text": "仮想マシンの住所を覚える (書き替える)"
+        },
+        {
+          "code": "curl.exe -s -H \"Host: site.example.test\" http://$VM_IP/",
+          "text": "Host を付けて取る。curl.exe と書くと、PowerShell の別の curl と間違えない"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "仮想マシンの中と同じように、Pod の名前が返れば届いています。",
+      "trouble": [
+        {
+          "symptom": "届かない",
+          "check": "仮想マシンの中で同じことを試す",
+          "fix": "中で届くなら、住所の書き替えと VPN を見直す"
+        },
+        {
+          "symptom": "404 page not found と出る",
+          "check": "Host のつづりを見る",
+          "fix": "届いてはいる。名前を site.example.test に直す"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/services-networking/ingress/"
+    },
+    {
+      "id": "ing-host-mac",
+      "text": "ホストの端末から、ホスト名を付けて取ります。1 行目の住所は、multipass list で見たものに書き替えます。",
+      "why": "PC から Ingress を通る道を見るためです。名前の住所を PC に登録しなくても、Host を付ければ試せます。",
+      "os": "mac",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "VM_IP=10.0.0.5\ncurl -s -H \"Host: site.example.test\" http://$VM_IP/"
+      },
+      "lines": [
+        {
+          "code": "VM_IP=10.0.0.5",
+          "text": "仮想マシンの住所を覚える (書き替える)"
+        },
+        {
+          "code": "curl -s -H \"Host: site.example.test\" http://$VM_IP/",
+          "text": "Host を付けて取る"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "仮想マシンの中と同じように、Pod の名前が返れば届いています。",
+      "trouble": [
+        {
+          "symptom": "届かない",
+          "check": "仮想マシンの中で同じことを試す",
+          "fix": "中で届くなら、住所の書き替えと VPN を見直す"
+        },
+        {
+          "symptom": "404 page not found と出る",
+          "check": "Host のつづりを見る",
+          "fix": "届いてはいる。名前を site.example.test に直す"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/services-networking/ingress/"
+    },
+    {
+      "id": "ing-host-linux",
+      "text": "ホストの端末から、ホスト名を付けて取ります。1 行目の住所は、multipass list で見たものに書き替えます。",
+      "why": "PC から Ingress を通る道を見るためです。名前の住所を PC に登録しなくても、Host を付ければ試せます。",
+      "os": "linux",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "VM_IP=10.0.0.5\ncurl -s -H \"Host: site.example.test\" http://$VM_IP/"
+      },
+      "lines": [
+        {
+          "code": "VM_IP=10.0.0.5",
+          "text": "仮想マシンの住所を覚える (書き替える)"
+        },
+        {
+          "code": "curl -s -H \"Host: site.example.test\" http://$VM_IP/",
+          "text": "Host を付けて取る"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "仮想マシンの中と同じように、Pod の名前が返れば届いています。",
+      "trouble": [
+        {
+          "symptom": "届かない",
+          "check": "仮想マシンの中で同じことを試す",
+          "fix": "中で届くなら、住所の書き替えと VPN を見直す"
+        },
+        {
+          "symptom": "404 page not found と出る",
+          "check": "Host のつづりを見る",
+          "fix": "届いてはいる。名前を site.example.test に直す"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/services-networking/ingress/"
+    },
+    {
+      "id": "trace",
+      "text": "外から Pod まで、通り道を 1 段ずつたどります。仮想マシンの中で打ちます。",
+      "why": "つながらない時は、この順に見ていくと、切れている場所が分かるためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl get service traefik -n kube-system -o wide\nkubectl get ingress web -n ch6 -o jsonpath='{range .spec.rules[*].http.paths[*]}{.path} -> {.backend.service.name}{\"\\n\"}{end}'\nkubectl get service web api -n ch6\nkubectl get endpointslice -l kubernetes.io/service-name=web -n ch6 -o jsonpath='{range .items[*].endpoints[*]}{.addresses[0]} {.targetRef.name}{\"\\n\"}{end}'\nkubectl get pods -l app=web -n ch6 -o wide"
+      },
+      "lines": [
+        {
+          "code": "kubectl get service traefik -n kube-system -o wide",
+          "text": "1 段目: ノードの 80 番を受ける入口"
+        },
+        {
+          "code": "kubectl get ingress web -n ch6 -o jsonpath='{range .spec.rules[*].http.paths[*]}{.path} -> {.backend.service.name}{\"\\n\"}{end}'",
+          "text": "2 段目: 道ごとの行き先の Service"
+        },
+        {
+          "code": "kubectl get service web api -n ch6",
+          "text": "3 段目: Service と番号"
+        },
+        {
+          "code": "kubectl get endpointslice -l kubernetes.io/service-name=web -n ch6 -o jsonpath='{range .items[*].endpoints[*]}{.addresses[0]} {.targetRef.name}{\"\\n\"}{end}'",
+          "text": "web の渡す先の住所と Pod を出す"
+        },
+        {
+          "code": "kubectl get pods -l app=web -n ch6 -o wide",
+          "text": "5 段目: その住所の Pod"
+        }
+      ],
+      "output": "NAME      TYPE           CLUSTER-IP      EXTERNAL-IP   PORT(S)                      AGE   SELECTOR\ntraefik   LoadBalancer   10.43.253.117   10.0.2.15     80:30494/TCP,443:30932/TCP   14m   app.kubernetes.io/instance=traefik-kube-system,app.kubernetes.io/name=traefik\n/ -> web\n/api/ -> api\nNAME   TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)    AGE\nweb    ClusterIP   10.43.78.147   <none>        8080/TCP   85s\napi    ClusterIP   10.43.40.121   <none>        80/TCP     13s\n10.42.0.18 web-687f6fbb85-b2tbl\n10.42.0.19 web-687f6fbb85-2ll5s\nNAME                   READY   STATUS    RESTARTS   AGE   IP           NODE   NOMINATED NODE   READINESS GATES\nweb-687f6fbb85-2ll5s   1/1     Running   0          81s   10.42.0.19   kcna   <none>           <none>\nweb-687f6fbb85-b2tbl   1/1     Running   0          81s   10.42.0.18   kcna   <none>           <none>",
+      "read": "入口 → 決まり → Service → 渡す先 → Pod と、名前・番号・住所がつながっています。4 段目 (渡す先) の住所が、5 段目の Pod の IP と同じです。",
+      "trouble": [
+        {
+          "symptom": "途中で食い違う",
+          "check": "食い違った段の、名前と番号を見る",
+          "fix": "その段を直すと、その後ろが全部つながる"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-service/"
+    },
+    {
+      "id": "order",
+      "text": "中から外へ、順に試して切れ目を探します。",
+      "why": "外から順でも、中から順でもかまいません。1 段ずつ試すと、どこまで届くかがはっきりします。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "POD_IP=$(kubectl get pod -l app=web -n ch6 -o jsonpath='{.items[0].status.podIP}')\nkubectl exec client -n ch6 -- wget -qO- -T 5 http://$POD_IP\nSVC_IP=$(kubectl get service web -n ch6 -o jsonpath='{.spec.clusterIP}')\nkubectl exec client -n ch6 -- wget -qO- -T 5 http://$SVC_IP:8080\nkubectl exec client -n ch6 -- wget -qO- -T 5 http://web:8080\nNODE_IP=$(kubectl get node kcna -o jsonpath='{.status.addresses[?(@.type==\"InternalIP\")].address}')\ncurl -s -m 5 -H 'Host: site.example.test' http://$NODE_IP/"
+      },
+      "lines": [
+        {
+          "code": "POD_IP=$(kubectl get pod -l app=web -n ch6 -o jsonpath='{.items[0].status.podIP}')",
+          "text": "Pod の住所を 1 つ覚える"
+        },
+        {
+          "code": "kubectl exec client -n ch6 -- wget -qO- -T 5 http://$POD_IP",
+          "text": "Pod に直接"
+        },
+        {
+          "code": "SVC_IP=$(kubectl get service web -n ch6 -o jsonpath='{.spec.clusterIP}')",
+          "text": "Service の住所を覚える"
+        },
+        {
+          "code": "kubectl exec client -n ch6 -- wget -qO- -T 5 http://$SVC_IP:8080",
+          "text": "Service の住所で"
+        },
+        {
+          "code": "kubectl exec client -n ch6 -- wget -qO- -T 5 http://web:8080",
+          "text": "Service の名前で"
+        },
+        {
+          "code": "NODE_IP=$(kubectl get node kcna -o jsonpath='{.status.addresses[?(@.type==\"InternalIP\")].address}')",
+          "text": "ノードの住所を覚える。今の端末だけで使える"
+        },
+        {
+          "code": "curl -s -m 5 -H 'Host: site.example.test' http://$NODE_IP/",
+          "text": "Ingress を通して"
+        }
+      ],
+      "output": "web-687f6fbb85-2ll5s\nweb-687f6fbb85-2ll5s\nweb-687f6fbb85-2ll5s\nweb-687f6fbb85-2ll5s",
+      "read": "4 つとも返れば、全部つながっています。1 つ目で切れたら Pod、2 つ目なら Service (選び方・番号)、3 つ目なら DNS、4 つ目なら Ingress を疑います。",
+      "trouble": [
+        {
+          "symptom": "client の Pod が見つからないと出る",
+          "check": "kubectl get pods -n ch6 を打つ",
+          "fix": "無ければ、client を作る手順の run の行から打ち直す"
+        },
+        {
+          "symptom": "curl で何も出ない、または URL がおかしいと出る",
+          "check": "echo $SVC_IP $NODE_IP を打つ",
+          "fix": "空なら、その値を決めた行を打ち直す。端末を開き直すと消えている"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-service/"
+    },
+    {
+      "id": "gateway",
+      "text": "Ingress の次の形 (Gateway API) が、入っているかを見ます。",
+      "why": "Kubernetes の文書は、新しく作るなら Gateway API を勧めています。Ingress は無くなる予定はありませんが、これ以上は機能が増えません。Gateway API は、入口を用意する人と、道を書く人の役を分けて書けます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl get crd -o name | grep gateway.networking.k8s.io | cut -d/ -f2\nkubectl get gatewayclass"
+      },
+      "lines": [
+        {
+          "code": "kubectl get crd -o name | grep gateway.networking.k8s.io | cut -d/ -f2",
+          "text": "Gateway API の種類の一覧を出す"
+        },
+        {
+          "code": "kubectl get gatewayclass",
+          "text": "受け持ちの一覧を出す"
+        }
+      ],
+      "output": "backendtlspolicies.gateway.networking.k8s.io\ngatewayclasses.gateway.networking.k8s.io\ngateways.gateway.networking.k8s.io\ngrpcroutes.gateway.networking.k8s.io\nhttproutes.gateway.networking.k8s.io\nlistenersets.gateway.networking.k8s.io\nreferencegrants.gateway.networking.k8s.io\ntcproutes.gateway.networking.k8s.io\ntlsroutes.gateway.networking.k8s.io\nudproutes.gateway.networking.k8s.io\nNo resources found",
+      "read": "種類 (gateways や httproutes など) は、k3s の Traefik と一緒に入っています。受け持ち (GatewayClass) はまだありません。k3s では、Traefik の設定で使うと決めると、使えるようになります。この章では、入口の設定を変えないために、見るだけにします。役の分けは、GatewayClass と Gateway が入口、HTTPRoute が道です。",
+      "trouble": [
+        {
+          "symptom": "1 つも出ない",
+          "check": "kubectl get pods -n kube-system を打つ",
+          "fix": "Traefik の準備が終わっていない。版によっては入っていないこともある"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/services-networking/gateway/"
+    },
+    {
+      "id": "break-before-policy",
+      "text": "ここでも休めます。休む人は、exit で出てから、ホストでこの行を打ちます。休まない人は、打たずに印を付けて先へ進みます。",
+      "why": "この先は、通信をわざと止める練習です。区切りのよい所で休めるようにします。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass stop kcna"
+      },
+      "lines": [
+        {
+          "code": "multipass stop kcna",
+          "text": "kcna の電源を切る。動いている (Running) ときだけ打てる"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "何もエラーが出なければ止まっています。続けるときは、ホストで multipass shell kcna を打ち、cd ~/ch6 を打ちます。kubectl get pods -A で ch6 と kube-system の Pod が動いているのを見てから進みます。戻った直後の 1〜2 分は、一覧が止める前の古い様子のことがあります。",
+      "trouble": [
+        {
+          "symptom": "refused と断られる",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "activating の間は待つ"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/stop/"
+    },
+    {
+      "id": "np-open",
+      "text": "NetworkPolicy が無い時は、誰からでも届くことを見ます。",
+      "why": "Kubernetes の初めの状態は「全部通す」です。止めたければ、自分で決まりを書きます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl get networkpolicy -A\nfor i in $(seq 60); do [ \"$(kubectl get endpointslice -l kubernetes.io/service-name=web -n ch6 -o jsonpath='{.items[*].endpoints[*].conditions.ready}' | grep -o true | wc -l)\" -ge 2 ] && break; sleep 2; done\nkubectl wait --for=condition=Ready pod/client -n ch6 --timeout=120s\nkubectl exec client -n ch6 -- wget -qO- -T 5 http://web:8080\nkubectl exec other -n ch6b -- wget -qO- -T 5 http://web.ch6:8080"
+      },
+      "lines": [
+        {
+          "code": "kubectl get networkpolicy -A",
+          "text": "今ある決まりを全部出す"
+        },
+        {
+          "code": "for i in $(seq 60); do [ \"$(kubectl get endpointslice -l kubernetes.io/service-name=web -n ch6 -o jsonpath='{.items[*].endpoints[*].conditions.ready}' | grep -o true | wc -l)\" -ge 2 ] && break; sleep 2; done",
+          "text": "受けられる渡す先が 2 つ以上になるまで見て待つ (最大 2 分で先へ進む)"
+        },
+        {
+          "code": "kubectl wait --for=condition=Ready pod/client -n ch6 --timeout=120s",
+          "text": "client が使えるようになるまで待つ"
+        },
+        {
+          "code": "kubectl exec client -n ch6 -- wget -qO- -T 5 http://web:8080",
+          "text": "client から"
+        },
+        {
+          "code": "kubectl exec other -n ch6b -- wget -qO- -T 5 http://web.ch6:8080",
+          "text": "別の名前空間の other から"
+        }
+      ],
+      "output": "No resources found\npod/client condition met\nweb-687f6fbb85-b2tbl\nweb-687f6fbb85-b2tbl",
+      "read": "1 行目は No resources found (決まりは無い) です。どちらからも届きます。",
+      "trouble": [
+        {
+          "symptom": "client の Pod が見つからないと出る",
+          "check": "kubectl get pods -n ch6 を打つ",
+          "fix": "無ければ、client を作る手順の run の行から打ち直す"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/services-networking/network-policies/"
+    },
+    {
+      "id": "np-deny",
+      "text": "ch6 に入る通信を、全部止めます。",
+      "why": "決まりに 1 つでも当てはまった Pod は、書かれたものだけが通るようになります。何も許さないと書けば、全部止まります。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cat > deny.yaml <<'EOF'\napiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: deny-all-in\nspec:\n  podSelector: {}\n  policyTypes:\n  - Ingress\nEOF\nkubectl apply -f deny.yaml -n ch6\nsleep 10\nkubectl exec client -n ch6 -- wget -qO- -T 5 http://web:8080\nkubectl delete pod -l app=web -n ch6\nkubectl rollout status deployment/web -n ch6 --timeout=180s\nfor i in $(seq 60); do [ \"$(kubectl get endpointslice -l kubernetes.io/service-name=web -n ch6 -o jsonpath='{.items[*].endpoints[*].conditions.ready}' | grep -o true | wc -l)\" -ge 2 ] && break; sleep 2; done\nsleep 5\nNODE_IP=$(kubectl get node kcna -o jsonpath='{.status.addresses[?(@.type==\"InternalIP\")].address}')\ncurl -s -o /dev/null -w '%{http_code}\\n' -m 8 -H 'Host: site.example.test' http://$NODE_IP/\nPOD_IP=$(kubectl get pod -l app=web -n ch6 -o jsonpath='{.items[0].status.podIP}')\ncurl -s -m 5 http://$POD_IP"
+      },
+      "lines": [
+        {
+          "code": "cat > deny.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま deny.yaml というファイルに書く"
+        },
+        {
+          "code": "apiVersion: networking.k8s.io/v1",
+          "text": "NetworkPolicy のある API"
+        },
+        {
+          "code": "kind: NetworkPolicy",
+          "text": "通す相手の決まり"
+        },
+        {
+          "code": "metadata:",
+          "text": "呼び名など"
+        },
+        {
+          "code": "  name: deny-all-in",
+          "text": "呼び名"
+        },
+        {
+          "code": "spec:",
+          "text": "中身"
+        },
+        {
+          "code": "  podSelector: {}",
+          "text": "{} は、この名前空間の Pod 全部"
+        },
+        {
+          "code": "  policyTypes:",
+          "text": "どちら向きを決めるか"
+        },
+        {
+          "code": "  - Ingress",
+          "text": "入ってくる向き。許す相手を書かないので、全部止まる"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "kubectl apply -f deny.yaml -n ch6",
+          "text": "決まりを作る"
+        },
+        {
+          "code": "sleep 10",
+          "text": "効くまで 10 秒待つ"
+        },
+        {
+          "code": "kubectl exec client -n ch6 -- wget -qO- -T 5 http://web:8080",
+          "text": "client から"
+        },
+        {
+          "code": "kubectl delete pod -l app=web -n ch6",
+          "text": "web を作り直す。前からつながっている通信を切るため"
+        },
+        {
+          "code": "kubectl rollout status deployment/web -n ch6 --timeout=180s",
+          "text": "2 つとも使えるようになるまで待つ"
+        },
+        {
+          "code": "for i in $(seq 60); do [ \"$(kubectl get endpointslice -l kubernetes.io/service-name=web -n ch6 -o jsonpath='{.items[*].endpoints[*].conditions.ready}' | grep -o true | wc -l)\" -ge 2 ] && break; sleep 2; done",
+          "text": "受けられる渡す先が 2 つ以上になるまで見て待つ (最大 2 分で先へ進む)"
+        },
+        {
+          "code": "sleep 5",
+          "text": "伝わるまで 5 秒待つ"
+        },
+        {
+          "code": "NODE_IP=$(kubectl get node kcna -o jsonpath='{.status.addresses[?(@.type==\"InternalIP\")].address}')",
+          "text": "ノードの住所を覚える。今の端末だけで使える"
+        },
+        {
+          "code": "curl -s -o /dev/null -w '%{http_code}\\n' -m 8 -H 'Host: site.example.test' http://$NODE_IP/",
+          "text": "Ingress を通して (返事の番号だけ出す)"
+        },
+        {
+          "code": "POD_IP=$(kubectl get pod -l app=web -n ch6 -o jsonpath='{.items[0].status.podIP}')",
+          "text": "Pod の住所を覚える"
+        },
+        {
+          "code": "curl -s -m 5 http://$POD_IP",
+          "text": "ノードから Pod へ直接"
+        }
+      ],
+      "output": "networkpolicy.networking.k8s.io/deny-all-in created\nwget: can't connect to remote host (10.43.78.147): Connection refused\ncommand terminated with exit code 1\npod \"web-687f6fbb85-2ll5s\" deleted from ch6 namespace\npod \"web-687f6fbb85-b2tbl\" deleted from ch6 namespace\nWaiting for deployment \"web\" rollout to finish: 0 of 2 updated replicas are available...\nWaiting for deployment \"web\" rollout to finish: 1 of 2 updated replicas are available...\ndeployment \"web\" successfully rolled out\n502\nweb-687f6fbb85-d6n4t",
+      "read": "client からは断られました (k3s では、すぐに断られます。ほかの部品では時間切れになることもあります)。Ingress も 200 ではなくなりました (504 は「待ったが返事が無い」、502 は「つなげない」、000 は「curl があきらめた」)。Pod を作り直したのは、前からつながっている通信は、決まりを作ったあとも続くことがあるためです。それでも、ノードから Pod へは届きます。Pod のいるノードからの通信は、いつも通すと決まっているためです。だから Pod の動作検査 (probe) も止まりません。この見張りは、k3s の中の NetworkPolicy コントローラーがしています。",
+      "trouble": [
+        {
+          "symptom": "まだ届く",
+          "check": "もう 10 秒待って取り直す",
+          "fix": "決まりが効く前だった"
+        },
+        {
+          "symptom": "curl で何も出ない、または URL がおかしいと出る",
+          "check": "echo $SVC_IP $NODE_IP を打つ",
+          "fix": "空なら、その値を決めた行を打ち直す。端末を開き直すと消えている"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/services-networking/network-policies/"
+    },
+    {
+      "id": "np-allow",
+      "text": "通してよい相手を足します。",
+      "why": "止めてから、要るものだけを開けます。決まりは足し算なので、前のものを消さずに、別のファイルで許せます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cat > allow.yaml <<'EOF'\napiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: allow-to-web\nspec:\n  podSelector:\n    matchLabels:\n      app: web\n  policyTypes:\n  - Ingress\n  ingress:\n  - from:\n    - podSelector:\n        matchLabels:\n          app: client\n    - namespaceSelector:\n        matchLabels:\n          kubernetes.io/metadata.name: kube-system\n    ports:\n    - port: http\nEOF\nkubectl apply -f allow.yaml -n ch6\nsleep 10\nkubectl exec client -n ch6 -- wget -qO- -T 5 http://web:8080\nkubectl exec client -n ch6 -- wget -qO- -T 5 http://api\nkubectl exec other -n ch6b -- wget -qO- -T 5 http://web.ch6:8080\nNODE_IP=$(kubectl get node kcna -o jsonpath='{.status.addresses[?(@.type==\"InternalIP\")].address}')\ncurl -s -m 8 -H 'Host: site.example.test' http://$NODE_IP/"
+      },
+      "lines": [
+        {
+          "code": "cat > allow.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま allow.yaml というファイルに書く"
+        },
+        {
+          "code": "apiVersion: networking.k8s.io/v1",
+          "text": "同じ種類の決まり"
+        },
+        {
+          "code": "kind: NetworkPolicy",
+          "text": "通す相手の決まり"
+        },
+        {
+          "code": "metadata:",
+          "text": "呼び名など"
+        },
+        {
+          "code": "  name: allow-to-web",
+          "text": "呼び名"
+        },
+        {
+          "code": "spec:",
+          "text": "中身"
+        },
+        {
+          "code": "  podSelector:",
+          "text": "守られる側の Pod"
+        },
+        {
+          "code": "    matchLabels:",
+          "text": "ラベルで選ぶ"
+        },
+        {
+          "code": "      app: web",
+          "text": "app=web の Pod"
+        },
+        {
+          "code": "  policyTypes:",
+          "text": "どちら向きか"
+        },
+        {
+          "code": "  - Ingress",
+          "text": "入ってくる向き"
+        },
+        {
+          "code": "  ingress:",
+          "text": "許す相手"
+        },
+        {
+          "code": "  - from:",
+          "text": "どこから"
+        },
+        {
+          "code": "    - podSelector:",
+          "text": "同じ名前空間の Pod のうち"
+        },
+        {
+          "code": "        matchLabels:",
+          "text": "ラベルで選ぶ"
+        },
+        {
+          "code": "          app: client",
+          "text": "app=client の Pod"
+        },
+        {
+          "code": "    - namespaceSelector:",
+          "text": "または、名前空間で選ぶ (- があると「または」)"
+        },
+        {
+          "code": "        matchLabels:",
+          "text": "ラベルで選ぶ"
+        },
+        {
+          "code": "          kubernetes.io/metadata.name: kube-system",
+          "text": "Traefik のいる kube-system から"
+        },
+        {
+          "code": "    ports:",
+          "text": "番号も絞る"
+        },
+        {
+          "code": "    - port: http",
+          "text": "http という名前の番号だけ"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "kubectl apply -f allow.yaml -n ch6",
+          "text": "決まりを足す"
+        },
+        {
+          "code": "sleep 10",
+          "text": "効くまで 10 秒待つ"
+        },
+        {
+          "code": "kubectl exec client -n ch6 -- wget -qO- -T 5 http://web:8080",
+          "text": "client から web へ"
+        },
+        {
+          "code": "kubectl exec client -n ch6 -- wget -qO- -T 5 http://api",
+          "text": "client から api へ"
+        },
+        {
+          "code": "kubectl exec other -n ch6b -- wget -qO- -T 5 http://web.ch6:8080",
+          "text": "別の名前空間から web へ"
+        },
+        {
+          "code": "NODE_IP=$(kubectl get node kcna -o jsonpath='{.status.addresses[?(@.type==\"InternalIP\")].address}')",
+          "text": "ノードの住所を覚える。今の端末だけで使える"
+        },
+        {
+          "code": "curl -s -m 8 -H 'Host: site.example.test' http://$NODE_IP/",
+          "text": "Ingress を通して"
+        }
+      ],
+      "output": "networkpolicy.networking.k8s.io/allow-to-web created\nweb-687f6fbb85-d6n4t\nwget: can't connect to remote host (10.43.40.121): Connection refused\ncommand terminated with exit code 1\nwget: can't connect to remote host (10.43.78.147): Connection refused\ncommand terminated with exit code 1\nweb-687f6fbb85-d6n4t",
+      "read": "client と Ingress からは届き、別の名前空間からは断られます。api へも断られます。許したのは web だけだからです。名前空間のラベル kubernetes.io/metadata.name は、Kubernetes が自動で付けています。",
+      "trouble": [
+        {
+          "symptom": "Ingress だけ届かない",
+          "check": "kubectl get namespace kube-system --show-labels を打つ",
+          "fix": "ラベルのつづりを見直す"
+        },
+        {
+          "symptom": "全部届いてしまう",
+          "check": "kubectl get networkpolicy -n ch6 を打つ",
+          "fix": "deny-all-in があるかを見る"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/services-networking/network-policies/"
+    },
+    {
+      "id": "np-egress",
+      "text": "わざと、client の出ていく通信を全部止め、名前も引けなくします。",
+      "why": "出ていく向き (egress) を絞ると、DNS も止まります。とても多い失敗です。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cat > egress.yaml <<'EOF'\napiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: client-out\nspec:\n  podSelector:\n    matchLabels:\n      app: client\n  policyTypes:\n  - Egress\nEOF\nkubectl apply -f egress.yaml -n ch6\nsleep 10\nkubectl exec client -n ch6 -- wget -qO- -T 5 http://web:8080"
+      },
+      "lines": [
+        {
+          "code": "cat > egress.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま egress.yaml というファイルに書く"
+        },
+        {
+          "code": "apiVersion: networking.k8s.io/v1",
+          "text": "同じ種類の決まり"
+        },
+        {
+          "code": "kind: NetworkPolicy",
+          "text": "通す相手の決まり"
+        },
+        {
+          "code": "metadata:",
+          "text": "呼び名など"
+        },
+        {
+          "code": "  name: client-out",
+          "text": "呼び名"
+        },
+        {
+          "code": "spec:",
+          "text": "中身"
+        },
+        {
+          "code": "  podSelector:",
+          "text": "決まりを当てる Pod"
+        },
+        {
+          "code": "    matchLabels:",
+          "text": "ラベルで選ぶ"
+        },
+        {
+          "code": "      app: client",
+          "text": "app=client の Pod"
+        },
+        {
+          "code": "  policyTypes:",
+          "text": "どちら向きか"
+        },
+        {
+          "code": "  - Egress",
+          "text": "出ていく向き。許す相手を書かないので、全部止まる"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "kubectl apply -f egress.yaml -n ch6",
+          "text": "決まりを作る"
+        },
+        {
+          "code": "sleep 10",
+          "text": "効くまで 10 秒待つ"
+        },
+        {
+          "code": "kubectl exec client -n ch6 -- wget -qO- -T 5 http://web:8080",
+          "text": "名前で取る"
+        }
+      ],
+      "output": "networkpolicy.networking.k8s.io/client-out created\nwget: bad address 'web:8080'\ncommand terminated with exit code 1",
+      "read": "web は許したはずなのに、bad address (名前を引けない) です。web へ行く前の、DNS への問い合わせが止まっているためです。",
+      "trouble": [
+        {
+          "symptom": "client の Pod が見つからないと出る",
+          "check": "kubectl get pods -n ch6 を打つ",
+          "fix": "無ければ、client を作る手順の run の行から打ち直す"
+        },
+        {
+          "symptom": "まだ届く",
+          "check": "もう 10 秒待って取り直す",
+          "fix": "決まりが効く前だった"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/services-networking/network-policies/"
+    },
+    {
+      "id": "np-dns",
+      "text": "DNS と web への通信だけを許します。",
+      "why": "出ていく向きを絞る時は、DNS (53 番の UDP と TCP) を必ず許します。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cat > egress.yaml <<'EOF'\napiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: client-out\nspec:\n  podSelector:\n    matchLabels:\n      app: client\n  policyTypes:\n  - Egress\n  egress:\n  - to:\n    - namespaceSelector:\n        matchLabels:\n          kubernetes.io/metadata.name: kube-system\n    ports:\n    - protocol: UDP\n      port: 53\n    - protocol: TCP\n      port: 53\n  - to:\n    - podSelector:\n        matchLabels:\n          app: web\nEOF\nkubectl apply -f egress.yaml -n ch6\nsleep 10\nkubectl exec client -n ch6 -- wget -qO- -T 5 http://web:8080"
+      },
+      "lines": [
+        {
+          "code": "cat > egress.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま egress.yaml というファイルに書く"
+        },
+        {
+          "code": "apiVersion: networking.k8s.io/v1",
+          "text": "同じ種類の決まり"
+        },
+        {
+          "code": "kind: NetworkPolicy",
+          "text": "通す相手の決まり"
+        },
+        {
+          "code": "metadata:",
+          "text": "呼び名など"
+        },
+        {
+          "code": "  name: client-out",
+          "text": "前と同じ呼び名 (中身を差し替える)"
+        },
+        {
+          "code": "spec:",
+          "text": "中身"
+        },
+        {
+          "code": "  podSelector:",
+          "text": "決まりを当てる Pod"
+        },
+        {
+          "code": "    matchLabels:",
+          "text": "ラベルで選ぶ"
+        },
+        {
+          "code": "      app: client",
+          "text": "app=client の Pod"
+        },
+        {
+          "code": "  policyTypes:",
+          "text": "どちら向きか"
+        },
+        {
+          "code": "  - Egress",
+          "text": "出ていく向き"
+        },
+        {
+          "code": "  egress:",
+          "text": "許す行き先"
+        },
+        {
+          "code": "  - to:",
+          "text": "行き先 1"
+        },
+        {
+          "code": "    - namespaceSelector:",
+          "text": "名前空間で選ぶ"
+        },
+        {
+          "code": "        matchLabels:",
+          "text": "ラベルで選ぶ"
+        },
+        {
+          "code": "          kubernetes.io/metadata.name: kube-system",
+          "text": "DNS のいる kube-system"
+        },
+        {
+          "code": "    ports:",
+          "text": "番号"
+        },
+        {
+          "code": "    - protocol: UDP",
+          "text": "UDP の"
+        },
+        {
+          "code": "      port: 53",
+          "text": "53 番"
+        },
+        {
+          "code": "    - protocol: TCP",
+          "text": "TCP の"
+        },
+        {
+          "code": "      port: 53",
+          "text": "53 番"
+        },
+        {
+          "code": "  - to:",
+          "text": "行き先 2"
+        },
+        {
+          "code": "    - podSelector:",
+          "text": "同じ名前空間の Pod"
+        },
+        {
+          "code": "        matchLabels:",
+          "text": "ラベルで選ぶ"
+        },
+        {
+          "code": "          app: web",
+          "text": "app=web の Pod"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "kubectl apply -f egress.yaml -n ch6",
+          "text": "決まりを差し替える"
+        },
+        {
+          "code": "sleep 10",
+          "text": "効くまで 10 秒待つ"
+        },
+        {
+          "code": "kubectl exec client -n ch6 -- wget -qO- -T 5 http://web:8080",
+          "text": "名前で取る"
+        }
+      ],
+      "output": "networkpolicy.networking.k8s.io/client-out configured\nweb-687f6fbb85-d6n4t",
+      "read": "届きました。行き先には Pod を書きます。Service の住所ではありません (Service の住所は、途中で Pod の住所に書き替わるためです)。",
+      "trouble": [
+        {
+          "symptom": "client の Pod が見つからないと出る",
+          "check": "kubectl get pods -n ch6 を打つ",
+          "fix": "無ければ、client を作る手順の run の行から打ち直す"
+        },
+        {
+          "symptom": "まだ bad address",
+          "check": "kubectl describe networkpolicy client-out -n ch6 を打つ",
+          "fix": "53 番と kube-system の行を見直す"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/services-networking/network-policies/"
+    },
+    {
+      "id": "np-clean",
+      "text": "通信の決まりを、全部消します。",
+      "why": "残しておくと、あとで理由の分からない「つながらない」になるためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl delete networkpolicy --all -n ch6\nsleep 10\nkubectl exec other -n ch6b -- wget -qO- -T 5 http://web.ch6:8080"
+      },
+      "lines": [
+        {
+          "code": "kubectl delete networkpolicy --all -n ch6",
+          "text": "ch6 の決まりを全部消す"
+        },
+        {
+          "code": "sleep 10",
+          "text": "効くまで 10 秒待つ"
+        },
+        {
+          "code": "kubectl exec other -n ch6b -- wget -qO- -T 5 http://web.ch6:8080",
+          "text": "別の名前空間から取る"
+        }
+      ],
+      "output": "networkpolicy.networking.k8s.io \"allow-to-web\" deleted from ch6 namespace\nnetworkpolicy.networking.k8s.io \"client-out\" deleted from ch6 namespace\nnetworkpolicy.networking.k8s.io \"deny-all-in\" deleted from ch6 namespace\nweb-687f6fbb85-d6n4t",
+      "read": "また届くようになりました。決まりが無くなると、初めの「全部通す」に戻ります。",
+      "trouble": [
+        {
+          "symptom": "届かない",
+          "check": "kubectl get networkpolicy -n ch6 を打つ",
+          "fix": "何も無ければ、もう 10 秒待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/services-networking/network-policies/"
+    },
+    {
+      "id": "kube-proxy",
+      "text": "Service の住所が、ノードのどこで Pod の住所に変わるかを見ます。",
+      "why": "Service の住所を持つ機械は、どこにもありません。ノードの通信の決まり (iptables) が、宛先を書き替えています。決まりを作るのは kube-proxy という部品です。k3s では、k3s のプロセスの中で動きます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "sudo iptables-save -t nat | grep 'ch6/web:http' | grep -E 'KUBE-SERVICES|statistic'\nip -br addr show cni0"
+      },
+      "lines": [
+        {
+          "code": "sudo iptables-save -t nat | grep 'ch6/web:http' | grep -E 'KUBE-SERVICES|statistic'",
+          "text": "web の Service のための決まりから、入口と振り分けの行を出す"
+        },
+        {
+          "code": "ip -br addr show cni0",
+          "text": "Pod をつなぐ仮想の線 (cni0) を出す"
+        }
+      ],
+      "output": "-A KUBE-SERVICES -d 10.43.78.147/32 -p tcp -m comment --comment \"ch6/web:http cluster IP\" -m tcp --dport 8080 -j KUBE-SVC-FEZLIV77ES4DNZR2\n-A KUBE-SVC-FEZLIV77ES4DNZR2 -m comment --comment \"ch6/web:http -> 10.42.0.24:80\" -m statistic --mode random --probability 0.50000000000 -j KUBE-SEP-PECSXQE6A65CF6QU\ncni0             UP             10.42.0.1/24 fe80::200b:5eff:fef9:15d7/64",
+      "read": "KUBE-SERVICES の行が「この Service の住所の 8080 番あてなら」という入口です。statistic の行が「この確率で 1 つ目へ」という振り分けです。cni0 は、Pod をつなぐ部品 (CNI。k3s では flannel) が作ったものです。住所や英数字の並びは、マシンごとに違います。",
+      "trouble": [
+        {
+          "symptom": "何も出ない",
+          "check": "kubectl get service web -n ch6 を打つ",
+          "fix": "Service が無いか、仕組みが iptables でない版になっている"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/networking/virtual-ips/"
+    },
+    {
+      "id": "cni",
+      "text": "最後に、言葉だけ押さえます。Pod に住所を配り、Pod どうしをつなぐ部品を CNI プラグインと呼びます。Kubernetes は「どの Pod からどの Pod へも、住所を変えずに届く」ことだけを決めていて、やり方は部品に任せています。k3s は flannel を使い、ノードが何台もある時は、ノードの間を VXLAN という包みで運びます。NetworkPolicy を守らせるのも部品の仕事で、対応していない部品では、書いても何も起きません。",
+      "why": "部品を替えると、できることが変わります。この VM では k3s の既定のままなので、決まりが効きました。",
+      "source": "https://docs.k3s.io/networking/basic-network-options"
+    },
+    {
+      "id": "check-before-delete",
+      "text": "消す前に、どのマシンにいるかを見ます。kcna と出なければ、次の手順を打ちません。",
+      "why": "次の手順は名前空間を 2 つまるごと消し、元に戻せません。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "hostname"
+      },
+      "lines": [
+        {
+          "code": "hostname",
+          "text": "マシンの名前を出す"
+        }
+      ],
+      "output": "kcna",
+      "read": "kcna が出れば、仮想マシンの中です。",
+      "trouble": [
+        {
+          "symptom": "kcna ではない名前が出る",
+          "check": "行の頭を見る",
+          "fix": "ホストにいる。multipass shell kcna で入り直す"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man1/hostname.1.html"
+    },
+    {
+      "id": "delete-namespace",
+      "text": "名前空間 ch6 と ch6b を消します。前の手順で kcna と出たときだけ打ちます。",
+      "why": "Service や Ingress も一緒に消え、ノードの 30080 番や 8081 番も空きます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cd ~\nkubectl delete namespace ch6 ch6b\nkubectl get namespaces\nkubectl get service -A | grep -E \"NodePort|LoadBalancer\""
+      },
+      "lines": [
+        {
+          "code": "cd ~",
+          "text": "ホームへ戻る"
+        },
+        {
+          "code": "kubectl delete namespace ch6 ch6b",
+          "text": "2 つを、中のものごと消す。1 分ほどかかることがある"
+        },
+        {
+          "code": "kubectl get namespaces",
+          "text": "残りを出す"
+        },
+        {
+          "code": "kubectl get service -A | grep -E \"NodePort|LoadBalancer\"",
+          "text": "外から届く Service の残りを出す"
+        }
+      ],
+      "output": "namespace \"ch6\" deleted\nnamespace \"ch6b\" deleted\nNAME              STATUS   AGE\ndefault           Active   17m\nkube-node-lease   Active   17m\nkube-public       Active   17m\nkube-system       Active   17m\nkube-system   traefik          LoadBalancer   10.43.253.117   10.0.2.15     80:30494/TCP,443:30932/TCP   16m",
+      "read": "初めからある 4 つの名前空間だけになり、外から届く Service は traefik だけになれば片付いています。~/ch6 のファイルは残ります。",
+      "trouble": [
+        {
+          "symptom": "消す行がしばらく止まる",
+          "check": "1 分ほど待つ",
+          "fix": "client などの sleep が終わるのを待っている"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/"
+    },
+    {
+      "id": "leave",
+      "text": "仮想マシンから出ます。",
+      "why": "次は、ホストで控えを取るためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "exit"
+      },
+      "lines": [
+        {
+          "code": "exit",
+          "text": "今の端末を終える。仮想マシンは動き続ける"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "行の頭が、自分の PC のものに戻ります。",
+      "trouble": [
+        {
+          "symptom": "行の頭が ubuntu@kcna のまま",
+          "check": "もう一度見る",
+          "fix": "もう一度 exit を打つ"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man1/bash.1.html"
+    },
+    {
+      "id": "snapshot",
+      "text": "ホストで、この章を終えた状態の控えを ch6-end という名前で取り、仮想マシンに入り直します。",
+      "why": "次の章で失敗しても、ここへ戻れるようにするためです。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass stop kcna\nmultipass snapshot --name ch6-end kcna\nmultipass list --snapshots\nmultipass shell kcna"
+      },
+      "lines": [
+        {
+          "code": "multipass stop kcna",
+          "text": "止める。控えは、止まっているときだけ取れる。stop は動いている (Running) ときだけ打てる"
+        },
+        {
+          "code": "multipass snapshot --name ch6-end kcna",
+          "text": "今の状態を ch6-end という名前で控える"
+        },
+        {
+          "code": "multipass list --snapshots",
+          "text": "控えの一覧を出す"
+        },
+        {
+          "code": "multipass shell kcna",
+          "text": "止まっている kcna を動かし、中に入り直す"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "一覧に ch6-end が並べば取れています。戻すときは、止めてから multipass restore kcna.ch6-end を打ちます。今の状態も控えるかを聞かれたら、要らなければ no と答えます。最後の行で、行の頭が ubuntu@kcna:~$ に変わります。課題と後片付けは、この中で続けます。",
+      "trouble": [
+        {
+          "symptom": "止まっていないので取れないと出る",
+          "check": "multipass list で State を見る",
+          "fix": "multipass stop kcna で止めてから取る"
+        },
+        {
+          "symptom": "ch6-end がもうあると出る",
+          "check": "multipass list --snapshots を打つ",
+          "fix": "前の控えを使うか、--name ch6-endb のように別の名前にする"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/snapshot/"
+    }
+  ],
+  "cleanup": [
+    {
+      "id": "check-vm",
+      "text": "仮想マシンの中で、どのマシンにいるかを見ます。kcna と出なければ止まり、multipass shell kcna で入ります。",
+      "why": "次の手順は、つないでいるクラスターのものを消します。自分の PC の別のクラスターで打たないためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "hostname"
+      },
+      "lines": [
+        {
+          "code": "hostname",
+          "text": "このマシンの名前を出す"
+        }
+      ],
+      "output": "kcna",
+      "read": "kcna と出れば、仮想マシンの中です。",
+      "trouble": [
+        {
+          "symptom": "kcna ではない名前が出る",
+          "check": "行の頭が ubuntu@kcna かを見る",
+          "fix": "ホストにいる。multipass shell kcna で入り、もう一度打つ"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man1/hostname.1.html"
+    },
+    {
+      "id": "delete-practice",
+      "text": "仮想マシンの中で、課題で作った名前空間を消します。課題をしていなければ、何も起きません。",
+      "why": "次の章を、k3s の部品だけの状態から始めるためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl delete namespace practice --ignore-not-found\nkubectl get namespaces"
+      },
+      "lines": [
+        {
+          "code": "kubectl delete namespace practice --ignore-not-found",
+          "text": "practice を消す。無くてもエラーにしない (--ignore-not-found)"
+        },
+        {
+          "code": "kubectl get namespaces",
+          "text": "名前空間の一覧を出す"
+        }
+      ],
+      "output": "namespace \"practice\" deleted\nNAME              STATUS   AGE\ndefault           Active   18m\nkube-node-lease   Active   18m\nkube-public       Active   18m\nkube-system       Active   18m",
+      "read": "default と kube- で始まる 4 つだけになれば、片付いています。k3s は消しません。",
+      "trouble": [
+        {
+          "symptom": "消す行がしばらく止まる",
+          "check": "1 分ほど待つ",
+          "fix": "中の Pod が終わるのを待っている。そのまま待つ"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_delete/"
+    },
+    {
+      "id": "rest",
+      "text": "今日はここまでにするときは、exit で出てから、ホストで仮想マシンを止めます。止まっていれば (Stopped)、打ちません。",
+      "why": "動いている間は PC のメモリを使うためです。次の章でも使うので、消しません。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass stop kcna"
+      },
+      "lines": [
+        {
+          "code": "multipass stop kcna",
+          "text": "kcna を止める"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "続けるときは multipass shell kcna で、動かして中に入れます。k3s は自分で始まります。",
+      "trouble": [
+        {
+          "symptom": "止まったか分からない",
+          "check": "multipass list で State を見る",
+          "fix": "Stopped なら止まっている。Running なら、もう一度止める"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/stop/"
+    }
+  ],
+  "challenges": [
+    {
+      "task": "仮想マシンの中で、practice という名前空間に nginx:1.27-alpine の Deployment shop を 2 つと、9000 番で受けて 80 番へ渡す Service shop を作り、別の Pod から名前で取ってください。",
+      "hint": "expose に --port と --target-port を付けます。取る側の Pod は sleep させておきます。",
+      "answer": "kubectl create namespace practice\nkubectl wait --for=create serviceaccount/default -n practice --timeout=60s\nkubectl create deployment shop --image=nginx:1.27-alpine --replicas=2 -n practice\nkubectl rollout status deployment/shop -n practice --timeout=180s\nkubectl expose deployment shop --port=9000 --target-port=80 -n practice\nkubectl run probe --image=busybox:1.37 -n practice -- sleep 86400\nkubectl wait --for=condition=Ready pod/probe -n practice --timeout=180s\nsleep 5\nkubectl exec probe -n practice -- wget -qO- -T 5 http://shop:9000 | grep title",
+      "verify": "Welcome to nginx! が返れば正解です。"
+    },
+    {
+      "task": "仮想マシンの中で、shop.example.test というホスト名で shop へ渡す Ingress を作り、ノードの 80 番から取ってください。",
+      "hint": "kubectl create ingress に --class と --rule を付けます。",
+      "answer": "kubectl create ingress shop --class=traefik --rule='shop.example.test/*=shop:9000' -n practice\nsleep 10\nNODE_IP=$(kubectl get node kcna -o jsonpath='{.status.addresses[?(@.type==\"InternalIP\")].address}')\ncurl -s -H 'Host: shop.example.test' http://$NODE_IP/ | grep title",
+      "verify": "Welcome to nginx! が返り、Host を付けない時が 404 page not found なら正解です。"
+    },
+    {
+      "task": "仮想マシンの中で、probe から shop への通信だけを止め、Ingress からは届くままにする NetworkPolicy を書いてください。",
+      "hint": "shop の Pod に、kube-system からだけ入れると書きます。",
+      "answer": "cat > ~/only-traefik.yaml <<'EOF'\napiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: only-traefik\nspec:\n  podSelector:\n    matchLabels:\n      app: shop\n  policyTypes:\n  - Ingress\n  ingress:\n  - from:\n    - namespaceSelector:\n        matchLabels:\n          kubernetes.io/metadata.name: kube-system\nEOF\nkubectl apply -f ~/only-traefik.yaml -n practice\nsleep 10\nNODE_IP=$(kubectl get node kcna -o jsonpath='{.status.addresses[?(@.type==\"InternalIP\")].address}')\ncurl -s -m 8 -H 'Host: shop.example.test' http://$NODE_IP/ | grep title\nrm ~/only-traefik.yaml\nkubectl exec probe -n practice -- wget -qO- -T 5 http://shop:9000 || echo 'probe からは届かない'",
+      "verify": "Ingress からは Welcome to nginx! が返り、probe からは届かないと出れば正解です。"
+    }
+  ],
+  "sources": [
+    {
+      "label": "Kubernetes: Service",
+      "url": "https://kubernetes.io/docs/concepts/services-networking/service/"
+    },
+    {
+      "label": "Kubernetes: EndpointSlices",
+      "url": "https://kubernetes.io/docs/concepts/services-networking/endpoint-slices/"
+    },
+    {
+      "label": "Kubernetes: DNS for Services and Pods",
+      "url": "https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/"
+    },
+    {
+      "label": "Kubernetes: Debug Services",
+      "url": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-service/"
+    },
+    {
+      "label": "Kubernetes: Ingress",
+      "url": "https://kubernetes.io/docs/concepts/services-networking/ingress/"
+    },
+    {
+      "label": "Kubernetes: Ingress Controllers",
+      "url": "https://kubernetes.io/docs/concepts/services-networking/ingress-controllers/"
+    },
+    {
+      "label": "Kubernetes: Gateway API",
+      "url": "https://kubernetes.io/docs/concepts/services-networking/gateway/"
+    },
+    {
+      "label": "Kubernetes: Network Policies",
+      "url": "https://kubernetes.io/docs/concepts/services-networking/network-policies/"
+    },
+    {
+      "label": "Kubernetes: Virtual IPs and Service Proxies",
+      "url": "https://kubernetes.io/docs/reference/networking/virtual-ips/"
+    },
+    {
+      "label": "Kubernetes: Network Plugins",
+      "url": "https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/network-plugins/"
+    },
+    {
+      "label": "K3s: Networking Services",
+      "url": "https://docs.k3s.io/networking/networking-services"
+    },
+    {
+      "label": "K3s: Basic Network Options",
+      "url": "https://docs.k3s.io/networking/basic-network-options"
+    },
+    {
+      "label": "Docker Hub: 取得の上限",
+      "url": "https://docs.docker.com/docker-hub/usage/"
+    },
+    {
+      "label": "Multipass: list",
+      "url": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/list/"
+    },
+    {
+      "label": "Multipass: snapshot",
+      "url": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/snapshot/"
+    }
+  ]
+}
