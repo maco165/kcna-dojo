@@ -1412,7 +1412,7 @@
         "flags": [
           "--rule"
         ],
-        "text": "振り分けの決まり。パスの最後に * を付けると、その先も全部当てはまる"
+        "text": "振り分けの決まり。パスの最後に * を付けると、そのパスと、その下 (/ で区切った先) に当てはまる (/foo* は /foo/bar に当たり、/foobar には当たらない)"
       },
       {
         "flags": [
@@ -1429,7 +1429,7 @@
     ],
     "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_create/kubectl_create_ingress/",
     "inside": [
-      "kubectl が、--rule の文字から Ingress を手元で組み立てます。パスの最後に * があれば、* を除いて pathType を Prefix (前の部分が合えばよい) に、無ければ Exact (完全に同じ) にします。",
+      "kubectl が、--rule の文字から Ingress を手元で組み立てます。パスの最後に * があれば、* を除いて pathType を Prefix (/ で区切った前の部分が合えばよい) に、無ければ Exact (完全に同じ) にします。",
       "API サーバーに POST で送り、保存されます。",
       "Ingress コントローラー (k3s では同梱の Traefik) が新しい Ingress に気づき、自分の設定に取り込みます。"
     ],
@@ -1470,7 +1470,7 @@
     "command": "kubectl create serviceaccount",
     "tool": "kubectl",
     "summary": "ServiceAccount (Pod の中のプログラムの身元) を作ります。",
-    "detail": "作っただけでは、ほとんど何もできません。RoleBinding などで権限を結び付けて使います。serviceaccount は sa と短く書けます。",
+    "detail": "RBAC を使うクラスタでは、作っただけではほとんど何もできません。RoleBinding などで権限を結び付けて使います。serviceaccount は sa と短く書けます。",
     "usage": "kubectl create serviceaccount <名前> [オプション]",
     "flags": [
       {
@@ -1484,7 +1484,7 @@
     "inside": [
       "kubectl が、名前だけを書いた ServiceAccount を手元で組み立て、API サーバーに POST で送ります。",
       "Pod の serviceAccountName にこの名前を書くと、Pod の中のプログラムは、この身元のトークンで API サーバーに話しかけられます。",
-      "権限を調べるときの名前は system:serviceaccount:<名前空間>:<名前> の形です。"
+      "API サーバーから見たユーザー名は system:serviceaccount:<名前空間>:<名前> の形です。"
     ],
     "api": [
       {
@@ -1505,6 +1505,10 @@
       {
         "label": "Kubernetes: Service Accounts",
         "url": "https://kubernetes.io/docs/concepts/security/service-accounts/"
+      },
+      {
+        "label": "Kubernetes: Using RBAC Authorization",
+        "url": "https://kubernetes.io/docs/reference/access-authn-authz/rbac/"
       }
     ],
     "usedIn": [
@@ -1552,7 +1556,7 @@
     "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_patch/",
     "inside": [
       "kubectl が、-p に書いた内容を JSON にして、PATCH で API サーバーに送ります。",
-      "API サーバーが今の中身に重ねます。書いた項目だけが変わり、書かなかった項目はそのままです。",
+      "strategic と merge では、API サーバーが今の中身に重ねます。書いた項目だけが変わり、書かなかった項目はそのままです。",
       "一覧 (配列) の重ね方は --type と項目で変わります。strategic では、コンテナのように名前で合わせる一覧があります。"
     ],
     "api": [
@@ -1587,7 +1591,7 @@
     "id": "base64",
     "command": "base64",
     "tool": "Linux",
-    "summary": "データを、英数字だけの文字に置き換えます (戻すこともできます)。",
+    "summary": "データを、英数字と + / = の文字だけに置き換えます (戻すこともできます)。",
     "detail": "暗号ではありません。だれでも戻せるので、秘密を守る力はありません。Secret の data の値は、この形で書かれています。",
     "usage": "base64 [オプション] [ファイル]",
     "flags": [
@@ -1645,7 +1649,7 @@
     "inside": [
       "sleep は、カーネルに「この時間だけ起こさないで」と頼みます。待っている間、CPU はほとんど使いません。",
       "時間が来ると、何も出さずに終わります。Ctrl+C を押すと、待つのをやめます。",
-      "数の後ろに m (分) や h (時間) も付けられます (GNU と uutils の sleep)。コンテナの中で sleep 3600 と書くのは、コンテナをすぐに終わらせないためです。"
+      "数の後ろに m (分) や h (時間) も付けられます (GNU・uutils・BusyBox の sleep)。コンテナの中で sleep 3600 と書くのは、コンテナをすぐに終わらせないためです。"
     ],
     "api": [],
     "examples": [
@@ -1656,7 +1660,12 @@
         "note": "time は、かかった時間を出すシェルの命令です。real が実際の時間、user と sys が CPU を使った時間で、ほとんど使っていません。"
       }
     ],
-    "sources": [],
+    "sources": [
+      {
+        "label": "BusyBox の sleep",
+        "url": "https://busybox.net/downloads/BusyBox.html"
+      }
+    ],
     "usedIn": [
       {
         "topic": "troubleshooting",
