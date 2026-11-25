@@ -22,14 +22,14 @@ import { MEANINGS, Prose, TERM_NAMES } from '../components/TermProse';
 import TermTipArea from '../components/TermTip';
 import { dueReviewCount } from '../content';
 import { chapterNo } from '../content/coveredLabs';
-import { HANDS_ON_TITLE } from '../content/handsOn';
-import { HANDS_ON_CHAPTERS } from '../content/handsOnChapters';
-import type { HandsOnChapter as Chapter, HandsOnOs, HandsOnStep } from '../content/types';
+import { HANDS_ON, HANDS_ON_TITLE } from '../content/handsOn';
+import { isChapter, loadChapter, loadedChapter } from '../content/handsOnChapters';
+import type { HandsOnChapter as Chapter, HandsOnMeta, HandsOnOs, HandsOnStep } from '../content/types';
 import { handsOnStepText } from '../lib/askAi';
 import { XP_PER_LAB } from '../lib/grade';
 import { OS_CHOICES, OS_LABEL, WHERE_LABEL, canComplete, handsOnOs, markedCount, stepsFor } from '../lib/handsOn';
 import { completeHandsOn, goalXp, markHandsOnStep, restartHandsOn, setProfile, todayXp, type Progress } from '../lib/progress';
-import { handbookHref, handsOnHref } from '../lib/route';
+import { handbookHref, handsOnHref, type Route } from '../lib/route';
 import { SITE_NAME } from '../lib/site';
 import { makeTermLinker, type TermPiece } from '../lib/termLinks';
 import { WIDE_QUERY, useMediaQuery } from '../lib/useMediaQuery';
@@ -117,7 +117,7 @@ function StepBody({ step, text, why, ask }: { step: HandsOnStep; text: TermPiece
   );
 }
 
-export function ChapterView({ chapter: c, chapters, progress, updateProgress }: { chapter: Chapter; chapters: Chapter[]; progress: Progress; updateProgress: Update }) {
+export function ChapterView({ chapter: c, chapters, progress, updateProgress }: { chapter: Chapter; chapters: Pick<HandsOnMeta, 'id' | 'title'>[]; progress: Progress; updateProgress: Update }) {
   const os = handsOnOs(progress);
   const rec = progress.handsOn?.[c.id];
   const hasOs = [...c.steps, ...c.cleanup].some((s) => s.os);
@@ -346,11 +346,16 @@ export function ChapterView({ chapter: c, chapters, progress, updateProgress }: 
   );
 }
 
+/** 開いた章の本文を読み終えているか (知らない id は、読むものが無いので描ける)。src/lib/screens.ts が描く前に見る */
+export const isReady = (route: Route) => route.name !== 'handsOnChapter' || !isChapter(route.chapterId) || loadedChapter(route.chapterId) !== undefined;
+/** 開いた章の本文を読む */
+export const prepare = async (route: Route) => (route.name === 'handsOnChapter' ? loadChapter(route.chapterId) : undefined);
+
 export default function HandsOnChapter({ chapterId, progress, updateProgress }: { chapterId: string; progress: Progress; updateProgress: Update }) {
   const isWide = useMediaQuery(WIDE_QUERY);
-  const chapter = HANDS_ON_CHAPTERS.find((c) => c.id === chapterId);
+  const chapter = loadedChapter(chapterId);
   const body = chapter ? (
-    <ChapterView chapter={chapter} chapters={HANDS_ON_CHAPTERS} progress={progress} updateProgress={updateProgress} />
+    <ChapterView chapter={chapter} chapters={HANDS_ON} progress={progress} updateProgress={updateProgress} />
   ) : (
     <div className="hb">
       <h1 className="week-title">見つかりませんでした</h1>
