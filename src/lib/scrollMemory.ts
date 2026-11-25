@@ -47,7 +47,8 @@ export const isFreshVisit = () => lastFresh;
 
 /** 今のページの位置を覚える。ページを離れる直前 (前の画面がまだあるうち) と、閉じる・再読み込みの前に呼ぶ */
 export function savePosition() {
-  if (!current) return;
+  // 読んでいる間は、前のページの画面が出たまま履歴だけが進んでいる。その位置を新しいページの位置として覚えない
+  if (!current || document.documentElement.dataset.loading) return;
   positions.set(current, scroller().scrollTop);
   writeStore();
 }
