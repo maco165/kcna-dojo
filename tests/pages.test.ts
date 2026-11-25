@@ -134,7 +134,7 @@ describe('構造化データとパンくず', { timeout: 30_000 }, () => {
     expect([...l2.doc.querySelectorAll('#root nav a')].map((a) => a.getAttribute('href'))).toEqual(['/kcna-dojo/', '/kcna-dojo/week/2/']);
   });
   /** 章が覆った実習の週は、実習でなく章へ送る */
-  const WEEK_LINKS: Record<number, string[]> = { 1: ['hands-on/vm-setup/', 'hands-on/run-containers/'], 2: ['hands-on/vm-setup/', 'hands-on/install-k3s/', 'hands-on/self-healing/'] };
+  const WEEK_LINKS: Record<number, string[]> = { 1: ['hands-on/vm-setup/', 'hands-on/run-containers/'], 2: ['hands-on/vm-setup/', 'hands-on/install-k3s/', 'hands-on/self-healing/'], 4: ['hands-on/vm-setup/', 'hands-on/scaling/'] };
   it('実習のパンくずは実践の下。週のページには問題演習だけを並べ、実習 (覆われていれば章) は実践へのリンクにする', () => {
     for (let w = 1; w <= 8; w++) {
       const lab = docs.find((d) => d.page.path === `lesson/w${w}-lab/`)!;
