@@ -162,11 +162,16 @@ async function checkChapterPage(page, width, tag, c, flow) {
   check(focused === 'ho-steps' && (await page.getByRole('checkbox', { checked: true }).count()) === 0, `${tag} 印を消すと、手順の見出しにフォーカスが移る (${focused})`);
 }
 
-/** 章だけにある文 (ほかの章には無く、軽い一覧にも入らない文。チャンクの中でも書き方の変わらない、引用符と改行の無いもの。コマンドはほかのデータにもあるので、日本語の文だけ) */
+/** 章だけにある文 (ほかの章にも、章以外のデータ (旧い実習など) にも無く、軽い一覧にも入らない文。チャンクの中でも書き方の変わらない、引用符と改行の無いもの。コマンドはほかのデータにもあるので、日本語の文だけ) */
 const chapterTexts = (v) => (typeof v === 'string' ? [v] : v && typeof v === 'object' ? Object.values(v).flatMap(chapterTexts) : []);
+const CONTENT_DIR = new URL('../src/content/', import.meta.url);
+const otherData = readdirSync(CONTENT_DIR, { recursive: true })
+  .filter((f) => f.endsWith('.json') && !f.startsWith('hands-on'))
+  .map((f) => readFileSync(new URL(f, CONTENT_DIR), 'utf8'))
+  .join('\n');
 const ownTexts = (c) => {
   const others = new Set(chapters.filter((x) => x.id !== c.id).flatMap(chapterTexts));
-  return [...new Set(chapterTexts([c.steps, c.cleanup, c.challenges, c.goal]))].filter((t) => t.length >= 30 && /[ぁ-ん]/.test(t) && !/["'\\\n`]|https?:/.test(t) && !others.has(t));
+  return [...new Set(chapterTexts([c.steps, c.cleanup, c.challenges, c.goal]))].filter((t) => t.length >= 30 && /[ぁ-ん]/.test(t) && !/["'\\\n`]|https?:/.test(t) && !others.has(t) && !otherData.includes(t));
 };
 
 /**
