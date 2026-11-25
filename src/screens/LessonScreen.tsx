@@ -263,7 +263,7 @@ function LabRun({ lesson, week, progress, updateProgress }: Props & { lesson: La
               {covered.chapters.map((c, i) => (
                 <Fragment key={c.id}>
                   {i > 0 && '、'}
-                  <a href={handsOnHref(c.id)}>{`${c.order} 章「${c.title}」`}</a>
+                  <Link href={handsOnHref(c.id)}>{`${c.order} 章「${c.title}」`}</Link>
                 </Fragment>
               ))}
             </p>
