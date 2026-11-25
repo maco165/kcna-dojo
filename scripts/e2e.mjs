@@ -116,9 +116,9 @@ function checkSpeedBuild() {
 
 /**
  * 実践の章の画面: OS を選ぶと手順が替わり、印は開き直しても残り、その OS の手順に全部印を付けると完了にできる。
- * 書き出した HTML には全部の OS の手順がある
+ * 書き出した HTML には全部の OS の手順がある。手順の出し分けと横はみ出しは全部の章、印と完了の流れ (flow) は最初の章だけ
  */
-async function checkChapterPage(page, width, tag, c) {
+async function checkChapterPage(page, width, tag, c, flow) {
   await page.goto(`${BASE}hands-on/${c.id}/`);
   await page.getByRole('heading', { name: '手順', exact: true }).waitFor();
   await page.waitForFunction(() => !document.querySelector('#root > main.prerender'));
@@ -128,13 +128,15 @@ async function checkChapterPage(page, width, tag, c) {
     if (hasOs) await page.getByRole('radio', { name: label }).click();
     const mine = c.steps.filter((s) => !s.os || s.os === os);
     check((await page.getByRole('checkbox').count()) === mine.length, `${tag} 章の ${label} の手順は ${mine.length}`);
-    await noHorizontalOverflow(page, width, `${tag} 章 ${label}`);
+    await noHorizontalOverflow(page, width, `${tag} 章 ${c.id} ${label}`);
   }
   if (width < 768) {
     await page.setViewportSize({ width: 320, height: 844 });
-    await noHorizontalOverflow(page, 320, `${tag} 章 320`);
+    await noHorizontalOverflow(page, 320, `${tag} 章 ${c.id} 320`);
     await page.setViewportSize({ width, height: 844 });
   }
+  await checkChapterText(page, tag, c);
+  if (!flow) return;
   const finish = page.getByRole('button', { name: /^完了にする/ });
   check(await finish.isDisabled(), `${tag} 章は印を付けるまで完了にできない`);
   await page.getByRole('checkbox').first().check();
@@ -147,6 +149,14 @@ async function checkChapterPage(page, width, tag, c) {
   await finish.click();
   await page.getByText(/^完了しました/).waitFor();
   check((await xp()) === before + 10, `${tag} 章を完了すると 10 XP`);
+  // 二度押しで印が消えないよう、もう一度やるのは別のボタンで、確かめてから
+  await page.getByRole('button', { name: '印を消してもう一度やる' }).click();
+  await page.getByRole('button', { name: 'やめる' }).click();
+  check((await page.getByRole('checkbox', { checked: true }).count()) === (await page.getByRole('checkbox').count()), `${tag} 章の印は、確かめるまで消えない`);
+}
+
+/** 章の本文の幅・書き出した HTML・最初に読まないこと */
+async function checkChapterText(page, tag, c) {
   const wide = await page.evaluate(() => [...document.querySelectorAll('.hb-step__text, .ho-note, .ho-more, .hb-lead')].filter((e) => e.getBoundingClientRect().width > parseFloat(getComputedStyle(e).fontSize) * 40 + 1).length);
   check(wide === 0, `${tag} 章の本文は 1 行 40 字まで (${wide})`);
   const html = await (await fetch(`${BASE}hands-on/${c.id}/`)).text();
@@ -555,7 +565,7 @@ async function run(browser, name, width, height) {
   await page.goto(`${BASE}hands-on/no-such-chapter/`);
   await page.getByRole('heading', { name: '見つかりませんでした' }).waitFor();
   check(true, `${tag} 無い章を開いても壊れない`);
-  if (chapters.length > 0) await checkChapterPage(page, width, tag, chapters[0]);
+  for (const [i, c] of chapters.entries()) await checkChapterPage(page, width, tag, c, i === 0);
 
   // 9. このサイトについて と リポジトリへのリンク
   await page.goto(BASE);
@@ -1435,7 +1445,7 @@ async function run(browser, name, width, height) {
   }
 
   // 描画後の h1 は、書き出した HTML の h1 と同じ (ホームはサイト名、週は「第 n 週 …」、レッスンはレッスン名、用語のページは語の名前)。h1 は 1 つだけ
-  for (const p of ['', 'week/1/', 'week/2/', 'lesson/w2-l1/', 'glossary/etcd/', 'hands-on/', ...chapters.slice(0, 1).map((c) => `hands-on/${c.id}/`)]) {
+  for (const p of ['', 'week/1/', 'week/2/', 'lesson/w2-l1/', 'glossary/etcd/', 'hands-on/', ...chapters.map((c) => `hands-on/${c.id}/`)]) {
     const html = await (await fetch(`${BASE}${p}`)).text();
     const written = html.match(/<h1>([^<]*)<\/h1>/)?.[1].replace(/&amp;/g, '&') ?? '(無し)';
     await page.goto(`${BASE}${p}`);
