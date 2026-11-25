@@ -3345,3 +3345,8 @@ html[data-loading='true'] body::before {
 .ho-trouble dd {
   white-space: pre-wrap;
 }
+
+/* 結果の画面の、覆った実習の章へのリンク */
+.result__note {
+  padding: var(--spacing-4);
+}

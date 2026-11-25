@@ -250,7 +250,7 @@ function LabRun({ lesson, week, progress, updateProgress }: Props & { lesson: La
         ]}
         progress={progress}
         rows={[]}
-        note={<CoveredNote labId={lesson.id} />}
+        note={chaptersOfLab(lesson.id).length > 0 && <CoveredNote labId={lesson.id} />}
         share={{ text: lessonShareText(total, total).replace('問正解', '手順'), url: shareUrl(lessonHref(lesson.id)) }}
       />
     );
@@ -415,7 +415,7 @@ function ResultView({
         </>
       )}
 
-      {note}
+      {note && <div className="result__note">{note}</div>}
 
       <div className="result__actions">
         {share && (
