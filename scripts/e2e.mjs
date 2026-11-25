@@ -1224,7 +1224,7 @@ async function run(browser, name, width, height) {
     // スマホでは全部のページの横のはみ出しを見る (長い API のパスなど、ページごとに中身が違うため)
     if (width < 768) {
       const ids = readdirSync(new URL('../src/content/commandPages/', import.meta.url)).flatMap((f) => JSON.parse(readFileSync(new URL(`../src/content/commandPages/${f}`, import.meta.url), 'utf8')).map((p) => p.id));
-      ids.push(...JSON.parse(readFileSync(new URL('../src/content/setupCommands.json', import.meta.url), 'utf8')).map((p) => p.id));
+      ids.push(...JSON.parse(readFileSync(new URL('../src/content/handbookCommands.json', import.meta.url), 'utf8')).map((p) => p.id));
       const wide = [];
       for (const id of ids) {
         await page.goto(`${BASE}commands/${id}/`);

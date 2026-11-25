@@ -2384,6 +2384,10 @@ body {
   color: var(--color-text-secondary);
 }
 
+.hb-lines > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
 .hb a.hb-cmd {
   color: var(--color-text-blue);
   text-decoration: underline dotted;
