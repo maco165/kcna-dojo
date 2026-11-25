@@ -630,7 +630,7 @@
     "flags": [],
     "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_config/kubectl_config_get-contexts/",
     "inside": [
-      "kubectl が、手元の kubeconfig のファイルを読みます。KUBECONFIG があればそのファイル、無ければ ~/.kube/config です。",
+      "kubectl が、手元の kubeconfig のファイルを読みます。KUBECONFIG (複数なら合わせたもの) か --kubeconfig があればそのファイル、無ければ ~/.kube/config です。k3s に付いてくる kubectl は、代わりに /etc/rancher/k3s/k3s.yaml を読もうとします。",
       "contexts の一覧を表にして出します。API サーバーには聞かないので、クラスタが止まっていても出ます。"
     ],
     "api": [],
@@ -646,6 +646,10 @@
       {
         "label": "Kubernetes: kubeconfig によるクラスターアクセスの設定",
         "url": "https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/"
+      },
+      {
+        "label": "K3s: CLI Tools (kubectl)",
+        "url": "https://docs.k3s.io/cli"
       }
     ],
     "usedIn": [
@@ -693,7 +697,7 @@
     "id": "kubectl-config-set-context",
     "command": "kubectl config set-context",
     "tool": "kubectl",
-    "summary": "コンテキストの中身 (名前空間など) を書き換えます。",
+    "summary": "コンテキストの中身 (名前空間など) を書き換えます (無ければ作ります)。",
     "detail": "--current を付けると今のコンテキストを変えます。--namespace を決めておくと、そのあと -n を書かなくても、その名前空間を見ます。",
     "usage": "kubectl config set-context (<名前> | --current) [オプション]",
     "flags": [
@@ -754,7 +758,7 @@
     "command": "kubectl config view",
     "tool": "kubectl",
     "summary": "kubeconfig の中身を出します。",
-    "detail": "証明書やトークンなどの秘密は隠して出ます。--minify を付けると、今のコンテキストで使うところだけになります。",
+    "detail": "トークン・パスワード・秘密鍵などの値は隠して出ます (--raw と --flatten を付けると隠れません)。人に見せる前に、残っている秘密が無いか確かめます。--minify を付けると、今のコンテキストで使うところだけになります。",
     "usage": "kubectl config view [オプション]",
     "flags": [
       {
@@ -829,7 +833,7 @@
     "inside": [
       "kubectl が、--hard の並びから ResourceQuota を手元で組み立て、API サーバーに POST で送ります。",
       "保存されたあと、コントローラーが今の使用量を数えて status に書きます。",
-      "名前空間に Pod などを作る要求が来るたびに、API サーバーの中の検査 (ResourceQuota のアドミッション) が上限と比べ、超えるなら 403 で断ります。"
+      "名前空間に Pod などを作る要求が来るたびに、API サーバーの中の検査 (ResourceQuota のアドミッション) が上限と比べ、超えるなら 403 で断ります。Deployment なら、Deployment は作れて、Pod を作るところで断られます (イベントの FailedCreate)。cpu や memory の上限を付けると、requests などを書かない Pod も断られます。すでにある Pod は消えません。"
     ],
     "api": [
       {
@@ -864,7 +868,7 @@
     "command": "kubectl set resources",
     "tool": "kubectl",
     "summary": "Deployment などのコンテナの requests と limits を書き換えます。",
-    "detail": "requests は「確保してほしい量」、limits は「使ってよい上限」です。Deployment では Pod のひな形が変わるので、Pod が入れ替わります。",
+    "detail": "コンテナを選ばなければ、全部のコンテナが変わります。requests は「確保してほしい量」、limits は「使ってよい上限」です。Deployment では Pod のひな形が変わるので、Pod が入れ替わります。",
     "usage": "kubectl set resources (<種類> <名前> | -f <ファイル>) [--requests=...] [--limits=...]",
     "flags": [
       {
@@ -990,7 +994,7 @@
     "id": "k3s-crictl-pods",
     "command": "k3s crictl pods",
     "tool": "k3s",
-    "summary": "そのノードで動いている Pod を、コンテナランタイムに聞いて一覧します。",
+    "summary": "そのノードにある Pod を、状態 (STATE) も付けて、コンテナランタイムに聞いて一覧します。",
     "detail": "kubectl と違い、API サーバーを通さずにノードの中を直接見ます。API サーバーがつながらないときの調べものにも使えます。root の権限が要ります。",
     "usage": "k3s crictl pods [オプション]",
     "flags": [
