@@ -1,6 +1,6 @@
 // コマンドのページ (/commands/ と /commands/<id>/)。問題に出てくるコマンドごとに、何をするか・書き方・オプション・
 // 中で何が起きるか・API の要求・実行の例・-v で見える要求・実装の抜粋・出てくる問題・公式リファレンスを出す
-import { useMemo } from 'react';
+import { Fragment, useMemo } from 'react';
 import Crumbs from '../components/Crumbs';
 import { AppShell } from '@astryxdesign/core/AppShell';
 import { CodeBlock } from '@astryxdesign/core/CodeBlock';
@@ -39,7 +39,7 @@ function Index() {
         <Crumbs items={[{ name: 'コマンド' }]} />
         <h1 className="week-title">コマンド</h1>
         <p className="hb-lead">
-          問題と、ハンドブックの k3s の入れ方に出てくるコマンドごとに、何をするか・書き方・オプションに加えて、打ってから結果が出るまでに中で何が起きるか (どの API の要求になり、どの部品が動くか) を、実際のコード (実行の例と出力・kubectl -v で見える要求・実装のソースの該当箇所) と一緒に説明します。中身は公式のリファレンスと実装で確かめ、出典を付けています。
+          問題とハンドブックに出てくるコマンドごとに、何をするか・書き方・オプションに加えて、打ってから結果が出るまでに中で何が起きるか (どの API の要求になり、どの部品が動くか) を、実際のコード (実行の例と出力・kubectl -v で見える要求・実装のソースの該当箇所) と一緒に説明します。中身は公式のリファレンスと実装で確かめ、出典を付けています。
         </p>
         <p className="hb-lead hb-muted">
           kubectl が API サーバーへ要求を送る流れの全体は、<a href={handbookHref('kubectl-internals')}>ハンドブックの「kubectl の中身」</a>にあります。
@@ -173,9 +173,16 @@ function Page({ p }: { p: CommandPage }) {
         </section>
       )}
 
-      {p.setup && (
+      {p.usedIn && (
         <p className="hb-muted">
-          ハンドブックの<a href={handbookHref('setup-k3s')}>「k3s の入れ方」</a>の手順で使います。
+          ハンドブックの
+          {p.usedIn.map((u, i) => (
+            <Fragment key={u.topic}>
+              {i > 0 && '・'}
+              <a href={handbookHref(u.topic)}>{u.label}</a>
+            </Fragment>
+          ))}
+          で使います。
         </p>
       )}
       {lessons.length > 0 && (
