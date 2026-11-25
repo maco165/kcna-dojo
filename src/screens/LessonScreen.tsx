@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '@astryxdesign/core/Button';
 import { CheckboxList, CheckboxListItem } from '@astryxdesign/core/CheckboxList';
 import { Link } from '@astryxdesign/core/Link';
@@ -12,7 +12,7 @@ import { AskAiLinks } from '../components/AskAi';
 import ChoiceQuestionView from '../components/ChoiceQuestionView';
 import FillQuestionView from '../components/FillQuestionView';
 import { ActionArea, PrimaryAction, QuestionHead, QuestionHeadingLevel } from '../components/QuestionFrame';
-import type { LabLesson, Lesson, Question, QuizLesson } from '../content/types';
+import type { HandsOnMeta, LabLesson, Lesson, Question, QuizLesson } from '../content/types';
 import { labStepText } from '../lib/askAi';
 import { XP_PER_CORRECT, XP_PER_LAB } from '../lib/grade';
 import { answerHistory, completeLesson, currentStreak, goalXp, recordAnswer, todayXp, type Progress } from '../lib/progress';
@@ -213,6 +213,18 @@ function LabRun({ lesson, week, progress, updateProgress }: Props & { lesson: La
   const total = lesson.steps.length;
   const allDone = checked.length === total;
   const read = WEEKS.find((w) => w.week === week)?.read ?? [];
+  // 覆った章の一覧は開いてから読む (静的に読むと rolldown が本体を切り直し、最初に読む JS が 13 → 14 本に増えたため)
+  const [covered, setCovered] = useState<{ lead: string; chapters: HandsOnMeta[] }>({ lead: '', chapters: [] });
+  useEffect(() => {
+    let alive = true;
+    import('../content/handsOn').then(
+      (m) => alive && setCovered({ lead: m.COVERED_LEAD, chapters: m.chaptersOfLab(lesson.id) }),
+      () => {},
+    );
+    return () => {
+      alive = false;
+    };
+  }, [lesson.id]);
 
   const finish = () => {
     updateProgress((p) => completeLesson(p, lesson.id, { correct: 1, total: 1 }, XP_PER_LAB, new Date()));
@@ -245,6 +257,17 @@ function LabRun({ lesson, week, progress, updateProgress }: Props & { lesson: La
           <QuestionHeadingLevel.Provider value={2}>
             <QuestionHead kind="実習 · 家のクラスタ (k3s) で動かす" domain={lesson.domain} prompt={lesson.title} />
           </QuestionHeadingLevel.Provider>
+          {covered.chapters.length > 0 && (
+            <p className="hb-lead">
+              {covered.lead}{' '}
+              {covered.chapters.map((c, i) => (
+                <Fragment key={c.id}>
+                  {i > 0 && '、'}
+                  <a href={handsOnHref(c.id)}>{`${c.order} 章「${c.title}」`}</a>
+                </Fragment>
+              ))}
+            </p>
+          )}
           <section className="lab-prep" aria-labelledby="lab-prep-title">
             <h2 id="lab-prep-title" className="h-sm">
               始める前に

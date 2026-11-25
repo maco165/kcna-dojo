@@ -17,7 +17,7 @@ import { useMemo, useState } from 'react';
 import SummaryCard from '../components/SummaryCard';
 import { masteryByDomain } from '../lib/mastery';
 import { WEEKS } from '../content/curriculum';
-import { HANDS_ON } from '../content/handsOn';
+import { HANDS_ON, isListedLab } from '../content/handsOn';
 import { doneChapters } from '../lib/handsOn';
 import { DOMAINS, domainAccuracy, doneLessons, exercisesOf, labsOf, planStatus, weeklyXp } from '../lib/lessonStatus';
 import { FREEZE_EVERY, MAX_FREEZES, currentStreak, daysToExam, freezeStatus, freezeText, type Progress } from '../lib/progress';
@@ -37,7 +37,7 @@ function Body({ progress }: { progress: Progress }) {
   const due = dueReviewCount(progress, now);
   const freeze = freezeStatus(progress, now);
   const mastery = useMemo(() => masteryByDomain(progress), [progress]);
-  const labs = WEEKS.flatMap(labsOf);
+  const labs = WEEKS.flatMap(labsOf).filter(isListedLab);
   const planText =
     plan.expected === 0 ? 'これから' : plan.done >= plan.expected ? '予定どおり' : `${plan.expected - plan.done} レッスン遅れ`;
   const dayName = (day: string, isToday: boolean) => {
