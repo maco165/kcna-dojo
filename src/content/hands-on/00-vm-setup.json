@@ -13,7 +13,8 @@
   "minutes": 60,
   "needs": [
     "Windows 10 (1809 以降) か 11 の Home・Pro、macOS 14 以降の Mac、または snap の使える Linux",
-    "メモリ 8 GB 以上の PC (仮想マシンに 2 GB を分けます) と、ディスクの空き 20 GB 以上",
+    "メモリ 8 GB 以上の PC (仮想マシンに 2 GB を分けます)",
+    "ディスクの空き 20 GB と、それに加えて控えの分の余裕 (控えのあとに変わった分だけ、別に場所を使います)",
     "インターネットへの接続と、PC の管理者の権限",
     "出力について: 「仮想マシンの中」の出力は、2026-11-25 に Linux の QEMU の上で、Ubuntu 24.04 の公式のクラウドイメージ (x86_64・2 コア・2 GB・20 GB) を動かして取りました。Multipass を打つ手順は実機で確かめていないので、出力を載せていません。"
   ],
@@ -35,25 +36,25 @@
     },
     {
       "id": "open-terminal-windows",
-      "text": "端末を開きます。スタート メニューで PowerShell と打ち、Windows PowerShell を選びます。コマンドは 1 行ずつ写し、Enter キーを押します。",
+      "text": "端末を開きます。スタート メニューで PowerShell と打ち、Windows PowerShell を選びます。コマンドは 1 行ずつコピーし、Ctrl+V キーか右クリックで貼り付け、Enter キーを押します。端末では、Ctrl キーを押しながら C を押すのは「コピー」ではなく「動いているコマンドを止める」合図です。",
       "why": "この章では、文字のコマンドで進めるためです。管理者として開くのは、そう書いてある手順だけです。",
       "os": "windows"
     },
     {
       "id": "open-terminal-mac",
-      "text": "端末を開きます。command キーを押しながらスペースキーを押し、「ターミナル」と打って Enter キーを押します。コマンドは 1 行ずつ写し、Enter キーを押します。",
+      "text": "端末を開きます。command キーを押しながらスペースキーを押し、「ターミナル」と打って Enter キーを押します。コマンドは 1 行ずつコピーし、command+V キーで貼り付け、Enter キーを押します。端末では、Ctrl キーを押しながら C を押すのは「コピー」ではなく「動いているコマンドを止める」合図です。",
       "why": "この章では、文字のコマンドで進めるためです。",
       "os": "mac"
     },
     {
       "id": "open-terminal-linux",
-      "text": "端末を開きます。アプリの一覧から「端末」(Terminal) を選びます。コマンドは 1 行ずつ写し、Enter キーを押します。",
+      "text": "端末を開きます。アプリの一覧から「端末」(Terminal) を選びます。コマンドは 1 行ずつコピーし、Ctrl+Shift+V キーで貼り付け、Enter キーを押します。端末では、Ctrl キーを押しながら C を押すのは「コピー」ではなく「動いているコマンドを止める」合図です。",
       "why": "この章では、文字のコマンドで進めるためです。",
       "os": "linux"
     },
     {
       "id": "enable-vmp-windows",
-      "text": "PowerShell を右クリックし、「管理者として実行」で開きます。次のコマンドを打ち、終わったら Windows を再起動します。",
+      "text": "スタート メニューで PowerShell と打ち、出てきた Windows PowerShell を右クリックして「管理者として実行」を選びます。次のコマンドを打ち、終わったら Windows を再起動します。",
       "why": "仮想マシンを動かす Windows の機能 (Virtual Machine Platform) を有効にするためです。Multipass は Home・Pro・Enterprise のどれでも、この機能を使います。",
       "os": "windows",
       "where": "host",
@@ -73,7 +74,7 @@
         {
           "symptom": "エラー 740 が出る、または昇格が必要と出る",
           "check": "PowerShell の窓の題名に「管理者」とあるかを見る",
-          "fix": "窓を閉じ、右クリックから「管理者として実行」で開き直す"
+          "fix": "窓を閉じ、スタート メニューの Windows PowerShell を右クリックして「管理者として実行」で開き直す"
         },
         {
           "symptom": "再起動したあとも仮想マシンが作れない",
@@ -109,7 +110,7 @@
         },
         {
           "symptom": "インストールを始められない",
-          "check": "スタート メニューで winver と打ち、Windows 10 の 1809 より新しいか、Windows 11 かを見る",
+          "check": "スタート メニューで winver と打ち、Windows 10 の 1809 以降か、Windows 11 かを見る",
           "fix": "古ければ Windows を更新する"
         }
       ],
@@ -238,7 +239,7 @@
         }
       ],
       "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
-      "read": "Launched: kcna と出れば成功です。PC のメモリに余裕があれば、--memory は 4G にしてもかまいません。",
+      "read": "Launched: kcna で始まる行が出れば成功です。新しい版の Multipass では、後ろに in zone1 などが付きます。PC のメモリに余裕があれば、--memory は 4G にしてもかまいません。",
       "trouble": [
         {
           "symptom": "timed out と出て止まる",
@@ -249,6 +250,21 @@
           "symptom": "Downloaded image hash does not match と出る",
           "check": "同じ multipass launch をもう一度打ち、同じ文が出るかを見る",
           "fix": "multipass find --force-update で一覧を取り直してから、もう一度作る"
+        },
+        {
+          "symptom": "メモリが足りないと出る、または PC 全体がとても遅くなる",
+          "check": "空きを見る。Windows はタスク マネージャーの「パフォーマンス」の「メモリ」、Mac はアクティビティモニタの「メモリ」、Linux は free -h",
+          "fix": "ほかのアプリを閉じて空きを作る。メモリ 2G、2 コアより下げると次の章の k3s の最低に足りないので、下げない"
+        },
+        {
+          "symptom": "ディスクが足りないと出る",
+          "check": "空きを見る。Windows はエクスプローラーの「PC」、Mac は「システム設定」の「一般」の「ストレージ」、Linux は df -h",
+          "fix": "要らないファイルを消して空きを作り、もう一度作る"
+        },
+        {
+          "symptom": "仮想化が使えないと出る",
+          "check": "Windows はタスク マネージャーの「パフォーマンス」の「CPU」の「仮想化」、Linux は ls -l /dev/kvm を見る。Mac は「この Mac について」で macOS 14 以降かを見る",
+          "fix": "Windows と Linux は、PC の UEFI (BIOS) の設定で仮想化を有効にする。Windows は Virtual Machine Platform の手順も見直す。Mac は macOS を更新する"
         },
         {
           "symptom": "kcna がもうあると出る",
@@ -279,7 +295,7 @@
         }
       ],
       "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
-      "read": "kcna の行の State が Running、Release が Ubuntu 24.04 LTS なら思ったとおりです。IPv4 は仮想マシンの住所で、PC ごとに違います。",
+      "read": "kcna の行の State が Running、Release が Ubuntu 24.04 LTS なら思ったとおりです。IPv4 は仮想マシンの住所で、PC ごとに違います。新しい版の Multipass では、Zone の列も出ます。",
       "trouble": [
         {
           "symptom": "kcna の行が無い",
@@ -315,12 +331,12 @@
         {
           "symptom": "行の頭が変わらない",
           "check": "multipass list で、kcna が Running かを見る",
-          "fix": "multipass stop kcna、multipass start kcna の順に打ち、もう一度入る"
+          "fix": "Running なら multipass stop kcna で止め、もう一度 multipass shell kcna を打つ"
         },
         {
           "symptom": "時間切れで入れない",
           "check": "multipass list で IPv4 に住所が出ているかを見る",
-          "fix": "VPN とファイアウォールを確かめ、multipass stop kcna、multipass start kcna の順に打つ"
+          "fix": "VPN とファイアウォールを確かめる。Running なら multipass stop kcna で止め、もう一度 multipass shell kcna を打つ"
         }
       ],
       "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/shell/"
@@ -399,7 +415,7 @@
           "text": "自分のホーム (/home/ubuntu) へ戻る"
         }
       ],
-      "output": "total 4\n-rw-rw-r-- 1 ubuntu ubuntu 6 Nov 25 02:17 memo.txt\nhello",
+      "output": "total 4\n-rw-rw-r-- 1 ubuntu ubuntu 6 Nov 25 02:42 memo.txt\nhello",
       "read": "-rw で始まる行が memo.txt です。左から、権限・数・持ち主・グループ・大きさ・日時・名前です。total は、ディスクで使う量です。最後の行の hello がファイルの中身です。",
       "trouble": [
         {
@@ -471,7 +487,7 @@
         {
           "symptom": "Ubuntu 26.04 など、違う版が出る",
           "check": "exit で出て、multipass list の Release を見る",
-          "fix": "後片付けの「完全に消す」を行い、24.04 を付けて作り直す"
+          "fix": "exit で出てから、ホストで後片付けの「完全に消す」を行い、24.04 を付けて作り直す"
         },
         {
           "symptom": "grep: No such file or directory と出る",
@@ -504,18 +520,18 @@
           "text": "いちばん上のフォルダ / が載っているディスクの大きさと空きを出す"
         }
       ],
-      "output": "2\n               total        used        free      shared  buff/cache   available\nMem:           1.9Gi       367Mi       1.4Gi       1.0Mi       321Mi       1.6Gi\nSwap:             0B          0B          0B\nFilesystem      Size  Used Avail Use% Mounted on\n/dev/vda1        19G  1.7G   17G   9% /",
+      "output": "2\n               total        used        free      shared  buff/cache   available\nMem:           1.9Gi       333Mi       1.4Gi       1.0Mi       322Mi       1.6Gi\nSwap:             0B          0B          0B\nFilesystem      Size  Used Avail Use% Mounted on\n/dev/vda1        19G  1.7G   17G   9% /",
       "read": "コアは 2、Mem の total は 1.9Gi です。Linux のカーネルが使う分が引かれるので、2G と書いても少し小さく出ます。available が、これから使える量です。ディスクは Size が 20G より少し小さく、Avail の列が空きです。",
       "trouble": [
         {
           "symptom": "nproc が 1 になる",
           "check": "multipass launch に --cpus 2 を付けたかを見返す",
-          "fix": "後片付けの「完全に消す」を行い、作り直す"
+          "fix": "exit で出てから、ホストで後片付けの「完全に消す」を行い、作り直す"
         },
         {
           "symptom": "Mem の total が 1Gi より小さい",
           "check": "multipass launch に --memory 2G を付けたかを見返す",
-          "fix": "後片付けの「完全に消す」を行い、作り直す"
+          "fix": "exit で出てから、ホストで後片付けの「完全に消す」を行い、作り直す"
         }
       ],
       "source": "https://man7.org/linux/man-pages/man1/free.1.html"
@@ -543,7 +559,7 @@
           "text": "そのファイルを読もうとする"
         }
       ],
-      "output": "1000\n-rw-r----- 1 root shadow 842 Nov 25 02:16 /etc/shadow\ncat: /etc/shadow: Permission denied",
+      "output": "1000\n-rw-r----- 1 root shadow 842 Nov 25 02:41 /etc/shadow\ncat: /etc/shadow: Permission denied",
       "read": "自分の番号は 1000 です。-rw-r----- は、持ち主 (root) は読み書き、グループ (shadow) は読むだけ、ほかの人は何もできないという意味です。そのため Permission denied (許可が無い) と断られます。",
       "trouble": [
         {
@@ -584,7 +600,7 @@
         {
           "symptom": "パスワードを聞かれる",
           "check": "行の頭が ubuntu@kcna かを見る",
-          "fix": "Ctrl キーを押しながら C で止め、kcna の中に入ってから打つ"
+          "fix": "Ctrl キーを押しながら C で止め、ホストで multipass shell kcna を打って中に入ってから打つ"
         },
         {
           "symptom": "sudo: command not found のように出る",
@@ -609,13 +625,13 @@
           "text": "相手の返事の見出しだけを取る (-I)。途中の表示は出さない (-s)。| で次のコマンドに渡し、最初の 1 行だけを出す"
         }
       ],
-      "output": "HTTP/2 200 \r",
+      "output": "HTTP/2 200",
       "read": "HTTP/2 200 の 200 は「うまくいった」という返事です。| (パイプ) は、左の出力を右のコマンドへ渡します。",
       "trouble": [
         {
           "symptom": "何も出ない",
           "check": "curl -I https://get.k3s.io を打ち、-s で隠れていたエラーを見る",
-          "fix": "Could not resolve host なら名前を引けていない。VPN を切り、仮想マシンを止めて動かし直す"
+          "fix": "Could not resolve host なら名前を引けていない。VPN を切り、exit で出てから、ホストで multipass stop kcna を打ち、multipass shell kcna で入り直す"
         },
         {
           "symptom": "404 と出る",
@@ -646,7 +662,7 @@
         {
           "symptom": "本当の URL でも同じ文が出る",
           "check": "cat /etc/resolv.conf を打ち、nameserver の行があるかを見る",
-          "fix": "exit で出て、multipass stop kcna、multipass start kcna の順に打つ"
+          "fix": "exit で出て、ホストで multipass stop kcna を打ち、multipass shell kcna で入り直す"
         },
         {
           "symptom": "何も出ない",
@@ -690,7 +706,7 @@
     {
       "id": "stop",
       "text": "仮想マシンを止めます。",
-      "why": "控えは、止まっているときだけ取れるためです。止めても中身は消えません。",
+      "why": "控えは、止まっているときだけ取れるためです。止めるのは、動いている (Running) ときだけできます。止めても中身は消えません。",
       "where": "host",
       "code": {
         "language": "bash",
@@ -757,14 +773,14 @@
         {
           "symptom": "Mac で、控えに対応していないと出る",
           "check": "multipass get local.driver を打つ",
-          "fix": "applevz なら控えが使えない。qemu (Mac の既定) で作り直すと使える"
+          "fix": "applevz なら控えが使えない。multipass set local.driver=qemu で既定の qemu に替え、仮想マシンを作り直す。一覧はドライバごとに別なので、替えた直後は空から始まる。前の仮想マシンは消えておらず、applevz に戻すとまた見える。もう要らなければ、替える前に multipass delete --purge kcna で消す"
         }
       ],
       "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/snapshot/"
     },
     {
       "id": "break",
-      "text": "戻す練習のために、仮想マシンを動かしてファイルを 1 つ作ります。",
+      "text": "戻す練習のために、止まっている仮想マシンを動かして、ファイルを 1 つ作ります。",
       "why": "控えのあとに変えたものが、戻すと消えることを目で見るためです。",
       "where": "host",
       "code": {
@@ -774,7 +790,7 @@
       "lines": [
         {
           "code": "multipass start kcna",
-          "text": "kcna を動かす"
+          "text": "kcna を動かす。Stopped か Suspended のときだけ使える"
         },
         {
           "code": "multipass exec kcna -- touch /home/ubuntu/after.txt",
@@ -875,7 +891,7 @@
   "cleanup": [
     {
       "id": "rest",
-      "text": "今日はここまでにするときは、仮想マシンを止めます。",
+      "text": "今日はここまでにするときは、仮想マシンを止めます。中にいれば exit で出てから、ホストで打ちます。止まっていれば (Stopped)、打ちません。",
       "why": "動いている間は PC のメモリを使うためです。次の章でも使うので、消しません。",
       "where": "host",
       "code": {
@@ -889,7 +905,7 @@
         }
       ],
       "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
-      "read": "何もエラーが出なければ止まっています。続けるときは multipass start kcna で動かします。",
+      "read": "何もエラーが出なければ止まっています。続けるときは multipass shell kcna で、動かして中に入れます。",
       "trouble": [
         {
           "symptom": "止まったか分からない",
@@ -901,7 +917,7 @@
     },
     {
       "id": "delete",
-      "text": "実践の章を全部終えたときだけ、完全に消します。続きをするなら、打ちません。",
+      "text": "実践の章を全部終えたときだけ、完全に消します。続きをするなら、打ちません。中にいれば exit で出てから、ホストで打ちます。",
       "why": "ディスクを空けるためです。控えも一緒に消え、元に戻せません。",
       "where": "host",
       "code": {
@@ -937,20 +953,20 @@
   ],
   "challenges": [
     {
-      "task": "仮想マシンの中で practice というフォルダを作り、その中の name.txt に、マシンの名前を書いてください。",
+      "task": "仮想マシンの中で (ホストにいれば multipass shell kcna で入ってから)、practice というフォルダを作り、その中の name.txt に、マシンの名前を書いてください。",
       "hint": "hostname の出力を、> でファイルに書きます。",
       "answer": "mkdir practice\ncd practice\nhostname > name.txt\ncd ~",
       "verify": "cat ~/practice/name.txt を打ち、kcna と出れば正解です。"
     },
     {
-      "task": "管理者しか読めない /etc/sudoers の、行の数を数えてください。まず sudo なしで打ち、断られる文も読みます。",
+      "task": "仮想マシンの中で、管理者しか読めない /etc/sudoers の、行の数を数えてください。まず sudo なしで打ち、断られる文も読みます。",
       "hint": "行を数えるのは wc -l です。",
       "answer": "wc -l /etc/sudoers\nsudo wc -l /etc/sudoers",
       "verify": "1 つ目は Permission denied と出て、2 つ目は数と名前が出れば正解です。"
     },
     {
-      "task": "ホストで、控えの clean2 を取り、一覧に 2 つ並べてください (この課題は Multipass を使うため、実機で未確認です)。",
-      "hint": "控えは、止まっているときだけ取れます。",
+      "task": "exit で出てからホストで、控えの clean2 を取り、一覧に 2 つ並べてください。stop は、動いている (Running) ときだけ打ちます (この課題は Multipass を使うため、実機で未確認です)。",
+      "hint": "控えは、止まっているときだけ取れます。multipass list で State を見ます。",
       "answer": "multipass stop kcna\nmultipass snapshot --name clean2 kcna\nmultipass list --snapshots",
       "verify": "一覧に clean と clean2 が出れば正解です。"
     }
