@@ -12,8 +12,8 @@ import { Text } from '@astryxdesign/core/Text';
 import AppSideNav from '../components/AppSideNav';
 import { AskAiLinks } from '../components/AskAi';
 import BottomTabs from '../components/BottomTabs';
-import CommandLines from '../components/CommandLines';
 import Crumbs from '../components/Crumbs';
+import HandsOnLines from '../components/HandsOnLines';
 import LazyCodeBlock from '../components/LazyCodeBlock';
 import RepoLink from '../components/RepoLink';
 import SiteLogo from '../components/SiteLogo';
@@ -73,7 +73,7 @@ function StepBody({ step, text, why, ask }: { step: HandsOnStep; text: TermPiece
         </p>
       )}
       {step.code && <LazyCodeBlock code={step.code.text} language={step.code.language === 'text' ? 'plaintext' : step.code.language} title={step.code.title} hasCopyButton />}
-      {step.lines && <CommandLines lines={step.lines} isShell={step.code?.language === 'bash'} title={step.code?.language === 'bash' || step.code?.language === 'powershell' ? undefined : '1 行ずつの意味'} />}
+      {step.code && step.lines && <HandsOnLines language={step.code.language} lines={step.lines} />}
       {step.output && (
         <figure className="hb-output">
           <figcaption>実機の出力 (名前・時刻などは環境で変わります)</figcaption>

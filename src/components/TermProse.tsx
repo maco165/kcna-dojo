@@ -1,4 +1,4 @@
-// 本文の中の用語を用語集へのリンクにする部品と、吹き出しに出す意味 (ハンドブックと実践の章で共通)。用語集のデータを読むので、開いたときに読む画面だけが取り込む
+// 本文の中の用語を用語集へのリンクにする部品と、吹き出しに出す意味 (実践の章で使う。作りは Handbook.tsx の Prose と同じ)。用語集のデータを読むので、開いたときに読む画面だけが取り込む
 import { COMMAND_BRIEFS } from '../content/commandBriefs';
 import glossary from '../content/glossary.json';
 import type { GlossaryTerm } from '../lib/glossary';
