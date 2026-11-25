@@ -1,0 +1,2213 @@
+{
+  "id": "scaling",
+  "order": 4,
+  "title": "増やす、減らす",
+  "summary": "Pod の数を手で変え、置き場所が決まる理由を読み、使用量に合わせて自動で増減させます。ノードの空きの上限に当たったときの見え方まで動かします。",
+  "goal": "手・YAML・HPA の増減を使い分け、Pending の理由を読み、HPA が増やす・減らす時機を説明できる",
+  "features": [
+    "数の正はファイルか HPA のどちらかに決める",
+    "スケジューラーは requests・ラベル・taint・離す決まりを見て置く",
+    "HPA の使用率は requests に対する割合で、requests が無いと計算できない",
+    "減らすほうが遅いのは、安定化の窓があるため",
+    "増やしても、ノードの空きが無ければ Pending のまま"
+  ],
+  "minutes": 170,
+  "needs": [
+    "3 章を終えた仮想マシン kcna (k3s が動き、kubectl が使える)",
+    "インターネットへの接続 (イメージを取ってきます)",
+    "出力について: 「仮想マシンの中」の出力は、2026-11-25 に Linux の QEMU の上で、Ubuntu 24.04 の公式のクラウドイメージ (x86_64・2 コア・2 GB・20 GB) と k3s v1.36.6+k3s1 で取りました。Multipass を打つ手順は実機で確かめていないので、出力を載せていません。M 系の Mac でも手順は同じです。CPU の種類が出るところだけ arm64 か aarch64 になります。"
+  ],
+  "reads": [
+    {
+      "topic": "scheduling",
+      "label": "スケジューリング"
+    },
+    {
+      "topic": "cloud-native-principles",
+      "label": "オートスケール"
+    }
+  ],
+  "steps": [
+    {
+      "id": "enter",
+      "text": "3 章を終えた仮想マシンの中に入ります。ホストの端末で打ちます。",
+      "why": "この章のコマンドは、最初と最後のほかは全部、仮想マシンの中で打つためです。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass shell kcna"
+      },
+      "lines": [
+        {
+          "code": "multipass shell kcna",
+          "text": "kcna の中の端末を開く。止まっていれば、動かしてから開く"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "行の頭が ubuntu@kcna:~$ に変われば、中に入っています。",
+      "trouble": [
+        {
+          "symptom": "multipass: command not found、または「認識されません」と出る",
+          "check": "端末を閉じて開き直し、multipass version を打つ",
+          "fix": "開き直しても出るなら、Multipass を入れる手順をもう一度行う"
+        },
+        {
+          "symptom": "kcna が無いと出る",
+          "check": "multipass list で名前を見る",
+          "fix": "0 章から始める"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/shell/"
+    },
+    {
+      "id": "check-host",
+      "text": "仮想マシンの中で、どのマシンにいるかと、クラスターの様子を見ます。hostname が kcna でなければ、先へ進まず multipass shell kcna で入ります。枠は、迷ったら 1 行ずつ貼ります。sudo などのあとの行は、端末によって、まとめて貼ると消えることがあるためです (EOF で終わる書き込みの部分は、EOF まで続けて貼ります)。",
+      "why": "自分の PC の別のクラスターで打たないためです。この章では、ノードの設定も少しだけ変え、最後に戻します。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "hostname\nkubectl get nodes"
+      },
+      "lines": [
+        {
+          "code": "hostname",
+          "text": "このマシンの名前を出す"
+        },
+        {
+          "code": "kubectl get nodes",
+          "text": "ノードの一覧を出す"
+        }
+      ],
+      "output": "kcna\nNAME   STATUS   ROLES           AGE   VERSION\nkcna   Ready    control-plane   27m   v1.36.6+k3s1",
+      "read": "kcna と出て、ノードの STATUS が Ready なら進めます。VERSION が v1.36.6+k3s1 でない人は、出力の版を読み替えます。",
+      "trouble": [
+        {
+          "symptom": "kcna ではない名前が出る",
+          "check": "行の頭が ubuntu@kcna かを見る",
+          "fix": "ホストにいる。multipass shell kcna で入り、もう一度打つ"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        },
+        {
+          "symptom": "permission denied や localhost:8080 と出る",
+          "check": "echo $KUBECONFIG を打つ",
+          "fix": "空なら export KUBECONFIG=~/.kube/k3s.yaml を打つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/architecture/nodes/"
+    },
+    {
+      "id": "words",
+      "text": "同じ仕事をする Pod を増やしたり減らしたりすることを、スケール (増減) と呼びます。この章では、手で数を変える、置き場所が決まる仕組みを見る、使用量に合わせて自動で変える、の順に進めます。",
+      "why": "数を増やしても、置く場所 (ノードの空き) が無ければ動きません。増やす仕組みと、置く仕組みと、量を測る仕組みを、別々に見てからつなげます。",
+      "source": "https://kubernetes.io/docs/concepts/workloads/autoscaling/"
+    },
+    {
+      "id": "prepare",
+      "text": "作業のフォルダと、練習用の名前空間 ch4 を作ります。",
+      "why": "作るものを、まとめて片付けられるようにするためです。端末を開き直したときや再起動のあとは、cd ~/ch4 を打ちます。SVC_IP のような覚えた値は、端末を閉じると消えるので、それを決めた行も打ち直します。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "mkdir -p ~/ch4\ncd ~/ch4\nkubectl create namespace ch4\nkubectl wait --for=create serviceaccount/default -n ch4 --timeout=60s"
+      },
+      "lines": [
+        {
+          "code": "mkdir -p ~/ch4",
+          "text": "ch4 というフォルダを作る"
+        },
+        {
+          "code": "cd ~/ch4",
+          "text": "ch4 へ移る"
+        },
+        {
+          "code": "kubectl create namespace ch4",
+          "text": "名前空間 ch4 を作る"
+        },
+        {
+          "code": "kubectl wait --for=create serviceaccount/default -n ch4 --timeout=60s",
+          "text": "ch4 の準備ができるまで待つ"
+        }
+      ],
+      "output": "namespace/ch4 created\nserviceaccount/default condition met",
+      "read": "namespace/ch4 created と出れば進めます。",
+      "trouble": [
+        {
+          "symptom": "AlreadyExists と出る",
+          "check": "kubectl get namespaces を打つ",
+          "fix": "もうあるので、そのまま進む"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/"
+    },
+    {
+      "id": "deploy",
+      "text": "自分の名前を返す Web サーバーを 2 つ動かします。枠を、最後の行までまとめて貼り付けます。",
+      "why": "どの Pod が返事をしたかが分かるように、ページに Pod の名前を書きます。requests は、この章の主役です。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cat > web.yaml <<'EOF'\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web\nspec:\n  replicas: 2\n  selector:\n    matchLabels:\n      app: web\n  template:\n    metadata:\n      labels:\n        app: web\n    spec:\n      terminationGracePeriodSeconds: 5\n      containers:\n      - name: web\n        image: nginx:1.27-alpine\n        command: ['sh', '-c', 'hostname > /usr/share/nginx/html/index.html; exec nginx -g \"daemon off;\"']\n        resources:\n          requests:\n            cpu: 20m\n            memory: 16Mi\n        readinessProbe:\n          httpGet:\n            path: /\n            port: 80\n          periodSeconds: 2\nEOF\nkubectl apply -f web.yaml -n ch4\nkubectl rollout status deployment/web -n ch4 --timeout=180s\nkubectl get pods -n ch4 -o wide"
+      },
+      "lines": [
+        {
+          "code": "cat > web.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま web.yaml というファイルに書く"
+        },
+        {
+          "code": "apiVersion: apps/v1",
+          "text": "使う API の種類と版"
+        },
+        {
+          "code": "kind: Deployment",
+          "text": "作るものの種類"
+        },
+        {
+          "code": "metadata:",
+          "text": "見分けるための情報"
+        },
+        {
+          "code": "  name: web",
+          "text": "名前"
+        },
+        {
+          "code": "spec:",
+          "text": "ほしい中身"
+        },
+        {
+          "code": "  replicas: 2",
+          "text": "Pod の数"
+        },
+        {
+          "code": "  selector:",
+          "text": "自分の Pod の見分け方"
+        },
+        {
+          "code": "    matchLabels:",
+          "text": "次のラベルが付いたもの"
+        },
+        {
+          "code": "      app: web",
+          "text": "app が web"
+        },
+        {
+          "code": "  template:",
+          "text": "作る Pod のひな型"
+        },
+        {
+          "code": "    metadata:",
+          "text": "作る Pod の情報"
+        },
+        {
+          "code": "      labels:",
+          "text": "作る Pod に付けるラベル"
+        },
+        {
+          "code": "        app: web",
+          "text": "app を web にする"
+        },
+        {
+          "code": "    spec:",
+          "text": "作る Pod の中身"
+        },
+        {
+          "code": "      terminationGracePeriodSeconds: 5",
+          "text": "消すときに待つ秒数の上限"
+        },
+        {
+          "code": "      containers:",
+          "text": "コンテナの一覧"
+        },
+        {
+          "code": "      - name: web",
+          "text": "コンテナの名前"
+        },
+        {
+          "code": "        image: nginx:1.27-alpine",
+          "text": "使うイメージ"
+        },
+        {
+          "code": "        command: ['sh', '-c', 'hostname > /usr/share/nginx/html/index.html; exec nginx -g \"daemon off;\"']",
+          "text": "始めるコマンド。自分の Pod の名前をページに書いてから、nginx を始める"
+        },
+        {
+          "code": "        resources:",
+          "text": "使う量の決まり"
+        },
+        {
+          "code": "          requests:",
+          "text": "最低これだけ要る、という予約"
+        },
+        {
+          "code": "            cpu: 20m",
+          "text": "CPU は 0.02 コア"
+        },
+        {
+          "code": "            memory: 16Mi",
+          "text": "メモリは 16Mi"
+        },
+        {
+          "code": "        readinessProbe:",
+          "text": "仕事を受けられるかの検査"
+        },
+        {
+          "code": "          httpGet:",
+          "text": "Web の返事で見る"
+        },
+        {
+          "code": "            path: /",
+          "text": "取りに行くページ"
+        },
+        {
+          "code": "            port: 80",
+          "text": "番号"
+        },
+        {
+          "code": "          periodSeconds: 2",
+          "text": "2 秒おきに見る"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "kubectl apply -f web.yaml -n ch4",
+          "text": "Deployment を作る"
+        },
+        {
+          "code": "kubectl rollout status deployment/web -n ch4 --timeout=180s",
+          "text": "全部の Pod が使えるようになるまで待つ"
+        },
+        {
+          "code": "kubectl get pods -n ch4 -o wide",
+          "text": "一覧を、詳しい列まで出す"
+        }
+      ],
+      "output": "deployment.apps/web created\nWaiting for deployment \"web\" rollout to finish: 0 of 2 updated replicas are available...\nWaiting for deployment \"web\" rollout to finish: 1 of 2 updated replicas are available...\ndeployment \"web\" successfully rolled out\nNAME                   READY   STATUS    RESTARTS   AGE   IP           NODE   NOMINATED NODE   READINESS GATES\nweb-6d455b9f54-wfh6w   1/1     Running   0          2s    10.42.0.15   kcna   <none>           <none>\nweb-6d455b9f54-wg7jk   1/1     Running   0          2s    10.42.0.14   kcna   <none>           <none>",
+      "read": "2 つの Pod が 1/1 で、NODE はどちらも kcna です。ノードが 1 台なので、全部ここに置かれます。",
+      "trouble": [
+        {
+          "symptom": "toomanyrequests や 429 と出る",
+          "check": "kubectl describe の Events で、Failed to pull image の行の終わりを見る",
+          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る。短い「429 Too Many Requests」だけのときは、使いすぎを防ぐ別の上限なので、数分待ってからもう一度行う"
+        },
+        {
+          "symptom": "イメージが not found と出る",
+          "check": "Events で、イメージの名前と版 (: の後ろ) を見る",
+          "fix": "つづりが正しいなら、その版はもう配られていない。hub.docker.com でイメージのページを開き、同じ系統の新しい版に替える。この先の出力の版は、替えた版に読み替える"
+        },
+        {
+          "symptom": "CrashLoopBackOff になる",
+          "check": "kubectl logs -l app=web -n ch4 を打つ",
+          "fix": "command の行の引用符を直し、枠をコピーして貼り直す"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"
+    },
+    {
+      "id": "scale-hand",
+      "text": "手で 4 つに増やし、ファイルとのずれを見ます。",
+      "why": "急ぐときは、手で増やすのが早いためです。ただし、ファイルには 2 と書いたままです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl scale deployment web --replicas=4 -n ch4\nkubectl rollout status deployment/web -n ch4 --timeout=180s\nkubectl get deployment web -n ch4\nkubectl diff -f web.yaml -n ch4 | grep -E '^[-+] +replicas'"
+      },
+      "lines": [
+        {
+          "code": "kubectl scale deployment web --replicas=4 -n ch4",
+          "text": "数を 4 にする"
+        },
+        {
+          "code": "kubectl rollout status deployment/web -n ch4 --timeout=180s",
+          "text": "全部の Pod が使えるようになるまで待つ"
+        },
+        {
+          "code": "kubectl get deployment web -n ch4",
+          "text": "Deployment の数を出す"
+        },
+        {
+          "code": "kubectl diff -f web.yaml -n ch4 | grep -E '^[-+] +replicas'",
+          "text": "web.yaml を渡すと数がどう変わるかを出す"
+        }
+      ],
+      "output": "deployment.apps/web scaled\nWaiting for deployment \"web\" rollout to finish: 2 of 4 updated replicas are available...\nWaiting for deployment \"web\" rollout to finish: 3 of 4 updated replicas are available...\ndeployment \"web\" successfully rolled out\nNAME   READY   UP-TO-DATE   AVAILABLE   AGE\nweb    4/4     4            4           7s\n-  replicas: 4\n+  replicas: 2",
+      "read": "READY が 4/4 です。- が今 (4)、+ が web.yaml (2) です。今のほうが多いまま誰かがファイルを渡すと、2 に減ります。",
+      "trouble": [
+        {
+          "symptom": "diff に何も出ない",
+          "check": "kubectl get deployment web -n ch4 を打つ",
+          "fix": "4/4 でなければ scale の行を打ち直す"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_scale/"
+    },
+    {
+      "id": "scale-yaml",
+      "text": "ファイルの数を 3 に直して渡します。",
+      "why": "数を残したいなら、ファイルを正とします。手の増減は、その場しのぎと決めておくと迷いません。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "sed -i 's/replicas: 2/replicas: 3/' web.yaml\ngrep replicas web.yaml\nkubectl apply -f web.yaml -n ch4\nkubectl rollout status deployment/web -n ch4 --timeout=180s\nkubectl wait --for=jsonpath='{.status.replicas}'=3 deployment/web -n ch4 --timeout=60s\nkubectl get pods -n ch4"
+      },
+      "lines": [
+        {
+          "code": "sed -i 's/replicas: 2/replicas: 3/' web.yaml",
+          "text": "ファイルの中の replicas: 2 を 3 に書き替える (-i はファイルそのものを直す)"
+        },
+        {
+          "code": "grep replicas web.yaml",
+          "text": "書き替わったかを見る"
+        },
+        {
+          "code": "kubectl apply -f web.yaml -n ch4",
+          "text": "渡す"
+        },
+        {
+          "code": "kubectl rollout status deployment/web -n ch4 --timeout=180s",
+          "text": "全部の Pod が使えるようになるまで待つ"
+        },
+        {
+          "code": "kubectl wait --for=jsonpath='{.status.replicas}'=3 deployment/web -n ch4 --timeout=60s",
+          "text": "数が 3 になるまで待つ"
+        },
+        {
+          "code": "kubectl get pods -n ch4",
+          "text": "一覧を出す"
+        }
+      ],
+      "output": "  replicas: 3\ndeployment.apps/web configured\ndeployment \"web\" successfully rolled out\ndeployment.apps/web condition met\nNAME                   READY   STATUS        RESTARTS   AGE\nweb-6d455b9f54-dnxvq   1/1     Terminating   0          7s\nweb-6d455b9f54-wfh6w   1/1     Running       0          9s\nweb-6d455b9f54-wg7jk   1/1     Running       0          9s\nweb-6d455b9f54-xgk5h   1/1     Running       0          7s",
+      "read": "4 つから 3 つに減りました。減らすときは、新しいものなどから選ばれて消えます。消している途中の Pod が Terminating で見えることがあります。",
+      "trouble": [
+        {
+          "symptom": "replicas: 2 のまま",
+          "check": "grep replicas web.yaml を打つ",
+          "fix": "もう 3 なら、そのまま進む。無ければ、前の手順の枠を貼り直す"
+        },
+        {
+          "symptom": "the path ... does not exist と出る",
+          "check": "pwd と ls を打つ",
+          "fix": "作業のフォルダにいない。cd で移ってから打つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"
+    },
+    {
+      "id": "service",
+      "text": "Service を置き、返事が分かれることを数えます。",
+      "why": "数を増やす意味は、仕事を分けて受けられることです。誰が受けたかを数えます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl expose deployment web --port=80 -n ch4\nkubectl wait --for=create endpointslice -l kubernetes.io/service-name=web -n ch4 --timeout=60s\nsleep 5\nSVC_IP=$(kubectl get service web -n ch4 -o jsonpath='{.spec.clusterIP}')\nfor i in $(seq 30); do curl -s http://$SVC_IP; done | sort | uniq -c"
+      },
+      "lines": [
+        {
+          "code": "kubectl expose deployment web --port=80 -n ch4",
+          "text": "web という Service を作る"
+        },
+        {
+          "code": "kubectl wait --for=create endpointslice -l kubernetes.io/service-name=web -n ch4 --timeout=60s",
+          "text": "渡す先の一覧ができるまで待つ"
+        },
+        {
+          "code": "sleep 5",
+          "text": "渡す先が入るまで 5 秒待つ"
+        },
+        {
+          "code": "SVC_IP=$(kubectl get service web -n ch4 -o jsonpath='{.spec.clusterIP}')",
+          "text": "Service の住所を覚える。今の端末だけで使える"
+        },
+        {
+          "code": "for i in $(seq 30); do curl -s http://$SVC_IP; done | sort | uniq -c",
+          "text": "30 回ページを取り、返事の名前ごとに数える"
+        }
+      ],
+      "output": "service/web exposed\nendpointslice.discovery.k8s.io/web-pphxn condition met\n     11 web-6d455b9f54-wfh6w\n      9 web-6d455b9f54-wg7jk\n     10 web-6d455b9f54-xgk5h",
+      "read": "左が回数、右が返事をした Pod の名前です。3 つに分かれます。順番に配るのではなく、どれに渡すかは接続ごとに選ばれるので、数はきっちり同じにならず、打つたびに変わります。",
+      "trouble": [
+        {
+          "symptom": "何も出ない",
+          "check": "echo $SVC_IP と kubectl get endpointslice -n ch4 を打つ",
+          "fix": "空なら SVC_IP の行から打ち直す"
+        },
+        {
+          "symptom": "AlreadyExists と出る",
+          "check": "kubectl get service -n ch4 を打つ",
+          "fix": "もうあるので、続きの行を打つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/services-networking/service/"
+    },
+    {
+      "id": "zero",
+      "text": "0 に減らし、また増やします。",
+      "why": "0 にすると、設定を残したまま止められます。Service があっても、渡す先が無いと返事はできません。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl scale deployment web --replicas=0 -n ch4\nkubectl wait --for=delete pod -l app=web -n ch4 --timeout=90s\nsleep 3\ncurl -s -m 5 http://$SVC_IP; echo \"終わりの番号 $?\"\nkubectl scale deployment web --replicas=3 -n ch4\nkubectl rollout status deployment/web -n ch4 --timeout=180s\nkubectl get deployment web -n ch4"
+      },
+      "lines": [
+        {
+          "code": "kubectl scale deployment web --replicas=0 -n ch4",
+          "text": "0 にする"
+        },
+        {
+          "code": "kubectl wait --for=delete pod -l app=web -n ch4 --timeout=90s",
+          "text": "Pod が消えるまで待つ"
+        },
+        {
+          "code": "sleep 3",
+          "text": "伝わるまで 3 秒待つ"
+        },
+        {
+          "code": "curl -s -m 5 http://$SVC_IP; echo \"終わりの番号 $?\"",
+          "text": "ページを取りに行き (5 秒であきらめる)、終わりの番号を出す"
+        },
+        {
+          "code": "kubectl scale deployment web --replicas=3 -n ch4",
+          "text": "3 に戻す"
+        },
+        {
+          "code": "kubectl rollout status deployment/web -n ch4 --timeout=180s",
+          "text": "全部の Pod が使えるようになるまで待つ"
+        },
+        {
+          "code": "kubectl get deployment web -n ch4",
+          "text": "数を出す"
+        }
+      ],
+      "output": "deployment.apps/web scaled\npod/web-6d455b9f54-wfh6w condition met\npod/web-6d455b9f54-wg7jk condition met\npod/web-6d455b9f54-xgk5h condition met\n終わりの番号 7\ndeployment.apps/web scaled\nWaiting for deployment \"web\" rollout to finish: 0 of 3 updated replicas are available...\nWaiting for deployment \"web\" rollout to finish: 1 of 3 updated replicas are available...\nWaiting for deployment \"web\" rollout to finish: 2 of 3 updated replicas are available...\ndeployment \"web\" successfully rolled out\nNAME   READY   UP-TO-DATE   AVAILABLE   AGE\nweb    3/3     3            3           24s",
+      "read": "終わりの番号が 0 でないのは「取れなかった」です。28 は「時間切れ」、7 は「つなげない」です。3 に戻すと、また使えます。後の手順で使う HPA (自動の増減) は、手で 0 にした Deployment には働きません。CPU を見る HPA が 0 まで減らすこともありません (1.37 からは、CPU やメモリ以外の量を見る HPA なら、0 まで減らせる機能 HPAScaleToZero が既定で有効になりました)。",
+      "trouble": [
+        {
+          "symptom": "終わりの番号が 0 になる",
+          "check": "echo $SVC_IP を打つ",
+          "fix": "空か、まだ渡す先が残っている。数秒待ってもう一度打つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_scale/"
+    },
+    {
+      "id": "requests",
+      "text": "1 台のノードに、どう置かれたかを見ます。",
+      "why": "置く場所を決める部品が、スケジューラー (kube-scheduler) です。まず置けないノードを外し (フィルタリング)、残りから点数の高いノードを選びます (スコアリング)。空きは、使用量ではなく requests の合計で数えます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl get pods -n ch4 -o custom-columns='NAME:.metadata.name,NODE:.spec.nodeName,CPU:.spec.containers[*].resources.requests.cpu'\nkubectl describe node kcna | sed -n '/^Allocated/,/^Events/p'\nkubectl get events -n ch4 --field-selector reason=Scheduled -o custom-columns=FROM:.reportingComponent,MESSAGE:.message | head -n 3"
+      },
+      "lines": [
+        {
+          "code": "kubectl get pods -n ch4 -o custom-columns='NAME:.metadata.name,NODE:.spec.nodeName,CPU:.spec.containers[*].resources.requests.cpu'",
+          "text": "Pod の名前・ノード・CPU の予約を出す"
+        },
+        {
+          "code": "kubectl describe node kcna | sed -n '/^Allocated/,/^Events/p'",
+          "text": "ノードの、予約された合計を出す"
+        },
+        {
+          "code": "kubectl get events -n ch4 --field-selector reason=Scheduled -o custom-columns=FROM:.reportingComponent,MESSAGE:.message | head -n 3",
+          "text": "「置いた」イベントの、置いた部品と文を出す"
+        }
+      ],
+      "output": "NAME                   NODE   CPU\nweb-6d455b9f54-m98tj   kcna   20m\nweb-6d455b9f54-vlnxg   kcna   20m\nweb-6d455b9f54-w829l   kcna   20m\nAllocated resources:\n  (Total limits may be over 100 percent, i.e., overcommitted.)\n  Resource           Requests    Limits\n  --------           --------    ------\n  cpu                260m (13%)  0 (0%)\n  memory             188Mi (9%)  170Mi (8%)\n  ephemeral-storage  0 (0%)      0 (0%)\n  hugepages-2Mi      0 (0%)      0 (0%)\nEvents:\nFROM                MESSAGE\ndefault-scheduler   Successfully assigned ch4/web-6d455b9f54-dnxvq to kcna\ndefault-scheduler   Successfully assigned ch4/web-6d455b9f54-m98tj to kcna",
+      "read": "web の 1 つが 20m です。合計の cpu の行に、k3s の部品の分と合わせて足されています。FROM の default-scheduler が、置き場所を決めた部品です。",
+      "trouble": [
+        {
+          "symptom": "Events の行が出ない",
+          "check": "kubectl get pods -n ch4 の AGE を見る",
+          "fix": "イベントは時間がたつと消える。困ることはない"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/scheduling-eviction/kube-scheduler/"
+    },
+    {
+      "id": "big",
+      "text": "わざと、どのノードにも収まらない Pod を作ります。",
+      "why": "置けない理由を、イベントから読む練習です。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cat > big.yaml <<'EOF'\napiVersion: v1\nkind: Pod\nmetadata:\n  name: big\nspec:\n  terminationGracePeriodSeconds: 1\n  containers:\n  - name: main\n    image: nginx:1.27-alpine\n    resources:\n      requests:\n        cpu: \"100\"\nEOF\nkubectl apply -f big.yaml -n ch4\nkubectl wait --for=jsonpath='{.status.conditions[?(@.type==\"PodScheduled\")].reason}'=Unschedulable pod/big -n ch4 --timeout=60s\nkubectl get pod big -n ch4 -o wide\nkubectl describe pod big -n ch4 | sed -n '/^Events/,$p'"
+      },
+      "lines": [
+        {
+          "code": "cat > big.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま big.yaml というファイルに書く"
+        },
+        {
+          "code": "apiVersion: v1",
+          "text": "使う API の版"
+        },
+        {
+          "code": "kind: Pod",
+          "text": "作るものの種類"
+        },
+        {
+          "code": "metadata:",
+          "text": "見分けるための情報"
+        },
+        {
+          "code": "  name: big",
+          "text": "Pod の名前"
+        },
+        {
+          "code": "spec:",
+          "text": "ほしい中身"
+        },
+        {
+          "code": "  terminationGracePeriodSeconds: 1",
+          "text": "消すときに待つ秒数の上限"
+        },
+        {
+          "code": "  containers:",
+          "text": "コンテナの一覧"
+        },
+        {
+          "code": "  - name: main",
+          "text": "コンテナの名前"
+        },
+        {
+          "code": "    image: nginx:1.27-alpine",
+          "text": "使うイメージ"
+        },
+        {
+          "code": "    resources:",
+          "text": "使う量の決まり"
+        },
+        {
+          "code": "      requests:",
+          "text": "予約"
+        },
+        {
+          "code": "        cpu: \"100\"",
+          "text": "CPU を 100 コア"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "kubectl apply -f big.yaml -n ch4",
+          "text": "Pod を作る"
+        },
+        {
+          "code": "kubectl wait --for=jsonpath='{.status.conditions[?(@.type==\"PodScheduled\")].reason}'=Unschedulable pod/big -n ch4 --timeout=60s",
+          "text": "「置けない」と決まるまで待つ"
+        },
+        {
+          "code": "kubectl get pod big -n ch4 -o wide",
+          "text": "一覧を、詳しい列まで出す"
+        },
+        {
+          "code": "kubectl describe pod big -n ch4 | sed -n '/^Events/,$p'",
+          "text": "起きたことを出す"
+        }
+      ],
+      "output": "pod/big created\npod/big condition met\nNAME   READY   STATUS    RESTARTS   AGE   IP       NODE     NOMINATED NODE   READINESS GATES\nbig    0/1     Pending   0          1s    <none>   <none>   <none>           <none>\nEvents:\n  Type     Reason            Age   From               Message\n  ----     ------            ----  ----               -------\n  Warning  FailedScheduling  0s    default-scheduler  0/1 nodes are available: 1 Insufficient cpu. no new claims to deallocate, preemption: 0/1 nodes are available: 1 Preemption is not helpful for scheduling.",
+      "read": "STATUS は Pending、NODE は <none> (まだどこにも置かれていない) です。0/1 nodes are available は「1 台のうち、置けるのは 0 台」、Insufficient cpu は「CPU の予約の空きが足りない」です。その後ろの preemption は、ほかの Pod をどかせば置けるかを調べた結果で、どかしても置けない、と出ています。",
+      "trouble": [
+        {
+          "symptom": "Running になる",
+          "check": "nproc を打つ",
+          "fix": "ありえない大きさなので、cpu の行を \"100\" に直して作り直す"
+        },
+        {
+          "symptom": "イベントが無い",
+          "check": "10 秒待って最後の行を打つ",
+          "fix": "調べる前だった"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/scheduling-eviction/kube-scheduler/"
+    },
+    {
+      "id": "selector",
+      "text": "nodeSelector で、ラベルの付いたノードにだけ置きます。",
+      "why": "「速いディスクのノードに」など、置く先を絞る、いちばん簡単な書き方です。無いラベルを書くと、置けません。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cat > ssd.yaml <<'EOF'\napiVersion: v1\nkind: Pod\nmetadata:\n  name: ssd\nspec:\n  terminationGracePeriodSeconds: 1\n  nodeSelector:\n    disktype: ssd\n  containers:\n  - name: main\n    image: nginx:1.27-alpine\nEOF\nkubectl apply -f ssd.yaml -n ch4\nkubectl wait --for=jsonpath='{.status.conditions[?(@.type==\"PodScheduled\")].reason}'=Unschedulable pod/ssd -n ch4 --timeout=60s\nkubectl get events -n ch4 --field-selector involvedObject.name=ssd,reason=FailedScheduling -o custom-columns=REASON:.reason,MESSAGE:.message\nkubectl label node kcna disktype=ssd\nkubectl wait --for=condition=Ready pod/ssd -n ch4 --timeout=180s\nkubectl label node kcna disktype-\nkubectl get pod ssd -n ch4 -o wide"
+      },
+      "lines": [
+        {
+          "code": "cat > ssd.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま ssd.yaml というファイルに書く"
+        },
+        {
+          "code": "apiVersion: v1",
+          "text": "使う API の版"
+        },
+        {
+          "code": "kind: Pod",
+          "text": "作るものの種類"
+        },
+        {
+          "code": "metadata:",
+          "text": "見分けるための情報"
+        },
+        {
+          "code": "  name: ssd",
+          "text": "Pod の名前"
+        },
+        {
+          "code": "spec:",
+          "text": "ほしい中身"
+        },
+        {
+          "code": "  terminationGracePeriodSeconds: 1",
+          "text": "消すときに待つ秒数の上限"
+        },
+        {
+          "code": "  nodeSelector:",
+          "text": "ノードの選び方"
+        },
+        {
+          "code": "    disktype: ssd",
+          "text": "disktype=ssd のラベルが付いたノードにだけ置く"
+        },
+        {
+          "code": "  containers:",
+          "text": "コンテナの一覧"
+        },
+        {
+          "code": "  - name: main",
+          "text": "コンテナの名前"
+        },
+        {
+          "code": "    image: nginx:1.27-alpine",
+          "text": "使うイメージ"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "kubectl apply -f ssd.yaml -n ch4",
+          "text": "Pod を作る"
+        },
+        {
+          "code": "kubectl wait --for=jsonpath='{.status.conditions[?(@.type==\"PodScheduled\")].reason}'=Unschedulable pod/ssd -n ch4 --timeout=60s",
+          "text": "「置けない」と決まるまで待つ"
+        },
+        {
+          "code": "kubectl get events -n ch4 --field-selector involvedObject.name=ssd,reason=FailedScheduling -o custom-columns=REASON:.reason,MESSAGE:.message",
+          "text": "ssd の、置けなかったイベントの理由と文を出す"
+        },
+        {
+          "code": "kubectl label node kcna disktype=ssd",
+          "text": "ノードに disktype=ssd のラベルを付ける"
+        },
+        {
+          "code": "kubectl wait --for=condition=Ready pod/ssd -n ch4 --timeout=180s",
+          "text": "使えるようになるまで待つ"
+        },
+        {
+          "code": "kubectl label node kcna disktype-",
+          "text": "ラベルを外す (名前の後ろに - を付ける)"
+        },
+        {
+          "code": "kubectl get pod ssd -n ch4 -o wide",
+          "text": "一覧を出す"
+        }
+      ],
+      "output": "pod/ssd created\npod/ssd condition met\nREASON             MESSAGE\nFailedScheduling   0/1 nodes are available: 1 node(s) didn't match Pod's node affinity/selector. no new claims to deallocate, preemption: 0/1 nodes are available: 1 Preemption is not helpful for scheduling.\nnode/kcna labeled\npod/ssd condition met\nnode/kcna unlabeled\nNAME   READY   STATUS    RESTARTS   AGE   IP           NODE   NOMINATED NODE   READINESS GATES\nssd    1/1     Running   0          4s    10.42.0.21   kcna   <none>           <none>",
+      "read": "didn't match Pod's node affinity/selector は「ノードのラベルが合わない」です。ラベルを付けると、作り直さなくても置かれました。外したあとも動いているのは、この決まりを見るのが、置くときだけだからです。",
+      "trouble": [
+        {
+          "symptom": "already has a value と出る",
+          "check": "kubectl get node kcna --show-labels を打つ",
+          "fix": "disktype がもう付いている。そのまま進む"
+        },
+        {
+          "symptom": "toomanyrequests や 429 と出る",
+          "check": "kubectl describe の Events で、Failed to pull image の行の終わりを見る",
+          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る。短い「429 Too Many Requests」だけのときは、使いすぎを防ぐ別の上限なので、数分待ってからもう一度行う"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/"
+    },
+    {
+      "id": "check-before-taint",
+      "text": "ノードに印を付ける前に、どのマシンにいるかを見ます。kcna と出なければ、次の手順を打ちません。",
+      "why": "次の手順は、ノード全体の置き方を変えます。自分の PC の別のクラスターで打つと、新しい Pod が置けなくなります。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "hostname"
+      },
+      "lines": [
+        {
+          "code": "hostname",
+          "text": "このマシンの名前を出す"
+        }
+      ],
+      "output": "kcna",
+      "read": "kcna と出れば、仮想マシンの中です。",
+      "trouble": [
+        {
+          "symptom": "kcna ではない名前が出る",
+          "check": "行の頭が ubuntu@kcna かを見る",
+          "fix": "ホストにいる。multipass shell kcna で入り、もう一度打つ"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man1/hostname.1.html"
+    },
+    {
+      "id": "taint",
+      "text": "ノードに「置かないで」の印 (taint) を付け、許した Pod (toleration) だけが置かれることを見ます。前の手順で kcna と出たときだけ打ちます。",
+      "why": "selector は Pod がノードを選びます。taint は逆に、ノードが Pod を断ります。専用のノードを作るときに使います。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl taint nodes kcna demo=yes:NoSchedule- || true\nkubectl taint nodes kcna demo=yes:NoSchedule\ncat > plain.yaml <<'EOF'\napiVersion: v1\nkind: Pod\nmetadata:\n  name: plain\nspec:\n  terminationGracePeriodSeconds: 1\n  containers:\n  - name: main\n    image: nginx:1.27-alpine\nEOF\ncat > tolerate.yaml <<'EOF'\napiVersion: v1\nkind: Pod\nmetadata:\n  name: tolerate\nspec:\n  terminationGracePeriodSeconds: 1\n  tolerations:\n  - key: demo\n    operator: Equal\n    value: \"yes\"\n    effect: NoSchedule\n  containers:\n  - name: main\n    image: nginx:1.27-alpine\nEOF\nkubectl apply -f plain.yaml -f tolerate.yaml -n ch4\nkubectl wait --for=condition=Ready pod/tolerate -n ch4 --timeout=180s\nkubectl wait --for=jsonpath='{.status.conditions[?(@.type==\"PodScheduled\")].reason}'=Unschedulable pod/plain -n ch4 --timeout=60s\nkubectl get events -n ch4 --field-selector involvedObject.name=plain,reason=FailedScheduling -o custom-columns=REASON:.reason,MESSAGE:.message\nkubectl get pods plain tolerate -n ch4\nkubectl taint nodes kcna demo=yes:NoSchedule-\nkubectl wait --for=condition=Ready pod/plain -n ch4 --timeout=180s"
+      },
+      "lines": [
+        {
+          "code": "kubectl taint nodes kcna demo=yes:NoSchedule- || true",
+          "text": "前にやりかけて残った印があれば外す。無いときは not found と出るが、そのまま進む (|| true は、失敗しても先へ進む書き方)"
+        },
+        {
+          "code": "kubectl taint nodes kcna demo=yes:NoSchedule",
+          "text": "demo=yes の印を付ける。NoSchedule は「許しの無い新しい Pod を置かない」"
+        },
+        {
+          "code": "cat > plain.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま plain.yaml というファイルに書く"
+        },
+        {
+          "code": "apiVersion: v1",
+          "text": "使う API の版"
+        },
+        {
+          "code": "kind: Pod",
+          "text": "作るものの種類"
+        },
+        {
+          "code": "metadata:",
+          "text": "見分けるための情報"
+        },
+        {
+          "code": "  name: plain",
+          "text": "Pod の名前"
+        },
+        {
+          "code": "spec:",
+          "text": "ほしい中身"
+        },
+        {
+          "code": "  terminationGracePeriodSeconds: 1",
+          "text": "消すときに待つ秒数の上限"
+        },
+        {
+          "code": "  containers:",
+          "text": "コンテナの一覧"
+        },
+        {
+          "code": "  - name: main",
+          "text": "コンテナの名前"
+        },
+        {
+          "code": "    image: nginx:1.27-alpine",
+          "text": "使うイメージ"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "cat > tolerate.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま tolerate.yaml というファイルに書く"
+        },
+        {
+          "code": "apiVersion: v1",
+          "text": "使う API の版"
+        },
+        {
+          "code": "kind: Pod",
+          "text": "作るものの種類"
+        },
+        {
+          "code": "metadata:",
+          "text": "見分けるための情報"
+        },
+        {
+          "code": "  name: tolerate",
+          "text": "Pod の名前"
+        },
+        {
+          "code": "spec:",
+          "text": "ほしい中身"
+        },
+        {
+          "code": "  terminationGracePeriodSeconds: 1",
+          "text": "消すときに待つ秒数の上限"
+        },
+        {
+          "code": "  tolerations:",
+          "text": "許す印の一覧"
+        },
+        {
+          "code": "  - key: demo",
+          "text": "印の名前"
+        },
+        {
+          "code": "    operator: Equal",
+          "text": "値が同じなら許す"
+        },
+        {
+          "code": "    value: \"yes\"",
+          "text": "印の値"
+        },
+        {
+          "code": "    effect: NoSchedule",
+          "text": "許す働き"
+        },
+        {
+          "code": "  containers:",
+          "text": "コンテナの一覧"
+        },
+        {
+          "code": "  - name: main",
+          "text": "コンテナの名前"
+        },
+        {
+          "code": "    image: nginx:1.27-alpine",
+          "text": "使うイメージ"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "kubectl apply -f plain.yaml -f tolerate.yaml -n ch4",
+          "text": "2 つの Pod を作る"
+        },
+        {
+          "code": "kubectl wait --for=condition=Ready pod/tolerate -n ch4 --timeout=180s",
+          "text": "使えるようになるまで待つ"
+        },
+        {
+          "code": "kubectl wait --for=jsonpath='{.status.conditions[?(@.type==\"PodScheduled\")].reason}'=Unschedulable pod/plain -n ch4 --timeout=60s",
+          "text": "「置けない」と決まるまで待つ"
+        },
+        {
+          "code": "kubectl get events -n ch4 --field-selector involvedObject.name=plain,reason=FailedScheduling -o custom-columns=REASON:.reason,MESSAGE:.message",
+          "text": "plain の、置けなかったイベントの理由と文を出す"
+        },
+        {
+          "code": "kubectl get pods plain tolerate -n ch4",
+          "text": "2 つの Pod を出す"
+        },
+        {
+          "code": "kubectl taint nodes kcna demo=yes:NoSchedule-",
+          "text": "印を外す (後ろに - を付ける)"
+        },
+        {
+          "code": "kubectl wait --for=condition=Ready pod/plain -n ch4 --timeout=180s",
+          "text": "使えるようになるまで待つ"
+        }
+      ],
+      "output": "error: taint \"demo:NoSchedule\" not found\nnode/kcna tainted\npod/plain created\npod/tolerate created\npod/tolerate condition met\npod/plain condition met\nREASON             MESSAGE\nFailedScheduling   0/1 nodes are available: 1 node(s) had untolerated taint(s). no new claims to deallocate, preemption: 0/1 nodes are available: 1 Preemption is not helpful for scheduling.\nNAME       READY   STATUS    RESTARTS   AGE\nplain      0/1     Pending   0          3s\ntolerate   1/1     Running   0          3s\nnode/kcna untainted\npod/plain condition met",
+      "read": "1 行目の not found は、残った印が無かったという意味です。untolerated taint は「許していない印がある」です。plain は Pending、tolerate は置かれました。もう動いていた Pod は、追い出されていません (NoSchedule は置くときだけ)。印を外すと、plain も置かれました。toleration は「置いてよい」で、「そこに置け」ではありません。",
+      "trouble": [
+        {
+          "symptom": "途中でやめてしまった",
+          "check": "kubectl describe node kcna | grep Taints を打つ",
+          "fix": "demo=yes と出たら、印を外す行を打つ。残すと、新しい Pod が置けない"
+        },
+        {
+          "symptom": "taint ... not found と出る",
+          "check": "kubectl describe node kcna | grep Taints を打つ",
+          "fix": "<none> なら、もう外れている"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/"
+    },
+    {
+      "id": "affinity",
+      "text": "podAntiAffinity で、同じ Pod をノードごとに 1 つまでにします。15 秒待つ行があります。",
+      "why": "1 台のノードが壊れても全部は止まらないように、分けて置くための書き方です。ノードが 1 台だと、2 つ目は置けません。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cat > spread.yaml <<'EOF'\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: spread\nspec:\n  replicas: 2\n  selector:\n    matchLabels:\n      app: spread\n  template:\n    metadata:\n      labels:\n        app: spread\n    spec:\n      affinity:\n        podAntiAffinity:\n          requiredDuringSchedulingIgnoredDuringExecution:\n          - labelSelector:\n              matchLabels:\n                app: spread\n            topologyKey: kubernetes.io/hostname\n      containers:\n      - name: web\n        image: nginx:1.27-alpine\nEOF\nkubectl apply -f spread.yaml -n ch4\nkubectl wait --for=condition=Progressing=True deployment/spread -n ch4 --timeout=60s\nsleep 15\nkubectl get pods -l app=spread -n ch4\nkubectl get events -n ch4 --field-selector reason=FailedScheduling -o custom-columns=NAME:.involvedObject.name,MESSAGE:.message | grep spread"
+      },
+      "lines": [
+        {
+          "code": "cat > spread.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま spread.yaml というファイルに書く"
+        },
+        {
+          "code": "apiVersion: apps/v1",
+          "text": "使う API の種類と版"
+        },
+        {
+          "code": "kind: Deployment",
+          "text": "作るものの種類"
+        },
+        {
+          "code": "metadata:",
+          "text": "見分けるための情報"
+        },
+        {
+          "code": "  name: spread",
+          "text": "名前"
+        },
+        {
+          "code": "spec:",
+          "text": "ほしい中身"
+        },
+        {
+          "code": "  replicas: 2",
+          "text": "Pod の数"
+        },
+        {
+          "code": "  selector:",
+          "text": "自分の Pod の見分け方"
+        },
+        {
+          "code": "    matchLabels:",
+          "text": "次のラベルが付いたもの"
+        },
+        {
+          "code": "      app: spread",
+          "text": "app が spread"
+        },
+        {
+          "code": "  template:",
+          "text": "作る Pod のひな型"
+        },
+        {
+          "code": "    metadata:",
+          "text": "作る Pod の情報"
+        },
+        {
+          "code": "      labels:",
+          "text": "ラベル"
+        },
+        {
+          "code": "        app: spread",
+          "text": "app を spread にする"
+        },
+        {
+          "code": "    spec:",
+          "text": "作る Pod の中身"
+        },
+        {
+          "code": "      affinity:",
+          "text": "近づける・離すの決まり"
+        },
+        {
+          "code": "        podAntiAffinity:",
+          "text": "ほかの Pod から離す"
+        },
+        {
+          "code": "          requiredDuringSchedulingIgnoredDuringExecution:",
+          "text": "置くときに必ず守る。置いたあとは見ない"
+        },
+        {
+          "code": "          - labelSelector:",
+          "text": "離す相手の見分け方"
+        },
+        {
+          "code": "              matchLabels:",
+          "text": "次のラベルが付いたもの"
+        },
+        {
+          "code": "                app: spread",
+          "text": "自分と同じ app"
+        },
+        {
+          "code": "            topologyKey: kubernetes.io/hostname",
+          "text": "同じノード (ホスト名) に 2 つ置かない"
+        },
+        {
+          "code": "      containers:",
+          "text": "コンテナの一覧"
+        },
+        {
+          "code": "      - name: web",
+          "text": "コンテナの名前"
+        },
+        {
+          "code": "        image: nginx:1.27-alpine",
+          "text": "使うイメージ"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "kubectl apply -f spread.yaml -n ch4",
+          "text": "Deployment を作る"
+        },
+        {
+          "code": "kubectl wait --for=condition=Progressing=True deployment/spread -n ch4 --timeout=60s",
+          "text": "動き始めるまで待つ"
+        },
+        {
+          "code": "sleep 15",
+          "text": "15 秒待つ"
+        },
+        {
+          "code": "kubectl get pods -l app=spread -n ch4",
+          "text": "一覧を出す"
+        },
+        {
+          "code": "kubectl get events -n ch4 --field-selector reason=FailedScheduling -o custom-columns=NAME:.involvedObject.name,MESSAGE:.message | grep spread",
+          "text": "spread の置けなかった理由を出す"
+        }
+      ],
+      "output": "deployment.apps/spread created\ndeployment.apps/spread condition met\nNAME                      READY   STATUS    RESTARTS   AGE\nspread-7dd55b4646-2kg5w   1/1     Running   0          16s\nspread-7dd55b4646-szjxk   0/1     Pending   0          16s\nspread-7dd55b4646-szjxk   0/1 nodes are available: 1 node(s) didn't match pod anti-affinity rules. no new claims to deallocate, preemption: 0/1 nodes are available: 1 No preemption victims found for incoming pod.",
+      "read": "1 つは Running、もう 1 つは Pending です。didn't match pod anti-affinity rules は「離す決まりを守れるノードが無い」です。required を preferred (できれば) に替える書き方もあり、そちらなら 1 台でも置けます。",
+      "trouble": [
+        {
+          "symptom": "2 つとも Pending",
+          "check": "kubectl describe node kcna | grep Taints を打つ",
+          "fix": "印が残っていれば、前の手順の外す行を打つ"
+        },
+        {
+          "symptom": "strict decoding error と出る",
+          "check": "文の中の欄の名前を探す",
+          "fix": "字下げを直し、枠をコピーして貼り直す"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/"
+    },
+    {
+      "id": "tidy-pods",
+      "text": "置き場所の練習で作ったものを消します。",
+      "why": "あとの手順のために、ノードの予約を空けるためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl delete pod big ssd plain tolerate -n ch4\nkubectl delete deployment spread -n ch4\nkubectl get pods -n ch4\nkubectl describe node kcna | grep Taints"
+      },
+      "lines": [
+        {
+          "code": "kubectl delete pod big ssd plain tolerate -n ch4",
+          "text": "4 つの Pod を消す"
+        },
+        {
+          "code": "kubectl delete deployment spread -n ch4",
+          "text": "Deployment を消す"
+        },
+        {
+          "code": "kubectl get pods -n ch4",
+          "text": "残りを出す"
+        },
+        {
+          "code": "kubectl describe node kcna | grep Taints",
+          "text": "ノードの印を出す"
+        }
+      ],
+      "output": "pod \"big\" deleted from ch4 namespace\npod \"ssd\" deleted from ch4 namespace\npod \"plain\" deleted from ch4 namespace\npod \"tolerate\" deleted from ch4 namespace\ndeployment.apps \"spread\" deleted from ch4 namespace\nNAME                      READY   STATUS        RESTARTS   AGE\nspread-7dd55b4646-2kg5w   1/1     Terminating   0          20s\nweb-6d455b9f54-m98tj      1/1     Running       0          40s\nweb-6d455b9f54-vlnxg      1/1     Running       0          39s\nweb-6d455b9f54-w829l      1/1     Running       0          39s\nTaints:             <none>",
+      "read": "web の Pod だけが残り、Taints が <none> なら片付いています。消している途中の Pod が Terminating で見えることがあります。",
+      "trouble": [
+        {
+          "symptom": "Taints に demo=yes が残っている",
+          "check": "taint の手順を見返す",
+          "fix": "kubectl taint nodes kcna demo=yes:NoSchedule- を打つ"
+        },
+        {
+          "symptom": "NotFound と出る",
+          "check": "kubectl get pods -n ch4 を打つ",
+          "fix": "もう消えている。そのまま進む"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_delete/"
+    },
+    {
+      "id": "break",
+      "text": "ここで休めます。休む人は、exit で出てから、ホストでこの行を打ちます。休まない人は、打たずに印を付けて先へ進みます。",
+      "why": "長い章なので、区切りを置くためです。止めても、作ったものとファイルは残ります。再起動と同じことが起きるので、Pod の中のコンテナは始め直され、Pod の住所も変わります。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass stop kcna"
+      },
+      "lines": [
+        {
+          "code": "multipass stop kcna",
+          "text": "kcna を止める。動いている (Running) ときだけ打てる"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "何もエラーが出なければ止まっています。休む前に、前の手順の最後で Taints が <none> だったことを思い出します。印が残っていると、新しく作る Pod が置けず Pending になります (外すのは、仮想マシンの中で kubectl taint nodes kcna demo=yes:NoSchedule- です)。続けるときは、ホストで multipass shell kcna を打つと、動かして中に入れます。戻ったら cd ~/ch4 を打ちます。kubectl get pods -n ch4 で web の 3 つが 1/1 になるまで待ちます。SVC_IP は、次に使う手順で決め直します。戻った直後の 1〜2 分は、一覧が止める前の古い様子のことがあります。少し待ってもう一度見ます。",
+      "trouble": [
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "activating なら、1 分ほど待つ"
+        },
+        {
+          "symptom": "No such file or directory と出る",
+          "check": "pwd を打つ",
+          "fix": "作業のフォルダにいない。cd で移る"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/stop/"
+    },
+    {
+      "id": "top",
+      "text": "今の使用量を、metrics-server に聞きます。",
+      "why": "自動の増減は、使用量を測れないと始まりません。k3s には、使用量を集める metrics-server が最初から入っています。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "for i in $(seq 36); do kubectl top node > /dev/null 2>&1 && break; sleep 5; done\nkubectl top node\nkubectl top pods -n ch4\nkubectl top pods -A --sort-by=cpu | head -n 4"
+      },
+      "lines": [
+        {
+          "code": "for i in $(seq 36); do kubectl top node > /dev/null 2>&1 && break; sleep 5; done",
+          "text": "使用量が出るまで、5 秒おきに試して待つ (最大 3 分であきらめて、次の行へ進む)"
+        },
+        {
+          "code": "kubectl top node",
+          "text": "ノードの使用量を出す"
+        },
+        {
+          "code": "kubectl top pods -n ch4",
+          "text": "Pod の使用量を出す"
+        },
+        {
+          "code": "kubectl top pods -A --sort-by=cpu | head -n 4",
+          "text": "全部の名前空間から、CPU の多い順に 3 つまで出す (1 行目は見出し)"
+        }
+      ],
+      "output": "NAME   CPU(cores)   CPU(%)   MEMORY(bytes)   MEMORY(%)\nkcna   505m         25%      1347Mi          68%\nNAME                   CPU(cores)   MEMORY(bytes)\nweb-6d455b9f54-m98tj   1m           2Mi\nweb-6d455b9f54-vlnxg   1m           2Mi\nweb-6d455b9f54-w829l   1m           2Mi\nNAMESPACE     NAME                                      CPU(cores)   MEMORY(bytes)\nkube-system   metrics-server-6dc596dfb8-snwh9           27m          74Mi\nkube-system   coredns-7cfb7bc9c7-pw8zl                  6m           70Mi\nkube-system   traefik-7c8677d4d9-nmw8q                  3m           127Mi",
+      "read": "左が使っている量で、予約 (requests) とは別の数です。web は、仕事が無いので 1m 前後です。数は少し前のもので、打つたびに変わります。",
+      "trouble": [
+        {
+          "symptom": "Metrics API not available や metrics not available yet と出る",
+          "check": "kubectl get pods -n kube-system で metrics-server が 1/1 かを見る",
+          "fix": "起動したあとや休んだあとは、数が出るまで 1〜2 分かかる。待ってからもう一度打つ"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/tasks/debug/debug-cluster/resource-metrics-pipeline/"
+    },
+    {
+      "id": "hpa-unknown",
+      "text": "わざと、requests の無い Deployment に HPA を付けます。1 分ほど待ちます。",
+      "why": "HPA (HorizontalPodAutoscaler) は、使用量を見て数を変える仕組みです。使用率は「requests に対する割合」なので、requests が無いと計算できません。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl create deployment noreq --image=nginx:1.27-alpine -n ch4\nkubectl rollout status deployment/noreq -n ch4 --timeout=180s\nkubectl autoscale deployment noreq --min=1 --max=3 --cpu=50% -n ch4\nsleep 60\nkubectl get hpa noreq -n ch4\nkubectl get hpa noreq -n ch4 -o jsonpath='{.status.conditions[?(@.type==\"ScalingActive\")].message}{\"\\n\"}'"
+      },
+      "lines": [
+        {
+          "code": "kubectl create deployment noreq --image=nginx:1.27-alpine -n ch4",
+          "text": "requests の無い Deployment を作る"
+        },
+        {
+          "code": "kubectl rollout status deployment/noreq -n ch4 --timeout=180s",
+          "text": "使えるようになるまで待つ"
+        },
+        {
+          "code": "kubectl autoscale deployment noreq --min=1 --max=3 --cpu=50% -n ch4",
+          "text": "CPU の使用率 50% を目標に、1〜3 個で増減させる HPA を付ける"
+        },
+        {
+          "code": "sleep 60",
+          "text": "使用量が集まるまで 60 秒待つ"
+        },
+        {
+          "code": "kubectl get hpa noreq -n ch4",
+          "text": "HPA を出す"
+        },
+        {
+          "code": "kubectl get hpa noreq -n ch4 -o jsonpath='{.status.conditions[?(@.type==\"ScalingActive\")].message}{\"\\n\"}'",
+          "text": "計算できない理由を出す"
+        }
+      ],
+      "output": "deployment.apps/noreq created\nWaiting for deployment \"noreq\" rollout to finish: 0 of 1 updated replicas are available...\ndeployment \"noreq\" successfully rolled out\nhorizontalpodautoscaler.autoscaling/noreq autoscaled\nNAME    REFERENCE          TARGETS              MINPODS   MAXPODS   REPLICAS   AGE\nnoreq   Deployment/noreq   cpu: <unknown>/50%   1         3         1          60s\nthe HPA was unable to compute the replica count: failed to get cpu utilization: missing request for cpu in container nginx of Pod noreq-7464666f8c-kzzvv",
+      "read": "TARGETS の <unknown> は「今の使用率が分からない」です。missing request for cpu が理由です。REPLICAS は変わりません。",
+      "trouble": [
+        {
+          "symptom": "理由が no metrics returned と出る",
+          "check": "1 分待って、最後の行を打つ",
+          "fix": "使用量がまだ集まっていない。待つと missing request に変わる"
+        },
+        {
+          "symptom": "unknown flag: --cpu と出る",
+          "check": "kubectl version を見る",
+          "fix": "1.33 以前の kubectl では --cpu-percent=50 と書く"
+        },
+        {
+          "symptom": "toomanyrequests や 429 と出る",
+          "check": "kubectl describe の Events で、Failed to pull image の行の終わりを見る",
+          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る。短い「429 Too Many Requests」だけのときは、使いすぎを防ぐ別の上限なので、数分待ってからもう一度行う"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/"
+    },
+    {
+      "id": "hpa-requests",
+      "text": "requests を付け、使用率が出ることを見ます。2 分ほどかかることがあります。",
+      "why": "理由のとおりに直すと、動き出すことを確かめるためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl set resources deployment noreq --requests=cpu=100m -n ch4\nkubectl rollout status deployment/noreq -n ch4 --timeout=180s\nkubectl wait --for=condition=ScalingActive hpa/noreq -n ch4 --timeout=240s\nkubectl get hpa noreq -n ch4\nkubectl delete hpa,deployment noreq -n ch4"
+      },
+      "lines": [
+        {
+          "code": "kubectl set resources deployment noreq --requests=cpu=100m -n ch4",
+          "text": "CPU の requests を 100m にする。Pod は新しいものに入れ替わる"
+        },
+        {
+          "code": "kubectl rollout status deployment/noreq -n ch4 --timeout=180s",
+          "text": "入れ替わるまで待つ"
+        },
+        {
+          "code": "kubectl wait --for=condition=ScalingActive hpa/noreq -n ch4 --timeout=240s",
+          "text": "使用率を計算できるようになるまで待つ"
+        },
+        {
+          "code": "kubectl get hpa noreq -n ch4",
+          "text": "HPA を出す"
+        },
+        {
+          "code": "kubectl delete hpa,deployment noreq -n ch4",
+          "text": "HPA と Deployment を消す"
+        }
+      ],
+      "output": "deployment.apps/noreq resource requirements updated\nWaiting for deployment \"noreq\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"noreq\" rollout to finish: 1 old replicas are pending termination...\ndeployment \"noreq\" successfully rolled out\nhorizontalpodautoscaler.autoscaling/noreq condition met\nNAME    REFERENCE          TARGETS        MINPODS   MAXPODS   REPLICAS   AGE\nnoreq   Deployment/noreq   cpu: 10%/50%   1         3         1          91s\nhorizontalpodautoscaler.autoscaling \"noreq\" deleted from ch4 namespace\ndeployment.apps \"noreq\" deleted from ch4 namespace",
+      "read": "TARGETS が cpu: 0%/50% のような数字になりました。左が今、右が目標です。REPLICAS は 1 のままです。",
+      "trouble": [
+        {
+          "symptom": "timed out と出る",
+          "check": "kubectl top pods -n ch4 を打つ",
+          "fix": "数が出なければ metrics-server を待つ。出るなら、待つ行をもう一度打つ"
+        },
+        {
+          "symptom": "Metrics API not available や metrics not available yet と出る",
+          "check": "kubectl get pods -n kube-system で metrics-server が 1/1 かを見る",
+          "fix": "起動したあとや休んだあとは、数が出るまで 1〜2 分かかる。待ってからもう一度打つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/"
+    },
+    {
+      "id": "hpa-yaml",
+      "text": "web に、YAML で HPA を付けます。2 分ほどかかることがあります。",
+      "why": "autoscaling/v2 は、今の正式な書き方です。急いで減らしすぎないための待ち (安定化の窓) も書けます。既定は 300 秒です。この章では、待つ時間を短くするため 30 秒にします。増やす側に窓は無く、すぐ増やします。ほしい数は「今の数 × 今の使用率 ÷ 目標」を切り上げて計算し、目標との差が 1 割 (0.1) より小さければ動かしません。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cat > hpa.yaml <<'EOF'\napiVersion: autoscaling/v2\nkind: HorizontalPodAutoscaler\nmetadata:\n  name: web\nspec:\n  scaleTargetRef:\n    apiVersion: apps/v1\n    kind: Deployment\n    name: web\n  minReplicas: 1\n  maxReplicas: 4\n  metrics:\n  - type: Resource\n    resource:\n      name: cpu\n      target:\n        type: Utilization\n        averageUtilization: 50\n  behavior:\n    scaleDown:\n      stabilizationWindowSeconds: 30\nEOF\nkubectl apply -f hpa.yaml -n ch4\nkubectl wait --for=condition=ScalingActive hpa/web -n ch4 --timeout=240s\nsleep 60\nkubectl get hpa web -n ch4\nkubectl get deployment web -n ch4"
+      },
+      "lines": [
+        {
+          "code": "cat > hpa.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま hpa.yaml というファイルに書く"
+        },
+        {
+          "code": "apiVersion: autoscaling/v2",
+          "text": "使う API の種類と版"
+        },
+        {
+          "code": "kind: HorizontalPodAutoscaler",
+          "text": "作るものの種類"
+        },
+        {
+          "code": "metadata:",
+          "text": "見分けるための情報"
+        },
+        {
+          "code": "  name: web",
+          "text": "HPA の名前"
+        },
+        {
+          "code": "spec:",
+          "text": "ほしい中身"
+        },
+        {
+          "code": "  scaleTargetRef:",
+          "text": "数を変える相手"
+        },
+        {
+          "code": "    apiVersion: apps/v1",
+          "text": "相手の API"
+        },
+        {
+          "code": "    kind: Deployment",
+          "text": "相手の種類"
+        },
+        {
+          "code": "    name: web",
+          "text": "相手の名前"
+        },
+        {
+          "code": "  minReplicas: 1",
+          "text": "いちばん少ない数"
+        },
+        {
+          "code": "  maxReplicas: 4",
+          "text": "いちばん多い数"
+        },
+        {
+          "code": "  metrics:",
+          "text": "見る量の一覧"
+        },
+        {
+          "code": "  - type: Resource",
+          "text": "CPU やメモリを見る"
+        },
+        {
+          "code": "    resource:",
+          "text": "どの量か"
+        },
+        {
+          "code": "      name: cpu",
+          "text": "CPU"
+        },
+        {
+          "code": "      target:",
+          "text": "目標"
+        },
+        {
+          "code": "        type: Utilization",
+          "text": "requests に対する割合で見る"
+        },
+        {
+          "code": "        averageUtilization: 50",
+          "text": "平均 50%"
+        },
+        {
+          "code": "  behavior:",
+          "text": "増減のしかた"
+        },
+        {
+          "code": "    scaleDown:",
+          "text": "減らすとき"
+        },
+        {
+          "code": "      stabilizationWindowSeconds: 30",
+          "text": "過去 30 秒で必要だった、いちばん多い数まで減らす (既定は 300)"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "kubectl apply -f hpa.yaml -n ch4",
+          "text": "HPA を作る"
+        },
+        {
+          "code": "kubectl wait --for=condition=ScalingActive hpa/web -n ch4 --timeout=240s",
+          "text": "使用率を計算できるようになるまで待つ"
+        },
+        {
+          "code": "sleep 60",
+          "text": "減る判断を 60 秒待つ"
+        },
+        {
+          "code": "kubectl get hpa web -n ch4",
+          "text": "HPA を出す"
+        },
+        {
+          "code": "kubectl get deployment web -n ch4",
+          "text": "Deployment の数を出す"
+        }
+      ],
+      "output": "horizontalpodautoscaler.autoscaling/web created\nhorizontalpodautoscaler.autoscaling/web condition met\nNAME   REFERENCE        TARGETS       MINPODS   MAXPODS   REPLICAS   AGE\nweb    Deployment/web   cpu: 5%/50%   1         4         1          76s\nNAME   READY   UP-TO-DATE   AVAILABLE   AGE\nweb    1/1     1            1           3m55s",
+      "read": "仕事が無いので使用率は目標より低く、3 つから 1 つへ減っていきます。窓の分だけ遅れるので、まだ 2 や 3 と出ることもあります。数を変えたのは自分ではなく HPA です。",
+      "trouble": [
+        {
+          "symptom": "<unknown> のまま",
+          "check": "kubectl describe hpa web -n ch4 の Conditions を見る",
+          "fix": "no metrics なら、もう 1 分待つ"
+        },
+        {
+          "symptom": "timed out と出る",
+          "check": "kubectl top pods -n ch4 を打つ",
+          "fix": "metrics-server の数が出てから、待つ行を打ち直す"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/"
+    },
+    {
+      "id": "load",
+      "text": "負荷をかけ、増える様子を見ます。2 分ほどかかります。途中でやめるときや休むときは、kubectl delete pod load -n ch4 を打って、負荷を必ず消します。",
+      "why": "休まずページを取り続ける Pod を作ります。HPA は、既定で 15 秒おき (設定で変えられる間隔) に計算し直します。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cat > load.yaml <<'EOF'\napiVersion: v1\nkind: Pod\nmetadata:\n  name: load\nspec:\n  terminationGracePeriodSeconds: 1\n  containers:\n  - name: main\n    image: busybox:1.37\n    command: ['sh', '-c', 'while true; do wget -q -O /dev/null http://web; done']\n    resources:\n      limits:\n        cpu: 600m\nEOF\nkubectl apply -f load.yaml -n ch4\nkubectl wait --for=condition=Ready pod/load -n ch4 --timeout=180s\nfor i in $(seq 9); do kubectl get hpa web -n ch4 --no-headers; sleep 12; done\nkubectl top pods -n ch4\nkubectl get hpa web -n ch4 -o jsonpath='{range .status.conditions[*]}{.type}={.status} {.reason}{\"\\n\"}{end}'"
+      },
+      "lines": [
+        {
+          "code": "cat > load.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま load.yaml というファイルに書く"
+        },
+        {
+          "code": "apiVersion: v1",
+          "text": "使う API の版"
+        },
+        {
+          "code": "kind: Pod",
+          "text": "作るものの種類"
+        },
+        {
+          "code": "metadata:",
+          "text": "見分けるための情報"
+        },
+        {
+          "code": "  name: load",
+          "text": "Pod の名前"
+        },
+        {
+          "code": "spec:",
+          "text": "ほしい中身"
+        },
+        {
+          "code": "  terminationGracePeriodSeconds: 1",
+          "text": "消すときに待つ秒数の上限"
+        },
+        {
+          "code": "  containers:",
+          "text": "コンテナの一覧"
+        },
+        {
+          "code": "  - name: main",
+          "text": "コンテナの名前"
+        },
+        {
+          "code": "    image: busybox:1.37",
+          "text": "使うイメージ"
+        },
+        {
+          "code": "    command: ['sh', '-c', 'while true; do wget -q -O /dev/null http://web; done']",
+          "text": "web のページを休まず取り続ける"
+        },
+        {
+          "code": "    resources:",
+          "text": "使う量の決まり"
+        },
+        {
+          "code": "      limits:",
+          "text": "上限"
+        },
+        {
+          "code": "        cpu: 600m",
+          "text": "負荷をかける側は 0.6 コアまで。ノードを使い切らないため"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "kubectl apply -f load.yaml -n ch4",
+          "text": "負荷をかける Pod を作る"
+        },
+        {
+          "code": "kubectl wait --for=condition=Ready pod/load -n ch4 --timeout=180s",
+          "text": "使えるようになるまで待つ"
+        },
+        {
+          "code": "for i in $(seq 9); do kubectl get hpa web -n ch4 --no-headers; sleep 12; done",
+          "text": "12 秒おきに 9 回、HPA の行を出す (名前・相手・今/目標・最小・最大・数・経過)"
+        },
+        {
+          "code": "kubectl top pods -n ch4",
+          "text": "Pod の使用量を出す"
+        },
+        {
+          "code": "kubectl get hpa web -n ch4 -o jsonpath='{range .status.conditions[*]}{.type}={.status} {.reason}{\"\\n\"}{end}'",
+          "text": "HPA の状態を出す"
+        }
+      ],
+      "output": "pod/load created\npod/load condition met\nweb   Deployment/web   cpu: 5%/50%   1     4     1     85s\nweb   Deployment/web   cpu: 5%/50%   1     4     1     97s\nweb   Deployment/web   cpu: 5%/50%   1     4     1     110s\nweb   Deployment/web   cpu: 340%/50%   1     4     1     2m3s\nweb   Deployment/web   cpu: 340%/50%   1     4     1     2m15s\nweb   Deployment/web   cpu: 430%/50%   1     4     4     2m27s\nweb   Deployment/web   cpu: 225%/50%   1     4     4     2m40s\nweb   Deployment/web   cpu: 105%/50%   1     4     4     2m52s\nweb   Deployment/web   cpu: 102%/50%   1     4     4     3m5s\nNAME                   CPU(cores)   MEMORY(bytes)\nload                   581m         2Mi\nweb-6d455b9f54-4ntpp   20m          2Mi\nweb-6d455b9f54-5bmbx   20m          2Mi\nweb-6d455b9f54-m98tj   22m          3Mi\nweb-6d455b9f54-wsrbp   20m          2Mi\nAbleToScale=True ReadyForNewScale\nScalingActive=True ValidMetricFound\nScalingLimited=True TooManyReplicas",
+      "read": "使用率が目標の 50% を大きく超え、数が増えます。たとえば 1 つで 425% なら、1 × 425 ÷ 50 = 8.5 を切り上げた 9 がほしい数です。最大の 4 で止まると、ScalingLimited が True (TooManyReplicas) になります。「もっと要るが、上限」です。数が増えると、1 つあたりの使用率は下がります。増え始めるまでの時間と % は、使用量が集まる時機とマシンの速さで変わります (この手順を作ったときは、始めて 30 秒〜1 分余りで増えました)。休んだり間が空いたりすると、数が 1 でないところから始まることもあります。",
+      "trouble": [
+        {
+          "symptom": "使用率が上がらない",
+          "check": "kubectl logs load -n ch4 を打つ",
+          "fix": "wget: bad address なら Service が無い。service の手順の expose の行を打つ"
+        },
+        {
+          "symptom": "4 まで増えない",
+          "check": "最後の数行の % を見る",
+          "fix": "50% に近ければ足りている。負荷が軽い速いマシンでは、数が少なくて済むことがある"
+        },
+        {
+          "symptom": "toomanyrequests や 429 と出る",
+          "check": "kubectl describe の Events で、Failed to pull image の行の終わりを見る",
+          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る。短い「429 Too Many Requests」だけのときは、使いすぎを防ぐ別の上限なので、数分待ってからもう一度行う"
+        },
+        {
+          "symptom": "Metrics API not available や metrics not available yet と出る",
+          "check": "kubectl get pods -n kube-system で metrics-server が 1/1 かを見る",
+          "fix": "起動したあとや休んだあとは、数が出るまで 1〜2 分かかる。待ってからもう一度打つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/"
+    },
+    {
+      "id": "unload",
+      "text": "負荷をやめ、減る様子を見ます。2 分半ほどかかります。",
+      "why": "増やすより減らすほうが遅いのは、すぐまた忙しくなったときに困らないためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl delete pod load -n ch4\nfor i in $(seq 12); do kubectl get hpa web -n ch4 --no-headers; sleep 12; done\nkubectl get events -n ch4 --field-selector involvedObject.name=web,involvedObject.kind=HorizontalPodAutoscaler -o custom-columns=REASON:.reason,MESSAGE:.message"
+      },
+      "lines": [
+        {
+          "code": "kubectl delete pod load -n ch4",
+          "text": "負荷をやめる"
+        },
+        {
+          "code": "for i in $(seq 12); do kubectl get hpa web -n ch4 --no-headers; sleep 12; done",
+          "text": "12 秒おきに 12 回、HPA の行を出す"
+        },
+        {
+          "code": "kubectl get events -n ch4 --field-selector involvedObject.name=web,involvedObject.kind=HorizontalPodAutoscaler -o custom-columns=REASON:.reason,MESSAGE:.message",
+          "text": "HPA のイベントを出す"
+        }
+      ],
+      "output": "pod \"load\" deleted from ch4 namespace\nweb   Deployment/web   cpu: 102%/50%   1     4     4     3m21s\nweb   Deployment/web   cpu: 103%/50%   1     4     4     3m34s\nweb   Deployment/web   cpu: 103%/50%   1     4     4     3m46s\nweb   Deployment/web   cpu: 58%/50%   1     4     4     3m59s\nweb   Deployment/web   cpu: 5%/50%   1     4     4     4m12s\nweb   Deployment/web   cpu: 5%/50%   1     4     4     4m24s\nweb   Deployment/web   cpu: 5%/50%   1     4     1     4m37s\nweb   Deployment/web   cpu: 5%/50%   1     4     1     4m49s\nweb   Deployment/web   cpu: 5%/50%   1     4     1     5m2s\nweb   Deployment/web   cpu: 5%/50%   1     4     1     5m14s\nweb   Deployment/web   cpu: 5%/50%   1     4     1     5m28s\nweb   Deployment/web   cpu: 5%/50%   1     4     1     5m40s\nREASON              MESSAGE\nSuccessfulRescale   New size: 1; reason: All metrics below target\nSuccessfulRescale   New size: 4; reason: cpu resource utilization (percentage of request) above target",
+      "read": "使用率が下がっても、すぐには減りません。使用量が古いまま少し残ることと、窓の 30 秒 (その間の、いちばん多いほしい数を使う) があるためです。そのあと 1 まで減ります。New size が、数を変えた記録と理由です。既定の窓 (300 秒) なら、5 分以上かかります。",
+      "trouble": [
+        {
+          "symptom": "最後まで 4 のまま",
+          "check": "kubectl get pods -n ch4 を打つ",
+          "fix": "load が残っていれば消す。無ければ、もう 1 分待つ"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/"
+    },
+    {
+      "id": "break-after-load",
+      "text": "ここで休めます。休む人は、exit で出てから、ホストでこの行を打ちます。休まない人は、打たずに印を付けて先へ進みます。",
+      "why": "長い章なので、区切りを置くためです。止めても、作ったものとファイルは残ります。再起動と同じことが起きるので、Pod の中のコンテナは始め直され、Pod の住所も変わります。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass stop kcna"
+      },
+      "lines": [
+        {
+          "code": "multipass stop kcna",
+          "text": "kcna を止める。動いている (Running) ときだけ打てる"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "何もエラーが出なければ止まっています。休む前に、kubectl get pod load -n ch4 で NotFound と出る (負荷を消してある) ことを確かめます。続けるときは、ホストで multipass shell kcna を打つと、動かして中に入れます。戻ったら cd ~/ch4 を打ち、kubectl get pods -n ch4 で web が 1/1 になるまで待ちます。戻った直後の 1〜3 分は、HPA の TARGETS が <unknown> のことがあります。",
+      "trouble": [
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "activating なら、1 分ほど待つ"
+        },
+        {
+          "symptom": "No such file or directory と出る",
+          "check": "pwd を打つ",
+          "fix": "作業のフォルダにいない。cd で移る"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/stop/"
+    },
+    {
+      "id": "hpa-vs-hand",
+      "text": "HPA がいる間に、手で増やします。2 分ほどかかります。",
+      "why": "数を決める人が 2 人いると、どちらが勝つかを見るためです。増やした直後の Pod は、まだ使用量がありません。その間 HPA は、減らさない方へ多めに見積もり、今の数 (4) を「ほしい数」として記録します。その記録が窓 (この HPA は 30 秒) に残るので、少し遅れて戻します。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl wait --for=condition=ScalingActive hpa/web -n ch4 --timeout=240s\nkubectl scale deployment web --replicas=4 -n ch4\nfor i in $(seq 10); do kubectl get hpa web -n ch4 --no-headers; sleep 12; done"
+      },
+      "lines": [
+        {
+          "code": "kubectl wait --for=condition=ScalingActive hpa/web -n ch4 --timeout=240s",
+          "text": "使用率を計算できるようになるまで待つ (休んだあとは、少しかかる)"
+        },
+        {
+          "code": "kubectl scale deployment web --replicas=4 -n ch4",
+          "text": "手で 4 にする"
+        },
+        {
+          "code": "for i in $(seq 10); do kubectl get hpa web -n ch4 --no-headers; sleep 12; done",
+          "text": "12 秒おきに 10 回、HPA の行を出す"
+        }
+      ],
+      "output": "horizontalpodautoscaler.autoscaling/web condition met\ndeployment.apps/web scaled\nweb   Deployment/web   cpu: 5%/50%   1     4     1     5m54s\nweb   Deployment/web   cpu: 5%/50%   1     4     4     6m7s\nweb   Deployment/web   cpu: 5%/50%   1     4     4     6m20s\nweb   Deployment/web   cpu: 5%/50%   1     4     4     6m32s\nweb   Deployment/web   cpu: 10%/50%   1     4     4     6m44s\nweb   Deployment/web   cpu: 5%/50%   1     4     4     6m57s\nweb   Deployment/web   cpu: 5%/50%   1     4     1     7m10s\nweb   Deployment/web   cpu: 5%/50%   1     4     1     7m22s\nweb   Deployment/web   cpu: 5%/50%   1     4     1     7m34s\nweb   Deployment/web   cpu: 5%/50%   1     4     1     7m46s",
+      "read": "いったん 4 になり、しばらくすると HPA が 1 へ戻します。HPA がいる間の数は、HPA のものです。手で変えても続きません。",
+      "trouble": [
+        {
+          "symptom": "4 のまま",
+          "check": "もう 1 分待って kubectl get hpa web -n ch4 を打つ",
+          "fix": "新しい Pod の使用量が集まるまで (1 分ほど) と、窓の 30 秒を合わせた分だけ遅れる。さらに 1 分待つ"
+        },
+        {
+          "symptom": "すぐに 1 へ戻った",
+          "check": "kubectl get hpa web -n ch4 で REPLICAS を見る",
+          "fix": "HPA が計算した時に、新しい Pod がまだ Pending だったと考えられる。1 に戻っていれば次へ進む"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/"
+    },
+    {
+      "id": "hpa-vs-yaml",
+      "text": "HPA がいる間に、replicas の書かれたファイルを渡します。",
+      "why": "ファイルを渡すたびに数が飛ぶと、忙しいときに減ってしまいます。公式も、HPA を使うなら replicas を書かないことを勧めています。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl apply -f web.yaml -n ch4\nkubectl get deployment web -n ch4 -o jsonpath='{.spec.replicas}{\"\\n\"}'\nsed -i '/replicas:/d' web.yaml\nkubectl apply -f web.yaml -n ch4\nkubectl get deployment web -n ch4 -o jsonpath='{.spec.replicas}{\"\\n\"}'"
+      },
+      "lines": [
+        {
+          "code": "kubectl apply -f web.yaml -n ch4",
+          "text": "replicas: 3 と書いたファイルを渡す"
+        },
+        {
+          "code": "kubectl get deployment web -n ch4 -o jsonpath='{.spec.replicas}{\"\\n\"}'",
+          "text": "ほしい数を出す"
+        },
+        {
+          "code": "sed -i '/replicas:/d' web.yaml",
+          "text": "ファイルから replicas の行を消す"
+        },
+        {
+          "code": "kubectl apply -f web.yaml -n ch4",
+          "text": "渡す"
+        },
+        {
+          "code": "kubectl get deployment web -n ch4 -o jsonpath='{.spec.replicas}{\"\\n\"}'",
+          "text": "ほしい数を出す"
+        }
+      ],
+      "output": "deployment.apps/web configured\n3\ndeployment.apps/web configured\n1",
+      "read": "1 度目で 3 に飛びました (もう HPA が 1 に戻していたものを、上書きしました)。行を消して渡すと、その 1 回だけ 1 になります。前に自分が書いた欄を消したので、既定の 1 に戻るためです。このあとは、何度渡しても数に触りません。忙しいときにこれをすると一時的に減るので、公式は、先に apply の覚え書き (last-applied-configuration) から外す方法を載せています。kubectl apply edit-last-applied deployment/web -n ch4 でエディターを開き、replicas の行を消して保存してから、ファイルの行も消す、という順です。今は打たなくてかまいません。",
+      "trouble": [
+        {
+          "symptom": "1 度目で 3 にならない",
+          "check": "grep replicas web.yaml を打つ",
+          "fix": "行が無ければ、もう消してある。そのまま進む"
+        },
+        {
+          "symptom": "the path ... does not exist と出る",
+          "check": "pwd と ls を打つ",
+          "fix": "作業のフォルダにいない。cd で移ってから打つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/"
+    },
+    {
+      "id": "node-full",
+      "text": "ノードの空きの上限に当てます。",
+      "why": "HPA も手の増減も「増やして」と頼むだけです。置けるかは、スケジューラーが決めます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl delete pod load -n ch4 --ignore-not-found\nkubectl delete hpa web -n ch4 --ignore-not-found\ncat > room.yaml <<'EOF'\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: room\nspec:\n  replicas: 6\n  selector:\n    matchLabels:\n      app: room\n  template:\n    metadata:\n      labels:\n        app: room\n    spec:\n      terminationGracePeriodSeconds: 1\n      containers:\n      - name: web\n        image: nginx:1.27-alpine\n        resources:\n          requests:\n            cpu: 500m\nEOF\nkubectl apply -f room.yaml -n ch4\nsleep 20\nkubectl get pods -l app=room -n ch4\nkubectl describe node kcna | sed -n '/^Allocated/,/^Events/p' | grep cpu\nkubectl top node\nkubectl scale deployment room --replicas=2 -n ch4\nkubectl wait --for=condition=Available deployment/room -n ch4 --timeout=60s\nsleep 5\nkubectl get pods -l app=room -n ch4\nkubectl delete deployment room -n ch4"
+      },
+      "lines": [
+        {
+          "code": "kubectl delete pod load -n ch4 --ignore-not-found",
+          "text": "負荷が残っていれば消す。無くてもエラーにしない"
+        },
+        {
+          "code": "kubectl delete hpa web -n ch4 --ignore-not-found",
+          "text": "HPA を消す。数が動かないようにするため。もう無くてもエラーにしない"
+        },
+        {
+          "code": "cat > room.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま room.yaml というファイルに書く"
+        },
+        {
+          "code": "apiVersion: apps/v1",
+          "text": "使う API の種類と版"
+        },
+        {
+          "code": "kind: Deployment",
+          "text": "作るものの種類"
+        },
+        {
+          "code": "metadata:",
+          "text": "見分けるための情報"
+        },
+        {
+          "code": "  name: room",
+          "text": "名前"
+        },
+        {
+          "code": "spec:",
+          "text": "ほしい中身"
+        },
+        {
+          "code": "  replicas: 6",
+          "text": "Pod の数"
+        },
+        {
+          "code": "  selector:",
+          "text": "自分の Pod の見分け方"
+        },
+        {
+          "code": "    matchLabels:",
+          "text": "次のラベルが付いたもの"
+        },
+        {
+          "code": "      app: room",
+          "text": "app が room"
+        },
+        {
+          "code": "  template:",
+          "text": "作る Pod のひな型"
+        },
+        {
+          "code": "    metadata:",
+          "text": "作る Pod の情報"
+        },
+        {
+          "code": "      labels:",
+          "text": "ラベル"
+        },
+        {
+          "code": "        app: room",
+          "text": "app を room にする"
+        },
+        {
+          "code": "    spec:",
+          "text": "作る Pod の中身"
+        },
+        {
+          "code": "      terminationGracePeriodSeconds: 1",
+          "text": "消すときに待つ秒数の上限"
+        },
+        {
+          "code": "      containers:",
+          "text": "コンテナの一覧"
+        },
+        {
+          "code": "      - name: web",
+          "text": "コンテナの名前"
+        },
+        {
+          "code": "        image: nginx:1.27-alpine",
+          "text": "使うイメージ"
+        },
+        {
+          "code": "        resources:",
+          "text": "使う量の決まり"
+        },
+        {
+          "code": "          requests:",
+          "text": "予約"
+        },
+        {
+          "code": "            cpu: 500m",
+          "text": "0.5 コア"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "kubectl apply -f room.yaml -n ch4",
+          "text": "Deployment を作る"
+        },
+        {
+          "code": "sleep 20",
+          "text": "置き終わるまで 20 秒待つ"
+        },
+        {
+          "code": "kubectl get pods -l app=room -n ch4",
+          "text": "一覧を出す"
+        },
+        {
+          "code": "kubectl describe node kcna | sed -n '/^Allocated/,/^Events/p' | grep cpu",
+          "text": "ノードの CPU の予約を出す"
+        },
+        {
+          "code": "kubectl top node",
+          "text": "実際の使用量を出す"
+        },
+        {
+          "code": "kubectl scale deployment room --replicas=2 -n ch4",
+          "text": "2 に減らす"
+        },
+        {
+          "code": "kubectl wait --for=condition=Available deployment/room -n ch4 --timeout=60s",
+          "text": "全部使えるようになるまで待つ"
+        },
+        {
+          "code": "sleep 5",
+          "text": "片付くまで 5 秒待つ"
+        },
+        {
+          "code": "kubectl get pods -l app=room -n ch4",
+          "text": "一覧を出す"
+        },
+        {
+          "code": "kubectl delete deployment room -n ch4",
+          "text": "消す"
+        }
+      ],
+      "output": "horizontalpodautoscaler.autoscaling \"web\" deleted from ch4 namespace\ndeployment.apps/room created\nNAME                    READY   STATUS    RESTARTS   AGE\nroom-7ccc4f56d8-7zj7j   1/1     Running   0          21s\nroom-7ccc4f56d8-fhtvv   0/1     Pending   0          21s\nroom-7ccc4f56d8-grfwk   1/1     Running   0          21s\nroom-7ccc4f56d8-rkctc   0/1     Pending   0          21s\nroom-7ccc4f56d8-wnlzq   0/1     Pending   0          21s\nroom-7ccc4f56d8-xk2xr   1/1     Running   0          21s\n  cpu                1720m (86%)  0 (0%)\nNAME   CPU(cores)   CPU(%)   MEMORY(bytes)   MEMORY(%)\nkcna   792m         39%      1400Mi          71%\ndeployment.apps/room scaled\ndeployment.apps/room condition met\nNAME                    READY   STATUS    RESTARTS   AGE\nroom-7ccc4f56d8-7zj7j   1/1     Running   0          29s\nroom-7ccc4f56d8-xk2xr   1/1     Running   0          29s\ndeployment.apps \"room\" deleted from ch4 namespace",
+      "read": "6 つのうち、入りきる数だけ Running で、残りは Pending です。Requests の残りが、1 つ分 (500m = 25%) より少なくなったためです。実際の使用量が少なくても、予約で数えるので置けません。減らすと、Pending が無くなります。増やしても Pending が残るときは、予約を見直すか、ノードを足します。",
+      "trouble": [
+        {
+          "symptom": "全部 Running",
+          "check": "nproc を打つ",
+          "fix": "コアの多いノードでは入りきる。replicas を 12 などに替えて試す"
+        },
+        {
+          "symptom": "toomanyrequests や 429 と出る",
+          "check": "kubectl describe の Events で、Failed to pull image の行の終わりを見る",
+          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る。短い「429 Too Many Requests」だけのときは、使いすぎを防ぐ別の上限なので、数分待ってからもう一度行う"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/"
+    },
+    {
+      "id": "beyond",
+      "text": "ほかの増減の仕組みを、名前だけ知っておきます。VPA (VerticalPodAutoscaler) は、数ではなく requests の大きさを調整します。Cluster Autoscaler などは、Pending の Pod があるとノードの台数を増やします (クラウドなどの、台数を変えられる所で使います)。PodDisruptionBudget (中断の予算) は、ノードの手入れなどで同時に止めてよい Pod の数を決めます。",
+      "why": "どれも別に入れるか、ノードが何台も要るので、この章では動かしません。HPA が数、VPA が大きさ、ノードの増減が台数、と覚えると区別できます。",
+      "source": "https://kubernetes.io/docs/concepts/workloads/autoscaling/"
+    },
+    {
+      "id": "check-before-delete",
+      "text": "消す前に、どのマシンにいるかを見ます。kcna と出なければ、次の手順を打ちません。",
+      "why": "次の手順は名前空間をまるごと消し、元に戻せません。打つ場所を先に確かめます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "hostname"
+      },
+      "lines": [
+        {
+          "code": "hostname",
+          "text": "このマシンの名前を出す"
+        }
+      ],
+      "output": "kcna",
+      "read": "kcna と出れば、仮想マシンの中です。",
+      "trouble": [
+        {
+          "symptom": "kcna ではない名前が出る",
+          "check": "行の頭が ubuntu@kcna かを見る",
+          "fix": "ホストにいる。multipass shell kcna で入り、もう一度打つ"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man1/hostname.1.html"
+    },
+    {
+      "id": "delete-namespace",
+      "text": "名前空間 ch4 を消します。前の手順で kcna と出たときだけ打ちます。",
+      "why": "中に作ったものを、まとめて片付けるためです。次の章は、k3s の部品だけの状態から始めます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cd ~\nkubectl delete namespace ch4\nkubectl get namespaces"
+      },
+      "lines": [
+        {
+          "code": "cd ~",
+          "text": "ホームへ戻る"
+        },
+        {
+          "code": "kubectl delete namespace ch4",
+          "text": "ch4 を、中のものごと消す。終わるまで待つ"
+        },
+        {
+          "code": "kubectl get namespaces",
+          "text": "名前空間の一覧を出す"
+        }
+      ],
+      "output": "namespace \"ch4\" deleted\nNAME              STATUS   AGE\ndefault           Active   38m\nkube-node-lease   Active   38m\nkube-public       Active   38m\nkube-system       Active   38m",
+      "read": "ch4 が消え、default と kube- で始まる 4 つだけになれば、片付いています。手元の ~/ch4 の YAML は残るので、読み返せます。",
+      "trouble": [
+        {
+          "symptom": "消す行がしばらく止まる",
+          "check": "1 分ほど待つ",
+          "fix": "中の Pod が終わるのを待っている。そのまま待つ"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/"
+    },
+    {
+      "id": "leave",
+      "text": "仮想マシンから出ます。",
+      "why": "次は、ホストで控えを取るためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "exit"
+      },
+      "lines": [
+        {
+          "code": "exit",
+          "text": "今の端末を終える。仮想マシンは動き続ける"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "行の頭が、自分の PC のものに戻ります。",
+      "trouble": [
+        {
+          "symptom": "行の頭が ubuntu@kcna のまま",
+          "check": "もう一度見る",
+          "fix": "もう一度 exit を打つ"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man1/bash.1.html"
+    },
+    {
+      "id": "snapshot",
+      "text": "ホストで、この章を終えた状態の控えを ch4-end という名前で取り、仮想マシンに入り直します。",
+      "why": "次の章で失敗しても、ここへ戻れるようにするためです。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass stop kcna\nmultipass snapshot --name ch4-end kcna\nmultipass list --snapshots\nmultipass shell kcna"
+      },
+      "lines": [
+        {
+          "code": "multipass stop kcna",
+          "text": "止める。控えは、止まっているときだけ取れる。stop は動いている (Running) ときだけ打てる"
+        },
+        {
+          "code": "multipass snapshot --name ch4-end kcna",
+          "text": "今の状態を ch4-end という名前で控える"
+        },
+        {
+          "code": "multipass list --snapshots",
+          "text": "控えの一覧を出す"
+        },
+        {
+          "code": "multipass shell kcna",
+          "text": "止まっている kcna を動かし、中に入り直す"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "一覧に ch4-end が並べば取れています。戻すときは、止めてから multipass restore kcna.ch4-end を打ちます。今の状態も控えるかを聞かれたら、要らなければ no と答えます。最後の行で、行の頭が ubuntu@kcna:~$ に変わります。課題と後片付けは、この中で続けます。",
+      "trouble": [
+        {
+          "symptom": "止まっていないので取れないと出る",
+          "check": "multipass list で State を見る",
+          "fix": "multipass stop kcna で止めてから取る"
+        },
+        {
+          "symptom": "ch4-end がもうあると出る",
+          "check": "multipass list --snapshots を打つ",
+          "fix": "前の控えを使うか、--name ch4-endb のように別の名前にする"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/snapshot/"
+    }
+  ],
+  "cleanup": [
+    {
+      "id": "check-vm",
+      "text": "仮想マシンの中で、どのマシンにいるかを見ます。kcna と出なければ止まり、multipass shell kcna で入ります。",
+      "why": "次の手順は、つないでいるクラスターのものを消します。自分の PC の別のクラスターで打たないためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "hostname"
+      },
+      "lines": [
+        {
+          "code": "hostname",
+          "text": "このマシンの名前を出す"
+        }
+      ],
+      "output": "kcna",
+      "read": "kcna と出れば、仮想マシンの中です。",
+      "trouble": [
+        {
+          "symptom": "kcna ではない名前が出る",
+          "check": "行の頭が ubuntu@kcna かを見る",
+          "fix": "ホストにいる。multipass shell kcna で入り、もう一度打つ"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man1/hostname.1.html"
+    },
+    {
+      "id": "delete-practice",
+      "text": "仮想マシンの中で、課題で作った名前空間を消します。課題をしていなければ、何も起きません。",
+      "why": "次の章を、k3s の部品だけの状態から始めるためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl delete namespace practice --ignore-not-found\nkubectl get namespaces"
+      },
+      "lines": [
+        {
+          "code": "kubectl delete namespace practice --ignore-not-found",
+          "text": "practice を消す。無くてもエラーにしない (--ignore-not-found)"
+        },
+        {
+          "code": "kubectl get namespaces",
+          "text": "名前空間の一覧を出す"
+        }
+      ],
+      "output": "namespace \"practice\" deleted\nNAME              STATUS   AGE\ndefault           Active   46m\nkube-node-lease   Active   46m\nkube-public       Active   46m\nkube-system       Active   46m",
+      "read": "default と kube- で始まる 4 つだけになれば、片付いています。k3s は消しません。",
+      "trouble": [
+        {
+          "symptom": "消す行がしばらく止まる",
+          "check": "1 分ほど待つ",
+          "fix": "中の Pod が終わるのを待っている。そのまま待つ"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_delete/"
+    },
+    {
+      "id": "rest",
+      "text": "今日はここまでにするときは、exit で出てから、ホストで仮想マシンを止めます。止まっていれば (Stopped)、打ちません。",
+      "why": "動いている間は PC のメモリを使うためです。次の章でも使うので、消しません。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass stop kcna"
+      },
+      "lines": [
+        {
+          "code": "multipass stop kcna",
+          "text": "kcna を止める"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "続けるときは multipass shell kcna で、動かして中に入れます。k3s は自分で始まります。",
+      "trouble": [
+        {
+          "symptom": "止まったか分からない",
+          "check": "multipass list で State を見る",
+          "fix": "Stopped なら止まっている。Running なら、もう一度止める"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/stop/"
+    }
+  ],
+  "challenges": [
+    {
+      "task": "仮想マシンの中で、practice という名前空間に nginx:1.27-alpine の Deployment shop を 2 つで作り、CPU の requests を 10m にして、2〜5 個・目標 60% の HPA を付けてください。",
+      "hint": "create・set resources・autoscale の順です。",
+      "answer": "kubectl create namespace practice\nkubectl create deployment shop --image=nginx:1.27-alpine --replicas=2 -n practice\nkubectl set resources deployment shop --requests=cpu=10m -n practice\nkubectl rollout status deployment/shop -n practice --timeout=180s\nkubectl autoscale deployment shop --min=2 --max=5 --cpu=60% -n practice\nkubectl wait --for=condition=ScalingActive hpa/shop -n practice --timeout=240s\nkubectl get hpa shop -n practice",
+      "verify": "kubectl get hpa shop -n practice で、TARGETS が数字/60%、MINPODS 2、MAXPODS 5 なら正解です。"
+    },
+    {
+      "task": "仮想マシンの中で、zone=east のラベルが付いたノードにだけ置く Pod east を作り、Pending の理由を読んでから、ノードにラベルを付けて動かし、ラベルを外してください。",
+      "hint": "nodeSelector は --overrides でも書けます。",
+      "answer": "kubectl run east --image=nginx:1.27-alpine -n practice --overrides='{\"spec\":{\"nodeSelector\":{\"zone\":\"east\"}}}'\nsleep 5\nkubectl get events -n practice --field-selector involvedObject.name=east,reason=FailedScheduling -o custom-columns=MESSAGE:.message\nkubectl label node kcna zone=east\nkubectl wait --for=condition=Ready pod/east -n practice --timeout=120s\nkubectl label node kcna zone-",
+      "verify": "kubectl get pod east -n practice で、east が 1/1 の Running なら正解です。"
+    },
+    {
+      "task": "仮想マシンの中で、shop を手で 5 つにし、2 分後と、さらに 5 分後に、HPA が戻したかを見てください。",
+      "hint": "shop の HPA は autoscale で作ったので、減らす窓は既定の 300 秒です。",
+      "answer": "kubectl scale deployment shop --replicas=5 -n practice\nsleep 120\nkubectl get hpa shop -n practice\nsleep 300\nkubectl get hpa shop -n practice",
+      "verify": "7 分後に 2 に戻っていれば正解です。2 分後は、ふつう 5 のままです。増やした直後、使用量の無い Pod がある間に HPA が「今の数 5」を記録し、その記録が窓の 300 秒残るためです (この章を作ったときは、時刻を測った 2 回は、どちらも 5 分余りで戻りました)。戻る時機は、使用量が集まる早さで前後します。HPA が計算した時に新しい Pod がまだ Pending だと、その分を数えないので、2 分より前に 2 に戻ることもあります。"
+    }
+  ],
+  "sources": [
+    {
+      "label": "Kubernetes: Autoscaling Workloads",
+      "url": "https://kubernetes.io/docs/concepts/workloads/autoscaling/"
+    },
+    {
+      "label": "Kubernetes: Horizontal Pod Autoscaling",
+      "url": "https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/"
+    },
+    {
+      "label": "Kubernetes: HorizontalPodAutoscaler Walkthrough",
+      "url": "https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale-walkthrough/"
+    },
+    {
+      "label": "Kubernetes: Deployments",
+      "url": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"
+    },
+    {
+      "label": "Kubernetes: kube-scheduler",
+      "url": "https://kubernetes.io/docs/concepts/scheduling-eviction/kube-scheduler/"
+    },
+    {
+      "label": "Kubernetes: Assigning Pods to Nodes",
+      "url": "https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/"
+    },
+    {
+      "label": "Kubernetes: Taints and Tolerations",
+      "url": "https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/"
+    },
+    {
+      "label": "Kubernetes: Resource Management",
+      "url": "https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/"
+    },
+    {
+      "label": "Kubernetes: Resource metrics pipeline",
+      "url": "https://kubernetes.io/docs/tasks/debug/debug-cluster/resource-metrics-pipeline/"
+    },
+    {
+      "label": "Kubernetes: Service",
+      "url": "https://kubernetes.io/docs/concepts/services-networking/service/"
+    },
+    {
+      "label": "Kubernetes: Pod Disruption Budget",
+      "url": "https://kubernetes.io/docs/concepts/workloads/pods/disruptions/"
+    },
+    {
+      "label": "Kubernetes: Node Autoscaling",
+      "url": "https://kubernetes.io/docs/concepts/cluster-administration/node-autoscaling/"
+    },
+    {
+      "label": "kubectl scale",
+      "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_scale/"
+    },
+    {
+      "label": "kubectl autoscale",
+      "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_autoscale/"
+    },
+    {
+      "label": "K3s: Packaged Components (metrics-server)",
+      "url": "https://docs.k3s.io/installation/packaged-components"
+    },
+    {
+      "label": "Docker Hub: 取得の上限",
+      "url": "https://docs.docker.com/docker-hub/usage/"
+    },
+    {
+      "label": "Multipass: snapshot",
+      "url": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/snapshot/"
+    }
+  ]
+}
