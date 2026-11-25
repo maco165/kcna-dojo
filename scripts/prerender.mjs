@@ -314,7 +314,7 @@ export async function buildPages(load, { chapters } = {}) {
 
   // 実践: 一覧と章 (手順は全部の OS の分を書く。課題の答えは、画面と同じく折りたたむ)。chapters はテストが見本の章を渡すため
   const handsOn = await load('/src/content/handsOn.ts');
-  const { HANDS_ON_CHAPTERS } = await load('/src/content/handsOnChapters.ts');
+  const { HANDS_ON_CHAPTERS } = await load('/src/content/handsOnAll.ts');
   const { OS_LABEL, WHERE_LABEL } = await load('/src/lib/handsOn.ts');
   const { exercisesOf } = await load('/src/lib/lessonStatus.ts');
   const { COVERED_LEAD, COVERED_REST, chapterNo, chaptersOfLab, handsOnLabel, handsOnLinks, listedLabs, restLabs, REST_LEAD } = await load('/src/content/coveredLabs.ts');

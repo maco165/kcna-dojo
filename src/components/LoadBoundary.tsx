@@ -34,6 +34,7 @@ export function LoadFailed() {
       <Text type="large">画面を読み込めませんでした</Text>
       <Text type="supporting">回線が切れたか、サイトが新しい版になった可能性があります。</Text>
       <Button variant="primary" label="読み直す" onClick={() => window.location.reload()} />
+      <Button variant="ghost" label="トップへ" href={import.meta.env.BASE_URL} />
     </main>
   );
 }

@@ -162,6 +162,97 @@ async function checkChapterPage(page, width, tag, c, flow) {
   check(focused === 'ho-steps' && (await page.getByRole('checkbox', { checked: true }).count()) === 0, `${tag} 印を消すと、手順の見出しにフォーカスが移る (${focused})`);
 }
 
+/** 章だけにある文 (ほかの章には無く、軽い一覧にも入らない文。チャンクの中でも書き方の変わらない、引用符と改行の無いもの。コマンドはほかのデータにもあるので、日本語の文だけ) */
+const chapterTexts = (v) => (typeof v === 'string' ? [v] : v && typeof v === 'object' ? Object.values(v).flatMap(chapterTexts) : []);
+const ownTexts = (c) => {
+  const others = new Set(chapters.filter((x) => x.id !== c.id).flatMap(chapterTexts));
+  return [...new Set(chapterTexts([c.steps, c.cleanup, c.challenges, c.goal]))].filter((t) => t.length >= 30 && /[ぁ-ん]/.test(t) && !/["'\\\n`]|https?:/.test(t) && !others.has(t));
+};
+
+/**
+ * 章ごとの読み込み: 章の画面は、開いた章の本文だけを読む。章から章へ移ると次の章だけを足し、戻るで元の位置に戻る。
+ * 続けて移ったとき古い章が後から来ても替わらず、章のチャンクが 404 でも白紙にしない
+ */
+async function checkChapterLoading(context, tag) {
+  const [a, b, c] = chapters;
+  const bodyOf = (x) => readdirSync(new URL('../dist/assets/', import.meta.url)).filter((f) => f.endsWith('.js') && ownTexts(x).some((t) => readFileSync(new URL(`../dist/assets/${f}`, import.meta.url), 'utf8').includes(t)));
+  const chunk = new Map(chapters.map((x) => [x.id, bodyOf(x)]));
+  check(chapters.every((x) => ownTexts(x).length >= 10 && chunk.get(x.id).length === 1) && new Set([...chunk.values()].flat()).size === chapters.length, `${tag} 章の本文は 1 章 1 チャンク (${[...chunk.values()].flat().join(' ')})`);
+  const p = await context.newPage();
+  const texts = [];
+  p.on('response', async (r) => {
+    if (/\/assets\/.*\.js$/.test(r.url())) texts.push(r.text().catch(() => ''));
+  });
+  const loadedChapters = async () => {
+    const js = (await Promise.all(texts)).join('\n');
+    return chapters.filter((x) => ownTexts(x).some((t) => js.includes(t))).map((x) => x.id);
+  };
+  const shown = () => p.waitForFunction(() => !document.querySelector('#root > main.prerender') && !document.documentElement.dataset.loading);
+  await p.goto(`${BASE}hands-on/${a.id}/`);
+  await shown();
+  await p.waitForLoadState('networkidle');
+  check(JSON.stringify(await loadedChapters()) === JSON.stringify([a.id]), `${tag} 章の画面はほかの章のデータを読まない (${await loadedChapters()})`);
+  // 閉じた確かめの窓の中の欄は除く (src/lib/scrollMemory.ts の scroller と同じ)
+  const scroll = (to) => p.evaluate((y) => { const el = [...document.querySelectorAll('.astryx-layout-content')].find((e) => !e.closest('dialog')) ?? document.scrollingElement; if (y !== null) el.scrollTop = y; return el.scrollTop; }, to ?? null);
+  const scrollTop = () => scroll();
+  await scroll(1e6);
+  await p.waitForTimeout(500);
+  const left = await scrollTop();
+  await p.getByRole('navigation', { name: '前後の章' }).getByRole('link', { name: b.title }).click();
+  await p.getByRole('heading', { name: b.title, level: 1 }).waitFor();
+  await p.waitForTimeout(300);
+  check((await scrollTop()) === 0 && JSON.stringify(await loadedChapters()) === JSON.stringify([a.id, b.id]), `${tag} 次の章へ移ると、先頭から出て、その章だけを足して読む (${await loadedChapters()})`);
+  await p.goBack();
+  await p.getByRole('heading', { name: a.title, level: 1 }).waitFor();
+  await p.waitForTimeout(1200);
+  check(left > 1000 && Math.abs((await scrollTop()) - left) <= 60, `${tag} 戻ると、前の章の元の位置に戻る (${left} → ${await scrollTop()})`);
+  // 再読み込みのあとの「戻る」: 前の章をまだ読んでいないので、ゆっくり届いても元の位置に戻る
+  await p.goForward();
+  await p.getByRole('heading', { name: b.title, level: 1 }).waitFor();
+  await p.reload();
+  await shown();
+  await p.route(`**/assets/${chunk.get(a.id)[0]}`, async (r) => {
+    await new Promise((ok) => setTimeout(ok, 1500));
+    await r.continue();
+  });
+  await p.goBack();
+  await p.getByRole('heading', { name: a.title, level: 1 }).waitFor();
+  await p.waitForTimeout(1200);
+  check(Math.abs((await scrollTop()) - left) <= 60, `${tag} 再読み込みのあとの戻るでも、読み終えてから元の位置に戻る (${left} → ${await scrollTop()})`);
+  await p.unrouteAll({ behavior: 'ignoreErrors' });
+  // 知らない id
+  await p.goto(`${BASE}hands-on/no-such/`);
+  await p.getByRole('heading', { name: '見つかりませんでした' }).waitFor();
+  // 続けて移る: 一覧から b を開きかけて c へ。b はあとから届く
+  await p.goto(`${BASE}hands-on/`);
+  await shown();
+  await p.route(`**/assets/${chunk.get(b.id)[0]}`, async (r) => {
+    await new Promise((ok) => setTimeout(ok, 1500));
+    await r.continue();
+  });
+  await p.locator(`a.cmp-card[href$="/hands-on/${b.id}/"]`).click();
+  await p.locator(`a.cmp-card[href$="/hands-on/${c.id}/"]`).click();
+  await p.getByRole('heading', { name: c.title, level: 1 }).waitFor();
+  await p.waitForTimeout(2000);
+  check((await p.locator('h1').allInnerTexts()).join() === c.title && p.url().endsWith(`/hands-on/${c.id}/`), `${tag} 続けて移ったとき、後から届いた古い章に替わらない`);
+  await p.unrouteAll({ behavior: 'ignoreErrors' });
+  // 章のチャンクが 404: 1 回だけ読み直し、書き出した HTML を残す (白紙にしない)
+  await p.goto(`${BASE}hands-on/`);
+  await shown();
+  await p.route(`**/assets/${chunk.get(a.id)[0]}`, (r) => r.fulfill({ status: 404, body: '' }));
+  await p.locator(`a.cmp-card[href$="/hands-on/${a.id}/"]`).click();
+  await p.waitForFunction(() => document.querySelector('#root > main.prerender') !== null);
+  await p.waitForTimeout(800);
+  check((await p.locator('h1').first().innerText()) === a.title && (await p.evaluate(() => document.getElementById('root').innerText.length)) > 1000, `${tag} 章のチャンクが 404 でも、書き出した章を読める`);
+  // 2 回目 (この URL は読み直し済み): 前のページを別の URL で出したままにせず、読み直しを出す
+  await p.goto(`${BASE}hands-on/`);
+  await shown();
+  await p.locator(`a.cmp-card[href$="/hands-on/${a.id}/"]`).click();
+  await p.getByText('画面を読み込めませんでした').waitFor();
+  check(p.url().endsWith(`/hands-on/${a.id}/`), `${tag} 2 回読めなければ、読み直しを出す`);
+  await p.close();
+}
+
 /** 章の本文の幅・書き出した HTML・最初に読まないこと */
 async function checkChapterText(page, tag, c) {
   const wide = await page.evaluate(() => [...document.querySelectorAll('.hb-step__text, .ho-note, .ho-more, .hb-lead')].filter((e) => e.getBoundingClientRect().width > parseFloat(getComputedStyle(e).fontSize) * 40 + 1).length);
@@ -172,7 +263,7 @@ async function checkChapterText(page, tag, c) {
   // 章のデータは、章の画面を開いたときだけ読む
   const home = readFileSync(new URL('../dist/index.html', import.meta.url), 'utf8');
   const first = [...new Set([...home.matchAll(/\/kcna-dojo\/assets\/([^"]+\.js)/g)].map((m) => m[1]))].map((f) => readFileSync(new URL(`../dist/assets/${f}`, import.meta.url), 'utf8')).join('\n');
-  check(!first.includes(c.steps[0].why), `${tag} 章のデータは最初に読まない`);
+  check(ownTexts(c).every((t) => !first.includes(t)), `${tag} 章のデータは最初に読まない`);
 }
 
 /**
@@ -575,6 +666,7 @@ async function run(browser, name, width, height) {
   await page.goto(`${BASE}hands-on/no-such-chapter/`);
   await page.getByRole('heading', { name: '見つかりませんでした' }).waitFor();
   check(true, `${tag} 無い章を開いても壊れない`);
+  if (chapters.length >= 3) await checkChapterLoading(context, tag);
   for (const [i, c] of chapters.entries()) await checkChapterPage(page, width, tag, c, i === 0);
 
   // 9. このサイトについて と リポジトリへのリンク
