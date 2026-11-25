@@ -80,6 +80,13 @@ export function linkShell(line: string, commands: CommandBrief[]): { pieces: She
       i += 1;
       continue;
     }
+    // コマンドの前の「名前=値」(そのコマンドにだけ渡す環境変数) は飛ばす
+    const env = head ? rest.match(/^[A-Za-z_]\w*=(?:'[^']*'|"[^"$`]*"|[^\s'"$`|;&]*)\s+/)?.[0] : undefined;
+    if (env) {
+      plain += env;
+      i += env.length;
+      continue;
+    }
     if (head) {
       head = false;
       const dir = rest.match(/^\/(?:[\w.-]+\/)*/)?.[0] ?? '';

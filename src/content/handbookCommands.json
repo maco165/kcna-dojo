@@ -94,6 +94,10 @@
     ],
     "usedIn": [
       {
+        "topic": "application-delivery",
+        "label": "アプリを届ける流れ (CI/CD・GitOps・Helm・Kustomize)"
+      },
+      {
         "topic": "setup-k3s",
         "label": "ハンドブックを試すための k3s の入れ方"
       }
@@ -559,6 +563,26 @@
         "label": "ストレージ: ボリューム・PV・PVC・StorageClass"
       },
       {
+        "topic": "application-delivery",
+        "label": "アプリを届ける流れ (CI/CD・GitOps・Helm・Kustomize)"
+      },
+      {
+        "topic": "debugging",
+        "label": "動かないアプリの原因を探す"
+      },
+      {
+        "topic": "observability",
+        "label": "オブザーバビリティ: ログ・メトリクス・トレースで中を知る"
+      },
+      {
+        "topic": "cloud-native-principles",
+        "label": "クラウドネイティブの考え方と、それを支える標準・オートスケール"
+      },
+      {
+        "topic": "cloud-native-community",
+        "label": "クラウドネイティブのコミュニティと、一緒に作る仕組み"
+      },
+      {
         "topic": "setup-k3s",
         "label": "ハンドブックを試すための k3s の入れ方"
       }
@@ -641,6 +665,18 @@
       {
         "topic": "troubleshooting",
         "label": "障害対応: 状態・イベント・ログの順に読む"
+      },
+      {
+        "topic": "application-delivery",
+        "label": "アプリを届ける流れ (CI/CD・GitOps・Helm・Kustomize)"
+      },
+      {
+        "topic": "debugging",
+        "label": "動かないアプリの原因を探す"
+      },
+      {
+        "topic": "cloud-native-principles",
+        "label": "クラウドネイティブの考え方と、それを支える標準・オートスケール"
       },
       {
         "topic": "setup-k3s",
@@ -1023,6 +1059,10 @@
       {
         "topic": "storage",
         "label": "ストレージ: ボリューム・PV・PVC・StorageClass"
+      },
+      {
+        "topic": "debugging",
+        "label": "動かないアプリの原因を探す"
       }
     ]
   },
@@ -1199,6 +1239,10 @@
       {
         "topic": "containerization",
         "label": "コンテナ化: イメージ・ランタイム・CRI"
+      },
+      {
+        "topic": "application-delivery",
+        "label": "アプリを届ける流れ (CI/CD・GitOps・Helm・Kustomize)"
       }
     ]
   },
@@ -1288,6 +1332,10 @@
       {
         "topic": "containerization",
         "label": "コンテナ化: イメージ・ランタイム・CRI"
+      },
+      {
+        "topic": "application-delivery",
+        "label": "アプリを届ける流れ (CI/CD・GitOps・Helm・Kustomize)"
       }
     ]
   },
@@ -1346,6 +1394,22 @@
       {
         "topic": "troubleshooting",
         "label": "障害対応: 状態・イベント・ログの順に読む"
+      },
+      {
+        "topic": "application-delivery",
+        "label": "アプリを届ける流れ (CI/CD・GitOps・Helm・Kustomize)"
+      },
+      {
+        "topic": "debugging",
+        "label": "動かないアプリの原因を探す"
+      },
+      {
+        "topic": "observability",
+        "label": "オブザーバビリティ: ログ・メトリクス・トレースで中を知る"
+      },
+      {
+        "topic": "cloud-native-community",
+        "label": "クラウドネイティブのコミュニティと、一緒に作る仕組み"
       }
     ]
   },
@@ -1674,6 +1738,418 @@
       {
         "topic": "storage",
         "label": "ストレージ: ボリューム・PV・PVC・StorageClass"
+      },
+      {
+        "topic": "debugging",
+        "label": "動かないアプリの原因を探す"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-rollout-history",
+    "command": "kubectl rollout history",
+    "tool": "kubectl",
+    "summary": "Deployment などの、入れ替えの履歴 (リビジョン) を一覧します。",
+    "detail": "戻したい番号を調べるのに使います。--revision を付けると、その番号のときの Pod のひな形を出します。",
+    "usage": "kubectl rollout history (<種類> <名前> | <種類>/<名前>) [オプション]",
+    "flags": [
+      {
+        "flags": [
+          "--revision"
+        ],
+        "text": "その番号の中身を出す"
+      }
+    ],
+    "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_rollout/kubectl_rollout_history/",
+    "inside": [
+      "Deployment では、kubectl が、その Deployment の持つ ReplicaSet を API サーバーから読みます。古い版の ReplicaSet が、履歴の正体です。",
+      "ReplicaSet に付いた番号 (リビジョン) の順に並べ、CHANGE-CAUSE の欄には、アノテーション kubernetes.io/change-cause の値を出します。書いていなければ <none> です。",
+      "残しておく数は revisionHistoryLimit (既定は 10) で決まり、それより古いものは出ません。"
+    ],
+    "api": [
+      {
+        "method": "GET",
+        "path": "/apis/apps/v1/namespaces/<名前空間>/replicasets",
+        "note": "古い版を読む (Deployment の場合)"
+      }
+    ],
+    "examples": [
+      {
+        "title": "履歴を見る (形の例)",
+        "code": "$ kubectl rollout history deployment/web -n try-kcna",
+        "output": "deployment.apps/web\nREVISION  CHANGE-CAUSE\n1         <none>\n2         <none>",
+        "note": "2 回目の入れ替えまで終わった形です。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "Kubernetes: Deployments (Checking Rollout History)",
+        "url": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"
+      }
+    ],
+    "usedIn": [
+      {
+        "topic": "application-delivery",
+        "label": "アプリを届ける流れ (CI/CD・GitOps・Helm・Kustomize)"
+      }
+    ]
+  },
+  {
+    "id": "helm-create",
+    "command": "helm create",
+    "tool": "helm",
+    "summary": "チャート (Helm の包み) のひな形を、フォルダとして作ります。",
+    "detail": "nginx を動かす見本が最初から入っているので、そのまま helm install で試せます。クラスタには何も作りません。",
+    "usage": "helm create <名前> [オプション]",
+    "flags": [
+      {
+        "flags": [
+          "-p",
+          "--starter"
+        ],
+        "text": "使うひな形を選ぶ"
+      }
+    ],
+    "source": "https://helm.sh/docs/helm/helm_create/",
+    "inside": [
+      "手元に <名前> のフォルダを作り、Chart.yaml (名札)、values.yaml (既定の値)、templates (マニフェストのひな形)、charts (ほかのチャートを置く所) などを書きます。",
+      "同じ名前のフォルダやファイルがすでにあると、中のファイルが上書きされることがあります。",
+      "手元のファイルだけの作業なので、API サーバーにはつなぎません。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "作られるもの (Helm の文書の例。一部)",
+        "code": "$ helm create foo",
+        "output": "foo/\n├── .helmignore   # Contains patterns to ignore when packaging Helm charts.\n├── Chart.yaml    # Information about your chart\n├── values.yaml   # The default values for your templates\n├── charts/       # Charts that this chart depends on\n└── templates/    # The template files\n    └── tests/    # The test files",
+        "note": "文書にある、作られるフォルダの形です。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "helm.sh の Charts",
+        "url": "https://helm.sh/docs/topics/charts/"
+      }
+    ],
+    "usedIn": [
+      {
+        "topic": "application-delivery",
+        "label": "アプリを届ける流れ (CI/CD・GitOps・Helm・Kustomize)"
+      }
+    ]
+  },
+  {
+    "id": "helm-uninstall",
+    "command": "helm uninstall",
+    "tool": "helm",
+    "summary": "リリース (入れたもの) を外します。",
+    "detail": "そのリリースが作ったリソースを消し、履歴も消します。名前空間そのものは消しません。履歴を残したいときは --keep-history を付けます。",
+    "usage": "helm uninstall <リリース名> [オプション]",
+    "flags": [
+      {
+        "flags": [
+          "--keep-history"
+        ],
+        "text": "リソースは消し、履歴は残す"
+      },
+      {
+        "flags": [
+          "--dry-run"
+        ],
+        "text": "外さずに試す"
+      },
+      {
+        "flags": [
+          "--wait"
+        ],
+        "text": "消え終わるのを待つ"
+      }
+    ],
+    "source": "https://helm.sh/docs/helm/helm_uninstall/",
+    "inside": [
+      "helm が、名前空間にある、そのリリースの記録 (既定では Secret) を読み、最後の版で作ったリソースを調べます。",
+      "そのリソースを API サーバーに頼んで消します。",
+      "履歴の記録も消します。--keep-history なら記録を残し、外した印だけを付けます。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "外す (形の例)",
+        "code": "$ helm uninstall hello -n try-kcna",
+        "output": "release \"hello\" uninstalled"
+      }
+    ],
+    "sources": [
+      {
+        "label": "helm.sh の Using Helm",
+        "url": "https://helm.sh/docs/intro/using_helm/"
+      }
+    ],
+    "usedIn": [
+      {
+        "topic": "application-delivery",
+        "label": "アプリを届ける流れ (CI/CD・GitOps・Helm・Kustomize)"
+      }
+    ]
+  },
+  {
+    "id": "printf",
+    "command": "printf",
+    "tool": "Linux",
+    "summary": "形を決めて、文字を出します。",
+    "detail": "\\n と書くと改行になるので、複数の行を 1 行のコマンドで書けます。> と組み合わせると、ファイルに書けます。echo と違い、最後に改行を付けません。",
+    "usage": "printf <形> [値...]",
+    "flags": [],
+    "source": "https://man7.org/linux/man-pages/man1/printf.1.html",
+    "inside": [
+      "形の中の \\n (改行) などの印を読み替え、%s などの所に後ろの値を入れて、標準出力に書きます。",
+      "最後の改行も自分で書きます。書かないと、次の表示が同じ行に続きます。",
+      "多くのシェルでは、シェルの中の命令として動きます。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "2 行のファイルを書く (このページのために打った例)",
+        "code": "$ printf 'resources:\\n  - deployment.yaml\\n' > k.yaml\n$ cat k.yaml",
+        "output": "resources:\n  - deployment.yaml",
+        "note": "\\n の所で改行されています。"
+      }
+    ],
+    "sources": [],
+    "usedIn": [
+      {
+        "topic": "application-delivery",
+        "label": "アプリを届ける流れ (CI/CD・GitOps・Helm・Kustomize)"
+      }
+    ]
+  },
+  {
+    "id": "head",
+    "command": "head",
+    "tool": "Linux",
+    "summary": "最初の数行だけを出します。",
+    "detail": "何も付けなければ最初の 10 行です。-n 3 か -3 で行数を決めます。長い出力の、先頭だけを確かめたいときに使います。",
+    "usage": "head [オプション] [ファイル...]",
+    "flags": [
+      {
+        "flags": [
+          "-n",
+          "--lines"
+        ],
+        "text": "出す行数 (-3 のようにも書ける)"
+      }
+    ],
+    "source": "https://man7.org/linux/man-pages/man1/head.1.html",
+    "inside": [
+      "先頭から順に読み、決めた行数を出したら終わります。",
+      "パイプの右で先に終わると、左のコマンドは書く先が無くなり、そこで止まることがあります。左が途中で止まるのは異常ではありません。",
+      "ファイルを書かなければ、標準入力 (パイプの左の出力) を読みます。反対に、最後だけを見るコマンドは tail です。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "最初の 2 行 (このページのために打った例)",
+        "code": "$ printf '1\\n2\\n3\\n4\\n' | head -2",
+        "output": "1\n2"
+      }
+    ],
+    "sources": [],
+    "usedIn": [
+      {
+        "topic": "observability",
+        "label": "オブザーバビリティ: ログ・メトリクス・トレースで中を知る"
+      },
+      {
+        "topic": "cloud-native-principles",
+        "label": "クラウドネイティブの考え方と、それを支える標準・オートスケール"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-version",
+    "command": "kubectl version",
+    "tool": "kubectl",
+    "summary": "kubectl と、API サーバーの版を出します。",
+    "detail": "版の差が大きいと、使えない機能が出ます。公式では、kubectl と API サーバーの差は minor の版で 1 つまでが対応の範囲です。",
+    "usage": "kubectl version [オプション]",
+    "flags": [
+      {
+        "flags": [
+          "--client"
+        ],
+        "text": "手元の kubectl の版だけを出す (クラスタが無くても出る)"
+      },
+      {
+        "flags": [
+          "-o",
+          "--output"
+        ],
+        "text": "出力の形 (yaml か json)"
+      }
+    ],
+    "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_version/",
+    "inside": [
+      "kubectl が、自分に書き込まれた版 (Client Version) と、組み込みの Kustomize の版を出します。",
+      "API サーバーの /version を読み、Server Version を出します。つながらなければ、ここで失敗します。"
+    ],
+    "api": [
+      {
+        "method": "GET",
+        "path": "/version",
+        "note": "API サーバーの版を読む"
+      }
+    ],
+    "examples": [
+      {
+        "title": "手元の版だけを見る (このページのために打った例)",
+        "code": "$ kubectl version --client",
+        "output": "Client Version: v1.37.2\nKustomize Version: v5.8.1",
+        "note": "版は環境で変わります。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "Kubernetes: Version Skew Policy",
+        "url": "https://kubernetes.io/releases/version-skew-policy/"
+      }
+    ],
+    "usedIn": [
+      {
+        "topic": "cloud-native-community",
+        "label": "クラウドネイティブのコミュニティと、一緒に作る仕組み"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-api-versions",
+    "command": "kubectl api-versions",
+    "tool": "kubectl",
+    "summary": "API サーバーが受け付ける、API のグループと版を一覧します。",
+    "detail": "「グループ/版」の形で並びます。マニフェストの apiVersion に書けるものが分かります。",
+    "usage": "kubectl api-versions",
+    "flags": [],
+    "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_api-versions/",
+    "inside": [
+      "kubectl が、API サーバーに、どんな API のグループと版があるかを聞きます。",
+      "「グループ/版」の形に並べて出します。v1 のように / の無いものは、Pod や Service のある最初からのグループ (コア) です。",
+      "拡張 (CRD など) を入れたクラスタでは、その分も並びます。"
+    ],
+    "api": [
+      {
+        "method": "GET",
+        "path": "/apis",
+        "note": "グループと版を読む"
+      },
+      {
+        "method": "GET",
+        "path": "/api",
+        "note": "コアの版を読む"
+      }
+    ],
+    "examples": [
+      {
+        "title": "オートスケールの API の版を見る (このページのために打った例)",
+        "code": "$ kubectl api-versions | grep '^autoscaling/'",
+        "output": "autoscaling/v1\nautoscaling/v2",
+        "note": "HPA には 2 つの版があります。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "Kubernetes: The Kubernetes API (API groups)",
+        "url": "https://kubernetes.io/docs/concepts/overview/kubernetes-api/"
+      }
+    ],
+    "usedIn": [
+      {
+        "topic": "cloud-native-community",
+        "label": "クラウドネイティブのコミュニティと、一緒に作る仕組み"
+      }
+    ]
+  },
+  {
+    "id": "ps",
+    "command": "ps",
+    "tool": "Linux",
+    "summary": "動いているプロセス (プログラム) を一覧します。",
+    "detail": "何も付けなければ、その端末で自分が動かしているものだけです。-ef で全部を、-o で出す列を選べます。",
+    "usage": "ps [オプション]",
+    "flags": [
+      {
+        "flags": [
+          "-e"
+        ],
+        "text": "全部のプロセスを出す"
+      },
+      {
+        "flags": [
+          "-f"
+        ],
+        "text": "詳しい形で出す (親の番号や、打たれたコマンドの全体)"
+      },
+      {
+        "flags": [
+          "-o"
+        ],
+        "text": "出す列を選ぶ (pid は番号、ppid は親の番号、comm は名前)"
+      }
+    ],
+    "source": "https://man7.org/linux/man-pages/man1/ps.1.html",
+    "inside": [
+      "ps は /proc の中の、プロセスごとのフォルダを読みます。カーネルが、今のプロセスの情報をファイルの形で見せている所です。",
+      "選んだ列に並べて出します。ps が読んだ一瞬の様子なので、もう一度打つと変わることがあります。",
+      "コンテナの中で打つと、ふつうはそのコンテナのプロセスだけが見えます。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "番号・親の番号・名前を出す (一部) (このページのために打った例)",
+        "code": "$ ps -o pid,ppid,comm | head -3",
+        "output": "    PID    PPID COMMAND\n   1617       1 systemd\n   1654    1617 (sd-pam)",
+        "note": "端末の開き方で、出るものは変わります。PPID が親の番号です。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "man7.org の proc(5)",
+        "url": "https://man7.org/linux/man-pages/man5/proc.5.html"
+      }
+    ],
+    "usedIn": [
+      {
+        "topic": "debugging",
+        "label": "動かないアプリの原因を探す"
+      }
+    ]
+  },
+  {
+    "id": "exit",
+    "command": "exit",
+    "tool": "Linux",
+    "summary": "シェルを終わります。",
+    "detail": "kubectl exec や kubectl debug で入ったコンテナの中では、外 (手元のシェル) へ戻るのに使います。手元のシェルで打つと、その端末が閉じることがあります。数を付けると、その終了コードで終わります。",
+    "usage": "exit [終了コード]",
+    "flags": [],
+    "source": "https://man7.org/linux/man-pages/man1/exit.1p.html",
+    "inside": [
+      "exit は別のプログラムではなく、シェルの中の命令です。シェルが、付けた数を終了コードにして終わります。付けなければ、直前のコマンドの終了コードです。",
+      "0 は成功、そのほかは失敗を表します。コンテナの最初のプロセスが 0 でない数で終わると、Kubernetes は失敗と見ます。",
+      "スクリプトの中では、そこでスクリプトが終わります。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "終了コードを決めて終わる (このページのために打った例)",
+        "code": "$ sh -c 'exit 3'; echo \"rc=$?\"",
+        "output": "rc=3",
+        "note": "$? は直前のコマンドの終了コードです。"
+      }
+    ],
+    "sources": [],
+    "usedIn": [
+      {
+        "topic": "debugging",
+        "label": "動かないアプリの原因を探す"
       }
     ]
   }

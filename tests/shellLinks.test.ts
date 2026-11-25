@@ -29,6 +29,7 @@ describe('コマンドの行の中のコマンドをページへつなぐ', () =
     expect(ids('cat a 2>&1 | grep b')).toEqual(['cat', 'grep']);
     expect(ids('cp a `id -u` sh')).toEqual(['cp', 'id']);
     expect(ids('echo "a \\"; cp b"')).toEqual(['echo']);
+    expect(ids('curl a | K3S_URL=https://x:6443 K3S_TOKEN=t sh -')).toEqual(['curl', 'sh']);
     expect(linkShell('cpx a', COMMAND_BRIEFS).unknown).toEqual(['cpx']);
     expect(linkShell('sh/x a', COMMAND_BRIEFS).unknown).toEqual(['sh/x']);
   });
