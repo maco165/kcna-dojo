@@ -1,0 +1,1682 @@
+{
+  "id": "install-k3s",
+  "order": 1,
+  "title": "k3s を入れて、最初のコンテナを動かす",
+  "summary": "仮想マシンに k3s を入れ、ノード・部品・コンテナを自分の目で見ます。止める・再起動する・消して入れ直すところまで行い、壊してもやり直せるようにします。",
+  "goal": "k3s を版を決めて入れ、kubectl でコンテナを動かして中を見て、消して入れ直せるようになる",
+  "features": [
+    "k3s は、Kubernetes の部品を 1 つのプロセスにまとめている",
+    "kubectl は kubeconfig を読んで、API サーバーに頼む",
+    "コンテナはカーネルを共有し、ファイルとプロセスの見え方が分かれている",
+    "k3s を止めてもコンテナは動き続け、再起動すると自分で戻る",
+    "消すとクラスターの記録も消え、入れ直すと証明書が変わる"
+  ],
+  "minutes": 90,
+  "needs": [
+    "0 章で作った仮想マシン kcna (Ubuntu 24.04・2 コア・メモリ 2G 以上・ディスク 20G)",
+    "インターネットへの接続 (k3s とイメージを取ってきます)",
+    "出力について: 「仮想マシンの中」の出力は、2026-11-25 に Linux の QEMU の上で、Ubuntu 24.04 の公式のクラウドイメージ (x86_64・2 コア・2 GB・20 GB) を動かして取りました。Multipass を打つ手順は実機で確かめていないので、出力を載せていません。"
+  ],
+  "reads": [
+    {
+      "topic": "setup-k3s",
+      "label": "k3s の入れ方"
+    },
+    {
+      "topic": "k3s-vs-kubernetes",
+      "label": "k3s と Kubernetes の違い"
+    },
+    {
+      "topic": "core-concepts",
+      "label": "Kubernetes の中心の考え方"
+    },
+    {
+      "topic": "container-internals",
+      "label": "コンテナの仕組み"
+    }
+  ],
+  "steps": [
+    {
+      "id": "enter",
+      "text": "0 章で作った仮想マシンを動かし、中に入ります。",
+      "why": "この章のコマンドは、最初と最後のほかは全部、仮想マシンの中で打つためです。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass start kcna\nmultipass shell kcna"
+      },
+      "lines": [
+        {
+          "code": "multipass start kcna",
+          "text": "kcna を動かす。動いていれば、そのまま次へ進む"
+        },
+        {
+          "code": "multipass shell kcna",
+          "text": "kcna の中の端末を開く"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "行の頭が ubuntu@kcna:~$ に変われば、中に入っています。",
+      "trouble": [
+        {
+          "symptom": "multipass: command not found、または「認識されません」と出る",
+          "check": "端末を閉じて開き直し、multipass version を打つ",
+          "fix": "開き直しても出るなら、Multipass を入れる手順をもう一度行う"
+        },
+        {
+          "symptom": "kcna が無いと出る",
+          "check": "multipass list で名前を見る",
+          "fix": "0 章の「kcna という名前の仮想マシンを作ります」から始める"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/shell/"
+    },
+    {
+      "id": "words",
+      "text": "k3s は、小さくまとめた Kubernetes です。Kubernetes は、たくさんのコンテナを決めたとおりに動かし続ける仕組みです。動かす先のマシンを「ノード」、全体を「クラスター」と呼びます。この章では、ノードが 1 台のクラスターを作ります。",
+      "why": "Kubernetes を部品から組むと手間がかかります。k3s は 1 つのプログラムにまとまっているので、仮想マシン 1 台で、本物の Kubernetes の動きを見られるためです。",
+      "source": "https://docs.k3s.io/"
+    },
+    {
+      "id": "check-machine",
+      "text": "仮想マシンが、k3s の条件に足りるかを見ます。",
+      "why": "k3s の公式の最低は 2 コア・2 GB です。足りないまま入れると、止まる原因が分かりにくくなります。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "nproc\nfree -h\nuname -m\nsudo ufw status"
+      },
+      "lines": [
+        {
+          "code": "nproc",
+          "text": "コアの数を出す"
+        },
+        {
+          "code": "free -h",
+          "text": "メモリの大きさと空きを出す"
+        },
+        {
+          "code": "uname -m",
+          "text": "CPU の種類を出す"
+        },
+        {
+          "code": "sudo ufw status",
+          "text": "ファイアウォール (通信を止める仕組み) の ufw が動いているかを見る"
+        }
+      ],
+      "output": "@@",
+      "read": "コアは 2、Mem の total は 1.9Gi なら進めます (2G のうち、カーネルの使う分が引かれて出ます)。ufw は inactive (動いていない) が、k3s の勧める状態です。M 系の Mac では uname -m が aarch64 になりますが、k3s は対応しています。",
+      "trouble": [
+        {
+          "symptom": "nproc が 1、または Mem の total が 1Gi より小さい",
+          "check": "0 章の作る手順の --cpus と --memory を見返す",
+          "fix": "0 章の「完全に消す」を行い、作り直す"
+        },
+        {
+          "symptom": "Status: active と出る",
+          "check": "自分で ufw を有効にしたかを思い出す",
+          "fix": "練習用の仮想マシンなので sudo ufw disable で止める"
+        }
+      ],
+      "source": "https://docs.k3s.io/installation/requirements"
+    },
+    {
+      "id": "pick-version",
+      "text": "インストールスクリプトが、版をどう選ぶかを見ます。",
+      "why": "この章では、わざと 1 つ前のマイナー版 v1.36.6+k3s1 を入れます。12 章で v1.37 へ更新し、版を上げる流れを自分で動かすためです。v1.36 の 36 がマイナー版、最後の 6 が修正の番号 (パッチ版)、+k3s1 は k3s としての番号です。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "curl -sfL https://get.k3s.io | grep -n 'INSTALL_K3S_VERSION'"
+      },
+      "lines": [
+        {
+          "code": "curl -sfL https://get.k3s.io | grep -n 'INSTALL_K3S_VERSION'",
+          "text": "スクリプトを取ってきて、動かさずに、INSTALL_K3S_VERSION のある行だけを番号付きで出す"
+        }
+      ],
+      "output": "@@",
+      "read": "INSTALL_K3S_VERSION に値があれば、それを版として使う、と書いてあります。何も書かないと stable (安定版) の版になり、2026-11-25 では v1.37.2+k3s1 です。行の番号は、スクリプトが新しくなると変わります。",
+      "trouble": [
+        {
+          "symptom": "何も出ない",
+          "check": "curl -I https://get.k3s.io を打ち、エラーを見る",
+          "fix": "Could not resolve host なら 0 章の curl の手順に戻り、ネットワークを確かめる"
+        }
+      ],
+      "source": "https://docs.k3s.io/upgrades/manual"
+    },
+    {
+      "id": "install",
+      "text": "k3s を入れます。1〜3 分かかります。",
+      "why": "Kubernetes の部品と kubectl (Kubernetes に頼むコマンド) を、まとめて入れるためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=v1.36.6+k3s1 sh -"
+      },
+      "lines": [
+        {
+          "code": "curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=v1.36.6+k3s1 sh -",
+          "text": "公式のスクリプトを取ってきて (curl)、そのままシェルに渡して動かす (| sh -)。-sfL は「余計な表示をしない・取れなければ失敗にする・移転先へたどる」。INSTALL_K3S_VERSION で版を決める"
+        }
+      ],
+      "output": "@@",
+      "read": "Downloading binary で k3s を取り、Verifying で壊れていないかを確かめ、kubectl と crictl を置き、最後に systemd: Starting k3s で動かしています。[ERROR] の行が無ければ成功です。systemd は、Linux でサービス (裏で動き続けるプログラム) を世話する仕組みです。",
+      "trouble": [
+        {
+          "symptom": "[ERROR]  Download failed と出る",
+          "check": "その上の Using の行で、版のつづりを見る",
+          "fix": "無い版 (例: v1.36.99+k3s1) を書くと、ハッシュを取るところで止まる。v1.36.6+k3s1 に直してもう一度打つ"
+        },
+        {
+          "symptom": "Using v1.37.2+k3s1 など、違う版が出る",
+          "check": "打った行に INSTALL_K3S_VERSION があるかを見る",
+          "fix": "k3s-uninstall.sh で消し (後の手順にある)、版を書いて入れ直す"
+        },
+        {
+          "symptom": "Job for k3s.service failed と出る",
+          "check": "sudo journalctl -u k3s --no-pager -n 20 で、最後の記録を見る",
+          "fix": "メモリかディスクが足りないなら、0 章から大きくして作り直す"
+        }
+      ],
+      "source": "https://docs.k3s.io/quick-start"
+    },
+    {
+      "id": "service",
+      "text": "k3s がサービスとして動いているかを見ます。",
+      "why": "入れただけでなく、動き続け、再起動のあとも自動で始まるかを確かめるためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "systemctl is-active k3s\nsystemctl is-enabled k3s\nsystemctl show k3s -p MainPID -p ExecStart --no-pager | cut -c1-80"
+      },
+      "lines": [
+        {
+          "code": "systemctl is-active k3s",
+          "text": "今、動いているかを出す"
+        },
+        {
+          "code": "systemctl is-enabled k3s",
+          "text": "マシンの起動のときに自動で始まるかを出す"
+        },
+        {
+          "code": "systemctl show k3s -p MainPID -p ExecStart --no-pager | cut -c1-80",
+          "text": "親のプロセスの番号 (MainPID) と、始めるときに打つコマンド (ExecStart) を出す。長いので、cut で行の頭の 80 字だけにする"
+        }
+      ],
+      "output": "@@",
+      "read": "active が「動いている」、enabled が「次の起動でも自動で始まる」です。ExecStart の path から、/usr/local/bin/k3s が動かされていると分かります。",
+      "trouble": [
+        {
+          "symptom": "activating と出る",
+          "check": "10 秒ほど待って、もう一度打つ",
+          "fix": "始まる途中なので、active になるまで待つ"
+        },
+        {
+          "symptom": "failed と出る",
+          "check": "sudo journalctl -u k3s --no-pager -n 20 を打つ",
+          "fix": "出てきた理由を直し、sudo systemctl restart k3s を打つ"
+        },
+        {
+          "symptom": "Unit k3s.service could not be found と出る",
+          "check": "ls /usr/local/bin に k3s があるかを見る",
+          "fix": "無ければ、入れる手順をもう一度行う"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man1/systemctl.1.html"
+    },
+    {
+      "id": "kubectl-denied",
+      "text": "わざと、準備をせずに kubectl を打ちます。",
+      "why": "kubectl は、接続の情報のファイル (kubeconfig) を読んで、つなぐ先と自分の証明書を決めます。それを読めないと何が起きるかを見ます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "ls -l /etc/rancher/k3s/k3s.yaml\nkubectl get nodes"
+      },
+      "lines": [
+        {
+          "code": "ls -l /etc/rancher/k3s/k3s.yaml",
+          "text": "k3s が作った接続の情報のファイルの、権限と持ち主を見る"
+        },
+        {
+          "code": "kubectl get nodes",
+          "text": "ノードの一覧を頼む"
+        }
+      ],
+      "output": "@@",
+      "read": "ファイルは -rw------- で、持ち主は root です。読めるのは root だけなので、permission denied と断られます。文に --write-kubeconfig-mode で読めるようにする案が出ますが、誰でも読めるようにはせず、次の手順で自分用に写します。",
+      "trouble": [
+        {
+          "symptom": "permission denied ではなく一覧が出る",
+          "check": "echo $KUBECONFIG を打つ",
+          "fix": "前に設定してある。そのまま次へ進む"
+        },
+        {
+          "symptom": "No such file or directory と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "active になってから打つ"
+        }
+      ],
+      "source": "https://docs.k3s.io/cluster-access"
+    },
+    {
+      "id": "kubeconfig",
+      "text": "接続の情報を自分用に写し、kubectl に場所を教えます。",
+      "why": "このファイルがあれば、クラスターで何でもできます。だから元のファイルの権限は広げず、自分だけが読める写しを作ります。人に渡さないでください。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "mkdir -p ~/.kube\nsudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/k3s.yaml\nsudo chown \"$(id -u):$(id -g)\" ~/.kube/k3s.yaml\nchmod 600 ~/.kube/k3s.yaml\nexport KUBECONFIG=~/.kube/k3s.yaml\necho 'export KUBECONFIG=~/.kube/k3s.yaml' >> ~/.bashrc\nls -l ~/.kube/k3s.yaml"
+      },
+      "lines": [
+        {
+          "code": "mkdir -p ~/.kube",
+          "text": "自分のホームに .kube というフォルダを作る。もうあれば何もしない (-p)"
+        },
+        {
+          "code": "sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/k3s.yaml",
+          "text": "root しか読めない元のファイルを、sudo で写す"
+        },
+        {
+          "code": "sudo chown \"$(id -u):$(id -g)\" ~/.kube/k3s.yaml",
+          "text": "写しの持ち主を、root から自分に変える。$( ) は、中のコマンドの出力に置き換わる"
+        },
+        {
+          "code": "chmod 600 ~/.kube/k3s.yaml",
+          "text": "自分だけが読み書きできるようにする"
+        },
+        {
+          "code": "export KUBECONFIG=~/.kube/k3s.yaml",
+          "text": "kubectl に「このファイルを使って」と教える。今の端末だけで効く"
+        },
+        {
+          "code": "echo 'export KUBECONFIG=~/.kube/k3s.yaml' >> ~/.bashrc",
+          "text": "上の行を ~/.bashrc の最後に足す (>>)。次に入ったときは、自動で読まれる"
+        },
+        {
+          "code": "ls -l ~/.kube/k3s.yaml",
+          "text": "写しの権限と持ち主を見る"
+        }
+      ],
+      "output": "@@",
+      "read": "-rw------- で、持ち主が ubuntu に変わっています。echo の行を何度も打つと ~/.bashrc に同じ行が増えるので、1 回だけ打ちます。",
+      "trouble": [
+        {
+          "symptom": "cp: cannot open '/etc/rancher/k3s/k3s.yaml' for reading: Permission denied と出る",
+          "check": "cp の前に sudo があるかを見る",
+          "fix": "sudo を付けて打ち直す"
+        },
+        {
+          "symptom": "入り直すと、また permission denied と出る",
+          "check": "tail -n 1 ~/.bashrc を打つ",
+          "fix": "export の行が無ければ、echo の行を打ってから exit で出て、入り直す"
+        }
+      ],
+      "source": "https://docs.k3s.io/cluster-access"
+    },
+    {
+      "id": "node",
+      "text": "ノードの準備ができるのを待ち、版を見ます。",
+      "why": "クラスターに頼めるようになったこと、入れた版が思ったとおりかを確かめるためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl wait --for=create node/kcna --timeout=60s\nkubectl wait --for=condition=Ready node/kcna --timeout=180s\nkubectl get nodes -o wide\nkubectl version"
+      },
+      "lines": [
+        {
+          "code": "kubectl wait --for=create node/kcna --timeout=60s",
+          "text": "kcna というノードが登録されるまで、最大 60 秒待つ。入れた直後は、まだ無いことがある"
+        },
+        {
+          "code": "kubectl wait --for=condition=Ready node/kcna --timeout=180s",
+          "text": "kcna というノードが Ready (準備完了) になるまで、最大 180 秒待つ"
+        },
+        {
+          "code": "kubectl get nodes -o wide",
+          "text": "ノードの一覧を、詳しい列 (-o wide) まで出す"
+        },
+        {
+          "code": "kubectl version",
+          "text": "kubectl (Client) と、クラスター (Server) の版を出す"
+        }
+      ],
+      "output": "@@",
+      "read": "STATUS が Ready、VERSION が v1.36.6+k3s1 なら成功です。CONTAINER-RUNTIME は、コンテナを動かす部品が containerd だという印です。登録された直後は ROLES が <none> で、少しすると control-plane (クラスターを管理する側) に変わります。INTERNAL-IP は仮想マシンの住所で、PC ごとに違います。",
+      "trouble": [
+        {
+          "symptom": "STATUS が NotReady",
+          "check": "30 秒ほど待って、もう一度打つ",
+          "fix": "入れた直後は NotReady で正常。1 分以上続くなら sudo journalctl -u k3s --no-pager -n 20 を見る"
+        },
+        {
+          "symptom": "nodes \"kcna\" not found と出る",
+          "check": "kubectl get nodes と hostname を打つ",
+          "fix": "入れた直後なら少し待つ。名前が違うなら、その名前に変えて打つ"
+        },
+        {
+          "symptom": "localhost:8080 was refused と出る",
+          "check": "echo $KUBECONFIG と ls ~/.kube を打つ",
+          "fix": "書いた場所にファイルが無い。前の手順をもう一度行う"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/architecture/nodes/"
+    },
+    {
+      "id": "system-pods",
+      "text": "k3s と一緒に動いている部品を見ます。",
+      "why": "Kubernetes は、自分の部品の一部も Pod として動かします。Pod は、コンテナを 1 つ以上まとめた、動かす単位です。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl wait --for=create deployment/traefik -n kube-system --timeout=300s\nkubectl wait --for=condition=Complete job --all -n kube-system --timeout=300s\nkubectl rollout status deployment/coredns deployment/local-path-provisioner deployment/metrics-server deployment/traefik -n kube-system --timeout=300s\nkubectl get pods -n kube-system"
+      },
+      "lines": [
+        {
+          "code": "kubectl wait --for=create deployment/traefik -n kube-system --timeout=300s",
+          "text": "traefik という部品が作られるまで待つ。いちばん最後に作られるので、ほかの部品もそろう。-n は名前空間を選ぶ書き方"
+        },
+        {
+          "code": "kubectl wait --for=condition=Complete job --all -n kube-system --timeout=300s",
+          "text": "準備の作業 (Job) が全部終わるまで待つ"
+        },
+        {
+          "code": "kubectl rollout status deployment/coredns deployment/local-path-provisioner deployment/metrics-server deployment/traefik -n kube-system --timeout=300s",
+          "text": "4 つの部品が使えるようになるまで待つ"
+        },
+        {
+          "code": "kubectl get pods -n kube-system",
+          "text": "kube-system という名前空間の Pod を出す"
+        }
+      ],
+      "output": "@@",
+      "read": "coredns は名前から住所を引く部品、traefik は外からの入口、local-path-provisioner は保存場所を用意する部品、metrics-server は使用量を集める部品です。svclb-traefik は入口の番号 (80 と 443) を受ける部品です。helm-install- で始まる Pod は、traefik を入れる作業が終わったものなので、Completed が正常です。RESTARTS の数が 0 でなくても、Running か Completed なら進めます。",
+      "trouble": [
+        {
+          "symptom": "ContainerCreating が続く",
+          "check": "kubectl describe pod -n kube-system を打ち、Events を見る",
+          "fix": "イメージを取っている途中なら待つ。名前を引けないなら、ネットワークを確かめる"
+        },
+        {
+          "symptom": "no matching resources found や not found と出る",
+          "check": "1 行目 (--for=create) が終わる前に、次の行へ進んでいないかを見る",
+          "fix": "入れた直後で、まだ部品が無い。1 行目から打ち直す"
+        },
+        {
+          "symptom": "helm-install-traefik が CrashLoopBackOff になる",
+          "check": "1 分ほど待って、もう一度 kubectl get pods -n kube-system を打つ",
+          "fix": "先に要る部品を待って、作業をやり直している途中。Completed になれば問題ない"
+        },
+        {
+          "symptom": "timed out waiting for the condition と出る",
+          "check": "kubectl get pods -n kube-system を打つ",
+          "fix": "取ってくるのが遅いだけのことが多い。もう一度打って待つ"
+        }
+      ],
+      "source": "https://docs.k3s.io/installation/packaged-components"
+    },
+    {
+      "id": "server-process",
+      "text": "k3s のプロセス (動いているプログラム) を見ます。",
+      "why": "ほかの入れ方では、API サーバーやスケジューラーが別のプロセスになります。k3s がどうまとめているかを、目で確かめます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "ps -C k3s-server -o pid,user,args\npgrep -a kube\nsudo ss -tlnp | grep -E ':(6443|10250|10257|10259) '"
+      },
+      "lines": [
+        {
+          "code": "ps -C k3s-server -o pid,user,args",
+          "text": "k3s-server という名前のプロセスの、番号・持ち主・打った行を出す"
+        },
+        {
+          "code": "pgrep -a kube",
+          "text": "名前に kube の付くプロセスを探す"
+        },
+        {
+          "code": "sudo ss -tlnp | grep -E ':(6443|10250|10257|10259) '",
+          "text": "待ち受けている番号 (ポート) のうち、Kubernetes の部品の 4 つを出す。6443 は API サーバー、10250 は kubelet、10257 は controller-manager、10259 は scheduler"
+        }
+      ],
+      "output": "@@",
+      "read": "pgrep は何も出しません。kube-apiserver などの別のプロセスは無く、4 つのポートは全部、k3s-server という 1 つのプロセス (pid が同じ) が持っています。部品は無いのではなく、1 つの中に入っています。",
+      "trouble": [
+        {
+          "symptom": "ps が見出しだけになる",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "active になってから打つ"
+        },
+        {
+          "symptom": "ss の行に users が出ない",
+          "check": "sudo を付けたかを見る",
+          "fix": "sudo を付けて打つ"
+        }
+      ],
+      "source": "https://docs.k3s.io/"
+    },
+    {
+      "id": "datastore",
+      "text": "クラスターの記録が置かれている場所を見ます。",
+      "why": "Kubernetes は「こうなっていてほしい」という状態を、データベースに残します。k3s が 1 台のときに何を使うかを見るためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "sudo ls -lh /var/lib/rancher/k3s/server/db"
+      },
+      "lines": [
+        {
+          "code": "sudo ls -lh /var/lib/rancher/k3s/server/db",
+          "text": "記録の置き場所の中身を、大きさと一緒に出す"
+        }
+      ],
+      "output": "@@",
+      "read": "state.db が記録の本体です。SQLite という、1 つのファイルに収まるデータベースです。ノードが 1 台の k3s は、これを使います。大きな構成では、etcd という別のデータベースを使います。",
+      "trouble": [
+        {
+          "symptom": "ls: cannot open directory ... Permission denied と出る",
+          "check": "sudo を付けたかを見る",
+          "fix": "sudo を付けて打つ"
+        }
+      ],
+      "source": "https://docs.k3s.io/datastore"
+    },
+    {
+      "id": "crictl",
+      "text": "コンテナを動かしている containerd に、直接聞きます。",
+      "why": "kubectl は API サーバーに聞きます。crictl は、ノードの中の containerd に聞きます。Kubernetes の下で、誰がコンテナを動かしているかを見るためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "ps -C containerd -o pid,user,args\nsudo crictl ps\nsudo crictl images"
+      },
+      "lines": [
+        {
+          "code": "ps -C containerd -o pid,user,args",
+          "text": "containerd のプロセスを出す"
+        },
+        {
+          "code": "sudo crictl ps",
+          "text": "動いているコンテナを出す。crictl は、コンテナを動かす部品に聞くコマンド"
+        },
+        {
+          "code": "sudo crictl images",
+          "text": "取ってきたイメージ (コンテナのもと) を出す"
+        }
+      ],
+      "output": "@@",
+      "read": "POD の列の名前は、さっきの Pod の名前と同じです。svclb-traefik の Pod には、lb-tcp-80 と lb-tcp-443 の 2 つのコンテナがあります。1 つの Pod に、コンテナが 2 つ入ることもあるためです。イメージの pause は、Pod の土台になる小さなコンテナのものです。",
+      "trouble": [
+        {
+          "symptom": "permission denied と fatal の行が出る",
+          "check": "sudo を付けたかを見る",
+          "fix": "sudo crictl ps と打つ。一般の利用者は、設定のファイルを読めない"
+        },
+        {
+          "symptom": "connection refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "k3s を止めると containerd も止まる。sudo systemctl start k3s で始める"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/tasks/debug/debug-cluster/crictl/"
+    },
+    {
+      "id": "namespace",
+      "text": "練習用の名前空間 first-k3s を作ります。",
+      "why": "名前空間は、クラスターの中を分ける入れ物です。分けておくと、ほかのものと混ざらず、まとめて消せます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl create namespace first-k3s\nkubectl get namespaces"
+      },
+      "lines": [
+        {
+          "code": "kubectl create namespace first-k3s",
+          "text": "first-k3s という名前空間を作る"
+        },
+        {
+          "code": "kubectl get namespaces",
+          "text": "名前空間の一覧を出す"
+        }
+      ],
+      "output": "@@",
+      "read": "first-k3s が Active で並べば成功です。default は何も書かないときの場所、kube-system は k3s の部品の場所です。kube-public と kube-node-lease も、最初からあります。",
+      "trouble": [
+        {
+          "symptom": "AlreadyExists と出る",
+          "check": "kubectl get namespaces を打つ",
+          "fix": "もうあるので、そのまま進む"
+        },
+        {
+          "symptom": "permission denied と出る",
+          "check": "echo $KUBECONFIG を打つ",
+          "fix": "空なら export KUBECONFIG=~/.kube/k3s.yaml を打つ"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/"
+    },
+    {
+      "id": "run",
+      "text": "最初のコンテナを、Pod として動かします。",
+      "why": "Web サーバーの nginx を 1 つ動かし、頼んでから動くまでを見るためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl run web --image=nginx:1.27-alpine -n first-k3s\nkubectl wait --for=condition=Ready pod/web -n first-k3s --timeout=180s\nkubectl get pods -n first-k3s -o wide"
+      },
+      "lines": [
+        {
+          "code": "kubectl run web --image=nginx:1.27-alpine -n first-k3s",
+          "text": "web という Pod を、nginx のイメージから作る。: の後ろは版の名札 (タグ)"
+        },
+        {
+          "code": "kubectl wait --for=condition=Ready pod/web -n first-k3s --timeout=180s",
+          "text": "Pod が使えるようになるまで待つ"
+        },
+        {
+          "code": "kubectl get pods -n first-k3s -o wide",
+          "text": "Pod の一覧を、詳しい列まで出す"
+        }
+      ],
+      "output": "@@",
+      "read": "READY の 1/1 は、コンテナ 1 つのうち 1 つが使えるという意味です。IP は Pod の住所で、10.42. で始まります。NODE は、動いているノードです。",
+      "trouble": [
+        {
+          "symptom": "pods \"web\" already exists と出る",
+          "check": "kubectl get pods -n first-k3s を打つ",
+          "fix": "もうあるので、そのまま進む。作り直すなら kubectl delete pod web -n first-k3s を先に打つ"
+        },
+        {
+          "symptom": "serviceaccount \"default\" not found と出る",
+          "check": "kubectl get serviceaccounts -n first-k3s を打つ",
+          "fix": "名前空間を作った直後は、まだ準備中のことがある。数秒待ってもう一度打つ"
+        },
+        {
+          "symptom": "a lowercase RFC 1123 と長い文が出る",
+          "check": "名前に大文字が無いかを見る",
+          "fix": "Pod の名前は小文字にする (Web ではなく web)"
+        },
+        {
+          "symptom": "kubectl get pods で No resources found と出る",
+          "check": "-n first-k3s を付けたかを見る",
+          "fix": "付けないと default を見る。-n first-k3s を付ける。名前空間のつづりを間違えても同じ文が出る"
+        },
+        {
+          "symptom": "namespaces \"first-k3s\" not found と出る",
+          "check": "kubectl get namespaces を打つ",
+          "fix": "無ければ kubectl create namespace first-k3s で作る"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_run/"
+    },
+    {
+      "id": "events",
+      "text": "Pod が動くまでに起きたことを見ます。",
+      "why": "動かないときに、最初に見る場所だからです。うまくいったときの形を知っておくと、違いに気付けます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl describe pod web -n first-k3s | sed -n '/^Events/,$p'"
+      },
+      "lines": [
+        {
+          "code": "kubectl describe pod web -n first-k3s | sed -n '/^Events/,$p'",
+          "text": "Pod の詳しい説明のうち、Events の行から後ろだけを出す"
+        }
+      ],
+      "output": "@@",
+      "read": "Scheduled (置くノードが決まった)、Pulling (イメージを取る)、Pulled (取れた)、Created (コンテナを作った)、Started (始めた) の順です。From の列は、誰がしたかです。置き場所を決めるのは scheduler、動かすのは kubelet です。イメージを前に取っていると、Pulling の行は出ず、already present と出ます。",
+      "trouble": [
+        {
+          "symptom": "pods \"web\" not found と出る",
+          "check": "kubectl get pods -n first-k3s を打つ",
+          "fix": "無ければ、前の手順で作る"
+        },
+        {
+          "symptom": "Events が <none> になる",
+          "check": "AGE を見る",
+          "fix": "時間がたつと、イベントは消える。Pod を消して作り直すと、また出る"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_describe/"
+    },
+    {
+      "id": "inside",
+      "text": "コンテナの中でコマンドを打ち、仮想マシンと比べます。",
+      "why": "コンテナは小さな仮想マシンではありません。カーネル (Linux の中心) はノードと同じものを使い、ファイルとプロセスの見え方だけが分けられています。それを確かめます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl exec web -n first-k3s -- grep PRETTY_NAME /etc/os-release\ngrep PRETTY_NAME /etc/os-release\nkubectl exec web -n first-k3s -- uname -r\nuname -r\nkubectl exec web -n first-k3s -- ps\nps -C nginx -o pid,user,args"
+      },
+      "lines": [
+        {
+          "code": "kubectl exec web -n first-k3s -- grep PRETTY_NAME /etc/os-release",
+          "text": "Pod の中で grep を打つ。-- の後ろが中で動くコマンド"
+        },
+        {
+          "code": "grep PRETTY_NAME /etc/os-release",
+          "text": "同じことを、仮想マシンで打つ"
+        },
+        {
+          "code": "kubectl exec web -n first-k3s -- uname -r",
+          "text": "Pod の中から見たカーネルの版"
+        },
+        {
+          "code": "uname -r",
+          "text": "仮想マシンのカーネルの版"
+        },
+        {
+          "code": "kubectl exec web -n first-k3s -- ps",
+          "text": "Pod の中から見たプロセス"
+        },
+        {
+          "code": "ps -C nginx -o pid,user,args",
+          "text": "仮想マシンから見た nginx のプロセス"
+        }
+      ],
+      "output": "@@",
+      "read": "OS の名前は Alpine と Ubuntu で違います (ファイルが別)。カーネルの版は同じです (カーネルは共通)。同じ nginx でも、中からは 1 番、仮想マシンからは別の番号に見えます (プロセスの見え方が別)。仮想マシンの側の利用者の名前が変わって見えるのは、同じ番号に、別の名前が付いているためです。",
+      "trouble": [
+        {
+          "symptom": "container not found (\"web\") と出る",
+          "check": "kubectl get pods -n first-k3s で STATUS を見る",
+          "fix": "Running になってから打つ"
+        },
+        {
+          "symptom": "exec: \"bash\": executable file not found と出る",
+          "check": "打ったコマンドがイメージに入っているかを考える",
+          "fix": "alpine のイメージに bash は無い。sh を使う"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_exec/"
+    },
+    {
+      "id": "logs",
+      "text": "コンテナが書いた記録を見ます。",
+      "why": "中に入らなくても、動きが分かるためです。落ちたコンテナの理由も、まず記録で見ます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl logs web -n first-k3s --tail=5"
+      },
+      "lines": [
+        {
+          "code": "kubectl logs web -n first-k3s --tail=5",
+          "text": "web のコンテナの記録を、最後の 5 行だけ出す"
+        }
+      ],
+      "output": "@@",
+      "read": "start worker process は、nginx が働くプロセスを始めたという記録です。",
+      "trouble": [
+        {
+          "symptom": "is waiting to start: ContainerCreating と出る",
+          "check": "kubectl get pods -n first-k3s を打つ",
+          "fix": "まだ始まっていない。Running になってから打つ"
+        },
+        {
+          "symptom": "pods \"web\" not found in namespace と出る",
+          "check": "-n の後ろの名前空間を見る",
+          "fix": "-n first-k3s に直す"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_logs/"
+    },
+    {
+      "id": "pod-ip",
+      "text": "Pod の住所へ、仮想マシンから Web のページを取りに行きます。",
+      "why": "Pod の 1 つ 1 つが、自分の IP アドレスを持つことを確かめるためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "POD_IP=$(kubectl get pod web -n first-k3s -o jsonpath='{.status.podIP}')\necho $POD_IP\ncurl -s http://$POD_IP | grep title"
+      },
+      "lines": [
+        {
+          "code": "POD_IP=$(kubectl get pod web -n first-k3s -o jsonpath='{.status.podIP}')",
+          "text": "Pod の住所だけを取り出し、POD_IP という名前で覚える。今の端末だけで使える"
+        },
+        {
+          "code": "echo $POD_IP",
+          "text": "覚えた住所を出す"
+        },
+        {
+          "code": "curl -s http://$POD_IP | grep title",
+          "text": "その住所からページを取り、title の行だけを出す"
+        }
+      ],
+      "output": "@@",
+      "read": "Welcome to nginx! が返れば、Pod が返事をしています。この住所は、クラスターの中だけで通じます。ホストのブラウザでは開けません。",
+      "trouble": [
+        {
+          "symptom": "echo で何も出ない",
+          "check": "kubectl get pods -n first-k3s -o wide を打つ",
+          "fix": "IP が <none> なら、Running になってから打ち直す"
+        },
+        {
+          "symptom": "curl で何も出ない",
+          "check": "curl http://$POD_IP を、-s を付けずに打つ",
+          "fix": "Pod を作り直すと住所が変わる。POD_IP の行から打ち直す"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/workloads/pods/"
+    },
+    {
+      "id": "bad-image",
+      "text": "わざと、無いイメージで Pod を作ります。",
+      "why": "Pod が動かない理由で、とても多いものだからです。STATUS と Events から原因を読む練習です。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl run bad --image=nginx:no-such-tag -n first-k3s\nkubectl wait --for=jsonpath='{.status.containerStatuses[0].state.waiting.reason}'=ErrImagePull pod/bad -n first-k3s --timeout=60s\nkubectl get events -n first-k3s --field-selector involvedObject.name=bad,type=Warning -o custom-columns=REASON:.reason,MESSAGE:.message\nkubectl delete pod bad -n first-k3s"
+      },
+      "lines": [
+        {
+          "code": "kubectl run bad --image=nginx:no-such-tag -n first-k3s",
+          "text": "無いタグを書いて、bad という Pod を作る"
+        },
+        {
+          "code": "kubectl wait --for=jsonpath='{.status.containerStatuses[0].state.waiting.reason}'=ErrImagePull pod/bad -n first-k3s --timeout=60s",
+          "text": "コンテナの待つ理由が ErrImagePull になるまで待つ"
+        },
+        {
+          "code": "kubectl get events -n first-k3s --field-selector involvedObject.name=bad,type=Warning -o custom-columns=REASON:.reason,MESSAGE:.message",
+          "text": "bad についての注意 (Warning) のイベントから、理由 (REASON) と文 (MESSAGE) だけを出す"
+        },
+        {
+          "code": "kubectl delete pod bad -n first-k3s",
+          "text": "bad を消す"
+        }
+      ],
+      "output": "@@",
+      "read": "Failed to pull image の行の最後に、not found と読めます。名前かタグが間違っている、という意味です。STATUS は ErrImagePull と、しばらく待つ ImagePullBackOff を行き来します。直し方は、正しいタグで作り直すことです。",
+      "trouble": [
+        {
+          "symptom": "timed out waiting for the condition と出る",
+          "check": "kubectl get pod bad -n first-k3s で STATUS を見る",
+          "fix": "ImagePullBackOff なら、待つ間に次の状態へ進んだだけなので、そのまま次の行へ進む"
+        },
+        {
+          "symptom": "dial tcp や timeout の文が出る",
+          "check": "curl -sI https://registry-1.docker.io | head -n 1 を打つ",
+          "fix": "何も出なければネットワークの問題。つなぎ直してからもう一度作る"
+        },
+        {
+          "symptom": "toomanyrequests と出る",
+          "check": "Events の文の続きを見る",
+          "fix": "取りに行く回数の上限なので、時間をおいてからもう一度行う"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/containers/images/"
+    },
+    {
+      "id": "delete-pod",
+      "text": "Pod を消し、戻ってこないことを見ます。",
+      "why": "kubectl run で作った Pod は、見張る人のいない 1 つきりの Pod です。消すと誰も作り直しません。作り直す仕組みは、後の章で動かします。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl delete pod web -n first-k3s\nkubectl get pods -n first-k3s\nps -C nginx"
+      },
+      "lines": [
+        {
+          "code": "kubectl delete pod web -n first-k3s",
+          "text": "web を消す。コンテナが終わるのを待つ"
+        },
+        {
+          "code": "kubectl get pods -n first-k3s",
+          "text": "Pod の一覧を出す"
+        },
+        {
+          "code": "ps -C nginx",
+          "text": "仮想マシンから見た nginx のプロセスを出す"
+        }
+      ],
+      "output": "@@",
+      "read": "No resources found と出て、nginx のプロセスも見出しだけになります。",
+      "trouble": [
+        {
+          "symptom": "消す行がしばらく止まる",
+          "check": "30 秒ほど待つ",
+          "fix": "終わりの合図を送って、止まるのを待っている。そのまま待つ"
+        },
+        {
+          "symptom": "pods \"web\" not found と出る",
+          "check": "kubectl get pods -n first-k3s を打つ",
+          "fix": "もう消えているので、そのまま進む"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_delete/"
+    },
+    {
+      "id": "keep",
+      "text": "止める練習に使う Pod を、新しく 1 つ動かします。",
+      "why": "k3s を止めたときと、マシンごと再起動したときに、Pod がどうなるかを比べるためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl run keep --image=nginx:1.27-alpine -n first-k3s\nkubectl wait --for=condition=Ready pod/keep -n first-k3s --timeout=180s\nPOD_IP=$(kubectl get pod keep -n first-k3s -o jsonpath='{.status.podIP}')\ncurl -s http://$POD_IP | grep title"
+      },
+      "lines": [
+        {
+          "code": "kubectl run keep --image=nginx:1.27-alpine -n first-k3s",
+          "text": "keep という Pod を作る"
+        },
+        {
+          "code": "kubectl wait --for=condition=Ready pod/keep -n first-k3s --timeout=180s",
+          "text": "使えるようになるまで待つ"
+        },
+        {
+          "code": "POD_IP=$(kubectl get pod keep -n first-k3s -o jsonpath='{.status.podIP}')",
+          "text": "keep の住所を覚える"
+        },
+        {
+          "code": "curl -s http://$POD_IP | grep title",
+          "text": "ページを取る"
+        }
+      ],
+      "output": "@@",
+      "read": "イメージは前に取ってあるので、今度は早く動きます。",
+      "trouble": [
+        {
+          "symptom": "namespaces \"first-k3s\" not found と出る",
+          "check": "kubectl get namespaces を打つ",
+          "fix": "無ければ kubectl create namespace first-k3s で作る"
+        },
+        {
+          "symptom": "timed out waiting for the condition と出る",
+          "check": "kubectl describe pod keep -n first-k3s の Events を見る",
+          "fix": "イメージを取れていないなら、ネットワークを確かめる"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_run/"
+    },
+    {
+      "id": "stop-denied",
+      "text": "わざと、sudo を付けずに k3s を止めようとします。",
+      "why": "サービスは、管理者のものだからです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "systemctl stop k3s < /dev/null"
+      },
+      "lines": [
+        {
+          "code": "systemctl stop k3s < /dev/null",
+          "text": "k3s を止めるよう頼む。< /dev/null は、パスワードを聞かれても何も入力しないようにする書き方"
+        }
+      ],
+      "output": "@@",
+      "read": "Interactive authentication required は「本人か確かめないとできない」という意味です。k3s は止まっていません。",
+      "trouble": [
+        {
+          "symptom": "パスワードを聞く行が出て止まる",
+          "check": "< /dev/null を付けたかを見る",
+          "fix": "Ctrl キーを押しながら C で止める。仮想マシンの利用者にパスワードは無い"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man1/systemctl.1.html"
+    },
+    {
+      "id": "stop-k3s",
+      "text": "k3s を止め、Pod がどうなるかを見ます。",
+      "why": "Kubernetes に頼む口が止まっても、動いているコンテナは別だ、ということを確かめるためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "sudo systemctl stop k3s\nsystemctl is-active k3s\nkubectl get pods -n first-k3s\nps -C containerd\ncurl -s http://$POD_IP | grep title"
+      },
+      "lines": [
+        {
+          "code": "sudo systemctl stop k3s",
+          "text": "k3s を止める"
+        },
+        {
+          "code": "systemctl is-active k3s",
+          "text": "動いているかを出す"
+        },
+        {
+          "code": "kubectl get pods -n first-k3s",
+          "text": "Pod の一覧を頼む"
+        },
+        {
+          "code": "ps -C containerd",
+          "text": "containerd のプロセスを出す"
+        },
+        {
+          "code": "curl -s http://$POD_IP | grep title",
+          "text": "Pod に、ページを取りに行く"
+        }
+      ],
+      "output": "@@",
+      "read": "is-active は inactive です。kubectl は API サーバーにつなげず、refused と断られます。k3s が始めた containerd も止まります。それでも、最後の curl は返事をもらえます。k3s の文書のとおり、k3s を止めても Pod のコンテナは動き続けます。",
+      "trouble": [
+        {
+          "symptom": "kubectl が普通に答える",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "active なら、sudo を付けて止め直す"
+        },
+        {
+          "symptom": "最後の curl で何も出ない",
+          "check": "echo $POD_IP を打つ",
+          "fix": "空なら、新しい端末を開いたため。k3s を始めてから、前の手順の POD_IP の行を打つ"
+        }
+      ],
+      "source": "https://docs.k3s.io/upgrades/manual"
+    },
+    {
+      "id": "start-k3s",
+      "text": "k3s を始めます。",
+      "why": "同じ Pod が、そのまま続いていることを見るためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "sudo systemctl start k3s\nsystemctl is-active k3s\nkubectl get pods -n first-k3s"
+      },
+      "lines": [
+        {
+          "code": "sudo systemctl start k3s",
+          "text": "k3s を始める。準備ができるまで待つ"
+        },
+        {
+          "code": "systemctl is-active k3s",
+          "text": "動いているかを出す"
+        },
+        {
+          "code": "kubectl get pods -n first-k3s",
+          "text": "Pod の一覧を出す"
+        }
+      ],
+      "output": "@@",
+      "read": "RESTARTS が 0 のままなら、コンテナは止まらずに続いていました。AGE も続きから数えています。",
+      "trouble": [
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        },
+        {
+          "symptom": "始める行が長く止まる",
+          "check": "別の端末で systemctl is-active k3s を打つ",
+          "fix": "activating の間は待つ。2 分を超えたら sudo journalctl -u k3s --no-pager -n 20 を見る"
+        }
+      ],
+      "source": "https://docs.k3s.io/upgrades/manual"
+    },
+    {
+      "id": "reboot",
+      "text": "起動した時刻を控えてから、仮想マシンごと再起動します。",
+      "why": "サービスの enabled が、本当に効くかを試すためです。端末は切れます。30 秒ほど待ち、ホストで multipass shell kcna を打って入り直します。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "uptime -s\nsudo reboot"
+      },
+      "lines": [
+        {
+          "code": "uptime -s",
+          "text": "このマシンが起動した時刻を出す"
+        },
+        {
+          "code": "sudo reboot",
+          "text": "マシンを再起動する"
+        }
+      ],
+      "output": "@@",
+      "read": "出た時刻を覚えておきます。reboot のあと、端末が切れて、ホストの行の頭に戻ります。",
+      "trouble": [
+        {
+          "symptom": "端末が切れたまま動かない",
+          "check": "端末の窓を閉じて開き直す",
+          "fix": "ホストで multipass list を打ち、Running になってから multipass shell kcna を打つ"
+        },
+        {
+          "symptom": "入り直せない",
+          "check": "multipass list で State を見る",
+          "fix": "Stopped なら multipass start kcna を打つ"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man8/reboot.8.html"
+    },
+    {
+      "id": "after-reboot",
+      "text": "再起動のあと、k3s と Pod が自分で戻ることを見ます。",
+      "why": "人が何もしなくても戻ることが、サービスと Kubernetes の役目だからです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "uptime -s\nuntil systemctl is-active --quiet k3s; do sleep 3; done\nsystemctl is-active k3s\nkubectl wait --for=jsonpath='{.status.containerStatuses[0].restartCount}'=1 pod/keep -n first-k3s --timeout=240s\nkubectl wait --for=condition=Ready pod/keep -n first-k3s --timeout=180s\nkubectl get pods -n first-k3s"
+      },
+      "lines": [
+        {
+          "code": "uptime -s",
+          "text": "起動した時刻を出す"
+        },
+        {
+          "code": "until systemctl is-active --quiet k3s; do sleep 3; done",
+          "text": "k3s が active になるまで、3 秒おきに見て待つ"
+        },
+        {
+          "code": "systemctl is-active k3s",
+          "text": "動いているかを出す"
+        },
+        {
+          "code": "kubectl wait --for=jsonpath='{.status.containerStatuses[0].restartCount}'=1 pod/keep -n first-k3s --timeout=240s",
+          "text": "keep のコンテナの、始め直した数が 1 になるまで待つ"
+        },
+        {
+          "code": "kubectl wait --for=condition=Ready pod/keep -n first-k3s --timeout=180s",
+          "text": "keep が使えるようになるまで待つ"
+        },
+        {
+          "code": "kubectl get pods -n first-k3s",
+          "text": "Pod の一覧を出す"
+        }
+      ],
+      "output": "@@",
+      "read": "時刻が新しくなり、k3s は active です。RESTARTS は 1 です。マシンごと止まるとコンテナも止まるので、kubelet が同じ Pod のコンテナを始め直しました。直後は、止まる前の古い状態 (RESTARTS 0 の Running) がしばらく見えることがあります。",
+      "trouble": [
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "起動の途中は断られる。active になってから打つ"
+        },
+        {
+          "symptom": "timed out waiting for the condition と出る",
+          "check": "kubectl get pods -n first-k3s で RESTARTS を見る",
+          "fix": "1 以上なら戻っている。2 回以上再起動したときは 1 にならないので、そのまま進む"
+        },
+        {
+          "symptom": "-n first-k3s で permission denied と出る",
+          "check": "tail -n 1 ~/.bashrc を打つ",
+          "fix": "export の行が無ければ、kubeconfig の手順の echo の行を打ち、入り直す"
+        }
+      ],
+      "source": "https://docs.k3s.io/quick-start"
+    },
+    {
+      "id": "before-uninstall",
+      "text": "消す前に、k3s が置いたものを見ます。",
+      "why": "何が消え、何が残るかを、あとで比べるためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "ls /usr/local/bin\nsudo ls /etc/rancher /var/lib/rancher\nkubectl get pods -n first-k3s"
+      },
+      "lines": [
+        {
+          "code": "ls /usr/local/bin",
+          "text": "k3s のスクリプトが置いたコマンドを出す"
+        },
+        {
+          "code": "sudo ls /etc/rancher /var/lib/rancher",
+          "text": "k3s の設定とデータの置き場所を出す"
+        },
+        {
+          "code": "kubectl get pods -n first-k3s",
+          "text": "消える前の Pod を出す"
+        }
+      ],
+      "output": "@@",
+      "read": "k3s-uninstall.sh が、消すためのスクリプトです。k3s-killall.sh は、k3s と Pod を全部止めるスクリプトです。",
+      "trouble": [
+        {
+          "symptom": "k3s-uninstall.sh が無い",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "公式のスクリプトで入れたときだけ作られる。入れる手順をもう一度行う"
+        }
+      ],
+      "source": "https://docs.k3s.io/installation/uninstall"
+    },
+    {
+      "id": "uninstall",
+      "text": "k3s を消します。確認は出ず、すぐに消し始めます。",
+      "why": "いつでも消してやり直せることを、失って困るものが無い今、試すためです。クラスターの中のデータは元に戻りません。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "/usr/local/bin/k3s-uninstall.sh > ~/uninstall.log 2>&1\ntail -n 2 ~/uninstall.log"
+      },
+      "lines": [
+        {
+          "code": "/usr/local/bin/k3s-uninstall.sh > ~/uninstall.log 2>&1",
+          "text": "消すスクリプトを動かす。長い表示 (エラーの分の 2>&1 も) は、uninstall.log というファイルに書く"
+        },
+        {
+          "code": "tail -n 2 ~/uninstall.log",
+          "text": "そのファイルの、最後の 2 行を出す"
+        }
+      ],
+      "output": "@@",
+      "read": "最後に、スクリプトが自分自身を消しています (rm -f /usr/local/bin/k3s-uninstall.sh)。+ で始まる行は、スクリプトが打ったコマンドです。",
+      "trouble": [
+        {
+          "symptom": "k3s-uninstall.sh: No such file or directory と出る",
+          "check": "ls /usr/local/bin を打つ",
+          "fix": "無ければ、もう消えている"
+        },
+        {
+          "symptom": "終わらない",
+          "check": "別の端末で tail ~/uninstall.log を打つ",
+          "fix": "Pod を止めている間は待つ"
+        }
+      ],
+      "source": "https://docs.k3s.io/installation/uninstall"
+    },
+    {
+      "id": "after-uninstall",
+      "text": "消えたものと、残ったものを見ます。",
+      "why": "公式の文書の説明と、実際の動きを自分で照らすためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "ls /usr/local/bin\nsystemctl is-active k3s\nps -C nginx\nsudo ls -A /etc/rancher /var/lib/rancher\nls ~/.kube/k3s.yaml\ntail -n 1 ~/.bashrc\nkubectl get nodes"
+      },
+      "lines": [
+        {
+          "code": "ls /usr/local/bin",
+          "text": "コマンドの置き場所を出す"
+        },
+        {
+          "code": "systemctl is-active k3s",
+          "text": "k3s のサービスを見る"
+        },
+        {
+          "code": "ps -C nginx",
+          "text": "keep の nginx のプロセスを出す"
+        },
+        {
+          "code": "sudo ls -A /etc/rancher /var/lib/rancher",
+          "text": "設定とデータの置き場所を、隠れたものも含めて出す (-A)"
+        },
+        {
+          "code": "ls ~/.kube/k3s.yaml",
+          "text": "自分で写したファイルを見る"
+        },
+        {
+          "code": "tail -n 1 ~/.bashrc",
+          "text": "自分で足した行を見る"
+        },
+        {
+          "code": "kubectl get nodes",
+          "text": "kubectl を打つ"
+        }
+      ],
+      "output": "@@",
+      "read": "1 つ目の ls は何も出ません。コマンド・サービス・Pod・クラスターの記録が消えました。残ったのは、自分で作った ~/.kube/k3s.yaml と ~/.bashrc の行です。公式の文書は、ノードの設定も消えると書いていますが、この版の実機では /etc/rancher/node (ノードの合言葉) と、空の /var/lib/rancher が残りました。",
+      "trouble": [
+        {
+          "symptom": "kubectl が動く",
+          "check": "command -v kubectl を打つ",
+          "fix": "別の方法で入れた kubectl がある。クラスターは無いので、つながらない"
+        },
+        {
+          "symptom": "ps に nginx が残る",
+          "check": "sudo reboot で再起動する",
+          "fix": "入り直して、もう一度見る"
+        }
+      ],
+      "source": "https://docs.k3s.io/installation/uninstall"
+    },
+    {
+      "id": "reinstall",
+      "text": "同じ版の k3s を、もう一度入れます。",
+      "why": "次の章で使うためです。版を書かないと v1.37 が入ってしまうので、同じ行を打ちます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=v1.36.6+k3s1 sh -\nsystemctl is-active k3s"
+      },
+      "lines": [
+        {
+          "code": "curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=v1.36.6+k3s1 sh -",
+          "text": "前と同じ行。公式のスクリプトで v1.36.6+k3s1 を入れる"
+        },
+        {
+          "code": "systemctl is-active k3s",
+          "text": "動いているかを出す"
+        }
+      ],
+      "output": "@@",
+      "read": "最後に active と出れば、動いています。",
+      "trouble": [
+        {
+          "symptom": "Using の行が v1.36.6+k3s1 でない",
+          "check": "打った行の INSTALL_K3S_VERSION を見る",
+          "fix": "k3s-uninstall.sh で消し、版を書いて入れ直す"
+        },
+        {
+          "symptom": "[ERROR]  Download failed と出る",
+          "check": "curl -sI https://github.com | head -n 1 を打つ",
+          "fix": "ネットワークを確かめて、もう一度打つ"
+        }
+      ],
+      "source": "https://docs.k3s.io/quick-start"
+    },
+    {
+      "id": "stale-kubeconfig",
+      "text": "わざと、古い写しのまま kubectl を打ちます。",
+      "why": "入れ直すと、クラスターの証明書が新しく作られます。古い写しで何が起きるかを見ます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl get nodes"
+      },
+      "lines": [
+        {
+          "code": "kubectl get nodes",
+          "text": "ノードの一覧を頼む"
+        }
+      ],
+      "output": "@@",
+      "read": "certificate signed by unknown authority は「知らない発行元の証明書だ」です。つなぐ先は同じでも、写しの中の発行元が、前のクラスターのものだからです。",
+      "trouble": [
+        {
+          "symptom": "エラーにならず一覧が出る",
+          "check": "前の手順で入れ直したかを見返す",
+          "fix": "写しが新しいなら、そのまま次へ進む"
+        },
+        {
+          "symptom": "/usr/local/bin/kubectl: No such file or directory と出る",
+          "check": "ls /usr/local/bin を打つ",
+          "fix": "kubectl があれば hash -r を打つ。無ければ、入れ直す手順を行う"
+        }
+      ],
+      "source": "https://docs.k3s.io/cluster-access"
+    },
+    {
+      "id": "recopy",
+      "text": "接続の情報を写し直し、クラスターが新しいことを見ます。",
+      "why": "写しは自動では新しくならないためです。~/.bashrc の行は残っているので、足し直しません。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/k3s.yaml\nsudo chown \"$(id -u):$(id -g)\" ~/.kube/k3s.yaml\nchmod 600 ~/.kube/k3s.yaml\nkubectl wait --for=create node/kcna --timeout=60s\nkubectl wait --for=condition=Ready node/kcna --timeout=180s\nkubectl get nodes\nkubectl get namespaces"
+      },
+      "lines": [
+        {
+          "code": "sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/k3s.yaml",
+          "text": "新しいファイルで上書きする"
+        },
+        {
+          "code": "sudo chown \"$(id -u):$(id -g)\" ~/.kube/k3s.yaml",
+          "text": "持ち主を自分に変える"
+        },
+        {
+          "code": "chmod 600 ~/.kube/k3s.yaml",
+          "text": "自分だけが読み書きできるようにする"
+        },
+        {
+          "code": "kubectl wait --for=create node/kcna --timeout=60s",
+          "text": "kcna というノードが登録されるまで、最大 60 秒待つ。入れた直後は、まだ無いことがある"
+        },
+        {
+          "code": "kubectl wait --for=condition=Ready node/kcna --timeout=180s",
+          "text": "ノードの準備ができるまで待つ"
+        },
+        {
+          "code": "kubectl get nodes",
+          "text": "ノードの一覧を出す"
+        },
+        {
+          "code": "kubectl get namespaces",
+          "text": "名前空間の一覧を出す"
+        }
+      ],
+      "output": "@@",
+      "read": "ノードは Ready、版は v1.36.6+k3s1 です。first-k3s はありません。前のクラスターの記録ごと消えたためです。",
+      "trouble": [
+        {
+          "symptom": "まだ certificate signed by unknown authority と出る",
+          "check": "ls -l ~/.kube/k3s.yaml で時刻を見る",
+          "fix": "sudo cp の行から打ち直す"
+        },
+        {
+          "symptom": "nodes \"kcna\" not found と出る",
+          "check": "--for=create の行が終わってから打ったかを見る",
+          "fix": "入れた直後はノードの登録前のことがある。--for=create の行から打つ"
+        }
+      ],
+      "source": "https://docs.k3s.io/cluster-access"
+    },
+    {
+      "id": "ready-again",
+      "text": "次の章に備え、k3s の部品が全部動くまで待ちます。",
+      "why": "部品がそろう前に控えを取ると、戻したあとも途中から始まるためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl wait --for=create deployment/traefik -n kube-system --timeout=300s\nkubectl wait --for=condition=Complete job --all -n kube-system --timeout=300s\nkubectl rollout status deployment/coredns deployment/local-path-provisioner deployment/metrics-server deployment/traefik -n kube-system --timeout=300s\nkubectl get pods -A"
+      },
+      "lines": [
+        {
+          "code": "kubectl wait --for=create deployment/traefik -n kube-system --timeout=300s",
+          "text": "traefik という部品が作られるまで待つ"
+        },
+        {
+          "code": "kubectl wait --for=condition=Complete job --all -n kube-system --timeout=300s",
+          "text": "準備の作業が終わるまで待つ"
+        },
+        {
+          "code": "kubectl rollout status deployment/coredns deployment/local-path-provisioner deployment/metrics-server deployment/traefik -n kube-system --timeout=300s",
+          "text": "4 つの部品が使えるようになるまで待つ"
+        },
+        {
+          "code": "kubectl get pods -A",
+          "text": "全部の名前空間の Pod を出す (-A)"
+        }
+      ],
+      "output": "@@",
+      "read": "kube-system の Pod だけが並び、Running か Completed になれば準備完了です。",
+      "trouble": [
+        {
+          "symptom": "no matching resources found や not found と出る",
+          "check": "1 行目 (--for=create) が終わる前に、次の行へ進んでいないかを見る",
+          "fix": "入れた直後で、まだ部品が無い。1 行目から打ち直す"
+        },
+        {
+          "symptom": "helm-install-traefik が CrashLoopBackOff になる",
+          "check": "1 分ほど待って、もう一度 kubectl get pods -n kube-system を打つ",
+          "fix": "先に要る部品を待って、作業をやり直している途中。Completed になれば問題ない"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://docs.k3s.io/installation/packaged-components"
+    },
+    {
+      "id": "leave",
+      "text": "仮想マシンから出ます。",
+      "why": "次は、ホストで控えを取るためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "exit"
+      },
+      "lines": [
+        {
+          "code": "exit",
+          "text": "今の端末を終える。仮想マシンは動き続ける"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "行の頭が、自分の PC のものに戻ります。",
+      "trouble": [
+        {
+          "symptom": "行の頭が ubuntu@kcna のまま",
+          "check": "もう一度見る",
+          "fix": "もう一度 exit を打つ"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man1/bash.1.html"
+    },
+    {
+      "id": "snapshot",
+      "text": "k3s が入った状態の控えを、k3s-v136 という名前で取ります。",
+      "why": "次の章から何度失敗しても、ここへ戻れるようにするためです。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass stop kcna\nmultipass snapshot --name k3s-v136 kcna\nmultipass list --snapshots\nmultipass start kcna"
+      },
+      "lines": [
+        {
+          "code": "multipass stop kcna",
+          "text": "止める。控えは、止まっているときだけ取れる"
+        },
+        {
+          "code": "multipass snapshot --name k3s-v136 kcna",
+          "text": "今の状態を k3s-v136 という名前で控える"
+        },
+        {
+          "code": "multipass list --snapshots",
+          "text": "控えの一覧を出す"
+        },
+        {
+          "code": "multipass start kcna",
+          "text": "次の章のために動かす"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "一覧に clean と k3s-v136 が並べば取れています。戻すときは、止めてから multipass restore kcna.k3s-v136 を打ちます。",
+      "trouble": [
+        {
+          "symptom": "止まっていないので取れないと出る",
+          "check": "multipass list で State を見る",
+          "fix": "multipass stop kcna で止めてから取る"
+        },
+        {
+          "symptom": "k3s-v136 がもうあると出る",
+          "check": "multipass list --snapshots を打つ",
+          "fix": "前の控えを使うか、--name k3s-v136b のように別の名前にする"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/snapshot/"
+    }
+  ],
+  "cleanup": [
+    {
+      "id": "delete-practice",
+      "text": "課題で作った名前空間を消します。課題をしていなければ、何も起きません。",
+      "why": "次の章を、k3s の部品だけの状態から始めるためです。名前空間を消すと、中の Pod も一緒に消えます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl delete namespace practice --ignore-not-found\nkubectl get namespaces"
+      },
+      "lines": [
+        {
+          "code": "kubectl delete namespace practice --ignore-not-found",
+          "text": "practice を消す。無くてもエラーにしない (--ignore-not-found)"
+        },
+        {
+          "code": "kubectl get namespaces",
+          "text": "名前空間の一覧を出す"
+        }
+      ],
+      "output": "@@",
+      "read": "default と kube- で始まる 4 つだけになれば、片付いています。k3s は消しません。",
+      "trouble": [
+        {
+          "symptom": "消す行がしばらく止まる",
+          "check": "30 秒ほど待つ",
+          "fix": "中の Pod が終わるのを待っている。そのまま待つ"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_delete/"
+    },
+    {
+      "id": "remove-log",
+      "text": "消すときに書いた記録のファイルを消します。",
+      "why": "もう使わないためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "rm ~/uninstall.log\nls ~"
+      },
+      "lines": [
+        {
+          "code": "rm ~/uninstall.log",
+          "text": "uninstall.log を消す"
+        },
+        {
+          "code": "ls ~",
+          "text": "ホームの中身を出す"
+        }
+      ],
+      "output": "@@",
+      "read": "uninstall.log が無ければ消えています。0 章で作ったものは残ります。",
+      "trouble": [
+        {
+          "symptom": "No such file or directory と出る",
+          "check": "ls ~ を打つ",
+          "fix": "もう無いので、そのまま進む"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man1/rm.1.html"
+    },
+    {
+      "id": "rest",
+      "text": "今日はここまでにするときは、仮想マシンを止めます。",
+      "why": "動いている間は PC のメモリを使うためです。次の章でも使うので、消しません。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass stop kcna"
+      },
+      "lines": [
+        {
+          "code": "multipass stop kcna",
+          "text": "kcna を止める"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "続けるときは multipass start kcna で動かします。k3s は自分で始まります。",
+      "trouble": [
+        {
+          "symptom": "止まったか分からない",
+          "check": "multipass list で State を見る",
+          "fix": "Stopped なら止まっている。Running なら、もう一度止める"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/stop/"
+    }
+  ],
+  "challenges": [
+    {
+      "task": "practice という名前空間を作り、その中で httpd:2.4-alpine のイメージから、site という Pod を動かしてください。",
+      "hint": "名前空間を作る、Pod を作る、待つ、の 3 行です。",
+      "answer": "kubectl create namespace practice\nkubectl run site --image=httpd:2.4-alpine -n practice\nkubectl wait --for=condition=Ready pod/site -n practice --timeout=180s",
+      "verify": "kubectl get pods -n practice で、site が 1/1 の Running なら正解です。"
+    },
+    {
+      "task": "site の住所からページを取り、site の記録に、その要求が残ることを確かめてください。",
+      "hint": "住所は -o jsonpath で取り出せます。記録は kubectl logs です。",
+      "answer": "SITE_IP=$(kubectl get pod site -n practice -o jsonpath='{.status.podIP}')\ncurl -s http://$SITE_IP\nkubectl logs site -n practice --tail=1",
+      "verify": "curl で It works! が返り、記録の最後の行に GET / と 200 があれば正解です。"
+    },
+    {
+      "task": "kubectl を使わず、ノードの中から、site のコンテナとイメージを見つけてください。",
+      "hint": "containerd に聞くコマンドを、管理者として打ちます。",
+      "answer": "sudo crictl ps --name site\nsudo crictl images | grep httpd",
+      "verify": "1 つ目に POD が site の行、2 つ目に httpd の 2.4-alpine の行が出れば正解です。"
+    }
+  ],
+  "sources": [
+    {
+      "label": "K3s: What is K3s?",
+      "url": "https://docs.k3s.io/"
+    },
+    {
+      "label": "K3s: Quick-Start Guide",
+      "url": "https://docs.k3s.io/quick-start"
+    },
+    {
+      "label": "K3s: Requirements",
+      "url": "https://docs.k3s.io/installation/requirements"
+    },
+    {
+      "label": "K3s: Manual Upgrades",
+      "url": "https://docs.k3s.io/upgrades/manual"
+    },
+    {
+      "label": "K3s: Release Notes v1.36.X",
+      "url": "https://docs.k3s.io/release-notes/v1.36.X"
+    },
+    {
+      "label": "K3s: チャネルの一覧",
+      "url": "https://update.k3s.io/v1-release/channels"
+    },
+    {
+      "label": "K3s: Cluster Access",
+      "url": "https://docs.k3s.io/cluster-access"
+    },
+    {
+      "label": "K3s: Architecture",
+      "url": "https://docs.k3s.io/architecture"
+    },
+    {
+      "label": "K3s: Packaged Components",
+      "url": "https://docs.k3s.io/installation/packaged-components"
+    },
+    {
+      "label": "K3s: Cluster Datastore",
+      "url": "https://docs.k3s.io/datastore"
+    },
+    {
+      "label": "K3s: Uninstalling K3s",
+      "url": "https://docs.k3s.io/installation/uninstall"
+    },
+    {
+      "label": "Kubernetes: Cluster Architecture",
+      "url": "https://kubernetes.io/docs/concepts/architecture/"
+    },
+    {
+      "label": "Kubernetes: Nodes",
+      "url": "https://kubernetes.io/docs/concepts/architecture/nodes/"
+    },
+    {
+      "label": "Kubernetes: Ports and Protocols",
+      "url": "https://kubernetes.io/docs/reference/networking/ports-and-protocols/"
+    },
+    {
+      "label": "Kubernetes: crictl でノードを調べる",
+      "url": "https://kubernetes.io/docs/tasks/debug/debug-cluster/crictl/"
+    },
+    {
+      "label": "Kubernetes: Namespaces",
+      "url": "https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/"
+    },
+    {
+      "label": "Kubernetes: Pods",
+      "url": "https://kubernetes.io/docs/concepts/workloads/pods/"
+    },
+    {
+      "label": "Kubernetes: Pod Lifecycle",
+      "url": "https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/"
+    },
+    {
+      "label": "Kubernetes: Images",
+      "url": "https://kubernetes.io/docs/concepts/containers/images/"
+    },
+    {
+      "label": "Kubernetes: Version Skew Policy",
+      "url": "https://kubernetes.io/releases/version-skew-policy/"
+    },
+    {
+      "label": "kubectl run",
+      "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_run/"
+    },
+    {
+      "label": "kubectl exec",
+      "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_exec/"
+    },
+    {
+      "label": "man7.org: systemctl(1)",
+      "url": "https://man7.org/linux/man-pages/man1/systemctl.1.html"
+    },
+    {
+      "label": "Multipass: snapshot",
+      "url": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/snapshot/"
+    }
+  ]
+}

@@ -1,0 +1,1044 @@
+{
+  "id": "vm-setup",
+  "order": 0,
+  "title": "仮想マシンを用意する",
+  "summary": "自分の PC の中に、練習用の Linux の仮想マシンを 1 台作ります。入る・出る・止める・控える・戻すまでを、Linux に初めて触れる人の速さで進めます。",
+  "goal": "PC の中に Ubuntu 24.04 の仮想マシンを作り、基本のコマンドを打ち、失敗しても元に戻せるようになる",
+  "features": [
+    "仮想マシンは、ホストから分けられたもう 1 台のマシンのように使える",
+    "Linux は、普通の利用者と管理者 (root) でできることを分けている",
+    "控え (スナップショット) を取ると、その時点へ戻せる",
+    "仮想マシンを止めても中身は残り、消すと残らない"
+  ],
+  "minutes": 60,
+  "needs": [
+    "Windows 10 (1809 以降) か 11 の Home・Pro、macOS 14 以降の Mac、または snap の使える Linux",
+    "メモリ 8 GB 以上の PC (仮想マシンに 2 GB を分けます) と、ディスクの空き 20 GB 以上",
+    "インターネットへの接続と、PC の管理者の権限",
+    "出力について: 「仮想マシンの中」の出力は、2026-11-25 に Linux の QEMU の上で、Ubuntu 24.04 の公式のクラウドイメージ (x86_64・2 コア・2 GB・20 GB) を動かして取りました。Multipass を打つ手順は実機で確かめていないので、出力を載せていません。"
+  ],
+  "reads": [
+    {
+      "topic": "linux-internals",
+      "label": "Linux の内部"
+    },
+    {
+      "topic": "containerization",
+      "label": "コンテナ化"
+    }
+  ],
+  "steps": [
+    {
+      "id": "know-words",
+      "text": "はじめに言葉をそろえます。自分の PC を「ホスト」と呼びます。その中に作る、もう 1 台のコンピューターのようなものが「仮想マシン」(VM) です。文字でコンピューターに頼む窓を「端末」(ターミナル) と呼びます。Multipass は、Ubuntu という Linux の仮想マシンを作る道具です。",
+      "why": "仮想マシンの中で何を壊しても、ホストの設定は変わりません。失敗してよい場所を先に作ると、安心して試せるためです。コマンドには「自分の PC」と「仮想マシンの中」の印を付けています。どちらの端末で打つかを、毎回ここで見分けます。"
+    },
+    {
+      "id": "open-terminal-windows",
+      "text": "端末を開きます。スタート メニューで PowerShell と打ち、Windows PowerShell を選びます。コマンドは 1 行ずつ写し、Enter キーを押します。",
+      "why": "この章では、文字のコマンドで進めるためです。管理者として開くのは、そう書いてある手順だけです。",
+      "os": "windows"
+    },
+    {
+      "id": "open-terminal-mac",
+      "text": "端末を開きます。command キーを押しながらスペースキーを押し、「ターミナル」と打って Enter キーを押します。コマンドは 1 行ずつ写し、Enter キーを押します。",
+      "why": "この章では、文字のコマンドで進めるためです。",
+      "os": "mac"
+    },
+    {
+      "id": "open-terminal-linux",
+      "text": "端末を開きます。アプリの一覧から「端末」(Terminal) を選びます。コマンドは 1 行ずつ写し、Enter キーを押します。",
+      "why": "この章では、文字のコマンドで進めるためです。",
+      "os": "linux"
+    },
+    {
+      "id": "enable-vmp-windows",
+      "text": "PowerShell を右クリックし、「管理者として実行」で開きます。次のコマンドを打ち、終わったら Windows を再起動します。",
+      "why": "仮想マシンを動かす Windows の機能 (Virtual Machine Platform) を有効にするためです。Multipass は Home・Pro・Enterprise のどれでも、この機能を使います。",
+      "os": "windows",
+      "where": "host",
+      "code": {
+        "language": "powershell",
+        "text": "dism.exe /online /enable-feature /featurename:VirtualMachinePlatform /all /norestart"
+      },
+      "lines": [
+        {
+          "code": "dism.exe /online /enable-feature /featurename:VirtualMachinePlatform /all /norestart",
+          "text": "Windows の機能を変える道具 (dism) で、VirtualMachinePlatform を有効にする。/all は要る機能も一緒に有効にする。/norestart は自動で再起動しない"
+        }
+      ],
+      "unverified": "Windows の実機で確かめていません。コマンドは Microsoft の文書、この機能が要ることは Multipass の文書のとおりです。",
+      "read": "100% まで進み、操作が成功したという文が出れば終わりです。再起動するまで効きません。",
+      "trouble": [
+        {
+          "symptom": "エラー 740 が出る、または昇格が必要と出る",
+          "check": "PowerShell の窓の題名に「管理者」とあるかを見る",
+          "fix": "窓を閉じ、右クリックから「管理者として実行」で開き直す"
+        },
+        {
+          "symptom": "再起動したあとも仮想マシンが作れない",
+          "check": "Ctrl+Shift+Esc でタスク マネージャーを開き、「パフォーマンス」の「CPU」で「仮想化」が有効かを見る",
+          "fix": "無効なら、PC の UEFI (BIOS) の設定で仮想化を有効にする。入り方は PC の説明書で確かめる"
+        }
+      ],
+      "source": "https://learn.microsoft.com/en-us/windows/wsl/install-manual"
+    },
+    {
+      "id": "install-windows",
+      "text": "Multipass の配布ページ (canonical.com/multipass/install) から .msi ファイルを取り、開いて案内のとおりに進めます。終わったら PowerShell を普通に開き直し、版を見ます。",
+      "why": "Multipass をホストに入れるためです。入れるときは管理者の許可が要りますが、使うときは普通の PowerShell で打ちます。",
+      "os": "windows",
+      "where": "host",
+      "code": {
+        "language": "powershell",
+        "text": "multipass version"
+      },
+      "lines": [
+        {
+          "code": "multipass version",
+          "text": "Multipass の版を出す。入ったかどうかの確かめになる"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "multipass と multipassd の 2 行が出れば成功です。multipass が打つコマンド、multipassd が裏で仮想マシンを世話するプログラムです。",
+      "trouble": [
+        {
+          "symptom": "multipass: command not found、または「認識されません」と出る",
+          "check": "端末を閉じて開き直し、multipass version を打つ",
+          "fix": "開き直しても出るなら、Multipass を入れる手順をもう一度行う"
+        },
+        {
+          "symptom": "インストールを始められない",
+          "check": "スタート メニューで winver と打ち、Windows 10 の 1809 より新しいか、Windows 11 かを見る",
+          "fix": "古ければ Windows を更新する"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/how-to-guides/install-multipass/"
+    },
+    {
+      "id": "install-mac",
+      "text": "Multipass の配布ページ (canonical.com/multipass/install) から .pkg ファイルを取り、開いて案内のとおりに進めます。終わったら端末を開き直し、版を見ます。",
+      "why": "Multipass をホストに入れるためです。管理者の権限を持つ利用者で行います。macOS 14 以降なら、Intel でも M 系でも使えます。",
+      "os": "mac",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass version"
+      },
+      "lines": [
+        {
+          "code": "multipass version",
+          "text": "Multipass の版を出す。入ったかどうかの確かめになる"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "multipass と multipassd の 2 行が出れば成功です。multipass が打つコマンド、multipassd が裏で仮想マシンを世話するプログラムです。",
+      "trouble": [
+        {
+          "symptom": "multipass: command not found、または「認識されません」と出る",
+          "check": "端末を閉じて開き直し、multipass version を打つ",
+          "fix": "開き直しても出るなら、Multipass を入れる手順をもう一度行う"
+        },
+        {
+          "symptom": "インストールを始められない",
+          "check": "画面の左上のりんごの印から「この Mac について」を開き、macOS の版を見る",
+          "fix": "14 より古ければ macOS を更新する"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/how-to-guides/install-multipass/"
+    },
+    {
+      "id": "install-linux",
+      "text": "Multipass を入れ、版を見ます。下の例は、snap が最初から入っている Ubuntu のホストです。",
+      "why": "Multipass をホストに入れるためです。Linux では snap という形で配られています。snap が無い Linux では、先に snapd を入れます。",
+      "os": "linux",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "sudo snap install multipass\nmultipass version\nls -l /var/snap/multipass/common/multipass_socket\ngroups"
+      },
+      "lines": [
+        {
+          "code": "sudo snap install multipass",
+          "text": "snap の配布元から Multipass を入れる。sudo は管理者として動かす印"
+        },
+        {
+          "code": "multipass version",
+          "text": "Multipass の版を出す。入ったかどうかの確かめになる"
+        },
+        {
+          "code": "ls -l /var/snap/multipass/common/multipass_socket",
+          "text": "Multipass と話す口 (ソケット) を、どのグループが使えるかを見る"
+        },
+        {
+          "code": "groups",
+          "text": "自分が入っているグループを出す"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "version に 2 行出れば入っています。ls の行の 4 番目の語が、使えるグループです (例: sudo)。その名前が groups の行にもあれば、そのまま使えます。",
+      "trouble": [
+        {
+          "symptom": "snap: command not found と出る",
+          "check": "command -v snap を打つ。何も出なければ snapd が無い",
+          "fix": "使っている Linux の手順で snapd を入れる"
+        },
+        {
+          "symptom": "Multipass を使う許可が無いと出る",
+          "check": "ls -l のグループの名前が、groups の行にあるかを見る",
+          "fix": "そのグループに入っている利用者で打つ"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/how-to-guides/install-multipass/"
+    },
+    {
+      "id": "find-image",
+      "text": "作れる仮想マシンの中から、Ubuntu 24.04 を探します。",
+      "why": "この章から先は、Ubuntu 24.04 で出力を確かめています。版を書かないと、いちばん新しい長期サポート版 (2026 年 11 月の文書では 26.04) になるので、24.04 と名指しします。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass find 24.04"
+      },
+      "lines": [
+        {
+          "code": "multipass find 24.04",
+          "text": "作れるイメージ (仮想マシンのもと) のうち、24.04 に合うものを出す"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "Image の列に 24.04、Description の列に Ubuntu 24.04 LTS が出れば使えます。LTS は、長く直し続けられる版のことです。",
+      "trouble": [
+        {
+          "symptom": "multipass: command not found、または「認識されません」と出る",
+          "check": "端末を閉じて開き直し、multipass version を打つ",
+          "fix": "開き直しても出るなら、Multipass を入れる手順をもう一度行う"
+        },
+        {
+          "symptom": "何も出ない",
+          "check": "multipass find を打ち、一覧が出るかを見る",
+          "fix": "multipass find --force-update で一覧を取り直す。だめならインターネットへの接続を確かめる"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/find/"
+    },
+    {
+      "id": "launch",
+      "text": "kcna という名前の仮想マシンを作ります。初めてのときはイメージを取ってくるので、数分かかることがあります。",
+      "why": "何も書かないと、1 コア・メモリ 1G・ディスク 5G になります。次の章で入れる k3s は 2 コア・2 GB が最低なので、足りる大きさを書きます。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass launch 24.04 --name kcna --cpus 2 --memory 2G --disk 20G"
+      },
+      "lines": [
+        {
+          "code": "multipass launch 24.04 --name kcna --cpus 2 --memory 2G --disk 20G",
+          "text": "Ubuntu 24.04 の仮想マシンを kcna という名前で作り、動かす。--cpus はコアの数、--memory はメモリ、--disk はディスクの大きさ"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "Launched: kcna と出れば成功です。PC のメモリに余裕があれば、--memory は 4G にしてもかまいません。",
+      "trouble": [
+        {
+          "symptom": "timed out と出て止まる",
+          "check": "multipass list を打ち、kcna の State を見る",
+          "fix": "数分待ってから multipass shell kcna を試す。準備は裏で続いている。次からは --timeout 1000 を足して、待つ時間を 1000 秒に延ばす"
+        },
+        {
+          "symptom": "Downloaded image hash does not match と出る",
+          "check": "同じ multipass launch をもう一度打ち、同じ文が出るかを見る",
+          "fix": "multipass find --force-update で一覧を取り直してから、もう一度作る"
+        },
+        {
+          "symptom": "kcna がもうあると出る",
+          "check": "multipass list を打つ",
+          "fix": "前に作った kcna をそのまま使う。作り直すなら、後片付けの「完全に消す」を先に行う"
+        },
+        {
+          "symptom": "Mac で IP アドレスを決められない (Unable to determine IP address) と出る",
+          "check": "システム設定の「ファイアウォール」を開き、「外部からの接続をすべてブロック」が入っていないか、VPN を使っていないかを見る",
+          "fix": "ブロックを切り、VPN を止めてからもう一度作る"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/launch/"
+    },
+    {
+      "id": "list",
+      "text": "仮想マシンの一覧を見ます。",
+      "why": "動いているか、どの Ubuntu かを、入る前に確かめるためです。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass list"
+      },
+      "lines": [
+        {
+          "code": "multipass list",
+          "text": "作った仮想マシンの名前・状態・IP アドレス・Ubuntu の版を出す"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "kcna の行の State が Running、Release が Ubuntu 24.04 LTS なら思ったとおりです。IPv4 は仮想マシンの住所で、PC ごとに違います。",
+      "trouble": [
+        {
+          "symptom": "kcna の行が無い",
+          "check": "multipass launch の最後の行を見返し、エラーが出ていないかを見る",
+          "fix": "作る手順をもう一度行う"
+        },
+        {
+          "symptom": "State が Stopped",
+          "check": "multipass start kcna を打つ",
+          "fix": "もう一度 multipass list を打ち、Running になったかを見る"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/list/"
+    },
+    {
+      "id": "shell",
+      "text": "仮想マシンの中に入ります。",
+      "why": "ここから先の「仮想マシンの中」のコマンドは、入ったあとの端末で打つためです。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass shell kcna"
+      },
+      "lines": [
+        {
+          "code": "multipass shell kcna",
+          "text": "kcna の中の端末を開く。止まっていれば、動かしてから開く"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "Welcome to Ubuntu 24.04 で始まる案内のあと、行の頭が ubuntu@kcna:~$ に変われば、中に入っています。ubuntu が利用者、kcna がマシンの名前、~ が今いる場所です。$ の後ろに打ちます。",
+      "trouble": [
+        {
+          "symptom": "行の頭が変わらない",
+          "check": "multipass list で、kcna が Running かを見る",
+          "fix": "multipass stop kcna、multipass start kcna の順に打ち、もう一度入る"
+        },
+        {
+          "symptom": "時間切れで入れない",
+          "check": "multipass list で IPv4 に住所が出ているかを見る",
+          "fix": "VPN とファイアウォールを確かめ、multipass stop kcna、multipass start kcna の順に打つ"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/shell/"
+    },
+    {
+      "id": "who-where",
+      "text": "自分は誰で、どのマシンの、どこにいるのかを見ます。",
+      "why": "同じ形の端末が 2 つあるので、打つ前に場所を確かめる癖をつけるためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "whoami\nhostname\npwd"
+      },
+      "lines": [
+        {
+          "code": "whoami",
+          "text": "自分の利用者の名前を出す"
+        },
+        {
+          "code": "hostname",
+          "text": "このマシンの名前を出す"
+        },
+        {
+          "code": "pwd",
+          "text": "今いるフォルダの場所を出す (print working directory)"
+        }
+      ],
+      "output": "ubuntu\nkcna\n/home/ubuntu",
+      "read": "ubuntu という利用者で、kcna というマシンの /home/ubuntu にいます。Linux の場所は / から始め、フォルダを / で区切ります。ホストで打っていれば、自分の PC の名前が出ます。",
+      "trouble": [
+        {
+          "symptom": "hostname が自分の PC の名前になる",
+          "check": "行の頭が ubuntu@kcna かを見る",
+          "fix": "multipass shell kcna を打って中に入る"
+        },
+        {
+          "symptom": "Command 'Pwd' not found と出る",
+          "check": "大文字を打っていないかを見る",
+          "fix": "コマンドは小文字で打つ。Linux は大文字と小文字を区別する"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man1/pwd.1.html"
+    },
+    {
+      "id": "files",
+      "text": "フォルダを作り、中にファイルを書いて読みます。",
+      "why": "次の章から、設定のファイルを作ったり読んだりするためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "mkdir work\ncd work\necho 'hello' > memo.txt\nls -l\ncat memo.txt\ncd ~"
+      },
+      "lines": [
+        {
+          "code": "mkdir work",
+          "text": "work というフォルダを作る"
+        },
+        {
+          "code": "cd work",
+          "text": "work の中へ移る"
+        },
+        {
+          "code": "echo 'hello' > memo.txt",
+          "text": "hello という文字を、> で memo.txt というファイルに書く"
+        },
+        {
+          "code": "ls -l",
+          "text": "今いるフォルダの中身を、持ち主や大きさと一緒に出す (-l は詳しく)"
+        },
+        {
+          "code": "cat memo.txt",
+          "text": "ファイルの中身を出す"
+        },
+        {
+          "code": "cd ~",
+          "text": "自分のホーム (/home/ubuntu) へ戻る"
+        }
+      ],
+      "output": "total 4\n-rw-rw-r-- 1 ubuntu ubuntu 6 Nov 25 01:47 memo.txt\nhello",
+      "read": "-rw で始まる行が memo.txt です。左から、権限・数・持ち主・グループ・大きさ・日時・名前です。total は、ディスクで使う量です。最後の行の hello がファイルの中身です。",
+      "trouble": [
+        {
+          "symptom": "mkdir: cannot create directory ‘work’: File exists と出る",
+          "check": "ls を打ち、work があるかを見る",
+          "fix": "もうあるので、そのまま cd work へ進む"
+        },
+        {
+          "symptom": "cat: memo.txt: No such file or directory と出る",
+          "check": "pwd で場所を、ls で名前を見る",
+          "fix": "cd ~/work で移ってから、もう一度 cat memo.txt を打つ"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man1/ls.1.html"
+    },
+    {
+      "id": "missing-file",
+      "text": "わざと、無いファイルを読みます。",
+      "why": "エラーは、ファイルの名前と理由を英語で教えてくれます。怖がらず、最後まで読む練習です。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cat nosuch.txt"
+      },
+      "lines": [
+        {
+          "code": "cat nosuch.txt",
+          "text": "nosuch.txt という無いファイルを読もうとする"
+        }
+      ],
+      "output": "cat: nosuch.txt: No such file or directory",
+      "read": "No such file or directory は「そんなファイルもフォルダも無い」です。出てきた名前のつづりと、今いる場所を確かめれば直せます。",
+      "trouble": [
+        {
+          "symptom": "command not found と出る",
+          "check": "コマンドの名前 cat のつづりを見る",
+          "fix": "矢印の上キーで前の行を出し、直して Enter キーを押す"
+        },
+        {
+          "symptom": "何も出ずに止まり、次の行に進まない",
+          "check": "cat だけで Enter キーを押していないかを見る",
+          "fix": "Ctrl キーを押しながら C を押して止める"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man1/cat.1.html"
+    },
+    {
+      "id": "os-release",
+      "text": "Linux の種類と版、CPU の種類を見ます。",
+      "why": "これからの手順は Ubuntu 24.04 を前提にしています。CPU の種類で、取ってくるプログラムが変わります。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "grep PRETTY_NAME /etc/os-release\nuname -m"
+      },
+      "lines": [
+        {
+          "code": "grep PRETTY_NAME /etc/os-release",
+          "text": "OS の名前を書いたファイルから、PRETTY_NAME の行だけを出す"
+        },
+        {
+          "code": "uname -m",
+          "text": "CPU の種類を出す"
+        }
+      ],
+      "output": "PRETTY_NAME=\"Ubuntu 24.04.5 LTS\"\nx86_64",
+      "read": "Ubuntu 24.04 と出ます。x86_64 は Intel や AMD の CPU です。M 系の Mac では aarch64 と出て、それで正常です。",
+      "trouble": [
+        {
+          "symptom": "Ubuntu 26.04 など、違う版が出る",
+          "check": "exit で出て、multipass list の Release を見る",
+          "fix": "後片付けの「完全に消す」を行い、24.04 を付けて作り直す"
+        },
+        {
+          "symptom": "grep: No such file or directory と出る",
+          "check": "/etc/os-release のつづりと、hostname が kcna かを見る",
+          "fix": "kcna の中に入り、行をコピーして打つ"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man5/os-release.5.html"
+    },
+    {
+      "id": "resources",
+      "text": "コアの数・メモリ・ディスクを見ます。",
+      "why": "作るときに書いた大きさになっているか、次の章の k3s に足りるかを確かめるためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "nproc\nfree -h\ndf -h /"
+      },
+      "lines": [
+        {
+          "code": "nproc",
+          "text": "使えるコアの数を出す"
+        },
+        {
+          "code": "free -h",
+          "text": "メモリの大きさと空きを出す (-h は読みやすい単位)"
+        },
+        {
+          "code": "df -h /",
+          "text": "いちばん上のフォルダ / が載っているディスクの大きさと空きを出す"
+        }
+      ],
+      "output": "2\n               total        used        free      shared  buff/cache   available\nMem:           1.9Gi       322Mi       1.4Gi       1.0Mi       321Mi       1.6Gi\nSwap:             0B          0B          0B\nFilesystem      Size  Used Avail Use% Mounted on\n/dev/vda1        19G  1.7G   17G   9% /",
+      "read": "コアは 2、Mem の total は 1.9Gi です。Linux のカーネルが使う分が引かれるので、2G と書いても少し小さく出ます。available が、これから使える量です。ディスクは Size が 20G より少し小さく、Avail の列が空きです。",
+      "trouble": [
+        {
+          "symptom": "nproc が 1 になる",
+          "check": "multipass launch に --cpus 2 を付けたかを見返す",
+          "fix": "後片付けの「完全に消す」を行い、作り直す"
+        },
+        {
+          "symptom": "Mem の total が 1Gi より小さい",
+          "check": "multipass launch に --memory 2G を付けたかを見返す",
+          "fix": "後片付けの「完全に消す」を行い、作り直す"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man1/free.1.html"
+    },
+    {
+      "id": "permission-denied",
+      "text": "わざと、管理者しか読めないファイルを読みます。",
+      "why": "Linux は、利用者ごとにできることを分けています。止められる様子を、先に見ておくためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "id -u\nls -l /etc/shadow\ncat /etc/shadow"
+      },
+      "lines": [
+        {
+          "code": "id -u",
+          "text": "自分の利用者の番号を出す"
+        },
+        {
+          "code": "ls -l /etc/shadow",
+          "text": "パスワードの情報を置くファイルの、権限と持ち主を見る"
+        },
+        {
+          "code": "cat /etc/shadow",
+          "text": "そのファイルを読もうとする"
+        }
+      ],
+      "output": "1000\n-rw-r----- 1 root shadow 842 Nov 25 01:46 /etc/shadow\ncat: /etc/shadow: Permission denied",
+      "read": "自分の番号は 1000 です。-rw-r----- は、持ち主 (root) は読み書き、グループ (shadow) は読むだけ、ほかの人は何もできないという意味です。そのため Permission denied (許可が無い) と断られます。",
+      "trouble": [
+        {
+          "symptom": "Permission denied ではなく中身が出る",
+          "check": "行の頭が root@kcna になっていないか、id -u が 0 でないかを見る",
+          "fix": "exit で root の端末を抜ける"
+        },
+        {
+          "symptom": "No such file or directory と出る",
+          "check": "/etc/shadow のつづりを見る",
+          "fix": "行をコピーして打つ"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man1/id.1.html"
+    },
+    {
+      "id": "sudo",
+      "text": "sudo を付けて、同じファイルを管理者として扱います。中身は出さず、行の数だけ数えます。",
+      "why": "k3s を入れるときも、管理者の権限が要るためです。何でもできてしまうので、意味の分かったコマンドにだけ付けます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "sudo id -u\nsudo wc -l /etc/shadow"
+      },
+      "lines": [
+        {
+          "code": "sudo id -u",
+          "text": "id -u を、管理者 (root) として動かす"
+        },
+        {
+          "code": "sudo wc -l /etc/shadow",
+          "text": "管理者として、ファイルの行を数える (wc -l)"
+        }
+      ],
+      "output": "0\n33 /etc/shadow",
+      "read": "番号は 0 です。0 番の利用者が root (管理者) です。次の行の数は、登録されている利用者の数です。この数は環境で少し変わります。",
+      "trouble": [
+        {
+          "symptom": "パスワードを聞かれる",
+          "check": "行の頭が ubuntu@kcna かを見る",
+          "fix": "Ctrl キーを押しながら C で止め、kcna の中に入ってから打つ"
+        },
+        {
+          "symptom": "sudo: command not found のように出る",
+          "check": "sudo のつづりと、後ろの空白を見る",
+          "fix": "行をコピーして打つ"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man8/sudo.8.html"
+    },
+    {
+      "id": "curl",
+      "text": "インターネットの先に届くかを、curl で見ます。",
+      "why": "次の章で、curl を使って k3s を取ってくるためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "curl -sI https://get.k3s.io | head -n 1"
+      },
+      "lines": [
+        {
+          "code": "curl -sI https://get.k3s.io | head -n 1",
+          "text": "相手の返事の見出しだけを取る (-I)。途中の表示は出さない (-s)。| で次のコマンドに渡し、最初の 1 行だけを出す"
+        }
+      ],
+      "output": "HTTP/2 200 \r",
+      "read": "HTTP/2 200 の 200 は「うまくいった」という返事です。| (パイプ) は、左の出力を右のコマンドへ渡します。",
+      "trouble": [
+        {
+          "symptom": "何も出ない",
+          "check": "curl -I https://get.k3s.io を打ち、-s で隠れていたエラーを見る",
+          "fix": "Could not resolve host なら名前を引けていない。VPN を切り、仮想マシンを止めて動かし直す"
+        },
+        {
+          "symptom": "404 と出る",
+          "check": "URL のつづりを見る",
+          "fix": "行をコピーして打つ"
+        }
+      ],
+      "source": "https://curl.se/docs/manpage.html"
+    },
+    {
+      "id": "curl-fail",
+      "text": "わざと、存在しない名前につなぎます。",
+      "why": "ネットワークのつまずきで、いちばんよく見る文を知っておくためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "curl -sS https://no-such-host.invalid"
+      },
+      "lines": [
+        {
+          "code": "curl -sS https://no-such-host.invalid",
+          "text": "無い名前につなぐ。-s で途中の表示を隠し、-S でエラーだけは出す"
+        }
+      ],
+      "output": "curl: (6) Could not resolve host: no-such-host.invalid",
+      "read": "Could not resolve host は「その名前の住所が分からない」です。.invalid は必ず存在しない名前として決められています。本当の URL でこれが出たら、つづりかネットワークを疑います。",
+      "trouble": [
+        {
+          "symptom": "本当の URL でも同じ文が出る",
+          "check": "cat /etc/resolv.conf を打ち、nameserver の行があるかを見る",
+          "fix": "exit で出て、multipass stop kcna、multipass start kcna の順に打つ"
+        },
+        {
+          "symptom": "何も出ない",
+          "check": "-sS の 2 つ目の S が大文字かを見る",
+          "fix": "行をコピーして打つ"
+        }
+      ],
+      "source": "https://curl.se/docs/manpage.html"
+    },
+    {
+      "id": "exit",
+      "text": "仮想マシンから出ます。",
+      "why": "次は、ホストの端末で仮想マシンを止めるためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "exit"
+      },
+      "lines": [
+        {
+          "code": "exit",
+          "text": "今の端末を終える。仮想マシンは止まらず、動き続ける"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "行の頭が、自分の PC のものに戻ります。出ても、仮想マシンの中のファイルは残ります。",
+      "trouble": [
+        {
+          "symptom": "行の頭が ubuntu@kcna のまま",
+          "check": "exit を打った行の下を見る",
+          "fix": "もう一度 exit を打つ"
+        },
+        {
+          "symptom": "端末の窓ごと閉じてしまった",
+          "check": "multipass list で kcna が Running かを見る",
+          "fix": "ホストの端末を開き直す。仮想マシンは動いたままになっている"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man1/bash.1.html"
+    },
+    {
+      "id": "stop",
+      "text": "仮想マシンを止めます。",
+      "why": "控えは、止まっているときだけ取れるためです。止めても中身は消えません。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass stop kcna\nmultipass list"
+      },
+      "lines": [
+        {
+          "code": "multipass stop kcna",
+          "text": "kcna の電源を切る"
+        },
+        {
+          "code": "multipass list",
+          "text": "状態を見る"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "kcna の行の State が Stopped なら止まっています。",
+      "trouble": [
+        {
+          "symptom": "State が Running のまま",
+          "check": "少し待って、もう一度 multipass list を打つ",
+          "fix": "もう一度 multipass stop kcna を打つ。--force は中身が壊れることがあるので、最後の手段にする"
+        },
+        {
+          "symptom": "multipass: command not found と出る",
+          "check": "行の頭が ubuntu@kcna かを見る",
+          "fix": "まだ中にいるので、exit で出てから打つ"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/stop/"
+    },
+    {
+      "id": "snapshot",
+      "text": "今の状態の控え (スナップショット) を、clean という名前で取ります。",
+      "why": "失敗しても、何も入れていない状態へすぐに戻れるようにするためです。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass snapshot --name clean kcna\nmultipass list --snapshots"
+      },
+      "lines": [
+        {
+          "code": "multipass snapshot --name clean kcna",
+          "text": "kcna の今の状態を clean という名前で控える"
+        },
+        {
+          "code": "multipass list --snapshots",
+          "text": "控えの一覧を出す"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "Snapshot taken: kcna.clean と出て、一覧の kcna の行に clean があれば取れています。控えは同じディスクの中に置かれるので、PC が壊れたときの備えにはなりません。",
+      "trouble": [
+        {
+          "symptom": "止まっていないので取れないと出る",
+          "check": "multipass list で State を見る",
+          "fix": "multipass stop kcna で止めてから取る"
+        },
+        {
+          "symptom": "clean がもうあると出る",
+          "check": "multipass list --snapshots を打つ",
+          "fix": "前の控えを使うか、--name clean2 のように別の名前にする"
+        },
+        {
+          "symptom": "Mac で、控えに対応していないと出る",
+          "check": "multipass get local.driver を打つ",
+          "fix": "applevz なら控えが使えない。qemu (Mac の既定) で作り直すと使える"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/snapshot/"
+    },
+    {
+      "id": "break",
+      "text": "戻す練習のために、仮想マシンを動かしてファイルを 1 つ作ります。",
+      "why": "控えのあとに変えたものが、戻すと消えることを目で見るためです。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass start kcna\nmultipass exec kcna -- touch /home/ubuntu/after.txt\nmultipass exec kcna -- ls /home/ubuntu"
+      },
+      "lines": [
+        {
+          "code": "multipass start kcna",
+          "text": "kcna を動かす"
+        },
+        {
+          "code": "multipass exec kcna -- touch /home/ubuntu/after.txt",
+          "text": "中に入らずに、kcna の中で touch (空のファイルを作る) を動かす。-- の後ろが中で動くコマンド"
+        },
+        {
+          "code": "multipass exec kcna -- ls /home/ubuntu",
+          "text": "kcna の中で ls を動かす"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "after.txt と work が並びます。after.txt は控えのあとに作ったもの、work は控えの前に作ったものです。",
+      "trouble": [
+        {
+          "symptom": "kcna が動いていないと出る",
+          "check": "multipass list で State を見る",
+          "fix": "multipass start kcna を打ち、Running になってから打つ"
+        },
+        {
+          "symptom": "work が出ない",
+          "check": "前の手順でファイルを作ったかを見返す",
+          "fix": "そのまま進む。after.txt だけでも練習できる"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/exec/"
+    },
+    {
+      "id": "restore",
+      "text": "仮想マシンを止め、控えの clean へ戻します。",
+      "why": "壊してもやり直せることを、壊す前に 1 度試すためです。戻すときも、仮想マシンを止めます。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass stop kcna\nmultipass restore --destructive kcna.clean"
+      },
+      "lines": [
+        {
+          "code": "multipass stop kcna",
+          "text": "kcna を止める"
+        },
+        {
+          "code": "multipass restore --destructive kcna.clean",
+          "text": "kcna を clean の状態へ戻す。--destructive は、今の状態を控えずに捨てる"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "Snapshot restored: kcna.clean と出れば戻っています。--destructive を付けないと、捨てる前に今の状態も控えるかを聞かれます。消して困るものがあるときは付けず、聞かれたら Enter キーを押します (既定は控える)。",
+      "trouble": [
+        {
+          "symptom": "止まっていないと出る",
+          "check": "multipass list で State を見る",
+          "fix": "multipass stop kcna で止めてから戻す"
+        },
+        {
+          "symptom": "控えが見つからないと出る",
+          "check": "multipass list --snapshots で名前を見る",
+          "fix": "仮想マシンの名前と控えの名前を、. でつないで打つ"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/restore/"
+    },
+    {
+      "id": "check-restore",
+      "text": "もう一度動かし、戻ったことを確かめます。",
+      "why": "控えが本当に使えることを、自分の目で確かめるためです。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass start kcna\nmultipass exec kcna -- ls /home/ubuntu"
+      },
+      "lines": [
+        {
+          "code": "multipass start kcna",
+          "text": "kcna を動かす"
+        },
+        {
+          "code": "multipass exec kcna -- ls /home/ubuntu",
+          "text": "kcna の中のホームの中身を出す"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "work だけが出て、after.txt が無ければ、控えの時点に戻っています。次の章は、この仮想マシンから始めます。",
+      "trouble": [
+        {
+          "symptom": "after.txt がまだある",
+          "check": "multipass restore の行が Snapshot restored で終わったかを見返す",
+          "fix": "止める手順から、もう一度行う"
+        },
+        {
+          "symptom": "ls の結果が空",
+          "check": "控えを取る前に work を作ったかを見返す",
+          "fix": "空でも、after.txt が無ければ戻っている"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/restore/"
+    }
+  ],
+  "cleanup": [
+    {
+      "id": "rest",
+      "text": "今日はここまでにするときは、仮想マシンを止めます。",
+      "why": "動いている間は PC のメモリを使うためです。次の章でも使うので、消しません。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass stop kcna"
+      },
+      "lines": [
+        {
+          "code": "multipass stop kcna",
+          "text": "kcna を止める"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "何もエラーが出なければ止まっています。続けるときは multipass start kcna で動かします。",
+      "trouble": [
+        {
+          "symptom": "止まったか分からない",
+          "check": "multipass list で State を見る",
+          "fix": "Stopped なら止まっている。Running なら、もう一度止める"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/stop/"
+    },
+    {
+      "id": "delete",
+      "text": "実践の章を全部終えたときだけ、完全に消します。続きをするなら、打ちません。",
+      "why": "ディスクを空けるためです。控えも一緒に消え、元に戻せません。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass delete --purge kcna\nmultipass list"
+      },
+      "lines": [
+        {
+          "code": "multipass delete --purge kcna",
+          "text": "kcna を、控えごと完全に消す。--purge を付けないと、multipass recover で戻せる形で残る"
+        },
+        {
+          "code": "multipass list",
+          "text": "仮想マシンの一覧を出す"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "一覧に kcna が無ければ消えています。",
+      "trouble": [
+        {
+          "symptom": "kcna が Deleted と出て残っている",
+          "check": "--purge を付けたかを見返す",
+          "fix": "本当に消してよければ multipass purge を打つ。消し済みの仮想マシンが全部、完全に消える"
+        },
+        {
+          "symptom": "kcna が無いと出る",
+          "check": "multipass list で名前を見る",
+          "fix": "一覧に無ければ、もう消えている"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/delete/"
+    }
+  ],
+  "challenges": [
+    {
+      "task": "仮想マシンの中で practice というフォルダを作り、その中の name.txt に、マシンの名前を書いてください。",
+      "hint": "hostname の出力を、> でファイルに書きます。",
+      "answer": "mkdir practice\ncd practice\nhostname > name.txt\ncd ~",
+      "verify": "cat ~/practice/name.txt を打ち、kcna と出れば正解です。"
+    },
+    {
+      "task": "管理者しか読めない /etc/sudoers の、行の数を数えてください。まず sudo なしで打ち、断られる文も読みます。",
+      "hint": "行を数えるのは wc -l です。",
+      "answer": "wc -l /etc/sudoers\nsudo wc -l /etc/sudoers",
+      "verify": "1 つ目は Permission denied と出て、2 つ目は数と名前が出れば正解です。"
+    },
+    {
+      "task": "ホストで、控えの clean2 を取り、一覧に 2 つ並べてください (この課題は Multipass を使うため、実機で未確認です)。",
+      "hint": "控えは、止まっているときだけ取れます。",
+      "answer": "multipass stop kcna\nmultipass snapshot --name clean2 kcna\nmultipass list --snapshots",
+      "verify": "一覧に clean と clean2 が出れば正解です。"
+    }
+  ],
+  "sources": [
+    {
+      "label": "Multipass: Install Multipass",
+      "url": "https://canonical.com/multipass/docs/stable/how-to-guides/install-multipass/"
+    },
+    {
+      "label": "Multipass: launch",
+      "url": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/launch/"
+    },
+    {
+      "label": "Multipass: find",
+      "url": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/find/"
+    },
+    {
+      "label": "Multipass: shell",
+      "url": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/shell/"
+    },
+    {
+      "label": "Multipass: exec",
+      "url": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/exec/"
+    },
+    {
+      "label": "Multipass: list",
+      "url": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/list/"
+    },
+    {
+      "label": "Multipass: start",
+      "url": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/start/"
+    },
+    {
+      "label": "Multipass: stop",
+      "url": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/stop/"
+    },
+    {
+      "label": "Multipass: snapshot",
+      "url": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/snapshot/"
+    },
+    {
+      "label": "Multipass: restore",
+      "url": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/restore/"
+    },
+    {
+      "label": "Multipass: delete",
+      "url": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/delete/"
+    },
+    {
+      "label": "Multipass: purge",
+      "url": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/purge/"
+    },
+    {
+      "label": "Multipass: Snapshot (止まっているときだけ取れる・戻せる)",
+      "url": "https://canonical.com/multipass/docs/stable/explanation/snapshot/"
+    },
+    {
+      "label": "Multipass: Driver (控えを使えないもの)",
+      "url": "https://canonical.com/multipass/docs/stable/explanation/driver/"
+    },
+    {
+      "label": "Multipass: Troubleshoot launch/start issues",
+      "url": "https://canonical.com/multipass/docs/stable/how-to-guides/troubleshoot/troubleshoot-launch-start-issues/"
+    },
+    {
+      "label": "Multipass: Troubleshoot networking",
+      "url": "https://canonical.com/multipass/docs/stable/how-to-guides/troubleshoot/troubleshoot-networking/"
+    },
+    {
+      "label": "Microsoft Learn: Virtual Machine Platform を有効にする",
+      "url": "https://learn.microsoft.com/en-us/windows/wsl/install-manual"
+    },
+    {
+      "label": "K3s: Requirements",
+      "url": "https://docs.k3s.io/installation/requirements"
+    },
+    {
+      "label": "man7.org: bash(1)",
+      "url": "https://man7.org/linux/man-pages/man1/bash.1.html"
+    },
+    {
+      "label": "man7.org: sudo(8)",
+      "url": "https://man7.org/linux/man-pages/man8/sudo.8.html"
+    },
+    {
+      "label": "curl: the man page",
+      "url": "https://curl.se/docs/manpage.html"
+    }
+  ]
+}
