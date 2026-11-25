@@ -6,7 +6,7 @@ import type { HandbookStep } from './handbook';
 const FILES = import.meta.glob<Record<string, string>>('./lineNotes/*.json', { eager: true, import: 'default' });
 export const LINE_NOTES: ReadonlyMap<string, string> = new Map(Object.keys(FILES).sort().flatMap((k) => Object.entries(FILES[k])));
 
-export const LINE_NOTE_TOPICS = new Set(['setup-k3s', 'core-concepts', 'administration', 'scheduling', 'containerization']);
+export const LINE_NOTE_TOPICS = new Set(['setup-k3s', 'core-concepts', 'administration', 'scheduling', 'containerization', 'networking', 'security', 'troubleshooting', 'storage']);
 
 export type LineNote = { code: string; text: string };
 /** 手順のコマンドの行と意味 (意味を付け終えていないトピックと、コマンドの無い手順は空) */
