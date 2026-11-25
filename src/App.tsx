@@ -41,6 +41,8 @@ export default function App() {
     );
     return () => {
       current = false;
+      // 離れたら忘れる (開き直したときは、知らせを先に出さずに読み直す)
+      setFailed(null);
     };
   }, [routeKey, lazyName, Screen]);
   // 開いたときに読む画面を描き終えたら、読み込み中の印を外し、戻せなかった位置をもう一度戻す

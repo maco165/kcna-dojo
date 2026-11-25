@@ -92,6 +92,15 @@ describe('章から章へ移るときの読み込み', { timeout: 30_000 }, () =
     expect(document.documentElement.dataset.loading).toBeUndefined();
     await go('a');
     expect(shown()).toBe('a');
+    // 開き直すと、読む前から知らせを出さず、前の画面のまま読む。また失敗したら知らせを出し、読み込み中の帯は残さない
+    await go('c');
+    expect(shown()).toBe('a');
+    expect(document.documentElement.dataset.loading).toBe('true');
+    await settle('c', 'reject');
+    expect(el.textContent).toContain('画面を読み込めませんでした');
+    expect(el.querySelector(`a[href="${BASE}"]`)).not.toBeNull();
+    expect(document.documentElement.dataset.loading).toBeUndefined();
+    await go('a');
     // もう一度開くと読み直し、読めれば出す
     await go('c');
     await settle('c', 'resolve');
@@ -132,6 +141,38 @@ describe('章の本文の入口', () => {
 });
 
 describe('戻るの位置', () => {
+  it('読んでいる間に離れても (閉じる・もう一度戻る)、前のページの位置を、読んでいるページの位置として覚えない', async () => {
+    vi.resetModules();
+    sessionStorage.setItem('kcna.scroll', JSON.stringify({ k1: 5000, k2: 70 }));
+    const { onRouteChanged, savePosition, retryRestore, scroller, startScrollMemory } = await import('../src/lib/scrollMemory');
+    const stored = () => JSON.parse(sessionStorage.getItem('kcna.scroll')!);
+    const frame = () => new Promise((r) => setTimeout(r, 60));
+    history.replaceState({ kcnaKey: 'k3' }, '');
+    startScrollMemory();
+    scroller().scrollTop = 120;
+    // k1 へ戻る: 離れる前のページの位置は覚える
+    savePosition();
+    expect(stored().k3).toBe(120);
+    history.replaceState({ kcnaKey: 'k1' }, '');
+    document.documentElement.dataset.loading = 'true';
+    onRouteChanged();
+    window.dispatchEvent(new Event('pagehide'));
+    expect(stored().k1).toBe(5000);
+    // 読んでいる間にもう一度戻る (k2 も読んでいる)、また k1 へ進む
+    savePosition();
+    history.replaceState({ kcnaKey: 'k2' }, '');
+    onRouteChanged();
+    savePosition();
+    history.replaceState({ kcnaKey: 'k1' }, '');
+    onRouteChanged();
+    expect(stored()).toMatchObject({ k1: 5000, k2: 70, k3: 120 });
+    delete document.documentElement.dataset.loading;
+    retryRestore();
+    await frame();
+    expect(scroller().scrollTop).toBe(5000);
+    window.dispatchEvent(new Event('pagehide'));
+    expect(stored().k1).toBe(5000);
+  });
   it('閉じた確かめの窓の中の欄は、スクロールする欄とみなさない (スマホの章・設定・模擬試験)', async () => {
     const { scroller } = await import('../src/lib/scrollMemory');
     document.body.innerHTML = '<dialog><div class="astryx-layout-content"></div></dialog>';
