@@ -22,9 +22,9 @@ function writeStore() {
   }
 }
 
-/** PC は AppShell の中の欄、スマホはページがスクロールする */
+/** PC は AppShell の中の欄、スマホはページがスクロールする。確かめの窓 (AlertDialog) も同じクラスの欄を持ち、閉じていても DOM にあるので除く */
 export function scroller(): Element {
-  return document.querySelector('.astryx-layout-content') ?? document.scrollingElement ?? document.documentElement;
+  return [...document.querySelectorAll('.astryx-layout-content')].find((e) => !e.closest('dialog')) ?? document.scrollingElement ?? document.documentElement;
 }
 
 const newKey = () => Math.random().toString(36).slice(2, 10);
@@ -60,6 +60,8 @@ function restore(top: number, until = performance.now() + 1000) {
   pending = top;
   requestAnimationFrame(() => {
     if (pending !== top) return;
+    // 開いたページをまだ読んでいて、前のページの画面が出ている間は動かさない (前のページの位置を動かして、戻した扱いにしない)。描き終えたら retryRestore が続ける
+    if (document.documentElement.dataset.loading) return;
     const el = scroller();
     el.scrollTop = top;
     if (Math.abs(el.scrollTop - top) <= 2) pending = null;
