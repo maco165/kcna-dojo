@@ -377,6 +377,10 @@
     ],
     "usedIn": [
       {
+        "topic": "security",
+        "label": "セキュリティ: 認証・RBAC・Secret・Pod のセキュリティ"
+      },
+      {
         "topic": "setup-k3s",
         "label": "ハンドブックを試すための k3s の入れ方"
       }
@@ -539,6 +543,22 @@
         "label": "コンテナ化: イメージ・ランタイム・CRI"
       },
       {
+        "topic": "networking",
+        "label": "ネットワーク: Pod・Service・DNS・入口・NetworkPolicy"
+      },
+      {
+        "topic": "security",
+        "label": "セキュリティ: 認証・RBAC・Secret・Pod のセキュリティ"
+      },
+      {
+        "topic": "troubleshooting",
+        "label": "障害対応: 状態・イベント・ログの順に読む"
+      },
+      {
+        "topic": "storage",
+        "label": "ストレージ: ボリューム・PV・PVC・StorageClass"
+      },
+      {
         "topic": "setup-k3s",
         "label": "ハンドブックを試すための k3s の入れ方"
       }
@@ -613,6 +633,14 @@
       {
         "topic": "administration",
         "label": "クラスタの管理: kubectl・kubeconfig・資源の上限"
+      },
+      {
+        "topic": "networking",
+        "label": "ネットワーク: Pod・Service・DNS・入口・NetworkPolicy"
+      },
+      {
+        "topic": "troubleshooting",
+        "label": "障害対応: 状態・イベント・ログの順に読む"
       },
       {
         "topic": "setup-k3s",
@@ -987,6 +1015,14 @@
       {
         "topic": "containerization",
         "label": "コンテナ化: イメージ・ランタイム・CRI"
+      },
+      {
+        "topic": "security",
+        "label": "セキュリティ: 認証・RBAC・Secret・Pod のセキュリティ"
+      },
+      {
+        "topic": "storage",
+        "label": "ストレージ: ボリューム・PV・PVC・StorageClass"
       }
     ]
   },
@@ -1306,6 +1342,10 @@
       {
         "topic": "containerization",
         "label": "コンテナ化: イメージ・ランタイム・CRI"
+      },
+      {
+        "topic": "troubleshooting",
+        "label": "障害対応: 状態・イベント・ログの順に読む"
       }
     ]
   },
@@ -1349,6 +1389,282 @@
       {
         "topic": "scheduling",
         "label": "スケジューリング: Pod を置くノードの決まり方"
+      },
+      {
+        "topic": "troubleshooting",
+        "label": "障害対応: 状態・イベント・ログの順に読む"
+      },
+      {
+        "topic": "storage",
+        "label": "ストレージ: ボリューム・PV・PVC・StorageClass"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-create-ingress",
+    "command": "kubectl create ingress",
+    "tool": "kubectl",
+    "summary": "Ingress (HTTP の通信を Service に振り分ける決まり) を作ります。",
+    "detail": "--rule に「ホスト名/パス=Service:ポート」の形で書きます。決まりを実際に動かすのは Ingress コントローラーなので、入っていなければ、作っても通信は届きません。",
+    "usage": "kubectl create ingress <名前> --rule=<ホスト>/<パス>=<Service>:<ポート> [オプション]",
+    "flags": [
+      {
+        "flags": [
+          "--rule"
+        ],
+        "text": "振り分けの決まり。パスの最後に * を付けると、その先も全部当てはまる"
+      },
+      {
+        "flags": [
+          "--class"
+        ],
+        "text": "使う Ingress コントローラーの種類 (IngressClass)"
+      },
+      {
+        "flags": [
+          "--dry-run"
+        ],
+        "text": "作らずに試す (client は手元だけ、server は API サーバーで確かめるところまで)"
+      }
+    ],
+    "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_create/kubectl_create_ingress/",
+    "inside": [
+      "kubectl が、--rule の文字から Ingress を手元で組み立てます。パスの最後に * があれば、* を除いて pathType を Prefix (前の部分が合えばよい) に、無ければ Exact (完全に同じ) にします。",
+      "API サーバーに POST で送り、保存されます。",
+      "Ingress コントローラー (k3s では同梱の Traefik) が新しい Ingress に気づき、自分の設定に取り込みます。"
+    ],
+    "api": [
+      {
+        "method": "POST",
+        "path": "/apis/networking.k8s.io/v1/namespaces/<名前空間>/ingresses",
+        "note": "Ingress を作る"
+      }
+    ],
+    "examples": [
+      {
+        "title": "何が作られるかを、作らずに見る (このページのために打った例)",
+        "code": "$ kubectl create ingress web --class=traefik --rule=\"web.example.test/*=web:80\" --dry-run=client -o yaml",
+        "output": "apiVersion: networking.k8s.io/v1\nkind: Ingress\nmetadata:\n  name: web\nspec:\n  ingressClassName: traefik\n  rules:\n  - host: web.example.test\n    http:\n      paths:\n      - backend:\n          service:\n            name: web\n            port:\n              number: 80\n        path: /\n        pathType: Prefix\nstatus:\n  loadBalancer: {}",
+        "note": "/* が、path: / と pathType: Prefix になりました。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "Kubernetes: Ingress",
+        "url": "https://kubernetes.io/docs/concepts/services-networking/ingress/"
+      },
+      {
+        "label": "kubectl v0.37.2: pkg/cmd/create/create_ingress.go",
+        "url": "https://github.com/kubernetes/kubectl/blob/v0.37.2/pkg/cmd/create/create_ingress.go"
+      }
+    ],
+    "usedIn": [
+      {
+        "topic": "networking",
+        "label": "ネットワーク: Pod・Service・DNS・入口・NetworkPolicy"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-create-serviceaccount",
+    "command": "kubectl create serviceaccount",
+    "tool": "kubectl",
+    "summary": "ServiceAccount (Pod の中のプログラムの身元) を作ります。",
+    "detail": "作っただけでは、ほとんど何もできません。RoleBinding などで権限を結び付けて使います。serviceaccount は sa と短く書けます。",
+    "usage": "kubectl create serviceaccount <名前> [オプション]",
+    "flags": [
+      {
+        "flags": [
+          "--dry-run"
+        ],
+        "text": "作らずに試す (client は手元だけ、server は API サーバーで確かめるところまで)"
+      }
+    ],
+    "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_create/kubectl_create_serviceaccount/",
+    "inside": [
+      "kubectl が、名前だけを書いた ServiceAccount を手元で組み立て、API サーバーに POST で送ります。",
+      "Pod の serviceAccountName にこの名前を書くと、Pod の中のプログラムは、この身元のトークンで API サーバーに話しかけられます。",
+      "権限を調べるときの名前は system:serviceaccount:<名前空間>:<名前> の形です。"
+    ],
+    "api": [
+      {
+        "method": "POST",
+        "path": "/api/v1/namespaces/<名前空間>/serviceaccounts",
+        "note": "ServiceAccount を作る"
+      }
+    ],
+    "examples": [
+      {
+        "title": "何が作られるかを、作らずに見る (このページのために打った例)",
+        "code": "$ kubectl create serviceaccount viewer -n try-kcna --dry-run=client -o yaml",
+        "output": "apiVersion: v1\nkind: ServiceAccount\nmetadata:\n  name: viewer\n  namespace: try-kcna",
+        "note": "名前と名前空間だけの、短いものです。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "Kubernetes: Service Accounts",
+        "url": "https://kubernetes.io/docs/concepts/security/service-accounts/"
+      }
+    ],
+    "usedIn": [
+      {
+        "topic": "security",
+        "label": "セキュリティ: 認証・RBAC・Secret・Pod のセキュリティ"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-patch",
+    "command": "kubectl patch",
+    "tool": "kubectl",
+    "summary": "動いているリソースの、一部の項目だけを書き換えます。",
+    "detail": "変えたいところだけを JSON か YAML で -p に書きます。全部を書き直さなくてよいので、1 か所だけ直すのに向いています。",
+    "usage": "kubectl patch (<種類> <名前> | -f <ファイル>) -p <変えるところ> [オプション]",
+    "flags": [
+      {
+        "flags": [
+          "-p",
+          "--patch"
+        ],
+        "text": "変えるところ (JSON か YAML)"
+      },
+      {
+        "flags": [
+          "--type"
+        ],
+        "text": "重ね方 (strategic が既定。merge・json もある)"
+      },
+      {
+        "flags": [
+          "--local"
+        ],
+        "text": "API サーバーに送らず、手元のファイルで試す"
+      },
+      {
+        "flags": [
+          "-f",
+          "--filename"
+        ],
+        "text": "対象を書いたファイル"
+      }
+    ],
+    "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_patch/",
+    "inside": [
+      "kubectl が、-p に書いた内容を JSON にして、PATCH で API サーバーに送ります。",
+      "API サーバーが今の中身に重ねます。書いた項目だけが変わり、書かなかった項目はそのままです。",
+      "一覧 (配列) の重ね方は --type と項目で変わります。strategic では、コンテナのように名前で合わせる一覧があります。"
+    ],
+    "api": [
+      {
+        "method": "PATCH",
+        "path": "/api/v1/namespaces/<名前空間>/services/<名前>",
+        "note": "変えるところを送る (Service の場合)"
+      }
+    ],
+    "examples": [
+      {
+        "title": "手元のファイルで、セレクターだけが変わるのを見る (このページのために打った例)",
+        "code": "$ kubectl patch -f s.yaml --local -p '{\"spec\":{\"selector\":{\"app\":\"web\"}}}' -o yaml",
+        "output": "apiVersion: v1\nkind: Service\nmetadata:\n  name: web\nspec:\n  ports:\n  - port: 80\n  selector:\n    app: web",
+        "note": "元のファイルでは app: wbe でした。ports は書かなかったので、そのままです。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "Kubernetes: Update API Objects in Place Using kubectl patch",
+        "url": "https://kubernetes.io/docs/tasks/manage-kubernetes-objects/update-api-object-kubectl-patch/"
+      }
+    ],
+    "usedIn": [
+      {
+        "topic": "troubleshooting",
+        "label": "障害対応: 状態・イベント・ログの順に読む"
+      }
+    ]
+  },
+  {
+    "id": "base64",
+    "command": "base64",
+    "tool": "Linux",
+    "summary": "データを、英数字だけの文字に置き換えます (戻すこともできます)。",
+    "detail": "暗号ではありません。だれでも戻せるので、秘密を守る力はありません。Secret の data の値は、この形で書かれています。",
+    "usage": "base64 [オプション] [ファイル]",
+    "flags": [
+      {
+        "flags": [
+          "-d",
+          "--decode"
+        ],
+        "text": "元に戻す"
+      },
+      {
+        "flags": [
+          "-w"
+        ],
+        "text": "何文字で改行するか (既定は 76。0 なら改行しない)"
+      }
+    ],
+    "source": "https://man7.org/linux/man-pages/man1/base64.1.html",
+    "inside": [
+      "3 バイトずつ取り、6 ビットの 4 つに分けて、64 種類の文字 (英数字と + と /) に置き換えます。余りは = で埋めます。",
+      "-d では、逆に文字からバイトに戻します。鍵は要りません。",
+      "ファイルを書かなければ、標準入力 (パイプの左の出力) を読みます。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "置き換えて、戻す (このページのために打った例)",
+        "code": "$ echo -n example-only | base64\n$ echo ZXhhbXBsZS1vbmx5 | base64 -d",
+        "output": "ZXhhbXBsZS1vbmx5\nexample-only",
+        "note": "echo の -n は、最後に改行を付けない指定です。付けないと、改行も一緒に置き換わります。"
+      }
+    ],
+    "sources": [
+      {
+        "label": "Kubernetes: Secrets",
+        "url": "https://kubernetes.io/docs/concepts/configuration/secret/"
+      }
+    ],
+    "usedIn": [
+      {
+        "topic": "security",
+        "label": "セキュリティ: 認証・RBAC・Secret・Pod のセキュリティ"
+      }
+    ]
+  },
+  {
+    "id": "sleep",
+    "command": "sleep",
+    "tool": "Linux",
+    "summary": "決めた秒数だけ、何もせずに待ちます。",
+    "detail": "クラスタの中で変化が起きるのを少し待ってから、次のコマンドを打ちたいときに使います。状態がはっきりしているときは、kubectl wait のほうが確実です (早く終われば待たず、終わらなければ失敗を知らせるため)。",
+    "usage": "sleep <秒数>",
+    "flags": [],
+    "source": "https://man7.org/linux/man-pages/man1/sleep.1.html",
+    "inside": [
+      "sleep は、カーネルに「この時間だけ起こさないで」と頼みます。待っている間、CPU はほとんど使いません。",
+      "時間が来ると、何も出さずに終わります。Ctrl+C を押すと、待つのをやめます。",
+      "数の後ろに m (分) や h (時間) も付けられます (GNU と uutils の sleep)。コンテナの中で sleep 3600 と書くのは、コンテナをすぐに終わらせないためです。"
+    ],
+    "api": [],
+    "examples": [
+      {
+        "title": "2 秒待つ (このページのために打った例)",
+        "code": "$ time sleep 2",
+        "output": "real\t0m2.007s\nuser\t0m0.001s\nsys\t0m0.006s",
+        "note": "time は、かかった時間を出すシェルの命令です。real が実際の時間、user と sys が CPU を使った時間で、ほとんど使っていません。"
+      }
+    ],
+    "sources": [],
+    "usedIn": [
+      {
+        "topic": "troubleshooting",
+        "label": "障害対応: 状態・イベント・ログの順に読む"
+      },
+      {
+        "topic": "storage",
+        "label": "ストレージ: ボリューム・PV・PVC・StorageClass"
       }
     ]
   }
