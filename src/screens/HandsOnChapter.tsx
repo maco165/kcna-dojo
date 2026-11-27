@@ -26,6 +26,7 @@ import { HANDS_ON, HANDS_ON_TITLE } from '../content/handsOn';
 import { isChapter, loadChapter, loadedChapter } from '../content/handsOnChapters';
 import type { HandsOnChapter as Chapter, HandsOnMeta, HandsOnOs, HandsOnStep } from '../content/types';
 import { handsOnStepText } from '../lib/askAi';
+import { chapterK3s, stuckIssueUrl } from '../lib/stuck';
 import { XP_PER_LAB } from '../lib/grade';
 import { OS_CHOICES, OS_LABEL, WHERE_LABEL, canComplete, handsOnOs, markedCount, stepsFor } from '../lib/handsOn';
 import { completeHandsOn, goalXp, markHandsOnStep, restartHandsOn, setProfile, todayXp, type Progress } from '../lib/progress';
@@ -56,7 +57,7 @@ function Source({ url }: { url: string }) {
 }
 
 /** 1 手順の中身。ask があれば、AI に聞く折りたたみを付ける */
-function StepBody({ step, text, why, ask }: { step: HandsOnStep; text: TermPiece[]; why: TermPiece[]; ask?: string }) {
+function StepBody({ step, text, why, ask, stuck }: { step: HandsOnStep; text: TermPiece[]; why: TermPiece[]; ask?: string; stuck: string }) {
   const tags = [step.os && `${OS_LABEL[step.os]} の手順`, step.where && WHERE_LABEL[step.where]].filter(Boolean);
   return (
     <>
@@ -108,6 +109,11 @@ function StepBody({ step, text, why, ask }: { step: HandsOnStep; text: TermPiece
           <AskAiLinks text={ask} lead="この手順を AI に聞く" />
         </OnOpen>
       )}
+      <p className="ho-stuck">
+        <Link href={stuck} isExternalLink newTabLabel="(新しいタブで開きます)">
+          ここで詰まった (GitHub に書く)
+        </Link>
+      </p>
       {step.source && (
         <p className="hb-muted">
           出典: <Source url={step.source} />
@@ -144,6 +150,8 @@ export function ChapterView({ chapter: c, chapters, progress, updateProgress }: 
     const prose = (s: HandsOnStep) => ({ step: s, text: link(s.text), why: link(s.why) });
     return { summary: link(c.summary), stepProse: stepsFor(c.steps, os).map(prose), cleanupProse: stepsFor(c.cleanup, os).map(prose) };
   }, [c, os]);
+  const k3s = chapterK3s(c.id, HANDS_ON);
+  const stuckOf = (step: HandsOnStep, where: string) => stuckIssueUrl({ chapter: c, step, where, os: OS_LABEL[os], k3s, pathname: handsOnHref(c.id) });
   const at = chapters.findIndex((x) => x.id === c.id);
   const prev = chapters[at - 1];
   const next = chapters[at + 1];
@@ -219,7 +227,7 @@ export function ChapterView({ chapter: c, chapters, progress, updateProgress }: 
           {stepProse.map(({ step, text, why }, i) => (
             <li key={step.id} id={`step-${step.id}`}>
               <div className="hb-step">
-                <StepBody step={step} text={text} why={why} ask={handsOnStepText(c.title, step, i, OS_LABEL[os])} />
+                <StepBody step={step} text={text} why={why} ask={handsOnStepText(c.title, step, i, OS_LABEL[os])} stuck={stuckOf(step, `手順 ${i + 1}`)} />
                 <CheckboxInput label={`手順 ${i + 1} を確かめた`} value={rec?.steps.includes(step.id) === true} onChange={(on) => updateProgress((p) => markHandsOnStep(p, c.id, step.id, on, new Date()))} />
               </div>
             </li>
@@ -305,10 +313,10 @@ export function ChapterView({ chapter: c, chapters, progress, updateProgress }: 
         </h2>
         <p className="hb-muted">終わったら片付けます。完了の条件には入れません。</p>
         <ol className="hb-flow">
-          {cleanupProse.map(({ step, text, why }) => (
+          {cleanupProse.map(({ step, text, why }, i) => (
             <li key={step.id}>
               <div className="hb-step">
-                <StepBody step={step} text={text} why={why} />
+                <StepBody step={step} text={text} why={why} stuck={stuckOf(step, `後片付け ${i + 1}`)} />
               </div>
             </li>
           ))}

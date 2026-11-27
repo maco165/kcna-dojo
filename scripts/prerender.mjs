@@ -338,9 +338,12 @@ export async function buildPages(load, { chapters } = {}) {
       .filter(Boolean)
       .join('\n'),
   });
+  const { chapterK3s, k3sVersionOf, stuckIssueUrl } = await load('/src/lib/stuck.ts');
+  const versions = chapterList.map((c) => ({ id: c.id, order: c.order, k3s: k3sVersionOf(JSON.stringify(c)) }));
   for (const c of chapterList) {
+    const stuckHtml = (s, where) => `<p><a href="${esc(stuckIssueUrl({ chapter: c, step: s, where, k3s: chapterK3s(c.id, versions), pathname: `${BASE}hands-on/${c.id}/` }))}">ここで詰まった (GitHub に書く)</a></p>`;
     const lineHtml = (s) => `<p>${s.code.language === 'bash' || s.code.language === 'powershell' ? 'コマンドの意味' : '1 行ずつの意味'}</p><dl>${s.lines.map((l) => `<dt><code>${(s.code.language === 'bash' ? linkShell(l.code, COMMAND_BRIEFS).pieces : [l.code]).map((p) => (typeof p === 'string' ? esc(p) : link(`commands/${p.id}/`, p.text))).join('')}</code></dt><dd>${esc(l.text)}</dd>`).join('')}</dl>`;
-    const stepHtml = (s) => {
+    const stepHtml = (s, where) => {
       const tags = [s.os && `${OS_LABEL[s.os]} の手順`, s.where && WHERE_LABEL[s.where]].filter(Boolean);
       return [
         '<li>',
@@ -353,6 +356,7 @@ export async function buildPages(load, { chapters } = {}) {
         s.output ? `<p>実機の出力</p><pre>${esc(s.output)}</pre>` : '',
         s.read ? `<p>出力の読み方: ${esc(s.read)}</p>` : '',
         s.trouble?.length ? `<p>つまずいた時</p>${s.trouble.map((t) => `<dl><dt>症状</dt><dd>${esc(t.symptom)}</dd><dt>確かめ方</dt><dd>${esc(t.check)}</dd><dt>直し方</dt><dd>${esc(t.fix)}</dd></dl>`).join('')}` : '',
+        stuckHtml(s, where),
         s.source ? `<p>出典: <a href="${esc(s.source)}">${esc(new URL(s.source).hostname)}</a></p>` : '',
         '</li>',
       ].join('');
@@ -373,9 +377,9 @@ export async function buildPages(load, { chapters } = {}) {
         `<h3>この章で分かる特徴</h3>${list(c.features)}`,
         `<h3>用意するもの</h3>${list(c.needs)}`,
         c.reads.length ? `<h3>先に読む</h3><ul>${c.reads.map((r) => `<li>${link(`handbook/${r.topic}/`, r.label)}</li>`).join('')}</ul>` : '',
-        `<h2>手順</h2><ol>${c.steps.map(stepHtml).join('')}</ol>`,
+        `<h2>手順</h2><ol>${c.steps.map((s, i) => stepHtml(s, `手順 ${i + 1}`)).join('')}</ol>`,
         `<h2>課題</h2><ol>${c.challenges.map((x) => `<li><p>${esc(x.task)}</p><details><summary>ヒント</summary><p>${esc(x.hint)}</p></details><details><summary>答え</summary><pre>${esc(x.answer)}</pre></details><p>確かめ方: ${esc(x.verify)}</p></li>`).join('')}</ol>`,
-        `<h2>後片付け</h2><ol>${c.cleanup.map(stepHtml).join('')}</ol>`,
+        `<h2>後片付け</h2><ol>${c.cleanup.map((s, i) => stepHtml(s, `後片付け ${i + 1}`)).join('')}</ol>`,
         '<h2>出典</h2>',
         `<ul>${c.sources.map((s) => `<li><a href="${esc(s.url)}">${esc(s.label)}</a></li>`).join('')}</ul>`,
         `<p>${link('hands-on/', '実践の一覧')}</p>`,

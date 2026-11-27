@@ -146,4 +146,4 @@ export type HandsOnChapter = {
 };
 
 /** 一覧と題名に使う軽い章 (vite.config.ts の ?meta。手順は id と OS だけ) */
-export type HandsOnMeta = Pick<HandsOnChapter, 'id' | 'order' | 'title' | 'short' | 'summary' | 'minutes'> & { steps: Pick<HandsOnStep, 'id' | 'os'>[] };
+export type HandsOnMeta = Pick<HandsOnChapter, 'id' | 'order' | 'title' | 'short' | 'summary' | 'minutes'> & { /** その章が入れる k3s の版 */ k3s?: string; steps: Pick<HandsOnStep, 'id' | 'os'>[] };
