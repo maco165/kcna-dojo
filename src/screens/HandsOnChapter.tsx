@@ -57,7 +57,7 @@ function Source({ url }: { url: string }) {
 }
 
 /** 1 手順の中身。ask があれば、AI に聞く折りたたみを付ける */
-function StepBody({ step, text, why, ask, stuck }: { step: HandsOnStep; text: TermPiece[]; why: TermPiece[]; ask?: string; stuck: string }) {
+function StepBody({ step, text, why, ask, stuck }: { step: HandsOnStep; text: TermPiece[]; why: TermPiece[]; ask?: string; stuck: { href: string; where: string } }) {
   const tags = [step.os && `${OS_LABEL[step.os]} の手順`, step.where && WHERE_LABEL[step.where]].filter(Boolean);
   return (
     <>
@@ -110,7 +110,8 @@ function StepBody({ step, text, why, ask, stuck }: { step: HandsOnStep; text: Te
         </OnOpen>
       )}
       <p className="ho-stuck">
-        <Link href={stuck} isExternalLink newTabLabel="(新しいタブで開きます)">
+        {/* 見える文は同じで、読み上げではどの手順かが分かるようにする (新しいタブの知らせも残す) */}
+        <Link href={stuck.href} aria-label={`${stuck.where} で詰まった (GitHub に書く) (新しいタブで開きます)`} isExternalLink newTabLabel="(新しいタブで開きます)">
           ここで詰まった (GitHub に書く)
         </Link>
       </p>
@@ -151,7 +152,7 @@ export function ChapterView({ chapter: c, chapters, progress, updateProgress }: 
     return { summary: link(c.summary), stepProse: stepsFor(c.steps, os).map(prose), cleanupProse: stepsFor(c.cleanup, os).map(prose) };
   }, [c, os]);
   const k3s = chapterK3s(c.id, HANDS_ON);
-  const stuckOf = (step: HandsOnStep, where: string) => stuckIssueUrl({ chapter: c, step, where, os: OS_LABEL[os], k3s, pathname: handsOnHref(c.id) });
+  const stuckOf = (step: HandsOnStep, where: string) => ({ where, href: stuckIssueUrl({ chapter: c, step, where, os: OS_LABEL[os], k3s, pathname: handsOnHref(c.id) }) });
   const at = chapters.findIndex((x) => x.id === c.id);
   const prev = chapters[at - 1];
   const next = chapters[at + 1];
@@ -314,7 +315,7 @@ export function ChapterView({ chapter: c, chapters, progress, updateProgress }: 
         <p className="hb-muted">終わったら片付けます。完了の条件には入れません。</p>
         <ol className="hb-flow">
           {cleanupProse.map(({ step, text, why }, i) => (
-            <li key={step.id}>
+            <li key={step.id} id={`step-${step.id}`}>
               <div className="hb-step">
                 <StepBody step={step} text={text} why={why} stuck={stuckOf(step, `後片付け ${i + 1}`)} />
               </div>

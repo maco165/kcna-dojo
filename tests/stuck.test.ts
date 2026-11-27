@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { HANDS_ON } from '../src/content/handsOn';
 import { HANDS_ON_CHAPTERS } from '../src/content/handsOnAll';
 import { NEW_ISSUE_URL } from '../src/lib/links';
-import { STUCK_FIELDS, STUCK_TEMPLATE, chapterK3s, k3sVersionOf, stuckIssueUrl } from '../src/lib/stuck';
+import { STUCK_FIELDS, STUCK_TEMPLATE, chapterK3s, codesOf, k3sInstallOf, stuckIssueUrl } from '../src/lib/stuck';
 
 const chapter = { id: 'install-k3s', order: 1, title: 'k3s を入れて、最初のコンテナを動かす' };
 const step = { id: 'install', text: 'あ'.repeat(300) };
@@ -37,12 +37,25 @@ describe('ここで詰まった', () => {
       for (const s of [...c.steps, ...c.cleanup])
         expect(stuckIssueUrl({ chapter: c, step: s, where: '後片付け 10', os: 'Windows', k3s: 'v1.36.6+k3s1', pathname: `/kcna-dojo/hands-on/${c.id}/` }).length, `${c.id} ${s.id}`).toBeLessThan(2000);
   });
-  it('章の版: その章か前の章が入れた版。まだ入れていない章は無し', () => {
-    expect(k3sVersionOf('curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=v1.36.6+k3s1 sh -')).toBe('v1.36.6+k3s1');
-    const list = [{ id: 'a', order: 0 }, { id: 'b', order: 1, k3s: 'v1.1.1+k3s1' }, { id: 'c', order: 2 }, { id: 'd', order: 3, k3s: 'v1.2.0+k3s1' }];
-    expect(['a', 'b', 'c', 'd', 'x'].map((id) => chapterK3s(id, list))).toEqual([undefined, 'v1.1.1+k3s1', 'v1.1.1+k3s1', 'v1.2.0+k3s1', undefined]);
-    // 実際の章: 0 章は無し、1 章から後は 1 章が入れた版
-    const v = k3sVersionOf(JSON.stringify(HANDS_ON_CHAPTERS.find((c) => c.order === 1)));
+  it('章の版の引き方: 入れる行の版 (引用符・rc も)。版を決めずに入れたら分からない。取ってくるだけ・見るだけの行は数えない', () => {
+    expect(k3sInstallOf(['curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=v1.36.6+k3s1 sh -'])).toBe('v1.36.6+k3s1');
+    expect(k3sInstallOf(['curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION="v1.36.6+k3s1" sh -'])).toBe('v1.36.6+k3s1');
+    expect(k3sInstallOf(["curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION='v1.37.0-rc1+k3s1' sh -s - server"])).toBe('v1.37.0-rc1+k3s1');
+    expect(k3sInstallOf(['curl -sfL https://get.k3s.io | sudo INSTALL_K3S_VERSION=v1.36.6+k3s1 sh -'])).toBe('v1.36.6+k3s1');
+    expect(k3sInstallOf(['curl -sfL https://get.k3s.io | INSTALL_K3S_CHANNEL=v1.36 sh -'])).toBeNull();
+    expect(k3sInstallOf(['curl -sfL https://get.k3s.io | sh -'])).toBeNull();
+    expect(k3sInstallOf(['INSTALL_K3S_VERSION=v1.35.3+k3s1 sh get-k3s.sh'])).toBe('v1.35.3+k3s1');
+    // 最後に入れた行の版
+    expect(k3sInstallOf(['curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=v1.35.3+k3s1 sh -', 'x\ncurl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=v1.36.6+k3s1 sh -'])).toBe('v1.36.6+k3s1');
+    expect(k3sInstallOf(['curl -sI https://get.k3s.io | head -n 1', 'curl -sfL https://get.k3s.io -o get-k3s.sh', "curl -sfL https://get.k3s.io | grep -n 'INSTALL_K3S_VERSION'", 'k3s --version'])).toBeUndefined();
+  });
+  it('章の版: その章までで最後に入れた章の版。どの章も入れる前は「使わない」、版の分からない入れ方なら「分からない」', () => {
+    const list = [{ id: 'a', order: 0 }, { id: 'b', order: 1, k3s: 'v1.1.1+k3s1' }, { id: 'c', order: 2 }, { id: 'd', order: 3, k3s: null }, { id: 'e', order: 4 }];
+    expect(['a', 'b', 'c', 'd', 'e'].map((id) => chapterK3s(id, list))).toEqual([undefined, 'v1.1.1+k3s1', 'v1.1.1+k3s1', null, null]);
+    const k3s = (v: string | null | undefined) => new URL(stuckIssueUrl({ chapter, step, where: '手順 1', k3s: v, pathname: '/' })).searchParams.get('chapter-k3s');
+    expect([k3s(undefined), k3s(null), k3s('v1.36.6+k3s1')]).toEqual(['この章では k3s を使わない', '章の版は分からない', 'v1.36.6+k3s1']);
+    // 実際の章: 0 章は使わない、1 章から後は 1 章が入れた版
+    const v = k3sInstallOf(codesOf(HANDS_ON_CHAPTERS.find((c) => c.order === 1)!));
     expect(v).toMatch(/^v1\.\d+\.\d+\+k3s\d+$/);
     expect(HANDS_ON.map((c) => chapterK3s(c.id, HANDS_ON))).toEqual(HANDS_ON.map((c) => (c.order === 0 ? undefined : v)));
   });

@@ -9,16 +9,33 @@ export const STUCK_FIELDS = ['chapter', 'step', 'page', 'chapter-os', 'chapter-k
 /** 手順の本文は頭だけ入れる (URL を長くしない) */
 export const STEP_HEAD = 80;
 
-/** 章を書いたときの k3s の版 (入れるコマンドの INSTALL_K3S_VERSION)。vite.config.ts の ?meta と書き出しが使う */
-export function k3sVersionOf(text: string): string | undefined {
-  return text.match(/INSTALL_K3S_VERSION=(v\d+\.\d+\.\d+\+k3s\d+)/)?.[1];
+/** k3s を入れる行: get.k3s.io をシェルへ流す行か、INSTALL_K3S_ の指定を付けてシェルで動かす行 (取ってくるだけ・見るだけの行は除く) */
+const INSTALL_LINE = /get\.k3s\.io\s*\|\s*(?:sudo\s+)?(?:(?:env\s+)?\w+=\S+\s+)*(?:sh|bash)\b|\bINSTALL_K3S_\w+=\S+\s+(?:\S+=\S+\s+)*(?:sh|bash)\b/;
+/** 入れる行の版。引用符で囲んでも、rc などが付いてもよい */
+const VERSION = /INSTALL_K3S_VERSION=["']?(v\d+\.\d+\.\d+[\w.+-]*?)["']?(?=\s|$)/;
+
+/**
+ * 章のコードが k3s を入れるか、入れるならその版 (章の中で最後に入れる行の版)。
+ * 入れないなら undefined、入れるが版を決めていない (INSTALL_K3S_CHANNEL など) なら null。vite.config.ts の ?meta と書き出しが使う
+ */
+export function k3sInstallOf(codes: string[]): string | null | undefined {
+  const lines = codes.flatMap((c) => c.split('\n')).filter((l) => INSTALL_LINE.test(l));
+  if (lines.length === 0) return undefined;
+  return lines[lines.length - 1].match(VERSION)?.[1] ?? null;
 }
 
-/** 章の版: その章か、それより前でいちばん近い章が入れた版。まだ k3s を入れていない章は undefined */
-export function chapterK3s(id: string, chapters: { id: string; order: number; k3s?: string }[]): string | undefined {
+/** 章の全部のコード (手順と後片付け) */
+export const codesOf = (c: { steps: { code?: { text: string } }[]; cleanup?: { code?: { text: string } }[] }) => [...c.steps, ...(c.cleanup ?? [])].flatMap((s) => (s.code ? [s.code.text] : []));
+
+/**
+ * 章の版: その章までで最後に k3s を入れた章の版。まだどの章も入れていなければ undefined (使わない)、
+ * 入れたが版が引けなければ null (分からない)
+ */
+export function chapterK3s(id: string, chapters: { id: string; order: number; k3s?: string | null }[]): string | null | undefined {
   const at = chapters.find((c) => c.id === id);
-  if (!at) return undefined;
-  return [...chapters].filter((c) => c.order <= at.order && c.k3s).sort((a, b) => b.order - a.order)[0]?.k3s;
+  if (!at) return null;
+  const last = [...chapters].filter((c) => c.order <= at.order && c.k3s !== undefined).sort((a, b) => b.order - a.order)[0];
+  return last ? last.k3s : undefined;
 }
 
 const head = (t: string) => (t.length > STEP_HEAD ? `${t.slice(0, STEP_HEAD - 1)}…` : t);
@@ -27,7 +44,7 @@ const head = (t: string) => (t.length > STEP_HEAD ? `${t.slice(0, STEP_HEAD - 1)
  * 詰まりを書く Issue の URL。os は画面で選んだ OS の名前 (書き出しの HTML では分からないので無し)。
  * where は画面の番号 (「手順 3」「後片付け 1」。OS で手順の数が変わるので、手順の id も入れる)
  */
-export function stuckIssueUrl(a: { chapter: { id: string; order: number; title: string }; step: { id: string; text: string }; where: string; os?: string; k3s?: string; pathname: string }): string {
+export function stuckIssueUrl(a: { chapter: { id: string; order: number; title: string }; step: { id: string; text: string }; where: string; os?: string; k3s: string | null | undefined; pathname: string }): string {
   const q = new URLSearchParams({
     template: STUCK_TEMPLATE,
     title: `詰まった: ${a.chapter.order} 章 ${a.where} (${a.chapter.id} / ${a.step.id})`,
@@ -35,7 +52,7 @@ export function stuckIssueUrl(a: { chapter: { id: string; order: number; title: 
     step: `${a.where} (${a.step.id}): ${head(a.step.text)}`,
     page: `${SITE_ORIGIN}${a.pathname}#step-${a.step.id}`,
     'chapter-os': a.os ?? '選んでいない (JavaScript の無いページから)',
-    'chapter-k3s': a.k3s ?? 'この章では k3s を使わない',
+    'chapter-k3s': a.k3s === undefined ? 'この章では k3s を使わない' : (a.k3s ?? '章の版は分からない'),
   });
   return `${NEW_ISSUE_URL}?${q.toString()}`;
 }

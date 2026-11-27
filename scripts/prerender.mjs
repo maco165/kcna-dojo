@@ -338,15 +338,15 @@ export async function buildPages(load, { chapters } = {}) {
       .filter(Boolean)
       .join('\n'),
   });
-  const { chapterK3s, k3sVersionOf, stuckIssueUrl } = await load('/src/lib/stuck.ts');
-  const versions = chapterList.map((c) => ({ id: c.id, order: c.order, k3s: k3sVersionOf(JSON.stringify(c)) }));
+  const { chapterK3s, codesOf, k3sInstallOf, stuckIssueUrl } = await load('/src/lib/stuck.ts');
+  const versions = chapterList.map((c) => ({ id: c.id, order: c.order, k3s: k3sInstallOf(codesOf(c)) }));
   for (const c of chapterList) {
-    const stuckHtml = (s, where) => `<p><a href="${esc(stuckIssueUrl({ chapter: c, step: s, where, k3s: chapterK3s(c.id, versions), pathname: `${BASE}hands-on/${c.id}/` }))}">ここで詰まった (GitHub に書く)</a></p>`;
+    const stuckHtml = (s, where) => `<p><a href="${esc(stuckIssueUrl({ chapter: c, step: s, where, k3s: chapterK3s(c.id, versions), pathname: `${BASE}hands-on/${c.id}/` }))}" aria-label="${esc(`${where} で詰まった (GitHub に書く)`)}">ここで詰まった (GitHub に書く)</a></p>`;
     const lineHtml = (s) => `<p>${s.code.language === 'bash' || s.code.language === 'powershell' ? 'コマンドの意味' : '1 行ずつの意味'}</p><dl>${s.lines.map((l) => `<dt><code>${(s.code.language === 'bash' ? linkShell(l.code, COMMAND_BRIEFS).pieces : [l.code]).map((p) => (typeof p === 'string' ? esc(p) : link(`commands/${p.id}/`, p.text))).join('')}</code></dt><dd>${esc(l.text)}</dd>`).join('')}</dl>`;
     const stepHtml = (s, where) => {
       const tags = [s.os && `${OS_LABEL[s.os]} の手順`, s.where && WHERE_LABEL[s.where]].filter(Boolean);
       return [
-        '<li>',
+        `<li id="step-${esc(s.id)}">`,
         tags.length ? `<p>${esc(tags.join(' · '))}</p>` : '',
         `<p>${esc(s.text)}</p><p>なぜ: ${esc(s.why)}</p>`,
         s.unverified ? `<p>実機で未確認: ${esc(s.unverified)}</p>` : '',
