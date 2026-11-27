@@ -74,7 +74,7 @@
           "text": "ノードの一覧を出す"
         }
       ],
-      "output": "kcna\nNAME   STATUS   ROLES           AGE   VERSION\nkcna   Ready    control-plane   44m   v1.36.6+k3s1",
+      "output": "kcna\nNAME   STATUS   ROLES           AGE     VERSION\nkcna   Ready    control-plane   2m45s   v1.36.6+k3s1",
       "read": "kcna と出て、ノードの STATUS が Ready なら進めます。VERSION が v1.36.6+k3s1 でない人は、出力の版を読み替えます。",
       "trouble": [
         {
@@ -402,8 +402,8 @@
           "text": "2 つの Pod を消す"
         }
       ],
-      "output": "pod/scratch created\npod/scratch condition met\n/dev/vda1                18.3G      2.8G     15.5G  15% /work\ntmpfs                     1.9G         0      1.9G   0% /fast\npod/scratch condition met\nkeep-me\npod \"scratch\" deleted from ch8 namespace\npod/scratch created\npod/scratch condition met\n消えた\ncat: can't open '/work/note.txt': No such file or directory\npod \"layer\" deleted from ch8 namespace\npod \"scratch\" deleted from ch8 namespace",
-      "read": "/fast は tmpfs (メモリ)、/work はノードのディスクの上です。始め直しでは keep-me が残り、Pod を作り直すと消えました。一時置き場や、Pod の中のコンテナどうしの受け渡しに使います。",
+      "output": "pod/scratch created\npod/scratch condition met\n/dev/vda1                18.3G      2.8G     15.5G  15% /work\ntmpfs                     1.9G         0      1.9G   0% /fast\npod/scratch condition met\nkeep-me\npod \"scratch\" deleted from ch8 namespace\npod/scratch created\npod/scratch condition met\ncat: can't open '/work/note.txt': No such file or directory\n消えた\npod \"layer\" deleted from ch8 namespace\npod \"scratch\" deleted from ch8 namespace",
+      "read": "/fast は tmpfs (メモリ)、/work はノードのディスクの上です。始め直しでは keep-me が残り、Pod を作り直すと消えました。メモリの上の置き場所は、使った分がその Pod のメモリの上限まで数えられます (sizeLimit で絞れます)。一時置き場や、Pod の中のコンテナどうしの受け渡しに使います。",
       "trouble": [
         {
           "symptom": "作り直す行で AlreadyExists と出る",
@@ -582,7 +582,7 @@
           "text": "Pod を消したあと、ノードの側で読む"
         }
       ],
-      "output": "pod/hp created\npod/hp condition met\nkcna\ntotal 4\n-rw-r--r-- 1 root root 9 Nov 27 01:42 note.txt\npod \"hp\" deleted from ch8 namespace\nfrom-pod",
+      "output": "pod/hp created\npod/hp condition met\nkcna\ntotal 4\n-rw-r--r-- 1 root root 9 Nov 27 05:04 note.txt\npod \"hp\" deleted from ch8 namespace\nfrom-pod",
       "read": "Pod の中から、ノードのホスト名 kcna が読めました。読むだけにしても、ノードの設定が丸見えです。書いたファイルは root の持ち物でノードに残り、Pod を消しても消えません。誰も片付けないので、たまっていきます。",
       "trouble": [
         {
@@ -638,7 +638,7 @@
           "text": "残りを見る"
         }
       ],
-      "output": "cloud-init\nsystemd-private-25d2c0faeb3549688c56caec32535f81-ModemManager.service-N2K0Tc\nsystemd-private-25d2c0faeb3549688c56caec32535f81-polkit.service-lyqRL9\nsystemd-private-25d2c0faeb3549688c56caec32535f81-systemd-logind.service-DLhiwX\nsystemd-private-25d2c0faeb3549688c56caec32535f81-systemd-resolved.service-rIv45g\nsystemd-private-25d2c0faeb3549688c56caec32535f81-systemd-timesyncd.service-GHkPfg",
+      "output": "cloud-init\nsystemd-private-73300523ae054ded8f38cfcfaaecdc86-ModemManager.service-ofclds\nsystemd-private-73300523ae054ded8f38cfcfaaecdc86-polkit.service-LmIZpw\nsystemd-private-73300523ae054ded8f38cfcfaaecdc86-systemd-logind.service-9zVdse\nsystemd-private-73300523ae054ded8f38cfcfaaecdc86-systemd-resolved.service-FH7IG6\nsystemd-private-73300523ae054ded8f38cfcfaaecdc86-systemd-timesyncd.service-CxWjhq",
       "read": "kcna-ch8 が無くなっていれば片付いています。",
       "trouble": [
         {
@@ -668,7 +668,7 @@
           "text": "local-path がノードのどこに置くかの設定を出す"
         }
       ],
-      "output": "NAME                   PROVISIONER             RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE\nlocal-path (default)   rancher.io/local-path   Delete          WaitForFirstConsumer   false                  44m\n{\n  \"nodePathMap\":[\n  {\n    \"node\":\"DEFAULT_PATH_FOR_NON_LISTED_NODES\",\n    \"paths\":[\"/var/lib/rancher/k3s/storage\"]\n  }\n  ]\n}",
+      "output": "NAME                   PROVISIONER             RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE\nlocal-path (default)   rancher.io/local-path   Delete          WaitForFirstConsumer   false                  3m11s\n{\n  \"nodePathMap\":[\n  {\n    \"node\":\"DEFAULT_PATH_FOR_NON_LISTED_NODES\",\n    \"paths\":[\"/var/lib/rancher/k3s/storage\"]\n  }\n  ]\n}",
       "read": "(default) は「PVC に何も書かなければこれ」の印です。PROVISIONER の rancher.io/local-path が、申し込みを受けて PV を作る部品です。RECLAIMPOLICY の Delete は「PVC を消したら中身も消す」、VOLUMEBINDINGMODE の WaitForFirstConsumer は「使う Pod が決まるまで作らない」です。置き場所は、ノードの /var/lib/rancher/k3s/storage です。",
       "trouble": [
         {
@@ -924,7 +924,7 @@
           "text": "置き場所のファイルを読む"
         }
       ],
-      "output": "deployment.apps/notes created\nWaiting for deployment \"notes\" rollout to finish: 0 of 1 updated replicas are available...\ndeployment \"notes\" successfully rolled out\nNAME    STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE\nnotes   Bound    pvc-7aca2f68-eeef-4089-90a6-0023e6d21932   64Mi       RWO            local-path     <unset>                 20s\nNAME                                       CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM       STORAGECLASS   VOLUMEATTRIBUTESCLASS   REASON   AGE\npvc-7aca2f68-eeef-4089-90a6-0023e6d21932   64Mi       RWO            Delete           Bound    ch8/notes   local-path     <unset>                          2s\nhello\nstarted 01:43:18 by notes-f8c4ddc9c-4wpt8",
+      "output": "deployment.apps/notes created\nWaiting for deployment \"notes\" rollout to finish: 0 of 1 updated replicas are available...\ndeployment \"notes\" successfully rolled out\nNAME    STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE\nnotes   Bound    pvc-d52dd088-0592-4a33-bfff-33d67d668e75   64Mi       RWO            local-path     <unset>                 20s\nNAME                                       CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM       STORAGECLASS   VOLUMEATTRIBUTESCLASS   REASON   AGE\npvc-d52dd088-0592-4a33-bfff-33d67d668e75   64Mi       RWO            Delete           Bound    ch8/notes   local-path     <unset>                          2s\nhello\nstarted 05:04:38 by notes-f8c4ddc9c-9f968",
       "read": "STATUS が Bound、VOLUME に pvc- で始まる PV の名前が出ます。PV の CLAIM は ch8/notes で、どの申し込みに結ばれたかが分かります。PV は名前空間の外のものなので、-n を付けずに出します。",
       "trouble": [
         {
@@ -947,7 +947,7 @@
       "where": "vm",
       "code": {
         "language": "bash",
-        "text": "PV_NAME=$(kubectl get pvc notes -n ch8 -o jsonpath='{.spec.volumeName}')\nkubectl get pv $PV_NAME -o jsonpath='{.spec.hostPath.path}{\"\\n\"}{.spec.nodeAffinity.required.nodeSelectorTerms[0].matchExpressions[0].values}{\"\\n\"}'\nsudo ls /var/lib/rancher/k3s/storage\nsudo cat /var/lib/rancher/k3s/storage/${PV_NAME}_ch8_notes/hello.txt"
+        "text": "PV_NAME=$(kubectl get pvc notes -n ch8 -o jsonpath='{.spec.volumeName}')\nkubectl get pv $PV_NAME -o jsonpath='{.spec.local.path}{\"\\n\"}{.spec.nodeAffinity.required.nodeSelectorTerms[0].matchExpressions[0].values}{\"\\n\"}'\nsudo ls /var/lib/rancher/k3s/storage\nsudo cat /var/lib/rancher/k3s/storage/${PV_NAME}_ch8_notes/hello.txt"
       },
       "lines": [
         {
@@ -955,8 +955,8 @@
           "text": "PVC に結ばれた PV の名前を覚える。今の端末だけで使える"
         },
         {
-          "code": "kubectl get pv $PV_NAME -o jsonpath='{.spec.hostPath.path}{\"\\n\"}{.spec.nodeAffinity.required.nodeSelectorTerms[0].matchExpressions[0].values}{\"\\n\"}'",
-          "text": "PV の置き場所と、結び付いたノードを出す"
+          "code": "kubectl get pv $PV_NAME -o jsonpath='{.spec.local.path}{\"\\n\"}{.spec.nodeAffinity.required.nodeSelectorTerms[0].matchExpressions[0].values}{\"\\n\"}'",
+          "text": "PV の置き場所 (local 型の PV の path) と、結び付いたノードを出す"
         },
         {
           "code": "sudo ls /var/lib/rancher/k3s/storage",
@@ -967,8 +967,8 @@
           "text": "ノードの側から、Pod が書いたファイルを読む"
         }
       ],
-      "output": "[\"kcna\"]\npvc-7aca2f68-eeef-4089-90a6-0023e6d21932_ch8_notes\nhello",
-      "read": "PV の名前・名前空間・PVC の名前をつないだフォルダに、hello が入っています。結び付いたノードは kcna です。ノードが壊れると、この中身にはどこからも届かなくなります。",
+      "output": "/var/lib/rancher/k3s/storage/pvc-d52dd088-0592-4a33-bfff-33d67d668e75_ch8_notes\n[\"kcna\"]\npvc-d52dd088-0592-4a33-bfff-33d67d668e75_ch8_notes\nhello",
+      "read": "この版の k3s の local-path は、local という型の PV を作ります (ノードのフォルダを、そのノードだけで使う型)。PV の名前・名前空間・PVC の名前をつないだフォルダに、hello が入っています。結び付いたノードは kcna です。ノードが壊れると、この中身にはどこからも届かなくなります。",
       "trouble": [
         {
           "symptom": "No such file or directory と出る",
@@ -1021,7 +1021,7 @@
           "text": "置き場所のファイルを読む"
         }
       ],
-      "output": "pod \"notes-f8c4ddc9c-4wpt8\" deleted from ch8 namespace\ndeployment \"notes\" successfully rolled out\nstarted 01:43:18 by notes-f8c4ddc9c-4wpt8\nstarted 01:43:22 by notes-f8c4ddc9c-hmnlm\ndeployment.apps \"notes\" deleted from ch8 namespace\nNAME    STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE\nnotes   Bound    pvc-7aca2f68-eeef-4089-90a6-0023e6d21932   64Mi       RWO            local-path     <unset>                 28s\ndeployment.apps/notes created\nWaiting for deployment \"notes\" rollout to finish: 0 of 1 updated replicas are available...\ndeployment \"notes\" successfully rolled out\nstarted 01:43:18 by notes-f8c4ddc9c-4wpt8\nstarted 01:43:22 by notes-f8c4ddc9c-hmnlm\nstarted 01:43:28 by notes-f8c4ddc9c-w768t",
+      "output": "pod \"notes-f8c4ddc9c-9f968\" deleted from ch8 namespace\ndeployment \"notes\" successfully rolled out\nstarted 05:04:38 by notes-f8c4ddc9c-9f968\nstarted 05:04:40 by notes-f8c4ddc9c-lnzkx\ndeployment.apps \"notes\" deleted from ch8 namespace\nNAME    STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE\nnotes   Bound    pvc-d52dd088-0592-4a33-bfff-33d67d668e75   64Mi       RWO            local-path     <unset>                 25s\ndeployment.apps/notes created\nWaiting for deployment \"notes\" rollout to finish: 0 of 1 updated replicas are available...\ndeployment \"notes\" successfully rolled out\nstarted 05:04:38 by notes-f8c4ddc9c-9f968\nstarted 05:04:40 by notes-f8c4ddc9c-lnzkx\nstarted 05:04:45 by notes-f8c4ddc9c-8bmsc",
       "read": "started の行が 3 つに増えています。Pod は 3 回とも別の名前ですが、書いたものは同じ置き場所に残りました。PVC が消えない限り、中身は残ります。",
       "trouble": [
         {
@@ -1048,7 +1048,7 @@
         }
       ],
       "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
-      "read": "何もエラーが出なければ止まっています。続けるときは、ホストで multipass shell kcna を打つと、動かして中に入れます。続けるときは cd ~/ch8 を打ち、kubectl rollout status deployment/notes -n ch8 で使えるようになるまで待ち、container not found と出なくなるまで少し待ってから、kubectl exec deployment/notes -n ch8 -- cat /data/log.txt を打ちます。started の行が 1 つ増えて、前の行も残っていれば、マシンを止めても中身が残ったということです。戻った直後の 1〜2 分は、一覧が止める前の古い様子のことがあります。少し待ってもう一度見ます。",
+      "read": "何もエラーが出なければ止まっています。続けるときは、ホストで multipass shell kcna を打つと、動かして中に入れます。そのあと cd ~/ch8 を打ち、kubectl rollout status deployment/notes -n ch8 で使えるようになるまで待ち、container not found と出なくなるまで少し待ってから、kubectl exec deployment/notes -n ch8 -- cat /data/log.txt を打ちます。started の行が 1 つ増えて、前の行も残っていれば、マシンを止めても中身が残ったということです。戻った直後の 1〜2 分は、一覧が止める前の古い様子のことがあります。少し待ってもう一度見ます。",
       "trouble": [
         {
           "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
@@ -1090,7 +1090,7 @@
           "text": "大きいファイルを消す"
         }
       ],
-      "output": "total 100M\n-rw-r--r--    1 root     root      100.0M Nov 27 01:43 big.bin\n-rw-r--r--    1 root     root           6 Nov 27 01:43 hello.txt\n-rw-r--r--    1 root     root         126 Nov 27 01:43 log.txt",
+      "output": "total 100M\n-rw-r--r--    1 root     root      100.0M Nov 27 05:04 big.bin\n-rw-r--r--    1 root     root           6 Nov 27 05:04 hello.txt\n-rw-r--r--    1 root     root         126 Nov 27 05:04 log.txt",
       "read": "64Mi を申し込んだのに、100 MiB 書けました。local-path の容量は、目安の数でしかありません。ノードのディスクが埋まると、そのノードの Pod 全部が困ります。容量を本当に守る置き場所もあり、それは部品の説明を見て選びます。",
       "trouble": [
         {
@@ -1255,7 +1255,7 @@
           "text": "置き場所のファイルを読む"
         }
       ],
-      "output": "persistentvolumeclaim \"notes\" deleted from ch8 namespace\nNAME    STATUS        VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE\nnotes   Terminating   pvc-7aca2f68-eeef-4089-90a6-0023e6d21932   64Mi       RWO            local-path     <unset>                 52s\n[\"kubernetes.io/pvc-protection\"]\nstarted 01:43:18 by notes-f8c4ddc9c-4wpt8\nstarted 01:43:22 by notes-f8c4ddc9c-hmnlm\nstarted 01:43:28 by notes-f8c4ddc9c-w768t",
+      "output": "persistentvolumeclaim \"notes\" deleted from ch8 namespace\nNAME    STATUS        VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE\nnotes   Terminating   pvc-d52dd088-0592-4a33-bfff-33d67d668e75   64Mi       RWO            local-path     <unset>                 52s\n[\"kubernetes.io/pvc-protection\"]\nstarted 05:04:38 by notes-f8c4ddc9c-9f968\nstarted 05:04:40 by notes-f8c4ddc9c-lnzkx\nstarted 05:04:45 by notes-f8c4ddc9c-8bmsc",
       "read": "STATUS は Terminating のまま止まっています。kubernetes.io/pvc-protection が、使っている Pod がある間は消させない印です。Pod はそのまま動いていて、読めます。",
       "trouble": [
         {
@@ -1327,7 +1327,7 @@
           "text": "ノードに notes のフォルダが残っているかを数える (|| true は、0 の時も失敗にしない書き方)"
         }
       ],
-      "output": "deployment.apps \"notes\" deleted from ch8 namespace\npersistentvolumeclaim/notes condition met\npersistentvolume/pvc-7aca2f68-eeef-4089-90a6-0023e6d21932 condition met\n0",
+      "output": "deployment.apps \"notes\" deleted from ch8 namespace\npersistentvolumeclaim/notes condition met\npersistentvolume/pvc-d52dd088-0592-4a33-bfff-33d67d668e75 condition met\n0",
       "read": "待っていた PVC が消え、PV も消え、ノードのフォルダも 0 になりました。中身は戻せません。消えては困るなら、reclaimPolicy を Retain にした StorageClass や PV を使います。Retain なら、PVC を消しても PV は Released (使い手の無い状態) で残り、中身の片付けは人がします。",
       "trouble": [
         {
@@ -1546,7 +1546,7 @@
           "text": "PVC を出す"
         }
       ],
-      "output": "service/store created\nstatefulset.apps/store created\nstore-0=Pending\nstore-0=Pending\nstore-0=Running store-1=Pending\nstore-0=Running store-1=ContainerCreating\nstore-0=Running store-1=Running store-2=Pending\nstore-0=Running store-1=Running store-2=Running\nNAME           STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE\ndata-store-0   Bound    pvc-505de709-8196-4df6-a204-046e5b3867f6   32Mi       RWO            local-path     <unset>                 18s\ndata-store-1   Bound    pvc-e4de5334-fe8e-4c44-8b12-1c78cb62e4d7   32Mi       RWO            local-path     <unset>                 12s\ndata-store-2   Bound    pvc-f9d4be41-c269-4ca4-a552-2fe788933354   32Mi       RWO            local-path     <unset>                 7s",
+      "output": "service/store created\nstatefulset.apps/store created\nstore-0=Pending\nstore-0=Pending\nstore-0=Running store-1=Pending\nstore-0=Running store-1=ContainerCreating\nstore-0=Running store-1=Running store-2=Pending\nstore-0=Running store-1=Running store-2=Running\nNAME           STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE\ndata-store-0   Bound    pvc-f24a089b-a109-4ce3-91ce-cda5769aa35b   32Mi       RWO            local-path     <unset>                 17s\ndata-store-1   Bound    pvc-c9731841-803f-4f32-9a5b-6e87c1beed44   32Mi       RWO            local-path     <unset>                 12s\ndata-store-2   Bound    pvc-e86e70d0-62ab-41bf-98e0-a31791ef4547   32Mi       RWO            local-path     <unset>                 6s",
       "read": "1 行ごとに、store-0、store-1、store-2 と 1 つずつ増えます。前の Pod が使えるようになってから、次を作るためです。PVC は data-store-0 のように、Pod ごとに 1 つです。並びの行の数は、マシンの速さで変わります。",
       "trouble": [
         {
@@ -1593,7 +1593,7 @@
           "text": "store-1 の住所を出す"
         }
       ],
-      "output": "pod/probe created\npod/probe condition met\nServer:\t\t10.43.0.10\nAddress:\t10.43.0.10:53\n\n\nName:\tstore-1.store.ch8.svc.cluster.local\nAddress: 10.42.0.27\n10.42.0.27",
+      "output": "pod/probe created\npod/probe condition met\nServer:\t\t10.43.0.10\nAddress:\t10.43.0.10:53\n\nName:\tstore-1.store.ch8.svc.cluster.local\nAddress: 10.42.0.27\n10.42.0.27",
       "read": "引いた住所が、store-1 の住所と同じです。Deployment の Pod では、名前が作り直すたびに変わるので、こうはいきません。",
       "trouble": [
         {
@@ -1631,7 +1631,7 @@
           "text": "使っている PVC を出す"
         }
       ],
-      "output": "pod \"store-1\" deleted from ch8 namespace\nstore-1 started 01:44:10\nstore-1 started 01:44:23\ndata-store-1",
+      "output": "pod \"store-1\" deleted from ch8 namespace\nstore-1 started 05:05:31\nstore-1 started 05:05:43\ndata-store-1",
       "read": "store-1 started の行が 2 つになりました。同じ data-store-1 を使い続けています。",
       "trouble": [
         {
@@ -1677,7 +1677,7 @@
           "text": "store-2 の置き場所を読む"
         }
       ],
-      "output": "statefulset.apps/store scaled\npod/store-2 condition met\npod/store-1 condition met\nNAME          READY   STATUS    RESTARTS   AGE\npod/probe     1/1     Running   0          16s\npod/store-0   1/1     Running   0          34s\n\nNAME                                 STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE\npersistentvolumeclaim/data-store-0   Bound    pvc-505de709-8196-4df6-a204-046e5b3867f6   32Mi       RWO            local-path     <unset>                 34s\npersistentvolumeclaim/data-store-1   Bound    pvc-e4de5334-fe8e-4c44-8b12-1c78cb62e4d7   32Mi       RWO            local-path     <unset>                 28s\npersistentvolumeclaim/data-store-2   Bound    pvc-f9d4be41-c269-4ca4-a552-2fe788933354   32Mi       RWO            local-path     <unset>                 23s\nstatefulset.apps/store scaled\nWaiting for 2 pods to be ready...\nWaiting for 1 pods to be ready...\nWaiting for 1 pods to be ready...\npartitioned roll out complete: 3 new pods have been updated...\nstore-2 started 01:44:16\nstore-2 started 01:44:36",
+      "output": "statefulset.apps/store scaled\npod/store-2 condition met\npod/store-1 condition met\nNAME          READY   STATUS    RESTARTS   AGE\npod/probe     1/1     Running   0          14s\npod/store-0   1/1     Running   0          31s\n\nNAME                                 STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE\npersistentvolumeclaim/data-store-0   Bound    pvc-f24a089b-a109-4ce3-91ce-cda5769aa35b   32Mi       RWO            local-path     <unset>                 31s\npersistentvolumeclaim/data-store-1   Bound    pvc-c9731841-803f-4f32-9a5b-6e87c1beed44   32Mi       RWO            local-path     <unset>                 26s\npersistentvolumeclaim/data-store-2   Bound    pvc-e86e70d0-62ab-41bf-98e0-a31791ef4547   32Mi       RWO            local-path     <unset>                 20s\nstatefulset.apps/store scaled\nWaiting for 2 pods to be ready...\nWaiting for 1 pods to be ready...\nWaiting for 1 pods to be ready...\npartitioned roll out complete: 3 new pods have been updated...\nstore-2 started 05:05:36\nstore-2 started 05:05:55",
       "read": "1 つの時も、PVC は 3 つ残っていました。戻した store-2 は、前の中身の続きに書いています。消すのは、中身を守るため、わざと人の仕事にしてあります。",
       "trouble": [
         {
@@ -1719,8 +1719,8 @@
           "text": "もう一度出す"
         }
       ],
-      "output": "statefulset.apps \"store\" deleted from ch8 namespace\npod/store-0 condition met\npod/store-1 condition met\npod/store-2 condition met\nNAME           STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE\ndata-store-0   Bound    pvc-505de709-8196-4df6-a204-046e5b3867f6   32Mi       RWO            local-path     <unset>                 42s\ndata-store-1   Bound    pvc-e4de5334-fe8e-4c44-8b12-1c78cb62e4d7   32Mi       RWO            local-path     <unset>                 36s\ndata-store-2   Bound    pvc-f9d4be41-c269-4ca4-a552-2fe788933354   32Mi       RWO            local-path     <unset>                 31s\npersistentvolumeclaim \"data-store-0\" deleted from ch8 namespace\npersistentvolumeclaim \"data-store-1\" deleted from ch8 namespace\npersistentvolumeclaim \"data-store-2\" deleted from ch8 namespace\nNo resources found in ch8 namespace.",
-      "read": "Pod が消えても PVC は 3 つ残り、ラベルで選んで消しました。PVC を自動で消す設定 (persistentVolumeClaimRetentionPolicy) もあります。",
+      "output": "statefulset.apps \"store\" deleted from ch8 namespace\npod/store-0 condition met\npod/store-1 condition met\npod/store-2 condition met\nNAME           STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE\ndata-store-0   Bound    pvc-f24a089b-a109-4ce3-91ce-cda5769aa35b   32Mi       RWO            local-path     <unset>                 40s\ndata-store-1   Bound    pvc-c9731841-803f-4f32-9a5b-6e87c1beed44   32Mi       RWO            local-path     <unset>                 35s\ndata-store-2   Bound    pvc-e86e70d0-62ab-41bf-98e0-a31791ef4547   32Mi       RWO            local-path     <unset>                 29s\npersistentvolumeclaim \"data-store-0\" deleted from ch8 namespace\npersistentvolumeclaim \"data-store-1\" deleted from ch8 namespace\npersistentvolumeclaim \"data-store-2\" deleted from ch8 namespace\nNo resources found in ch8 namespace.",
+      "read": "Pod が消えても PVC は 3 つ残り、ラベルで選んで消しました。PVC を自動で消す設定 (persistentVolumeClaimRetentionPolicy。1.32 から正式な機能) もあります。",
       "trouble": [
         {
           "symptom": "No resources found と出ない",
@@ -1921,7 +1921,7 @@
           "text": "名前空間の一覧を出す"
         }
       ],
-      "output": "namespace \"practice\" deleted\nNAME              STATUS   AGE\ndefault           Active   48m\nkube-node-lease   Active   48m\nkube-public       Active   48m\nkube-system       Active   48m",
+      "output": "namespace \"practice\" deleted\nNAME              STATUS   AGE\ndefault           Active   7m8s\nkube-node-lease   Active   7m8s\nkube-public       Active   7m8s\nkube-system       Active   7m8s",
       "read": "default と kube- で始まる 4 つだけになれば、片付いています。k3s は消しません。",
       "trouble": [
         {

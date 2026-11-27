@@ -394,7 +394,7 @@
         }
       ],
       "output": "job.batch/fail created\njob.batch/fail condition met\nNAME   STATUS   COMPLETIONS   DURATION   AGE\nfail   Failed   0/1           35s        35s\nNAME         READY   STATUS   RESTARTS   AGE\nfail-gbrtq   0/1     Error    0          24s\nfail-k8tcb   0/1     Error    0          4s\nfail-plcdl   0/1     Error    0          35s\nBackoffLimitExceeded\ntrying\ntrying\ntrying",
-      "read": "Pod が 3 つ (最初の 1 回とやり直しの 2 回)、どれも Error です。STATUS が Failed、理由が BackoffLimitExceeded (やり直しの上限を超えた) です。やり直しの間は 10 秒、20 秒と延びます。失敗した Pod が残るのは、記録を読んで原因を調べられるようにするためです。",
+      "read": "Pod が 3 つ (最初の 1 回とやり直しの 2 回)、どれも Error です。STATUS が Failed、理由が BackoffLimitExceeded (やり直しの上限を超えた) です。やり直しの間は 10 秒、20 秒と延び、上限は 10 分です。失敗の理由 (終わりの番号など) ごとに、やり直すかすぐ失敗にするかを決めたい時は、podFailurePolicy を書きます (たとえば「番号 42 で終わったら、やり直さずに Job を失敗にする」)。失敗した Pod が残るのは、記録を読んで原因を調べられるようにするためです。",
       "trouble": [
         {
           "symptom": "timed out と出る",
@@ -892,7 +892,7 @@
         }
       ],
       "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
-      "read": "何もエラーが出なければ止まっています。続けるときは、ホストで multipass shell kcna を打つと、動かして中に入れます。続けるときは cd ~/ch9 を打ちます。Job は止めても残るので、休んでもそのままです。戻った直後の 1〜2 分は、一覧が止める前の古い様子のことがあります。少し待ってもう一度見ます。",
+      "read": "何もエラーが出なければ止まっています。続けるときは、ホストで multipass shell kcna を打つと、動かして中に入れます。そのあと cd ~/ch9 を打ちます。Job は止めても残るので、休んでもそのままです。戻った直後の 1〜2 分は、一覧が止める前の古い様子のことがあります。少し待ってもう一度見ます。",
       "trouble": [
         {
           "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
@@ -910,7 +910,7 @@
     {
       "id": "cron-create",
       "text": "毎分動く CronJob を作り、最初の Job ができるのを待ちます。最大 1 分半ほどかかります。",
-      "why": "CronJob は、決まった時刻に Job を作る部品です。毎分にすると、待つ時間が短く済みます。",
+      "why": "CronJob は、決まった時刻に Job を作る部品です。毎分にすると、待つ時間が短く済みます。この tick は、章の終わりの手順で消すまで、毎分動き続けます。",
       "where": "vm",
       "code": {
         "language": "bash",
@@ -1244,7 +1244,7 @@
         }
       ],
       "output": "job.batch/tick-now created\njob.batch/tick-now condition met\nFri Nov 27 01:28:57 UTC 2026\ntick\n{\"cronjob.kubernetes.io/instantiate\":\"manual\"}",
-      "read": "すぐに動き、記録に時刻と tick が出ました。cronjob.kubernetes.io/instantiate: manual が、手で作ったという印です。手で作った Job は、CronJob の残す数には数えられません。",
+      "read": "すぐに動き、記録に時刻と tick が出ました。cronjob.kubernetes.io/instantiate: manual が、手で作ったという印です。手で作った Job も CronJob の子になるので、残す数 (成功は 3 つ) の数えに入り、古いものから片付けられます。",
       "trouble": [
         {
           "symptom": "AlreadyExists と出る",
@@ -1256,7 +1256,7 @@
     },
     {
       "id": "cron-deadline",
-      "text": "遅れた時の扱いも、言葉だけ押さえます。startingDeadlineSeconds は「時刻から何秒までなら、遅れても作るか」です。書かないと、遅れても作ります。CronJob を見る部品が止まっていた間に、やりそこねた回が 100 を超えると、その CronJob は作るのをやめて、記録に知らせを出します。",
+      "text": "遅れた時の扱いも、言葉だけ押さえます。startingDeadlineSeconds は「時刻から何秒までなら、遅れても作るか」です。書かないと、遅れても作ります。CronJob を見る部品が止まっていた間に、やりそこねた回が 100 を超えると、TooManyMissedTimes という注意をイベントに出し、そのうえで、いちばん新しい 1 回分だけを作ります。それより前の回は作りません。",
       "why": "クラスターを止めていた後に、溜まった回が一度に動いて困らないためです。",
       "source": "https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/"
     },
