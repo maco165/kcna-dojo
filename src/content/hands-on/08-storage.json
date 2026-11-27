@@ -1994,6 +1994,10 @@
       "url": "https://kubernetes.io/docs/concepts/storage/ephemeral-volumes/"
     },
     {
+      "label": "Kubernetes: Resource Management for Pods and Containers",
+      "url": "https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/"
+    },
+    {
       "label": "Kubernetes: Persistent Volumes",
       "url": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/"
     },
