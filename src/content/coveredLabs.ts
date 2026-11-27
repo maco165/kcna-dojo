@@ -15,6 +15,10 @@ export const COVERED_LABS: Record<string, readonly ChapterRef[]> = {
     { id: 'self-healing', order: 3, title: '壊れても戻る仕組みを見る' },
   ],
   'w4-lab': [{ id: 'scaling', order: 4, title: '増やす、減らす' }],
+  'w3-lab': [
+    { id: 'rollout', order: 5, title: '更新して、巻き戻す' },
+    { id: 'batch', order: 9, title: '決まった仕事を動かす' },
+  ],
   'w5-lab': [{ id: 'networking', order: 6, title: 'つなぐ' }],
 };
 
