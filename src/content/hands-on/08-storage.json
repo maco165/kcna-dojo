@@ -1048,7 +1048,7 @@
         }
       ],
       "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
-      "read": "何もエラーが出なければ止まっています。続けるときは、ホストで multipass shell kcna を打つと、動かして中に入れます。続けるときは cd ~/ch8 を打ち、kubectl rollout status deployment/notes -n ch8 で使えるようになるまで待ってから、kubectl exec deployment/notes -n ch8 -- cat /data/log.txt を打ちます。started の行が 1 つ増えて、前の行も残っていれば、マシンを止めても中身が残ったということです。戻った直後の 1〜2 分は、一覧が止める前の古い様子のことがあります。少し待ってもう一度見ます。",
+      "read": "何もエラーが出なければ止まっています。続けるときは、ホストで multipass shell kcna を打つと、動かして中に入れます。続けるときは cd ~/ch8 を打ち、kubectl rollout status deployment/notes -n ch8 で使えるようになるまで待ち、container not found と出なくなるまで少し待ってから、kubectl exec deployment/notes -n ch8 -- cat /data/log.txt を打ちます。started の行が 1 つ増えて、前の行も残っていれば、マシンを止めても中身が残ったということです。戻った直後の 1〜2 分は、一覧が止める前の古い様子のことがあります。少し待ってもう一度見ます。",
       "trouble": [
         {
           "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
@@ -1070,9 +1070,13 @@
       "where": "vm",
       "code": {
         "language": "bash",
-        "text": "kubectl exec deployment/notes -n ch8 -- sh -c \"head -c 104857600 /dev/zero > /data/big.bin\"\nkubectl exec deployment/notes -n ch8 -- ls -lh /data\nkubectl exec deployment/notes -n ch8 -- rm /data/big.bin"
+        "text": "for i in $(seq 60); do kubectl exec deployment/notes -n ch8 -- true 2> /dev/null && break; sleep 2; done\nkubectl exec deployment/notes -n ch8 -- sh -c \"head -c 104857600 /dev/zero > /data/big.bin\"\nkubectl exec deployment/notes -n ch8 -- ls -lh /data\nkubectl exec deployment/notes -n ch8 -- rm /data/big.bin"
       },
       "lines": [
+        {
+          "code": "for i in $(seq 60); do kubectl exec deployment/notes -n ch8 -- true 2> /dev/null && break; sleep 2; done",
+          "text": "notes の中で打てるようになるまで見て待つ (最大 2 分余り。休んだあとは少しかかる)"
+        },
         {
           "code": "kubectl exec deployment/notes -n ch8 -- sh -c \"head -c 104857600 /dev/zero > /data/big.bin\"",
           "text": "0 が並ぶだけの 100 MiB のファイルを書く"
@@ -1093,6 +1097,11 @@
           "symptom": "No space left on device と出る",
           "check": "df -h / を打つ",
           "fix": "仮想マシンのディスクが足りない。104857600 を 20971520 (20 MiB) に減らして試す"
+        },
+        {
+          "symptom": "container not found と出る",
+          "check": "kubectl get pods -n ch8 を打つ",
+          "fix": "休んだあとは、Running と出てもコンテナがまだ始まっていないことがある。1 行目の待つ行から打ち直す"
         }
       ],
       "source": "https://github.com/rancher/local-path-provisioner"
