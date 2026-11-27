@@ -52,8 +52,10 @@ describe('ここで詰まった', () => {
     for (const f of STUCK_FIELDS) expect(ids).toContain(f);
     expect(ids).toEqual(expect.arrayContaining(['did', 'output', 'expected', 'env', 'tried']));
     expect(new Set(ids).size).toBe(ids.length);
-    expect(yml).toMatch(/id: output\n(?:.*\n)*?\s+render: shell/);
-    expect(yml).toMatch(/住所.*ホスト名.*ユーザー名.*秘密の値/);
+    // 出力の欄: shell で貼らせ、その欄の説明そのものに、消してから貼ることを書く
+    const output = yml.slice(yml.indexOf('id: output'), yml.indexOf('- type:', yml.indexOf('id: output')));
+    expect(output).toMatch(/render: shell/);
+    expect(output).toMatch(/description: .*住所.*ホスト名.*ユーザー名.*秘密の値.*消してから/);
     expect(yml).toMatch(/labels: \["stuck", "hands-on"\]/);
   });
 });
