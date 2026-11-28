@@ -675,7 +675,11 @@ async function run(browser, name, width, height) {
   await page.goto(`${BASE}progress/`);
   await page.getByRole('heading', { name: '週ごとの進み具合 (問題演習)' }).waitFor();
   // 受験の目安: 何もしていなければ 13 細目とも足りず、足りない細目からレッスンとハンドブックへ行ける
-  check((await page.getByText(/^まだです \(足りない細目 13/).count()) === 1 && (await page.locator('.readiness__links a[href*="/handbook/storage/"]').count()) === 1 && (await page.locator('.readiness__links a[href*="/lesson/w6-l5/"]').count()) === 1, `${tag} 進捗に受験の目安と、足りない細目へのリンクが出る`);
+  // 開いたまま出すのは割合の低い 3 つ (同じなら学習要領の順) で、残りは畳む。細目ごとのリンクは次に解くレッスンとハンドブックの 2 つ
+  const shownShort = page.locator('.readiness__list > li:visible h4');
+  check((await page.getByText(/^まだです \(足りない細目 13/).count()) === 1 && (await shownShort.count()) === 3 && (await page.getByText('足りない細目をすべて見る (残り 10)').count()) === 1 && (await page.locator('.readiness__links a[href*="/lesson/w2-l1/"]').count()) === 1 && (await page.locator('.readiness__links a[href*="/handbook/storage/"]').count()) === 1 && (await page.locator('.readiness__links').first().locator('a').count()) === 2, `${tag} 進捗に受験の目安と、足りない細目 3 つ (残りは畳む) と次に解くレッスンが出る`);
+  await page.getByText('足りない細目をすべて見る (残り 10)').click();
+  check((await shownShort.count()) === 13, `${tag} 畳んだ足りない細目を開ける`);
   await noHorizontalOverflow(page, width, `${tag} 進捗 (受験の目安)`);
   check((await page.getByRole('listitem').filter({ hasText: '第 1 週 コンテナの基礎' }).last().innerText()).includes(`/ ${exercises.length}`) && (await page.getByRole('listitem').filter({ hasText: '週ごとの実習' }).count()) === 0, `${tag} 進捗は、問題演習と実践を別に数え、全部覆った週ごとの実習の行は出さない`);
   // 無い章は「見つかりませんでした」と一覧へのリンク

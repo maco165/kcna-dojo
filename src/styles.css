@@ -3392,3 +3392,14 @@ html[data-loading='true'] body::before {
   font-weight: 600;
   color: var(--color-text-primary);
 }
+
+.readiness__more > summary {
+  cursor: pointer;
+  padding: 4px 0;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.readiness__more > .readiness__list {
+  margin-top: 8px;
+}

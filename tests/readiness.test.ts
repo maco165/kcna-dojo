@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CURRICULUM } from '../src/content/guide';
+import examSets from '../src/content/examSets.json';
 import { HANDBOOK_TOPICS } from '../src/content/handbook';
 import { WEEK_CONTENTS } from '../src/content/lessons';
 import { COMPETENCY_TARGET, FRESH_SETS, RECENT_EXAMS, competencyLessons, readiness } from '../src/lib/readiness';
@@ -30,6 +31,8 @@ describe('受験の目安の元', () => {
     expect(PASS_MARK).toBe(0.75);
     expect(RECENT_EXAMS).toBe(2);
     expect(FRESH_SETS).toEqual([4, 5]);
+    // 数で書いた初見の回は、examSets.json の「問題が全部 x- の回」と同じ
+    expect(FRESH_SETS).toEqual(examSets.sets.filter((s) => s.questions.every((id) => id.startsWith('x-'))).map((s) => s.id));
   });
 });
 
@@ -75,6 +78,14 @@ describe('受験の目安', () => {
     expect(r.exam).toMatchObject({ ok: false, hasFresh: false });
     expect(r.ready).toBe(false);
     expect(readiness(withExams(allTwice, [exam(60, 5)])).exam.ok).toBe(false);
+  });
+  it('足りない細目は割合の低い順。次に解くレッスンは、その細目でまだ目安に届いていない最初のレッスン', () => {
+    const core = lessons.find((c) => c.en === 'Kubernetes Core Concepts')!.lessons;
+    const r = readiness(twice([...core[0].questions, ...core[1].questions, ...lessons.find((c) => c.en === 'Storage')!.lessons[0].questions]));
+    const c = r.short.find((x) => x.en === 'Kubernetes Core Concepts')!;
+    expect(c.next).toBe(core[2].id);
+    expect(r.short.map((x) => x.rate)).toEqual([...r.short.map((x) => x.rate)].sort((a, b) => a - b));
+    expect(r.short.at(-1)!.en).toBe('Storage');
   });
   it('1 回正解や、間違えた記録は「2 回続けて正解」に数えない', () => {
     const one = { ...allTwice, answers: Object.fromEntries(allQ.map((id) => [id, { right: 1, wrong: 0, last: '', run: 1 }])) };

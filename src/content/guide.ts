@@ -1,7 +1,6 @@
 // 説明のページ (#/guide) に載せる、公式の情報の写し。事実ごとに出典を持つ。
 // 確かめた日: 2026-11-18。数字を変えるときは出典を開き直し、CHECKED_AT も直す。
 import { EXAM_MINUTES, EXAM_QUESTIONS, PASS_MARK } from '../lib/exam';
-import type { Domain } from './types';
 
 export const CHECKED_AT = '2026-11-18';
 
@@ -76,7 +75,7 @@ export const EXAM_DAY: { id: string; title: string; items: { text: string; sourc
     title: '申し込みと予約',
     items: [
       { text: '申し込んだ日から 12 か月のうちに、予約して受験します。', sources: [SOURCES.kcnaJp, SOURCES.scheduling] },
-      { text: '予約は 90 日先まで取れます。前日までに取る必要があり (24 時間前から)、受験の開始の 24 時間前を切ると、予約の変更も取り消しもできません。', sources: [SOURCES.scheduling] },
+      { text: '予約できるのは 24 時間より先の枠で、早くても翌日です。90 日先まで取れます。受験の開始まで 24 時間を切ると、予約の変更も取り消しもできません。', sources: [SOURCES.scheduling] },
       { text: '予約した時刻に受けなかった (no-show) ときは、受験料は返らず、再受験もできません。', sources: [SOURCES.scheduling] },
     ],
   },
@@ -86,7 +85,8 @@ export const EXAM_DAY: { id: string; title: string; items: { text: string; sourc
     items: [
       { text: '有効期限内の、政府が発行した身分証の原本が要ります。コピーや電子のものは使えず、仮の身分証も使えません。', sources: [SOURCES.identification, SOURCES.mcInstructions] },
       { text: '身分証の姓と名は、受験のチェックリストに登録した名前と完全に一致している必要があります。身分証のつづりのとおりに登録します。', sources: [SOURCES.identification, SOURCES.mcInstructions] },
-      { text: '名前・写真・署名のある身分証を使います。パスポート、運転免許証、マイナンバーカードなどが挙がっています。', sources: [SOURCES.identification] },
+      { text: '名前・写真・署名のある身分証を使います。パスポート、運転免許証、マイナンバーカードなどが挙がっています。署名の無い、政府が発行した生体情報つきの身分証も受け入れられます。', sources: [SOURCES.identification] },
+      { text: '住民基本台帳カード・マイナンバーカード・運転免許証を使うときは、名前をローマ字ではなく漢字で登録します。', sources: [SOURCES.identification] },
     ],
   },
   {
@@ -95,6 +95,7 @@ export const EXAM_DAY: { id: string; title: string; items: { text: string; sourc
     items: [
       { text: '試験は PSI のセキュアブラウザで受けます。開始の時刻になるとダウンロードできます。', sources: [SOURCES.mcInstructions, SOURCES.takingExam] },
       { text: 'Web カメラは、部屋を映して回せるものにします。マイクは始める前に動くか確かめます。モニターは 1 台だけで、2 台は使えません。', sources: [SOURCES.mcInstructions] },
+      { text: '仮想マシンの中では受けられません (互換性の確認で問題が出なくても同じで、実践の章の練習で作った kcna のような仮想マシンも使えません)。会社から貸された機器は、使わないよう強く勧められています。', sources: [SOURCES.mcInstructions] },
       { text: '人のいない静かな個室で受け、ドアがあれば閉めます。机の上には、受験に使う機器のほかに紙・筆記用具・電子機器などを置きません。', sources: [SOURCES.mcInstructions] },
     ],
   },
@@ -102,9 +103,10 @@ export const EXAM_DAY: { id: string; title: string; items: { text: string; sourc
     id: 'day',
     title: '当日の流れ',
     items: [
-      { text: '予約の 30 分前から、My Portal の Take Exam で始められます。セキュアブラウザで、同意書への同意・身分証の写真・自分の写真を出し (自己チェックイン)、担当者が部屋と机をカメラで確かめたあと、監督者が付きます。', sources: [SOURCES.takingExam] },
+      { text: '予約の 30 分前から、My Portal の Take Exam で始められます (監督者の空きによっては、予約の時刻まで待つことがあります)。セキュアブラウザで、同意書への同意・身分証の写真・自分の写真を出し (自己チェックイン)、担当者が部屋と机をカメラで確かめたあと、監督者が付きます。担当者を待つのは 15 分までが目安で、困ったら LIVE CHAT で問い合わせます。', sources: [SOURCES.takingExam] },
       { text: '予約の時刻から 30 分のうちに始めないと、no-show になります。', sources: [SOURCES.takingExam] },
       { text: '多肢選択式の 60 問を 90 分で解きます。途中で切れたらセキュアブラウザから入り直しますが、時間は止まりません。', sources: [SOURCES.mcInstructions, SOURCES.takingExam] },
+      { text: '終えるときは、Finish Exam を押してから End Session を押します。', sources: [SOURCES.takingExam] },
     ],
   },
   {
@@ -113,13 +115,14 @@ export const EXAM_DAY: { id: string; title: string; items: { text: string; sourc
     items: [
       { text: '終わってから 24 時間のうちに、結果がメールで届きます。', sources: [SOURCES.mcFaq, SOURCES.mcInstructions] },
       { text: '多肢選択式の試験は 75% 以上で合格です (LF の多肢選択式の試験に共通の記述)。', sources: [SOURCES.mcFaq] },
+      { text: '多肢選択式の試験には、採点のやり直し (rescoring) はありません。', sources: [SOURCES.noPass] },
     ],
   },
   {
     id: 'retake',
     title: '再受験',
     items: [
-      { text: '受験料には再受験 1 回が含まれます。合格しなかったら、受験のチェックリストの「Claim Your Retake」から再受験を申し込みます。', sources: [SOURCES.kcnaJp, SOURCES.noPass] },
+      { text: '受験料には再受験 1 回が含まれます。合格しなかったら、受験のチェックリストの「Claim Your Retake」から再受験を申し込みます。受けられるかどうかと期限は Retake Policy の条件によります (受験の資格は申し込みから 12 か月)。', sources: [SOURCES.kcnaJp, SOURCES.noPass, SOURCES.scheduling] },
     ],
   },
   {
@@ -136,46 +139,7 @@ export const EXAM_DAY: { id: string; title: string; items: { text: string; sourc
 export const EXAM_PURPOSE =
   'Kubernetes と、より広いクラウドネイティブのエコシステムの基礎の知識とスキルを証明する試験です。経験は初心者向けで、前提の資格はありません。';
 
-/**
- * 学習要領 = 公開カリキュラムの細目 (英語は KCNA_Curriculum.pdf の見出し、日本語は LF の KCNA-JP のページの訳)。
- * weeks はこのサイトで主に学ぶ週。topic はその細目のハンドブックのトピック (competency が同じことは tests/handbook.test.ts が見る)。配点は lib/exam.ts の EXAM_WEIGHTS
- */
-export const CURRICULUM: { domain: Domain; competencies: { en: string; ja: string; weeks: number[]; /** この細目のハンドブックのトピックの id (受験の目安から開く) */ topic: string }[] }[] = [
-  {
-    domain: 'Kubernetes Fundamentals',
-    competencies: [
-      { en: 'Kubernetes Core Concepts', ja: 'Kubernetes コアコンセプト', weeks: [2, 3], topic: 'core-concepts' },
-      { en: 'Administration', ja: '管理', weeks: [4], topic: 'administration' },
-      { en: 'Scheduling', ja: 'スケジューリング', weeks: [4], topic: 'scheduling' },
-      { en: 'Containerization', ja: 'コンテナ化', weeks: [1], topic: 'containerization' },
-    ],
-  },
-  {
-    domain: 'Container Orchestration',
-    competencies: [
-      { en: 'Networking', ja: 'ネットワーク', weeks: [5], topic: 'networking' },
-      { en: 'Security', ja: 'セキュリティ', weeks: [6], topic: 'security' },
-      { en: 'Troubleshooting', ja: 'トラブルシューティング', weeks: [6], topic: 'troubleshooting' },
-      { en: 'Storage', ja: 'ストレージ', weeks: [6], topic: 'storage' },
-    ],
-  },
-  {
-    domain: 'Cloud Native Application Delivery',
-    competencies: [
-      { en: 'Application Delivery', ja: 'アプリケーション配信', weeks: [7], topic: 'application-delivery' },
-      { en: 'Debugging', ja: 'デバッグ', weeks: [7], topic: 'debugging' },
-    ],
-  },
-  {
-    domain: 'Cloud Native Architecture',
-    competencies: [
-      { en: 'Observability', ja: '可観測性', weeks: [8], topic: 'observability' },
-      { en: 'Cloud Native Ecosystem and Principles', ja: 'クラウドネイティブエコシステムと原則', weeks: [8], topic: 'cloud-native-principles' },
-      { en: 'Cloud Native Community and Collaboration', ja: 'クラウドネイティブコミュニティとコラボレーション', weeks: [8], topic: 'cloud-native-community' },
-    ],
-  },
-];
-export const CURRICULUM_VERSION = '2026-03-22 の版';
+export { CURRICULUM, CURRICULUM_VERSION } from './competencies';
 
 /** 見本に出す問題 (実際の第 1 週の問題) */
 export const SAMPLE_QUESTION_ID = 'w1-l3-q1';
