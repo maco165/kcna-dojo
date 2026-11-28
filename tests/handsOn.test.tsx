@@ -261,6 +261,14 @@ describe('画面', { timeout: 30_000 }, () => {
     // 行の中のコマンドはコマンドのページへ
     expect(v.el.querySelector(`a.hb-cmd[href="${BASE}commands/id/"]`)).not.toBeNull();
     expect(v.el.querySelector(`a[href="${BASE}handbook/containerization/"]`)).not.toBeNull();
+    // 手順ごとの「ここで詰まった」は、画面で選んだ OS と、画面の番号を入れる
+    const stuck = [...v.el.querySelectorAll('a')].filter((a) => a.textContent?.startsWith('ここで詰まった')).map((a) => new URL(a.getAttribute('href')!));
+    expect(stuck).toHaveLength(3 + sample.cleanup.length);
+    expect(stuck.map((u) => u.searchParams.get('chapter-os'))).toEqual(stuck.map(() => 'Mac'));
+    expect(stuck[1].searchParams.get('step')).toBe(`手順 2 (install-mac): ${sample.steps[2].text}`);
+    expect([...v.el.querySelectorAll('.ho-stuck a')].map((a) => a.getAttribute('aria-label'))).toEqual([...[1, 2, 3].map((n) => `手順 ${n} で詰まった (GitHub に書く) (新しいタブで開きます)`), ...sample.cleanup.map((_, i) => `後片付け ${i + 1} で詰まった (GitHub に書く) (新しいタブで開きます)`)]);
+    // 画面でも、出ている全部の手順 (後片付けも) の li に id がある
+    expect([...v.el.querySelectorAll('.ho-stuck')].every((p) => /^step-/.test(p.closest('li')?.id ?? ''))).toBe(true);
   });
   it('章が覆った実習は一覧から外し、ページには章へのリンクを出す。覆う章と実習は実在する', async () => {
     const labs = WEEKS.flatMap(labsOf).map((l) => l.id);
@@ -371,6 +379,15 @@ describe('書き出す HTML', { timeout: 60_000 }, () => {
     expect(body('lesson/w4-lab/').querySelector(`#root a[href="${BASE}hands-on/scaling/"]`)).not.toBeNull();
     expect(body('lesson/w5-lab/').querySelector(`#root a[href="${BASE}hands-on/networking/"]`)).not.toBeNull();
     expect(body('lesson/w3-lab/').querySelector(`#root a[href="${BASE}hands-on/batch/"]`)).not.toBeNull();
+  });
+  it('手順ごとに「ここで詰まった」のリンクを書く (JS なしでも開ける。OS は選んでいない)', () => {
+    const links = [...doc.querySelectorAll('#root a')].filter((a) => a.textContent === 'ここで詰まった (GitHub に書く)').map((a) => new URL(a.getAttribute('href')!));
+    expect(links).toHaveLength(sample.steps.length + sample.cleanup.length);
+    expect(links.map((u) => u.searchParams.get('step')!.split(' (')[0])).toEqual([...sample.steps.map((_, i) => `手順 ${i + 1}`), ...sample.cleanup.map((_, i) => `後片付け ${i + 1}`)]);
+    // 読み上げ名は番号入り。Issue の page の #step-<id> が飛べるよう、全部の手順 (後片付けも) の li に id がある
+    expect([...doc.querySelectorAll('#root a')].filter((a) => a.textContent === 'ここで詰まった (GitHub に書く)').map((a) => a.getAttribute('aria-label'))).toEqual([...sample.steps.map((_, i) => `手順 ${i + 1} で詰まった (GitHub に書く)`), ...sample.cleanup.map((_, i) => `後片付け ${i + 1} で詰まった (GitHub に書く)`)]);
+    expect([...sample.steps, ...sample.cleanup].every((s) => doc.querySelector(`#root li#step-${s.id}`))).toBe(true);
+    expect(links.every((u) => u.searchParams.get('template') === 'stuck.yml' && /選んでいない/.test(u.searchParams.get('chapter-os')!))).toBe(true);
   });
   it('全部の OS の手順・意味・出力・つまずいた時・課題を書く', () => {
     const text = doc.querySelector('#root')!.textContent!;

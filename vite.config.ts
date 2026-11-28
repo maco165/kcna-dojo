@@ -4,6 +4,7 @@ import path from 'node:path';
 import { defineConfig, type Plugin } from 'vite';
 import postcss from 'postcss';
 import react from '@vitejs/plugin-react';
+import { codesOf, k3sInstallOf } from './src/lib/stuck';
 
 // GitHub Pages では https://maco165.github.io/kcna-dojo/ に置かれる。
 const BASE = '/kcna-dojo/';
@@ -32,7 +33,8 @@ function lightLessons(): Plugin {
         this.addWatchFile(file);
         const c = JSON.parse(await readFile(file, 'utf8')) as Record<string, unknown> & { steps: { id: string; os?: string }[] };
         const { id: cid, order, title, short, summary, minutes } = c;
-        return { code: jsonModule({ id: cid, order, title, short, summary, minutes, steps: c.steps.map((s) => ({ id: s.id, os: s.os })) }), moduleType: 'js' };
+        // k3s は、その章が入れる k3s の版 (「ここで詰まった」の章の版。src/lib/stuck.ts)
+        return { code: jsonModule({ id: cid, order, title, short, summary, minutes, k3s: k3sInstallOf(codesOf(c as never)), steps: c.steps.map((s) => ({ id: s.id, os: s.os })) }), moduleType: 'js' };
       }
       if ((query !== 'light' && query !== 'ids') || !file.endsWith('.json')) return null;
       this.addWatchFile(file);

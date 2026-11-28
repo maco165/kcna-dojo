@@ -1,0 +1,65 @@
+# 実践の章で詰まったときの書式。章の画面の「ここで詰まった」が、URL の query で章・手順・OS・章の版の欄を埋めて開く
+# (src/lib/stuck.ts。欄の id を変えたら、そちらも直す。tests/stuck.test.ts が見る)
+name: 実践で詰まった
+description: 実践の章の手順で、書いてあるとおりに進まなかったとき
+title: "詰まった: "
+labels: ["stuck", "hands-on"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        出力やエラーを貼るときは、**住所 (IP)・ホスト名・ユーザー名・秘密の値 (トークン・パスワード) を消してから** 貼ってください。この Issue は公開されます。
+  - type: input
+    id: chapter
+    attributes:
+      label: 章
+    validations:
+      required: true
+  - type: input
+    id: step
+    attributes:
+      label: 手順
+    validations:
+      required: true
+  - type: input
+    id: page
+    attributes:
+      label: ページ
+  - type: input
+    id: chapter-os
+    attributes:
+      label: 画面で選んだ OS
+  - type: input
+    id: chapter-k3s
+    attributes:
+      label: 章の版 (章を書いたときの k3s の版。あなたの版ではありません)
+  - type: textarea
+    id: did
+    attributes:
+      label: 何をしたか
+      description: 打ったコマンドや、押したところ
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: 出たもの
+      description: 出力やエラーをそのまま。住所・ホスト名・ユーザー名・秘密の値は消してから貼ってください
+      render: shell
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期待と違った所
+      description: 章に書いてあったことと、どこが違ったか
+    validations:
+      required: true
+  - type: textarea
+    id: env
+    attributes:
+      label: あなたの環境
+      description: OS と版、Multipass の版 (multipass version)、k3s の版 (k3s --version)
+  - type: textarea
+    id: tried
+    attributes:
+      label: 試したこと
+      description: つまずいた時の欄や、ほかに試したこと

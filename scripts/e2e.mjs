@@ -136,6 +136,13 @@ async function checkChapterPage(page, width, tag, c, flow) {
     await page.setViewportSize({ width, height: 844 });
   }
   await checkChapterText(page, tag, c);
+  if (flow) {
+    // 手順ごとの「ここで詰まった」: 詰まりの書式で、章・手順・画面で選んだ OS を入れて GitHub の新しい Issue を開く
+    const stuck = page.getByRole('link', { name: /^(手順|後片付け) \d+ で詰まった \(GitHub に書く\)/ });
+    const u = new URL(await stuck.first().getAttribute('href'));
+    const mine = c.steps.filter((s) => !s.os || s.os === 'linux');
+    check((await stuck.count()) === mine.length + c.cleanup.filter((s) => !s.os || s.os === 'linux').length && u.href.startsWith('https://github.com/maco165/kcna-dojo/issues/new?') && u.searchParams.get('template') === 'stuck.yml' && u.searchParams.get('chapter-os') === 'Linux' && u.searchParams.get('step').startsWith(`手順 1 (${mine[0].id})`) && (await page.locator(`li#step-${mine[0].id} >> text=ここで詰まった (GitHub に書く)`).count()) === 1 && (await stuck.first().getAttribute('aria-label')).startsWith('手順 1 で詰まった') && u.searchParams.get('page') === `https://maco165.github.io/kcna-dojo/hands-on/${c.id}/#step-${mine[0].id}`, `${tag} 手順ごとに「ここで詰まった」があり、章・手順・選んだ OS を入れる (${u.searchParams.get('step')?.slice(0, 30)})`);
+  }
   if (!flow) return;
   const finish = page.getByRole('button', { name: /^完了にする/ });
   check(await finish.isDisabled(), `${tag} 章は印を付けるまで完了にできない`);
