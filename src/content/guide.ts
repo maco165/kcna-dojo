@@ -1,7 +1,6 @@
 // 説明のページ (#/guide) に載せる、公式の情報の写し。事実ごとに出典を持つ。
 // 確かめた日: 2026-11-18。数字を変えるときは出典を開き直し、CHECKED_AT も直す。
 import { EXAM_MINUTES, EXAM_QUESTIONS, PASS_MARK } from '../lib/exam';
-import type { Domain } from './types';
 
 export const CHECKED_AT = '2026-11-18';
 
@@ -17,6 +16,12 @@ export const SOURCES = {
   language: { label: '試験の言語', url: 'https://docs.linuxfoundation.org/tc-docs/certification/lf-handbook2/language' },
   curriculum: { label: 'CNCF の公開カリキュラム (KCNA_Curriculum.pdf)', url: 'https://github.com/cncf/curriculum/blob/master/KCNA_Curriculum.pdf' },
   agreement: { label: '認定試験の同意書 (守秘)', url: 'https://docs.linuxfoundation.org/tc-docs/certification/lf-cert-agreement/' },
+  kcna: { label: 'LF の KCNA のページ (英語)', url: 'https://training.linuxfoundation.org/certification/kubernetes-cloud-native-associate/' },
+  scheduling: { label: '受験者ハンドブック: 予約・変更・取り消し', url: 'https://docs.linuxfoundation.org/tc-docs/certification/lf-handbook2/scheduling-or-rescheduling-an-exam' },
+  identification: { label: '受験者ハンドブック: 本人確認', url: 'https://docs.linuxfoundation.org/tc-docs/certification/lf-handbook2/candidate-identification-and-authentication' },
+  takingExam: { label: '受験者ハンドブック: 受験の当日', url: 'https://docs.linuxfoundation.org/tc-docs/certification/lf-handbook2/taking-the-exam' },
+  noPass: { label: '受験者ハンドブック: 不合格のとき', url: 'https://docs.linuxfoundation.org/tc-docs/certification/lf-handbook2/exam-scoring-and-notification/exam-results-no-pass' },
+  certificates: { label: '受験者ハンドブック: 認定と有効期限', url: 'https://docs.linuxfoundation.org/tc-docs/certification/lf-handbook2/certificates-and-certification' },
 } satisfies Record<string, Source>;
 
 /** Kubernetes の名前と生まれ */
@@ -57,49 +62,84 @@ export const EXAM_FACTS: { label: string; value: string; note?: string; sources:
   { label: '受験料', value: '$250 (再受験 1 回つき)', sources: [SOURCES.kcnaJp] },
 ];
 
-export const EXAM_PURPOSE =
-  'Kubernetes と、より広いクラウドネイティブのエコシステムの基礎の知識とスキルを証明する試験です。経験は初心者向けで、前提の資格はありません。';
+/** 受験の当日までの案内を確かめた日。出典を開き直して文を変えたら、ここも直す (CHECKED_AT と同じ考え) */
+export const EXAM_DAY_CHECKED_AT = '2026-11-28';
 
 /**
- * 学習要領 = 公開カリキュラムの細目 (英語は KCNA_Curriculum.pdf の見出し、日本語は LF の KCNA-JP のページの訳)。
- * weeks はこのサイトで主に学ぶ週。配点は lib/exam.ts の EXAM_WEIGHTS
+ * 受験の当日までの案内 (申し込みから更新まで)。項目ごとに、確かめた公式の文書を出典に持つ。
+ * 公式に無いこと (休憩の扱いなど) は書かない
  */
-export const CURRICULUM: { domain: Domain; competencies: { en: string; ja: string; weeks: number[] }[] }[] = [
+export const EXAM_DAY: { id: string; title: string; items: { text: string; sources: Source[] }[] }[] = [
   {
-    domain: 'Kubernetes Fundamentals',
-    competencies: [
-      { en: 'Kubernetes Core Concepts', ja: 'Kubernetes コアコンセプト', weeks: [2, 3] },
-      { en: 'Administration', ja: '管理', weeks: [4] },
-      { en: 'Scheduling', ja: 'スケジューリング', weeks: [4] },
-      { en: 'Containerization', ja: 'コンテナ化', weeks: [1] },
+    id: 'register',
+    title: '申し込みと予約',
+    items: [
+      { text: '申し込んだ日から 12 か月のうちに、予約して受験します。', sources: [SOURCES.kcnaJp, SOURCES.scheduling] },
+      { text: '予約できるのは 24 時間より先の枠で、早くても翌日です。90 日先まで取れます。受験の開始まで 24 時間を切ると、予約の変更も取り消しもできません。', sources: [SOURCES.scheduling] },
+      { text: '予約した時刻に受けなかった (no-show) ときは、受験料は返らず、再受験もできません。', sources: [SOURCES.scheduling] },
     ],
   },
   {
-    domain: 'Container Orchestration',
-    competencies: [
-      { en: 'Networking', ja: 'ネットワーク', weeks: [5] },
-      { en: 'Security', ja: 'セキュリティ', weeks: [6] },
-      { en: 'Troubleshooting', ja: 'トラブルシューティング', weeks: [6] },
-      { en: 'Storage', ja: 'ストレージ', weeks: [6] },
+    id: 'identity',
+    title: '本人確認',
+    items: [
+      { text: '有効期限内の、政府が発行した身分証の原本が要ります。コピーや電子のものは使えず、仮の身分証も使えません。', sources: [SOURCES.identification, SOURCES.mcInstructions] },
+      { text: '身分証の姓と名は、受験のチェックリストに登録した名前と完全に一致している必要があります。身分証のつづりのとおりに登録します。', sources: [SOURCES.identification, SOURCES.mcInstructions] },
+      { text: '名前・写真・署名のある身分証を使います。パスポート、運転免許証、マイナンバーカードなどが挙がっています。署名の無い、政府が発行した生体情報つきの身分証も受け入れられます。', sources: [SOURCES.identification] },
+      { text: '住民基本台帳カード・マイナンバーカード・運転免許証を使うときは、名前をローマ字ではなく漢字で登録します。', sources: [SOURCES.identification] },
     ],
   },
   {
-    domain: 'Cloud Native Application Delivery',
-    competencies: [
-      { en: 'Application Delivery', ja: 'アプリケーション配信', weeks: [7] },
-      { en: 'Debugging', ja: 'デバッグ', weeks: [7] },
+    id: 'room',
+    title: '機材と部屋',
+    items: [
+      { text: '試験は PSI のセキュアブラウザで受けます。開始の時刻になるとダウンロードできます。', sources: [SOURCES.mcInstructions, SOURCES.takingExam] },
+      { text: 'Web カメラは、部屋を映して回せるものにします。マイクは始める前に動くか確かめます。モニターは 1 台だけで、2 台は使えません。', sources: [SOURCES.mcInstructions] },
+      { text: '仮想マシンの中では受けられません (互換性の確認で問題が出なくても同じで、実践の章の練習で作った kcna のような仮想マシンも使えません)。会社から貸された機器は、使わないよう強く勧められています。', sources: [SOURCES.mcInstructions] },
+      { text: '人のいない静かな個室で受け、ドアがあれば閉めます。机の上には、受験に使う機器のほかに紙・筆記用具・電子機器などを置きません。', sources: [SOURCES.mcInstructions] },
     ],
   },
   {
-    domain: 'Cloud Native Architecture',
-    competencies: [
-      { en: 'Observability', ja: '可観測性', weeks: [8] },
-      { en: 'Cloud Native Ecosystem and Principles', ja: 'クラウドネイティブエコシステムと原則', weeks: [8] },
-      { en: 'Cloud Native Community and Collaboration', ja: 'クラウドネイティブコミュニティとコラボレーション', weeks: [8] },
+    id: 'day',
+    title: '当日の流れ',
+    items: [
+      { text: '予約の 30 分前から、My Portal の Take Exam で始められます (監督者の空きによっては、予約の時刻まで待つことがあります)。セキュアブラウザで、同意書への同意・身分証の写真・自分の写真を出し (自己チェックイン)、担当者が部屋と机をカメラで確かめたあと、監督者が付きます。担当者を待つのは 15 分までが目安で、困ったら LIVE CHAT で問い合わせます。', sources: [SOURCES.takingExam] },
+      { text: '予約の時刻から 30 分のうちに始めないと、no-show になります。', sources: [SOURCES.takingExam] },
+      { text: '多肢選択式の 60 問を 90 分で解きます。途中で切れたらセキュアブラウザから入り直しますが、時間は止まりません。', sources: [SOURCES.mcInstructions, SOURCES.takingExam] },
+      { text: '終えるときは、Finish Exam を押してから End Session を押します。', sources: [SOURCES.takingExam] },
+    ],
+  },
+  {
+    id: 'result',
+    title: '結果',
+    items: [
+      { text: '終わってから 24 時間のうちに、結果がメールで届きます。', sources: [SOURCES.mcFaq, SOURCES.mcInstructions] },
+      { text: '多肢選択式の試験は 75% 以上で合格です (LF の多肢選択式の試験に共通の記述)。', sources: [SOURCES.mcFaq] },
+      { text: '多肢選択式の試験には、採点のやり直し (rescoring) はありません。', sources: [SOURCES.noPass] },
+    ],
+  },
+  {
+    id: 'retake',
+    title: '再受験',
+    items: [
+      { text: '受験料には再受験 1 回が含まれます。合格しなかったら、受験のチェックリストの「Claim Your Retake」から再受験を申し込みます。受けられるかどうかと期限は Retake Policy の条件によります (受験の資格は申し込みから 12 か月)。', sources: [SOURCES.kcnaJp, SOURCES.noPass, SOURCES.scheduling] },
+    ],
+  },
+  {
+    id: 'renew',
+    title: '有効期限と更新',
+    items: [
+      { text: '認定は 2 年 (24 か月) で切れます。', sources: [SOURCES.kcnaJp, SOURCES.certificates] },
+      { text: '切れる前に同じ試験にもう一度合格すると、その日から 2 年に延びます。', sources: [SOURCES.mcFaq, SOURCES.certificates] },
+      { text: 'CKA か CKAD に合格すると、KCNA は自動で更新されます (CARE の仕組み)。', sources: [SOURCES.mcFaq] },
     ],
   },
 ];
-export const CURRICULUM_VERSION = '2026-03-22 の版';
+
+export const EXAM_PURPOSE =
+  'Kubernetes と、より広いクラウドネイティブのエコシステムの基礎の知識とスキルを証明する試験です。経験は初心者向けで、前提の資格はありません。';
+
+export { CURRICULUM, CURRICULUM_VERSION } from './competencies';
 
 /** 見本に出す問題 (実際の第 1 週の問題) */
 export const SAMPLE_QUESTION_ID = 'w1-l3-q1';
