@@ -662,8 +662,8 @@ async function run(browser, name, width, height) {
   await page.getByRole('link', { name: '一覧へ戻る' }).click();
   await page.getByRole('heading', { name: '実践', level: 1 }).waitFor();
   check(new URL(page.url()).pathname === '/kcna-dojo/hands-on/', `${tag} 実習の「一覧へ戻る」は実践の一覧`);
-  check(await page.getByText('0 / 4 完了').isVisible(), `${tag} 章が覆った実習は、完了していても一覧の数に入れない`);
-  check((await page.locator('a.cmp-card[href^="/kcna-dojo/lesson/w"]').count()) === 4 && (await page.locator('a.cmp-card[href^="/kcna-dojo/hands-on/"]').count()) === chapters.length, `${tag} 実践の一覧に、章 ${chapters.length} と、章が覆っていない実習 4 本が並ぶ`);
+  check(await page.getByText('0 / 3 完了').isVisible(), `${tag} 章が覆った実習は、完了していても一覧の数に入れない`);
+  check((await page.locator('a.cmp-card[href^="/kcna-dojo/lesson/w"]').count()) === 3 && (await page.locator('a.cmp-card[href^="/kcna-dojo/hands-on/"]').count()) === chapters.length, `${tag} 実践の一覧に、章 ${chapters.length} と、章が覆っていない実習 3 本が並ぶ`);
   check((await page.locator('p a[href="/kcna-dojo/lesson/w2-lab/"]').count()) === 1, `${tag} 実践の一覧の説明から、複数のノードの実習へ行ける`);
   check((await page.locator('p a[href="/kcna-dojo/lesson/w5-lab/"]').count()) === 1, `${tag} 実践の一覧の説明から、クラスターの外から試す実習へ行ける`);
   check((await page.title()) === '実践 | クラネイ', `${tag} 実践の一覧の題名 (${await page.title()})`);
@@ -674,7 +674,7 @@ async function run(browser, name, width, height) {
   check((await page.locator('.lesson__main a[href="/kcna-dojo/hands-on/run-containers/"]').count()) === 1, `${tag} 章が覆った実習の頭に、章へのリンクが出る`);
   await page.goto(`${BASE}progress/`);
   await page.getByRole('heading', { name: '週ごとの進み具合 (問題演習)' }).waitFor();
-  check((await page.getByRole('listitem').filter({ hasText: '第 1 週 コンテナの基礎' }).last().innerText()).includes(`/ ${exercises.length}`) && (await page.getByRole('listitem').filter({ hasText: '週ごとの実習' }).last().innerText()).includes('0 / 4'), `${tag} 進捗は、問題演習と実践を別に数える`);
+  check((await page.getByRole('listitem').filter({ hasText: '第 1 週 コンテナの基礎' }).last().innerText()).includes(`/ ${exercises.length}`) && (await page.getByRole('listitem').filter({ hasText: '週ごとの実習' }).last().innerText()).includes('0 / 3'), `${tag} 進捗は、問題演習と実践を別に数える`);
   // 無い章は「見つかりませんでした」と一覧へのリンク
   await page.goto(`${BASE}hands-on/no-such-chapter/`);
   await page.getByRole('heading', { name: '見つかりませんでした' }).waitFor();

@@ -1,0 +1,1617 @@
+{
+  "id": "batch",
+  "order": 9,
+  "title": "決まった仕事を動かす",
+  "summary": "終わるまで動いて止まる Job と、時刻で Job を作る CronJob を動かします。成功の数え方、失敗とやり直しの上限、終わった跡の片付け、時間帯と重なりの決まりまで確かめます。",
+  "goal": "Job と CronJob を作り、成功と失敗を数え、時刻と重なりと残す数の決まりを説明し、片付けられる",
+  "features": [
+    "Job は成功の数 (completions) で終わり、失敗はやり直しの上限 (backoffLimit) まで",
+    "restartPolicy は Never か OnFailure だけ。Never なら失敗した Pod が残る",
+    "終わった Job は ttlSecondsAfterFinished か CronJob の残す数で片付く",
+    "CronJob の時刻は、書かなければノードの時間帯。timeZone で決める",
+    "重なりは concurrencyPolicy、止めるのは suspend、手で動かすのは create job --from"
+  ],
+  "minutes": 140,
+  "needs": [
+    "8 章を終えた仮想マシン kcna (k3s が動き、kubectl が使える)",
+    "インターネットへの接続 (イメージを取ってきます)",
+    "時刻を待つ手順が多いので、まとまった時間",
+    "出力について: 「仮想マシンの中」の出力は、2026-11-27 に Linux の QEMU の上で、Ubuntu 24.04 の公式のクラウドイメージ (x86_64・2 コア・2 GB・20 GB) と k3s v1.36.6+k3s1 で取りました。Multipass を打つ手順は実機で確かめていないので、出力を載せていません。M 系の Mac でも手順は同じです。CPU の種類が出るところだけ arm64 か aarch64 になります。"
+  ],
+  "reads": [
+    {
+      "topic": "core-concepts",
+      "label": "Kubernetes の中心の考え方"
+    }
+  ],
+  "steps": [
+    {
+      "id": "enter",
+      "text": "8 章を終えた仮想マシンの中に入ります。ホストの端末で打ちます。",
+      "why": "この章のコマンドは、最初と最後のほかは全部、仮想マシンの中で打つためです。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass shell kcna"
+      },
+      "lines": [
+        {
+          "code": "multipass shell kcna",
+          "text": "kcna の中の端末を開く。止まっていれば、動かしてから開く"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "行の頭が ubuntu@kcna:~$ に変われば、中に入っています。",
+      "trouble": [
+        {
+          "symptom": "multipass: command not found、または「認識されません」と出る",
+          "check": "端末を閉じて開き直し、multipass version を打つ",
+          "fix": "開き直しても出るなら、Multipass を入れる手順をもう一度行う"
+        },
+        {
+          "symptom": "kcna が無いと出る",
+          "check": "multipass list で名前を見る",
+          "fix": "0 章から始める"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/shell/"
+    },
+    {
+      "id": "check-host",
+      "text": "仮想マシンの中で、どのマシンにいるかと、クラスターの様子を見ます。hostname が kcna でなければ、先へ進まず multipass shell kcna で入ります。枠は、迷ったら 1 行ずつ貼ります。sudo などのあとの行は、端末によって、まとめて貼ると消えることがあるためです (EOF で終わる書き込みの部分は、EOF まで続けて貼ります)。",
+      "why": "自分の PC の別のクラスターで打たないためです。この章は、時刻を待つ手順が多いので、待つ行の秒数を見てから打ちます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "hostname\nkubectl get nodes"
+      },
+      "lines": [
+        {
+          "code": "hostname",
+          "text": "このマシンの名前を出す"
+        },
+        {
+          "code": "kubectl get nodes",
+          "text": "ノードの一覧を出す"
+        }
+      ],
+      "output": "kcna\nNAME   STATUS   ROLES           AGE   VERSION\nkcna   Ready    control-plane   23m   v1.36.6+k3s1",
+      "read": "kcna と出て、ノードの STATUS が Ready なら進めます。VERSION が v1.36.6+k3s1 でない人は、出力の版を読み替えます。",
+      "trouble": [
+        {
+          "symptom": "kcna ではない名前が出る",
+          "check": "行の頭が ubuntu@kcna かを見る",
+          "fix": "ホストにいる。multipass shell kcna で入り、もう一度打つ"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        },
+        {
+          "symptom": "permission denied や localhost:8080 と出る",
+          "check": "echo $KUBECONFIG を打つ",
+          "fix": "空なら export KUBECONFIG=~/.kube/k3s.yaml を打つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/architecture/nodes/"
+    },
+    {
+      "id": "words",
+      "text": "ここまでの Deployment は、ずっと動き続けるもののための部品でした。決まった仕事をして終わるもの (集計、移しかえ、片付け) には、Job を使います。決まった時刻に Job を作るのが、CronJob です。",
+      "why": "「終わったら成功」をどう数えるか、失敗したら何回やり直すか、終わった跡をいつ消すかが、ここで決まります。",
+      "source": "https://kubernetes.io/docs/concepts/workloads/controllers/job/"
+    },
+    {
+      "id": "prepare",
+      "text": "作業のフォルダと、練習用の名前空間 ch9 を作ります。",
+      "why": "作るものを、まとめて片付けられるようにするためです。端末を開き直したときや再起動のあとは、cd ~/ch9 を打ちます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "mkdir -p ~/ch9\ncd ~/ch9\nkubectl create namespace ch9\nkubectl wait --for=create serviceaccount/default -n ch9 --timeout=60s\ndate -u"
+      },
+      "lines": [
+        {
+          "code": "mkdir -p ~/ch9",
+          "text": "ch9 というフォルダを作る"
+        },
+        {
+          "code": "cd ~/ch9",
+          "text": "ch9 へ移る"
+        },
+        {
+          "code": "kubectl create namespace ch9",
+          "text": "名前空間 ch9 を作る"
+        },
+        {
+          "code": "kubectl wait --for=create serviceaccount/default -n ch9 --timeout=60s",
+          "text": "ch9 で Pod を作れるようになるまで待つ"
+        },
+        {
+          "code": "date -u",
+          "text": "今の時刻を、世界の基準の時刻 (UTC) で出す"
+        }
+      ],
+      "output": "namespace/ch9 created\nserviceaccount/default condition met\nFri Nov 27 01:22:02 UTC 2026",
+      "read": "namespace/ch9 created が出れば次へ進めます。date -u の時刻は、あとで CronJob の時刻を読む時に使います。",
+      "trouble": [
+        {
+          "symptom": "AlreadyExists と出る",
+          "check": "kubectl get namespaces を打つ",
+          "fix": "前に作ったものがある。そのまま使う"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/"
+    },
+    {
+      "id": "job-once",
+      "text": "1 度だけ動く Job を、命令で作ります。",
+      "why": "いちばん小さな Job です。仕事が成功で終わると、Job も終わります。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl create job hello -n ch9 --image=busybox:1.37 -- sh -c 'echo started; date; echo done'\nkubectl wait --for=condition=Complete job/hello -n ch9 --timeout=180s\nkubectl get job hello -n ch9\nkubectl get pods -l job-name=hello -n ch9\nkubectl logs job/hello -n ch9"
+      },
+      "lines": [
+        {
+          "code": "kubectl create job hello -n ch9 --image=busybox:1.37 -- sh -c 'echo started; date; echo done'",
+          "text": "hello という Job を作る"
+        },
+        {
+          "code": "kubectl wait --for=condition=Complete job/hello -n ch9 --timeout=180s",
+          "text": "終わるまで待つ"
+        },
+        {
+          "code": "kubectl get job hello -n ch9",
+          "text": "Job を出す"
+        },
+        {
+          "code": "kubectl get pods -l job-name=hello -n ch9",
+          "text": "hello が作った Pod を出す"
+        },
+        {
+          "code": "kubectl logs job/hello -n ch9",
+          "text": "記録を出す"
+        }
+      ],
+      "output": "job.batch/hello created\njob.batch/hello condition met\nNAME    STATUS     COMPLETIONS   DURATION   AGE\nhello   Complete   1/1           3s         3s\nNAME          READY   STATUS      RESTARTS   AGE\nhello-rb67j   0/1     Completed   0          3s\nstarted\nFri Nov 27 01:22:03 UTC 2026\ndone",
+      "read": "COMPLETIONS の 1/1 は「1 回の成功が要り、1 回成功した」です。Pod は Completed で残り、記録をあとから読めます。DURATION は、作ってから終わるまでの時間です。",
+      "trouble": [
+        {
+          "symptom": "toomanyrequests や 429 と出る",
+          "check": "kubectl describe の Events で、Failed to pull image の行の終わりを見る",
+          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る。短い「429 Too Many Requests」だけのときは、使いすぎを防ぐ別の上限なので、数分待ってからもう一度行う"
+        },
+        {
+          "symptom": "timed out と出る",
+          "check": "kubectl describe job hello -n ch9 の Events を見る",
+          "fix": "イメージを取っている途中なら待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_create/kubectl_create_job/"
+    },
+    {
+      "id": "job-parallel",
+      "text": "4 回の成功が要る仕事を、2 つずつ並べて動かします。30 秒ほどかかります。",
+      "why": "completions は成功の数、parallelism は同時に動かす数です。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cat > batch.yaml <<'EOF'\napiVersion: batch/v1\nkind: Job\nmetadata:\n  name: batch\nspec:\n  completions: 4\n  parallelism: 2\n  template:\n    spec:\n      restartPolicy: Never\n      containers:\n      - name: work\n        image: busybox:1.37\n        command: ['sh', '-c', 'echo $HOSTNAME; sleep 5']\nEOF\nkubectl apply -f batch.yaml -n ch9\nfor i in $(seq 20); do echo \"$(date +%T) $(kubectl get job batch -n ch9 --no-headers | awk '{print $3}') 動いている Pod $(kubectl get pods -l job-name=batch -n ch9 --field-selector=status.phase=Running --no-headers 2> /dev/null | wc -l)\"; [ \"$(kubectl get job batch -n ch9 -o jsonpath='{.status.succeeded}')\" = 4 ] && break; sleep 2; done\nkubectl wait --for=condition=Complete job/batch -n ch9 --timeout=180s\nkubectl get pods -l job-name=batch -n ch9"
+      },
+      "lines": [
+        {
+          "code": "cat > batch.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま batch.yaml というファイルに書く"
+        },
+        {
+          "code": "apiVersion: batch/v1",
+          "text": "Job のある API"
+        },
+        {
+          "code": "kind: Job",
+          "text": "終わるまで動かす仕事"
+        },
+        {
+          "code": "metadata:",
+          "text": "呼び名など"
+        },
+        {
+          "code": "  name: batch",
+          "text": "呼び名は batch"
+        },
+        {
+          "code": "spec:",
+          "text": "中身"
+        },
+        {
+          "code": "  completions: 4",
+          "text": "成功が 4 回要る"
+        },
+        {
+          "code": "  parallelism: 2",
+          "text": "同時に 2 つまで動かす"
+        },
+        {
+          "code": "  template:",
+          "text": "作る Pod のひな型"
+        },
+        {
+          "code": "    spec:",
+          "text": "Pod の中身"
+        },
+        {
+          "code": "      restartPolicy: Never",
+          "text": "失敗した時に、同じ Pod の中で始め直さない (Never) か、始め直す (OnFailure)"
+        },
+        {
+          "code": "      containers:",
+          "text": "コンテナたち"
+        },
+        {
+          "code": "      - name: work",
+          "text": "コンテナの呼び名"
+        },
+        {
+          "code": "        image: busybox:1.37",
+          "text": "小さな道具のイメージ"
+        },
+        {
+          "code": "        command: ['sh', '-c', 'echo $HOSTNAME; sleep 5']",
+          "text": "仕事の中身"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "kubectl apply -f batch.yaml -n ch9",
+          "text": "Job を作る"
+        },
+        {
+          "code": "for i in $(seq 20); do echo \"$(date +%T) $(kubectl get job batch -n ch9 --no-headers | awk '{print $3}') 動いている Pod $(kubectl get pods -l job-name=batch -n ch9 --field-selector=status.phase=Running --no-headers 2> /dev/null | wc -l)\"; [ \"$(kubectl get job batch -n ch9 -o jsonpath='{.status.succeeded}')\" = 4 ] && break; sleep 2; done",
+          "text": "2 秒おきに、時刻・成功の数・動いている Pod の数を並べる (4 回成功したら止める)"
+        },
+        {
+          "code": "kubectl wait --for=condition=Complete job/batch -n ch9 --timeout=180s",
+          "text": "終わるまで待つ"
+        },
+        {
+          "code": "kubectl get pods -l job-name=batch -n ch9",
+          "text": "batch が作った Pod を出す"
+        }
+      ],
+      "output": "job.batch/batch created\n01:22:06 0/4 動いている Pod 0\n01:22:08 0/4 動いている Pod 2\n01:22:11 0/4 動いている Pod 2\n01:22:13 0/4 動いている Pod 0\n01:22:16 2/4 動いている Pod 2\n01:22:18 2/4 動いている Pod 2\n01:22:21 2/4 動いている Pod 2\n01:22:23 2/4 動いている Pod 0\n01:22:27 4/4 動いている Pod 0\njob.batch/batch condition met\nNAME          READY   STATUS      RESTARTS   AGE\nbatch-f5szr   0/1     Completed   0          13s\nbatch-ncgg8   0/1     Completed   0          21s\nbatch-vgp2h   0/1     Completed   0          21s\nbatch-vkj8j   0/1     Completed   0          13s",
+      "read": "成功の数が 0/4、2/4、4/4 と、2 つずつ増えます。動いている Pod は 2 つまでです。Pod は 4 つ残ります。並びの行の数は、マシンの速さで変わります。",
+      "trouble": [
+        {
+          "symptom": "Pod が 4 つより多い",
+          "check": "STATUS に Error が無いかを見る",
+          "fix": "失敗した Pod の分も残る。次の手順で見る"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/workloads/controllers/job/"
+    },
+    {
+      "id": "job-fail",
+      "text": "わざと、いつも失敗する Job を作ります。1 分ほどかかります。",
+      "why": "失敗した時に何回やり直すか (backoffLimit) と、あきらめた時の見え方を知るためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cat > fail.yaml <<'EOF'\napiVersion: batch/v1\nkind: Job\nmetadata:\n  name: fail\nspec:\n  backoffLimit: 2\n  template:\n    spec:\n      restartPolicy: Never\n      containers:\n      - name: work\n        image: busybox:1.37\n        command: ['sh', '-c', 'echo trying; exit 1']\nEOF\nkubectl apply -f fail.yaml -n ch9\nkubectl wait --for=condition=Failed job/fail -n ch9 --timeout=240s\nkubectl get job fail -n ch9\nkubectl get pods -l job-name=fail -n ch9\nkubectl get job fail -n ch9 -o jsonpath='{.status.conditions[?(@.type==\"Failed\")].reason}{\"\\n\"}'\nkubectl logs -l job-name=fail -n ch9 --tail=1"
+      },
+      "lines": [
+        {
+          "code": "cat > fail.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま fail.yaml というファイルに書く"
+        },
+        {
+          "code": "apiVersion: batch/v1",
+          "text": "Job のある API"
+        },
+        {
+          "code": "kind: Job",
+          "text": "終わるまで動かす仕事"
+        },
+        {
+          "code": "metadata:",
+          "text": "呼び名など"
+        },
+        {
+          "code": "  name: fail",
+          "text": "呼び名は fail"
+        },
+        {
+          "code": "spec:",
+          "text": "中身"
+        },
+        {
+          "code": "  backoffLimit: 2",
+          "text": "やり直しは 2 回まで"
+        },
+        {
+          "code": "  template:",
+          "text": "作る Pod のひな型"
+        },
+        {
+          "code": "    spec:",
+          "text": "Pod の中身"
+        },
+        {
+          "code": "      restartPolicy: Never",
+          "text": "失敗した時に、同じ Pod の中で始め直さない (Never) か、始め直す (OnFailure)"
+        },
+        {
+          "code": "      containers:",
+          "text": "コンテナたち"
+        },
+        {
+          "code": "      - name: work",
+          "text": "コンテナの呼び名"
+        },
+        {
+          "code": "        image: busybox:1.37",
+          "text": "小さな道具のイメージ"
+        },
+        {
+          "code": "        command: ['sh', '-c', 'echo trying; exit 1']",
+          "text": "仕事の中身"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "kubectl apply -f fail.yaml -n ch9",
+          "text": "Job を作る"
+        },
+        {
+          "code": "kubectl wait --for=condition=Failed job/fail -n ch9 --timeout=240s",
+          "text": "失敗と決まるまで待つ"
+        },
+        {
+          "code": "kubectl get job fail -n ch9",
+          "text": "Job を出す"
+        },
+        {
+          "code": "kubectl get pods -l job-name=fail -n ch9",
+          "text": "fail が作った Pod を出す"
+        },
+        {
+          "code": "kubectl get job fail -n ch9 -o jsonpath='{.status.conditions[?(@.type==\"Failed\")].reason}{\"\\n\"}'",
+          "text": "失敗の理由を出す"
+        },
+        {
+          "code": "kubectl logs -l job-name=fail -n ch9 --tail=1",
+          "text": "失敗した Pod の記録を出す"
+        }
+      ],
+      "output": "job.batch/fail created\njob.batch/fail condition met\nNAME   STATUS   COMPLETIONS   DURATION   AGE\nfail   Failed   0/1           35s        35s\nNAME         READY   STATUS   RESTARTS   AGE\nfail-gbrtq   0/1     Error    0          24s\nfail-k8tcb   0/1     Error    0          4s\nfail-plcdl   0/1     Error    0          35s\nBackoffLimitExceeded\ntrying\ntrying\ntrying",
+      "read": "Pod が 3 つ (最初の 1 回とやり直しの 2 回)、どれも Error です。STATUS が Failed、理由が BackoffLimitExceeded (やり直しの上限を超えた) です。やり直しの間は 10 秒、20 秒と延び、上限は 10 分です。失敗の理由 (終わりの番号など) ごとに、やり直すかすぐ失敗にするかを決めたい時は、podFailurePolicy を書きます (たとえば「番号 42 で終わったら、やり直さずに Job を失敗にする」)。失敗した Pod が残るのは、記録を読んで原因を調べられるようにするためです。",
+      "trouble": [
+        {
+          "symptom": "timed out と出る",
+          "check": "kubectl get pods -l job-name=fail -n ch9 を打つ",
+          "fix": "やり直しの待ちが延びている。待つ行をもう一度打つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/workloads/controllers/job/"
+    },
+    {
+      "id": "job-onfailure",
+      "text": "restartPolicy を OnFailure にして、失敗の数え方の違いを見ます。1 分ほどかかります。",
+      "why": "OnFailure では、同じ Pod の中でコンテナを始め直します。Pod は 1 つのまま、始め直しの数が増えます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cat > retry.yaml <<'EOF'\napiVersion: batch/v1\nkind: Job\nmetadata:\n  name: retry\nspec:\n  backoffLimit: 2\n  template:\n    spec:\n      restartPolicy: OnFailure\n      containers:\n      - name: work\n        image: busybox:1.37\n        command: ['sh', '-c', 'echo trying; exit 1']\nEOF\nkubectl apply -f retry.yaml -n ch9\nkubectl wait --for=condition=Failed job/retry -n ch9 --timeout=240s\nkubectl get pods -l job-name=retry -n ch9\nkubectl get job retry -n ch9"
+      },
+      "lines": [
+        {
+          "code": "cat > retry.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま retry.yaml というファイルに書く"
+        },
+        {
+          "code": "apiVersion: batch/v1",
+          "text": "Job のある API"
+        },
+        {
+          "code": "kind: Job",
+          "text": "終わるまで動かす仕事"
+        },
+        {
+          "code": "metadata:",
+          "text": "呼び名など"
+        },
+        {
+          "code": "  name: retry",
+          "text": "呼び名は retry"
+        },
+        {
+          "code": "spec:",
+          "text": "中身"
+        },
+        {
+          "code": "  backoffLimit: 2",
+          "text": "やり直しは 2 回まで"
+        },
+        {
+          "code": "  template:",
+          "text": "作る Pod のひな型"
+        },
+        {
+          "code": "    spec:",
+          "text": "Pod の中身"
+        },
+        {
+          "code": "      restartPolicy: OnFailure",
+          "text": "失敗した時に、同じ Pod の中で始め直さない (Never) か、始め直す (OnFailure)"
+        },
+        {
+          "code": "      containers:",
+          "text": "コンテナたち"
+        },
+        {
+          "code": "      - name: work",
+          "text": "コンテナの呼び名"
+        },
+        {
+          "code": "        image: busybox:1.37",
+          "text": "小さな道具のイメージ"
+        },
+        {
+          "code": "        command: ['sh', '-c', 'echo trying; exit 1']",
+          "text": "仕事の中身"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "kubectl apply -f retry.yaml -n ch9",
+          "text": "Job を作る"
+        },
+        {
+          "code": "kubectl wait --for=condition=Failed job/retry -n ch9 --timeout=240s",
+          "text": "失敗と決まるまで待つ"
+        },
+        {
+          "code": "kubectl get pods -l job-name=retry -n ch9",
+          "text": "retry が作った Pod を出す"
+        },
+        {
+          "code": "kubectl get job retry -n ch9",
+          "text": "Job を出す"
+        }
+      ],
+      "output": "job.batch/retry created\njob.batch/retry condition met\nNAME          READY   STATUS   RESTARTS      AGE\nretry-gxmfm   0/1     Error    2 (13s ago)   16s\nNAME    STATUS   COMPLETIONS   DURATION   AGE\nretry   Failed   0/1           16s        16s",
+      "read": "Pod は 1 つで、RESTARTS が始め直しの数です。上限に当たると、その Pod は止められます (打つ時によって、Error で残って見えたり、もう消えていたりします)。記録を残したいなら Never のほうが調べやすくなります。",
+      "trouble": [
+        {
+          "symptom": "Pod が残っている",
+          "check": "10 秒待って Pod の行を打ち直す",
+          "fix": "止める途中"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/workloads/controllers/job/"
+    },
+    {
+      "id": "job-deadline",
+      "text": "わざと、時間の上限を超える Job を作ります。15 秒ほどかかります。",
+      "why": "activeDeadlineSeconds は「Job 全体でこの秒数まで」です。終わらない仕事を止めるためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cat > slow.yaml <<'EOF'\napiVersion: batch/v1\nkind: Job\nmetadata:\n  name: slow\nspec:\n  activeDeadlineSeconds: 10\n  template:\n    spec:\n      restartPolicy: Never\n      containers:\n      - name: work\n        image: busybox:1.37\n        command: ['sh', '-c', 'sleep 60']\nEOF\nkubectl apply -f slow.yaml -n ch9\nkubectl wait --for=condition=Failed job/slow -n ch9 --timeout=60s\nkubectl get job slow -n ch9 -o jsonpath='{.status.conditions[?(@.type==\"Failed\")].reason}{\"\\n\"}'\nkubectl get pods -l job-name=slow -n ch9"
+      },
+      "lines": [
+        {
+          "code": "cat > slow.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま slow.yaml というファイルに書く"
+        },
+        {
+          "code": "apiVersion: batch/v1",
+          "text": "Job のある API"
+        },
+        {
+          "code": "kind: Job",
+          "text": "終わるまで動かす仕事"
+        },
+        {
+          "code": "metadata:",
+          "text": "呼び名など"
+        },
+        {
+          "code": "  name: slow",
+          "text": "呼び名は slow"
+        },
+        {
+          "code": "spec:",
+          "text": "中身"
+        },
+        {
+          "code": "  activeDeadlineSeconds: 10",
+          "text": "10 秒で止める"
+        },
+        {
+          "code": "  template:",
+          "text": "作る Pod のひな型"
+        },
+        {
+          "code": "    spec:",
+          "text": "Pod の中身"
+        },
+        {
+          "code": "      restartPolicy: Never",
+          "text": "失敗した時に、同じ Pod の中で始め直さない (Never) か、始め直す (OnFailure)"
+        },
+        {
+          "code": "      containers:",
+          "text": "コンテナたち"
+        },
+        {
+          "code": "      - name: work",
+          "text": "コンテナの呼び名"
+        },
+        {
+          "code": "        image: busybox:1.37",
+          "text": "小さな道具のイメージ"
+        },
+        {
+          "code": "        command: ['sh', '-c', 'sleep 60']",
+          "text": "仕事の中身"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "kubectl apply -f slow.yaml -n ch9",
+          "text": "Job を作る"
+        },
+        {
+          "code": "kubectl wait --for=condition=Failed job/slow -n ch9 --timeout=60s",
+          "text": "失敗と決まるまで待つ"
+        },
+        {
+          "code": "kubectl get job slow -n ch9 -o jsonpath='{.status.conditions[?(@.type==\"Failed\")].reason}{\"\\n\"}'",
+          "text": "失敗の理由を出す"
+        },
+        {
+          "code": "kubectl get pods -l job-name=slow -n ch9",
+          "text": "slow が作った Pod を出す"
+        }
+      ],
+      "output": "job.batch/slow created\njob.batch/slow condition met\nDeadlineExceeded\nNo resources found in ch9 namespace.",
+      "read": "理由は DeadlineExceeded (時間切れ) です。動いていた Pod は止められ、No resources found のように、もう消えていることもあります。",
+      "trouble": [
+        {
+          "symptom": "timed out と出る",
+          "check": "kubectl get job slow -n ch9 を打つ",
+          "fix": "イメージを取るのに時間がかかった。待つ行を打ち直す"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/workloads/controllers/job/"
+    },
+    {
+      "id": "job-always",
+      "text": "わざと、restartPolicy を Always にした Job を作ります。",
+      "why": "Job では、成功して終わることが前提なので、ずっと動かす Always は使えません。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl create job always -n ch9 --image=busybox:1.37 --dry-run=client -o yaml -- true | sed 's/restartPolicy: Never/restartPolicy: Always/' | kubectl apply -n ch9 -f -"
+      },
+      "lines": [
+        {
+          "code": "kubectl create job always -n ch9 --image=busybox:1.37 --dry-run=client -o yaml -- true | sed 's/restartPolicy: Never/restartPolicy: Always/' | kubectl apply -n ch9 -f -",
+          "text": "Job のひな型を作り、restartPolicy だけ Always に替えて渡す"
+        }
+      ],
+      "output": "The Job \"always\" is invalid: spec.template.spec.restartPolicy: Required value: valid values: \"OnFailure\", \"Never\"",
+      "read": "valid values: \"OnFailure\", \"Never\" と断られます。使えるのは、その 2 つだけです。",
+      "trouble": [
+        {
+          "symptom": "created と出る",
+          "check": "sed の行を見る",
+          "fix": "Always に替わっていない。行をコピーして打ち直す"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/workloads/controllers/job/"
+    },
+    {
+      "id": "job-rerun",
+      "text": "わざと、同じ名前の Job をもう一度作ります。",
+      "why": "Job は 1 回きりで、終わったあとも名前が残ります。やり直すには、消してから作るか、別の名前にします。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl create job hello -n ch9 --image=busybox:1.37 -- sh -c 'echo again'\nkubectl delete job hello -n ch9\nkubectl create job hello -n ch9 --image=busybox:1.37 -- sh -c 'echo again'\nkubectl wait --for=condition=Complete job/hello -n ch9 --timeout=180s\nkubectl logs job/hello -n ch9"
+      },
+      "lines": [
+        {
+          "code": "kubectl create job hello -n ch9 --image=busybox:1.37 -- sh -c 'echo again'",
+          "text": "同じ名前で作ろうとする"
+        },
+        {
+          "code": "kubectl delete job hello -n ch9",
+          "text": "前の hello を、Pod ごと消す"
+        },
+        {
+          "code": "kubectl create job hello -n ch9 --image=busybox:1.37 -- sh -c 'echo again'",
+          "text": "作り直す"
+        },
+        {
+          "code": "kubectl wait --for=condition=Complete job/hello -n ch9 --timeout=180s",
+          "text": "終わるまで待つ"
+        },
+        {
+          "code": "kubectl logs job/hello -n ch9",
+          "text": "記録を出す"
+        }
+      ],
+      "output": "error: failed to create job: jobs.batch \"hello\" already exists\njob.batch \"hello\" deleted from ch9 namespace\njob.batch/hello created\njob.batch/hello condition met\nagain",
+      "read": "1 回目は AlreadyExists です。消すと、作った Pod も一緒に消えます。2 回目の hello は、新しい仕事として動きました。",
+      "trouble": [
+        {
+          "symptom": "2 回目も AlreadyExists",
+          "check": "kubectl get job hello -n ch9 を打つ",
+          "fix": "消す途中。数秒待って打ち直す"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/workloads/controllers/job/"
+    },
+    {
+      "id": "job-ttl",
+      "text": "終わったあと、自動で消える Job を作ります。30 秒ほどかかります。",
+      "why": "終わった Job と Pod は、消すまで残り続けます。ttlSecondsAfterFinished を書くと、決めた秒数のあと、Pod ごと消されます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cat > ttl.yaml <<'EOF'\napiVersion: batch/v1\nkind: Job\nmetadata:\n  name: ttl\nspec:\n  ttlSecondsAfterFinished: 15\n  template:\n    spec:\n      restartPolicy: Never\n      containers:\n      - name: work\n        image: busybox:1.37\n        command: ['sh', '-c', 'echo short']\nEOF\nkubectl apply -f ttl.yaml -n ch9\nkubectl wait --for=condition=Complete job/ttl -n ch9 --timeout=180s\nkubectl get job ttl -n ch9\nkubectl wait --for=delete job/ttl -n ch9 --timeout=90s\nkubectl get job ttl -n ch9"
+      },
+      "lines": [
+        {
+          "code": "cat > ttl.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま ttl.yaml というファイルに書く"
+        },
+        {
+          "code": "apiVersion: batch/v1",
+          "text": "Job のある API"
+        },
+        {
+          "code": "kind: Job",
+          "text": "終わるまで動かす仕事"
+        },
+        {
+          "code": "metadata:",
+          "text": "呼び名など"
+        },
+        {
+          "code": "  name: ttl",
+          "text": "呼び名は ttl"
+        },
+        {
+          "code": "spec:",
+          "text": "中身"
+        },
+        {
+          "code": "  ttlSecondsAfterFinished: 15",
+          "text": "終わってから 15 秒で消す"
+        },
+        {
+          "code": "  template:",
+          "text": "作る Pod のひな型"
+        },
+        {
+          "code": "    spec:",
+          "text": "Pod の中身"
+        },
+        {
+          "code": "      restartPolicy: Never",
+          "text": "失敗した時に、同じ Pod の中で始め直さない (Never) か、始め直す (OnFailure)"
+        },
+        {
+          "code": "      containers:",
+          "text": "コンテナたち"
+        },
+        {
+          "code": "      - name: work",
+          "text": "コンテナの呼び名"
+        },
+        {
+          "code": "        image: busybox:1.37",
+          "text": "小さな道具のイメージ"
+        },
+        {
+          "code": "        command: ['sh', '-c', 'echo short']",
+          "text": "仕事の中身"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "kubectl apply -f ttl.yaml -n ch9",
+          "text": "Job を作る"
+        },
+        {
+          "code": "kubectl wait --for=condition=Complete job/ttl -n ch9 --timeout=180s",
+          "text": "終わるまで待つ"
+        },
+        {
+          "code": "kubectl get job ttl -n ch9",
+          "text": "終わった直後に出す"
+        },
+        {
+          "code": "kubectl wait --for=delete job/ttl -n ch9 --timeout=90s",
+          "text": "消えるまで待つ"
+        },
+        {
+          "code": "kubectl get job ttl -n ch9",
+          "text": "もう一度出す"
+        }
+      ],
+      "output": "job.batch/ttl created\njob.batch/ttl condition met\nNAME   STATUS     COMPLETIONS   DURATION   AGE\nttl    Complete   1/1           3s         3s\njob.batch/ttl condition met\nError from server (NotFound): jobs.batch \"ttl\" not found",
+      "read": "終わった直後はありましたが、15 秒ほどで消え、NotFound になりました。記録を読みたいなら、消える前に読みます。",
+      "trouble": [
+        {
+          "symptom": "timed out と出る",
+          "check": "kubectl get job ttl -n ch9 を打つ",
+          "fix": "消す役の見回りが遅れている。少し待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/workloads/controllers/ttlafterfinished/"
+    },
+    {
+      "id": "job-indexed",
+      "text": "番号付きの Job で、Pod ごとに別の分担をさせます。30 秒ほどかかります。",
+      "why": "completionMode: Indexed にすると、Pod に 0、1、2 と番号が渡されます。同じひな型で、分けた仕事を並べられます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cat > indexed.yaml <<'EOF'\napiVersion: batch/v1\nkind: Job\nmetadata:\n  name: parts\nspec:\n  completions: 3\n  parallelism: 3\n  completionMode: Indexed\n  template:\n    spec:\n      restartPolicy: Never\n      containers:\n      - name: work\n        image: busybox:1.37\n        command: ['sh', '-c', 'echo part $JOB_COMPLETION_INDEX']\nEOF\nkubectl apply -f indexed.yaml -n ch9\nkubectl wait --for=condition=Complete job/parts -n ch9 --timeout=180s\nfor p in $(kubectl get pods -l job-name=parts -n ch9 -o name); do kubectl logs $p -n ch9; done | sort\nkubectl get pods -l job-name=parts -n ch9 -o custom-columns='NAME:.metadata.name,INDEX:.metadata.annotations.batch\\.kubernetes\\.io/job-completion-index'"
+      },
+      "lines": [
+        {
+          "code": "cat > indexed.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま indexed.yaml というファイルに書く"
+        },
+        {
+          "code": "apiVersion: batch/v1",
+          "text": "Job のある API"
+        },
+        {
+          "code": "kind: Job",
+          "text": "終わるまで動かす仕事"
+        },
+        {
+          "code": "metadata:",
+          "text": "呼び名など"
+        },
+        {
+          "code": "  name: parts",
+          "text": "呼び名は parts"
+        },
+        {
+          "code": "spec:",
+          "text": "中身"
+        },
+        {
+          "code": "  completions: 3",
+          "text": "成功が 3 回要る"
+        },
+        {
+          "code": "  parallelism: 3",
+          "text": "3 つ同時に動かす"
+        },
+        {
+          "code": "  completionMode: Indexed",
+          "text": "Pod に番号を渡す"
+        },
+        {
+          "code": "  template:",
+          "text": "作る Pod のひな型"
+        },
+        {
+          "code": "    spec:",
+          "text": "Pod の中身"
+        },
+        {
+          "code": "      restartPolicy: Never",
+          "text": "失敗した時に、同じ Pod の中で始め直さない (Never) か、始め直す (OnFailure)"
+        },
+        {
+          "code": "      containers:",
+          "text": "コンテナたち"
+        },
+        {
+          "code": "      - name: work",
+          "text": "コンテナの呼び名"
+        },
+        {
+          "code": "        image: busybox:1.37",
+          "text": "小さな道具のイメージ"
+        },
+        {
+          "code": "        command: ['sh', '-c', 'echo part $JOB_COMPLETION_INDEX']",
+          "text": "仕事の中身"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "kubectl apply -f indexed.yaml -n ch9",
+          "text": "Job を作る"
+        },
+        {
+          "code": "kubectl wait --for=condition=Complete job/parts -n ch9 --timeout=180s",
+          "text": "終わるまで待つ"
+        },
+        {
+          "code": "for p in $(kubectl get pods -l job-name=parts -n ch9 -o name); do kubectl logs $p -n ch9; done | sort",
+          "text": "3 つの Pod の記録を並べる"
+        },
+        {
+          "code": "kubectl get pods -l job-name=parts -n ch9 -o custom-columns='NAME:.metadata.name,INDEX:.metadata.annotations.batch\\.kubernetes\\.io/job-completion-index'",
+          "text": "Pod の名前と番号を出す"
+        }
+      ],
+      "output": "job.batch/parts created\njob.batch/parts condition met\npart 0\npart 1\npart 2\nNAME            INDEX\nparts-0-xtn6l   0\nparts-1-5fctw   1\nparts-2-j8h8q   2",
+      "read": "part 0、part 1、part 2 と、3 つの Pod が別の番号を受け取りました。番号は、環境変数 JOB_COMPLETION_INDEX と、Pod の覚え書きに入ります。",
+      "trouble": [
+        {
+          "symptom": "part の後ろが空",
+          "check": "command の行を見る",
+          "fix": "$JOB_COMPLETION_INDEX のつづりを見直す"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/tasks/job/indexed-parallel-processing-static/"
+    },
+    {
+      "id": "break",
+      "text": "ここで休めます。休む人は、exit で出てから、ホストでこの行を打ちます。休まない人は、打たずに印を付けて先へ進みます。",
+      "why": "長い章なので、区切りを置くためです。止めても、作ったものとファイルは残ります。再起動と同じことが起きるので、Pod の中のコンテナは始め直され、Pod の住所も変わります。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass stop kcna"
+      },
+      "lines": [
+        {
+          "code": "multipass stop kcna",
+          "text": "kcna を止める。動いている (Running) ときだけ打てる"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "何もエラーが出なければ止まっています。続けるときは、ホストで multipass shell kcna を打つと、動かして中に入れます。そのあと cd ~/ch9 を打ちます。Job は止めても残るので、休んでもそのままです。戻った直後の 1〜2 分は、一覧が止める前の古い様子のことがあります。少し待ってもう一度見ます。",
+      "trouble": [
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "activating なら、1 分ほど待つ"
+        },
+        {
+          "symptom": "No such file or directory と出る",
+          "check": "pwd を打つ",
+          "fix": "作業のフォルダにいない。cd で移る"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/stop/"
+    },
+    {
+      "id": "cron-create",
+      "text": "毎分動く CronJob を作り、最初の Job ができるのを待ちます。最大 1 分半ほどかかります。",
+      "why": "CronJob は、決まった時刻に Job を作る部品です。毎分にすると、待つ時間が短く済みます。この tick は、章の終わりの手順で消すまで、毎分動き続けます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl create cronjob tick -n ch9 --image=busybox:1.37 --schedule='*/1 * * * *' -- sh -c 'date; echo tick'\nkubectl label cronjob tick app=tick -n ch9\nkubectl patch cronjob tick -n ch9 --type=merge -p '{\"spec\":{\"jobTemplate\":{\"metadata\":{\"labels\":{\"app\":\"tick\"}}}}}'\nfor i in $(seq 40); do [ -n \"$(kubectl get jobs -n ch9 -l app=tick -o name 2> /dev/null)\" ] && break; sleep 3; done\nkubectl wait --for=condition=Complete job -l app=tick -n ch9 --timeout=120s\nkubectl get cronjob tick -n ch9\nkubectl get jobs -l app=tick -n ch9\nkubectl logs $(kubectl get jobs -l app=tick -n ch9 -o name | tail -n 1) -n ch9"
+      },
+      "lines": [
+        {
+          "code": "kubectl create cronjob tick -n ch9 --image=busybox:1.37 --schedule='*/1 * * * *' -- sh -c 'date; echo tick'",
+          "text": "毎分、時刻を書く tick という CronJob を作る"
+        },
+        {
+          "code": "kubectl label cronjob tick app=tick -n ch9",
+          "text": "見分けのラベルを付ける"
+        },
+        {
+          "code": "kubectl patch cronjob tick -n ch9 --type=merge -p '{\"spec\":{\"jobTemplate\":{\"metadata\":{\"labels\":{\"app\":\"tick\"}}}}}'",
+          "text": "作る Job にも同じラベルを付ける"
+        },
+        {
+          "code": "for i in $(seq 40); do [ -n \"$(kubectl get jobs -n ch9 -l app=tick -o name 2> /dev/null)\" ] && break; sleep 3; done",
+          "text": "tick の Job ができるまで、3 秒おきに見て待つ (最大 2 分)"
+        },
+        {
+          "code": "kubectl wait --for=condition=Complete job -l app=tick -n ch9 --timeout=120s",
+          "text": "その Job が終わるまで待つ"
+        },
+        {
+          "code": "kubectl get cronjob tick -n ch9",
+          "text": "CronJob を出す"
+        },
+        {
+          "code": "kubectl get jobs -l app=tick -n ch9",
+          "text": "tick の Job を出す"
+        },
+        {
+          "code": "kubectl logs $(kubectl get jobs -l app=tick -n ch9 -o name | tail -n 1) -n ch9",
+          "text": "いちばん新しい Job の記録を出す"
+        }
+      ],
+      "output": "cronjob.batch/tick created\ncronjob.batch/tick labeled\ncronjob.batch/tick patched\njob.batch/tick-29929045 condition met\nNAME   SCHEDULE      TIMEZONE   SUSPEND   ACTIVE   LAST SCHEDULE   AGE\ntick   */1 * * * *   <none>     False     0        3s              32s\nNAME            STATUS     COMPLETIONS   DURATION   AGE\ntick-29929045   Complete   1/1           3s         4s\nFri Nov 27 01:25:01 UTC 2026\ntick",
+      "read": "*/1 * * * * は、左から分・時・日・月・曜日で、「毎分」です。Job の名前は tick- の後ろに数字が付きます。COMPLETIONS は 1/1、記録には時刻と tick が出ます。CronJob が作る Job は、時刻の数秒後に動きます。",
+      "trouble": [
+        {
+          "symptom": "Job ができない",
+          "check": "kubectl describe cronjob tick -n ch9 の Events を見る",
+          "fix": "次の分になるまで待つ。--schedule の引用符を見直す"
+        },
+        {
+          "symptom": "toomanyrequests や 429 と出る",
+          "check": "kubectl describe の Events で、Failed to pull image の行の終わりを見る",
+          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る。短い「429 Too Many Requests」だけのときは、使いすぎを防ぐ別の上限なので、数分待ってからもう一度行う"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/"
+    },
+    {
+      "id": "cron-tz",
+      "text": "時刻の決まりと、時間帯 (タイムゾーン) を見ます。",
+      "why": "何も書かないと、時刻は CronJob を見る部品のマシンの時間帯で読まれます。この仮想マシンは UTC (世界の基準の時刻) なので、日本時間の朝 9 時は 0 時です。時間帯は timeZone で書きます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "date +%Z\nkubectl create cronjob morning -n ch9 --image=busybox:1.37 --schedule='0 9 * * *' --dry-run=client -o yaml -- date | sed 's/^spec:/spec:\\n  timeZone: Asia\\/Tokyo/' | kubectl apply -n ch9 -f -\nkubectl get cronjob morning -n ch9"
+      },
+      "lines": [
+        {
+          "code": "date +%Z",
+          "text": "ノードの時間帯を出す"
+        },
+        {
+          "code": "kubectl create cronjob morning -n ch9 --image=busybox:1.37 --schedule='0 9 * * *' --dry-run=client -o yaml -- date | sed 's/^spec:/spec:\\n  timeZone: Asia\\/Tokyo/' | kubectl apply -n ch9 -f -",
+          "text": "毎日 9 時 (日本時間) の CronJob を作る"
+        },
+        {
+          "code": "kubectl get cronjob morning -n ch9",
+          "text": "出す"
+        }
+      ],
+      "output": "UTC\ncronjob.batch/morning created\nNAME      SCHEDULE    TIMEZONE     SUSPEND   ACTIVE   LAST SCHEDULE   AGE\nmorning   0 9 * * *   Asia/Tokyo   False     0        <none>          0s",
+      "read": "TIMEZONE に Asia/Tokyo が付きました。SCHEDULE の 0 9 は 9 時 0 分です。時間帯を書かなければ、この仮想マシンでは 9 時 (UTC)、日本時間では 18 時に動きます。",
+      "trouble": [
+        {
+          "symptom": "timeZone のところで断られる",
+          "check": "sed の行の出力を、kubectl apply を外して見る",
+          "fix": "spec: の下に timeZone の行が入ったかを見る"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/"
+    },
+    {
+      "id": "cron-tz-bad",
+      "text": "わざと、時間帯を schedule の中に書きます。",
+      "why": "古いやり方 (CRON_TZ=) を schedule に書くと、断られます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl create cronjob badtz -n ch9 --image=busybox:1.37 --schedule='CRON_TZ=Asia/Tokyo 0 9 * * *' -- date"
+      },
+      "lines": [
+        {
+          "code": "kubectl create cronjob badtz -n ch9 --image=busybox:1.37 --schedule='CRON_TZ=Asia/Tokyo 0 9 * * *' -- date",
+          "text": "schedule に時間帯を混ぜて作ろうとする"
+        }
+      ],
+      "output": "error: failed to create cronjob: CronJob.batch \"badtz\" is invalid: spec.schedule: Invalid value: \"CRON_TZ=Asia/Tokyo 0 9 * * *\": cannot use TZ or CRON_TZ in schedule, use timeZone field instead",
+      "read": "cannot use TZ or CRON_TZ in schedule, use timeZone field instead と断られます。時間帯は timeZone の欄に書きます。",
+      "trouble": [
+        {
+          "symptom": "created と出る",
+          "check": "kubectl get cronjob -n ch9 を打つ",
+          "fix": "版によって言い回しが違う。badtz を消し、timeZone で書く"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/"
+    },
+    {
+      "id": "cron-forbid",
+      "text": "前の回が終わらないうちに、次の時刻が来たらどうなるかを見ます。2 分半ほどかかります。",
+      "why": "concurrencyPolicy の Allow (既定) は重ねて動かし、Forbid は飛ばし、Replace は前を止めて入れ替えます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cat > long.yaml <<'EOF'\napiVersion: batch/v1\nkind: CronJob\nmetadata:\n  name: long\nspec:\n  schedule: '*/1 * * * *'\n  concurrencyPolicy: Forbid\n  jobTemplate:\n    spec:\n      template:\n        spec:\n          restartPolicy: Never\n          terminationGracePeriodSeconds: 1\n          containers:\n          - name: work\n            image: busybox:1.37\n            command: ['sh', '-c', 'sleep 100']\nEOF\nkubectl apply -f long.yaml -n ch9\nfor i in $(seq 15); do echo \"$(date +%T) 動いている数 $(kubectl get cronjob long -n ch9 -o jsonpath='{.status.active[*].name}' | wc -w) Job $(kubectl get jobs -n ch9 --no-headers 2> /dev/null | grep -c '^long-')\"; sleep 10; done\nkubectl delete cronjob long -n ch9"
+      },
+      "lines": [
+        {
+          "code": "cat > long.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま long.yaml というファイルに書く"
+        },
+        {
+          "code": "apiVersion: batch/v1",
+          "text": "CronJob のある API"
+        },
+        {
+          "code": "kind: CronJob",
+          "text": "時刻で Job を作る部品"
+        },
+        {
+          "code": "metadata:",
+          "text": "呼び名など"
+        },
+        {
+          "code": "  name: long",
+          "text": "呼び名"
+        },
+        {
+          "code": "spec:",
+          "text": "中身"
+        },
+        {
+          "code": "  schedule: '*/1 * * * *'",
+          "text": "毎分"
+        },
+        {
+          "code": "  concurrencyPolicy: Forbid",
+          "text": "前の回が動いていたら、その回は作らない"
+        },
+        {
+          "code": "  jobTemplate:",
+          "text": "作る Job のひな型"
+        },
+        {
+          "code": "    spec:",
+          "text": "Job の中身"
+        },
+        {
+          "code": "      template:",
+          "text": "Pod のひな型"
+        },
+        {
+          "code": "        spec:",
+          "text": "Pod の中身"
+        },
+        {
+          "code": "          restartPolicy: Never",
+          "text": "始め直さない"
+        },
+        {
+          "code": "          terminationGracePeriodSeconds: 1",
+          "text": "終わるのを待つ秒数"
+        },
+        {
+          "code": "          containers:",
+          "text": "コンテナたち"
+        },
+        {
+          "code": "          - name: work",
+          "text": "コンテナの呼び名"
+        },
+        {
+          "code": "            image: busybox:1.37",
+          "text": "小さな道具のイメージ"
+        },
+        {
+          "code": "            command: ['sh', '-c', 'sleep 100']",
+          "text": "100 秒かかる仕事"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "kubectl apply -f long.yaml -n ch9",
+          "text": "CronJob を作る"
+        },
+        {
+          "code": "for i in $(seq 15); do echo \"$(date +%T) 動いている数 $(kubectl get cronjob long -n ch9 -o jsonpath='{.status.active[*].name}' | wc -w) Job $(kubectl get jobs -n ch9 --no-headers 2> /dev/null | grep -c '^long-')\"; sleep 10; done",
+          "text": "10 秒おきに 15 回、動いている数と、作られた Job の数を並べる"
+        },
+        {
+          "code": "kubectl delete cronjob long -n ch9",
+          "text": "消す。作った Job と Pod も一緒に消える"
+        }
+      ],
+      "output": "cronjob.batch/long created\n01:25:05 動いている数 0 Job 0\n01:25:15 動いている数 0 Job 0\n01:25:25 動いている数 0 Job 0\n01:25:36 動いている数 0 Job 0\n01:25:46 動いている数 0 Job 0\n01:25:56 動いている数 0 Job 0\n01:26:07 動いている数 1 Job 1\n01:26:17 動いている数 1 Job 1\n01:26:27 動いている数 1 Job 1\n01:26:38 動いている数 1 Job 1\n01:26:48 動いている数 1 Job 1\n01:26:58 動いている数 1 Job 1\n01:27:09 動いている数 1 Job 1\n01:27:19 動いている数 1 Job 1\n01:27:29 動いている数 1 Job 1\ncronjob.batch \"long\" deleted from ch9 namespace",
+      "read": "動いている数は 1 を超えません。1 つ目が 100 秒動く間に来た次の分は、飛ばされます。Job の数も、毎分は増えません。どの分で増えるかは、作った時刻で変わります。",
+      "trouble": [
+        {
+          "symptom": "動いている数が 0 のまま",
+          "check": "kubectl get cronjob long -n ch9 を打つ",
+          "fix": "最初の分が来る前。並びを見続ける"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/"
+    },
+    {
+      "id": "cron-history",
+      "text": "残っている Job の数を見ます。",
+      "why": "CronJob は、終わった Job を、成功は 3 つ、失敗は 1 つまで残し、古いものから消します (successfulJobsHistoryLimit と failedJobsHistoryLimit)。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "for i in $(seq 40); do [ \"$(kubectl get jobs -l app=tick -n ch9 --no-headers 2> /dev/null | wc -l)\" -ge 3 ] && break; sleep 5; done\nkubectl get jobs -l app=tick -n ch9\nkubectl get cronjob tick -n ch9 -o jsonpath='{.spec.successfulJobsHistoryLimit} {.spec.failedJobsHistoryLimit}{\"\\n\"}'"
+      },
+      "lines": [
+        {
+          "code": "for i in $(seq 40); do [ \"$(kubectl get jobs -l app=tick -n ch9 --no-headers 2> /dev/null | wc -l)\" -ge 3 ] && break; sleep 5; done",
+          "text": "tick の Job が 3 つになるまで見て待つ (最大 3 分余り)"
+        },
+        {
+          "code": "kubectl get jobs -l app=tick -n ch9",
+          "text": "tick の Job を出す"
+        },
+        {
+          "code": "kubectl get cronjob tick -n ch9 -o jsonpath='{.spec.successfulJobsHistoryLimit} {.spec.failedJobsHistoryLimit}{\"\\n\"}'",
+          "text": "残す数の設定を出す"
+        }
+      ],
+      "output": "NAME            STATUS     COMPLETIONS   DURATION   AGE\ntick-29929045   Complete   1/1           3s         2m40s\ntick-29929046   Complete   1/1           3s         100s\ntick-29929047   Complete   1/1           3s         40s\n3 1",
+      "read": "Job は 3 つで、4 つ目ができると、いちばん古いものが消えます。3 と 1 が既定の数です。",
+      "trouble": [
+        {
+          "symptom": "2 つ以下",
+          "check": "1 分待ってもう一度出す",
+          "fix": "まだ 3 回動いていない"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/"
+    },
+    {
+      "id": "cron-suspend",
+      "text": "CronJob を止め、その間は Job が増えないことを見ます。1 分半ほどかかります。",
+      "why": "suspend を true にすると、時刻が来ても Job を作りません。すでに動いている Job は止まりません。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl patch cronjob tick -n ch9 -p '{\"spec\":{\"suspend\":true}}'\nBEFORE=$(kubectl get cronjob tick -n ch9 -o jsonpath='{.status.lastScheduleTime}')\nsleep 75\necho \"前 $BEFORE 後 $(kubectl get cronjob tick -n ch9 -o jsonpath='{.status.lastScheduleTime}')\"\nkubectl get cronjob tick -n ch9\nkubectl patch cronjob tick -n ch9 -p '{\"spec\":{\"suspend\":false}}'"
+      },
+      "lines": [
+        {
+          "code": "kubectl patch cronjob tick -n ch9 -p '{\"spec\":{\"suspend\":true}}'",
+          "text": "止める"
+        },
+        {
+          "code": "BEFORE=$(kubectl get cronjob tick -n ch9 -o jsonpath='{.status.lastScheduleTime}')",
+          "text": "最後に作った時刻を覚える"
+        },
+        {
+          "code": "sleep 75",
+          "text": "75 秒待つ"
+        },
+        {
+          "code": "echo \"前 $BEFORE 後 $(kubectl get cronjob tick -n ch9 -o jsonpath='{.status.lastScheduleTime}')\"",
+          "text": "最後に作った時刻を並べる"
+        },
+        {
+          "code": "kubectl get cronjob tick -n ch9",
+          "text": "CronJob を出す"
+        },
+        {
+          "code": "kubectl patch cronjob tick -n ch9 -p '{\"spec\":{\"suspend\":false}}'",
+          "text": "動かし直す"
+        }
+      ],
+      "output": "cronjob.batch/tick patched\n前 2026-11-27T01:27:00Z 後 2026-11-27T01:27:00Z\nNAME   SCHEDULE      TIMEZONE   SUSPEND   ACTIVE   LAST SCHEDULE   AGE\ntick   */1 * * * *   <none>     True      0        116s            4m25s\ncronjob.batch/tick patched",
+      "read": "SUSPEND が True の間、最後に作った時刻は変わりません。止めていた間に来た時刻は「やりそこね」と数えられ、動かし直すと、いちばん新しい 1 回分だけがすぐ作られることがあります。",
+      "trouble": [
+        {
+          "symptom": "前と後の時刻が違う",
+          "check": "止める行の前後に、ちょうど時刻が来た",
+          "fix": "もう一度止めて、75 秒待って並べる"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/"
+    },
+    {
+      "id": "cron-manual",
+      "text": "時刻を待たずに、CronJob から 1 回だけ手で動かします。",
+      "why": "新しい設定を試す時に、次の時刻まで待たずに済むためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl create job tick-now --from=cronjob/tick -n ch9\nkubectl wait --for=condition=Complete job/tick-now -n ch9 --timeout=180s\nkubectl logs job/tick-now -n ch9\nkubectl get job tick-now -n ch9 -o jsonpath='{.metadata.annotations}{\"\\n\"}'"
+      },
+      "lines": [
+        {
+          "code": "kubectl create job tick-now --from=cronjob/tick -n ch9",
+          "text": "tick のひな型から、tick-now という Job を作る"
+        },
+        {
+          "code": "kubectl wait --for=condition=Complete job/tick-now -n ch9 --timeout=180s",
+          "text": "終わるまで待つ"
+        },
+        {
+          "code": "kubectl logs job/tick-now -n ch9",
+          "text": "記録を出す"
+        },
+        {
+          "code": "kubectl get job tick-now -n ch9 -o jsonpath='{.metadata.annotations}{\"\\n\"}'",
+          "text": "どこから作ったかの覚え書きを出す"
+        }
+      ],
+      "output": "job.batch/tick-now created\njob.batch/tick-now condition met\nFri Nov 27 01:28:57 UTC 2026\ntick\n{\"cronjob.kubernetes.io/instantiate\":\"manual\"}",
+      "read": "すぐに動き、記録に時刻と tick が出ました。cronjob.kubernetes.io/instantiate: manual が、手で作ったという印です。手で作った Job も CronJob の子になるので、残す数 (成功は 3 つ) の数えに入り、古いものから片付けられます。",
+      "trouble": [
+        {
+          "symptom": "AlreadyExists と出る",
+          "check": "kubectl get job tick-now -n ch9 を打つ",
+          "fix": "前に作ったものがある。kubectl delete job tick-now -n ch9 で消してから作る"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_create/kubectl_create_job/"
+    },
+    {
+      "id": "cron-deadline",
+      "text": "遅れた時の扱いも、言葉だけ押さえます。startingDeadlineSeconds は「時刻から何秒までなら、遅れても作るか」です。書かないと、遅れても作ります。CronJob を見る部品が止まっていた間に、やりそこねた回が 100 を超えると、TooManyMissedTimes という注意をイベントに出し、そのうえで、いちばん新しい 1 回分だけを作ります。それより前の回は作りません。",
+      "why": "クラスターを止めていた後に、溜まった回が一度に動いて困らないためです。",
+      "source": "https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/"
+    },
+    {
+      "id": "check-before-cron-delete",
+      "text": "CronJob を消す前に、どのマシンにいるかを見ます。kcna と出なければ、次の手順を打ちません。",
+      "why": "次の手順は、CronJob と、それが作った Job と Pod を消すためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "hostname"
+      },
+      "lines": [
+        {
+          "code": "hostname",
+          "text": "このマシンの名前を出す"
+        }
+      ],
+      "output": "kcna",
+      "read": "kcna と出れば、仮想マシンの中です。",
+      "trouble": [
+        {
+          "symptom": "kcna ではない名前が出る",
+          "check": "行の頭が ubuntu@kcna かを見る",
+          "fix": "ホストにいる。multipass shell kcna で入り、もう一度打つ"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man1/hostname.1.html"
+    },
+    {
+      "id": "cron-delete",
+      "text": "CronJob を消すと、作った Job と Pod も消えることを見ます。前の手順で kcna と出たときだけ打ちます。",
+      "why": "Job は CronJob の子 (ownerReferences) なので、親を消すと片付きます。手で作った tick-now も、子として付いています。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl get jobs,pods -n ch9 -l app=tick\nkubectl delete cronjob tick -n ch9\nkubectl wait --for=delete job -l app=tick -n ch9 --timeout=90s\nkubectl get jobs,pods -n ch9 -l app=tick"
+      },
+      "lines": [
+        {
+          "code": "kubectl get jobs,pods -n ch9 -l app=tick",
+          "text": "消す前の tick の Job と Pod を出す"
+        },
+        {
+          "code": "kubectl delete cronjob tick -n ch9",
+          "text": "tick を消す"
+        },
+        {
+          "code": "kubectl wait --for=delete job -l app=tick -n ch9 --timeout=90s",
+          "text": "tick の Job が消えるまで待つ"
+        },
+        {
+          "code": "kubectl get jobs,pods -n ch9 -l app=tick",
+          "text": "もう一度出す"
+        }
+      ],
+      "output": "NAME                      STATUS     COMPLETIONS   DURATION   AGE\njob.batch/tick-29929047   Complete   1/1           3s         2m1s\njob.batch/tick-29929048   Complete   1/1           4s         5s\njob.batch/tick-29929049   Running    0/1           1s         1s\njob.batch/tick-now        Complete   1/1           4s         5s\ncronjob.batch \"tick\" deleted from ch9 namespace\nNo resources found in ch9 namespace.",
+      "read": "親を消すと、Job も Pod も消えて、No resources found になりました。",
+      "trouble": [
+        {
+          "symptom": "Job が残る",
+          "check": "kubectl get job -n ch9 -o wide を打つ",
+          "fix": "少し待つ。消える途中"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/"
+    },
+    {
+      "id": "check-before-delete",
+      "text": "名前空間を消す前に、どのマシンにいるかを見ます。kcna と出なければ、次の手順を打ちません。",
+      "why": "名前空間と、その中の Job と CronJob を消すためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "hostname"
+      },
+      "lines": [
+        {
+          "code": "hostname",
+          "text": "このマシンの名前を出す"
+        }
+      ],
+      "output": "kcna",
+      "read": "kcna と出れば、仮想マシンの中です。",
+      "trouble": [
+        {
+          "symptom": "kcna ではない名前が出る",
+          "check": "行の頭が ubuntu@kcna かを見る",
+          "fix": "ホストにいる。multipass shell kcna で入り、もう一度打つ"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man1/hostname.1.html"
+    },
+    {
+      "id": "delete-namespace",
+      "text": "名前空間 ch9 を消します。前の手順で kcna と出たときだけ打ちます。",
+      "why": "Job も CronJob も、名前空間と一緒に消えます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cd ~\nkubectl delete namespace ch9\nkubectl get namespaces\nkubectl get cronjobs -A"
+      },
+      "lines": [
+        {
+          "code": "cd ~",
+          "text": "ホームへ戻る"
+        },
+        {
+          "code": "kubectl delete namespace ch9",
+          "text": "中のものごと消す。1 分ほどかかることがある"
+        },
+        {
+          "code": "kubectl get namespaces",
+          "text": "残りを出す"
+        },
+        {
+          "code": "kubectl get cronjobs -A",
+          "text": "残っている CronJob を全部出す"
+        }
+      ],
+      "output": "namespace \"ch9\" deleted\nNAME              STATUS   AGE\ndefault           Active   30m\nkube-node-lease   Active   30m\nkube-public       Active   30m\nkube-system       Active   30m\nNo resources found",
+      "read": "初めからある 4 つの名前空間だけになり、CronJob が 1 つも無ければ片付いています。CronJob を残すと、休んでいる間も動き続けるので、必ず消します。",
+      "trouble": [
+        {
+          "symptom": "消す行がしばらく止まる",
+          "check": "1 分ほど待つ",
+          "fix": "中の Pod が終わるのを待っている"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/"
+    },
+    {
+      "id": "leave",
+      "text": "仮想マシンから出ます。",
+      "why": "次は、ホストで控えを取るためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "exit"
+      },
+      "lines": [
+        {
+          "code": "exit",
+          "text": "今の端末を終える。仮想マシンは動き続ける"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "行の頭が、自分の PC のものに戻ります。",
+      "trouble": [
+        {
+          "symptom": "行の頭が ubuntu@kcna のまま",
+          "check": "もう一度見る",
+          "fix": "もう一度 exit を打つ"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man1/bash.1.html"
+    },
+    {
+      "id": "snapshot",
+      "text": "ホストで、この章を終えた状態の控えを ch9-end という名前で取り、仮想マシンに入り直します。",
+      "why": "次の章で失敗しても、ここへ戻れるようにするためです。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass stop kcna\nmultipass snapshot --name ch9-end kcna\nmultipass list --snapshots\nmultipass shell kcna"
+      },
+      "lines": [
+        {
+          "code": "multipass stop kcna",
+          "text": "止める。控えは、止まっているときだけ取れる。stop は動いている (Running) ときだけ打てる"
+        },
+        {
+          "code": "multipass snapshot --name ch9-end kcna",
+          "text": "今の状態を ch9-end という名前で控える"
+        },
+        {
+          "code": "multipass list --snapshots",
+          "text": "控えの一覧を出す"
+        },
+        {
+          "code": "multipass shell kcna",
+          "text": "止まっている kcna を動かし、中に入り直す"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "一覧に ch9-end が並べば取れています。戻すときは、止めてから multipass restore kcna.ch9-end を打ちます。今の状態も控えるかを聞かれたら、要らなければ no と答えます。最後の行で、行の頭が ubuntu@kcna:~$ に変わります。課題と後片付けは、この中で続けます。",
+      "trouble": [
+        {
+          "symptom": "止まっていないので取れないと出る",
+          "check": "multipass list で State を見る",
+          "fix": "multipass stop kcna で止めてから取る"
+        },
+        {
+          "symptom": "ch9-end がもうあると出る",
+          "check": "multipass list --snapshots を打つ",
+          "fix": "前の控えを使うか、--name ch9-endb のように別の名前にする"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/snapshot/"
+    }
+  ],
+  "cleanup": [
+    {
+      "id": "check-vm",
+      "text": "仮想マシンの中で、どのマシンにいるかを見ます。kcna と出なければ止まり、multipass shell kcna で入ります。",
+      "why": "次の手順は、つないでいるクラスターのものを消します。自分の PC の別のクラスターで打たないためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "hostname"
+      },
+      "lines": [
+        {
+          "code": "hostname",
+          "text": "このマシンの名前を出す"
+        }
+      ],
+      "output": "kcna",
+      "read": "kcna と出れば、仮想マシンの中です。",
+      "trouble": [
+        {
+          "symptom": "kcna ではない名前が出る",
+          "check": "行の頭が ubuntu@kcna かを見る",
+          "fix": "ホストにいる。multipass shell kcna で入り、もう一度打つ"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man1/hostname.1.html"
+    },
+    {
+      "id": "delete-practice",
+      "text": "仮想マシンの中で、課題で作った名前空間を消します。課題をしていなければ、何も起きません。",
+      "why": "次の章を、k3s の部品だけの状態から始めるためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl delete namespace practice --ignore-not-found\nkubectl get namespaces"
+      },
+      "lines": [
+        {
+          "code": "kubectl delete namespace practice --ignore-not-found",
+          "text": "practice を消す。無くてもエラーにしない (--ignore-not-found)"
+        },
+        {
+          "code": "kubectl get namespaces",
+          "text": "名前空間の一覧を出す"
+        }
+      ],
+      "output": "namespace \"practice\" deleted\nNAME              STATUS   AGE\ndefault           Active   31m\nkube-node-lease   Active   31m\nkube-public       Active   31m\nkube-system       Active   31m",
+      "read": "default と kube- で始まる 4 つだけになれば、片付いています。k3s は消しません。",
+      "trouble": [
+        {
+          "symptom": "消す行がしばらく止まる",
+          "check": "1 分ほど待つ",
+          "fix": "中の Pod が終わるのを待っている。そのまま待つ"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_delete/"
+    },
+    {
+      "id": "rest",
+      "text": "今日はここまでにするときは、exit で出てから、ホストで仮想マシンを止めます。止まっていれば (Stopped)、打ちません。",
+      "why": "動いている間は PC のメモリを使うためです。次の章でも使うので、消しません。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass stop kcna"
+      },
+      "lines": [
+        {
+          "code": "multipass stop kcna",
+          "text": "kcna を止める"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "続けるときは multipass shell kcna で、動かして中に入れます。k3s は自分で始まります。",
+      "trouble": [
+        {
+          "symptom": "止まったか分からない",
+          "check": "multipass list で State を見る",
+          "fix": "Stopped なら止まっている。Running なら、もう一度止める"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/stop/"
+    }
+  ],
+  "challenges": [
+    {
+      "task": "仮想マシンの中で、practice という名前空間に、成功が 3 回要り、同時に 3 つ動かす Job count を作り、終わるまで待ってください。",
+      "hint": "kubectl create job は completions を書けないので、YAML に書きます。",
+      "answer": "kubectl create namespace practice\nkubectl wait --for=create serviceaccount/default -n practice --timeout=60s\nkubectl create job count -n practice --image=busybox:1.37 --dry-run=client -o yaml -- sh -c 'echo one' | sed 's/^spec:/spec:\\n  completions: 3\\n  parallelism: 3/' | kubectl apply -n practice -f -\nkubectl wait --for=condition=Complete job/count -n practice --timeout=180s",
+      "verify": "kubectl get job count -n practice で COMPLETIONS が 3/3 なら正解です。"
+    },
+    {
+      "task": "仮想マシンの中で、5 分ごとに動く CronJob five を、日本時間で作ってください。",
+      "hint": "timeZone を spec に足します。",
+      "answer": "kubectl create cronjob five -n practice --image=busybox:1.37 --schedule='*/5 * * * *' --dry-run=client -o yaml -- date | sed 's/^spec:/spec:\\n  timeZone: Asia\\/Tokyo/' | kubectl apply -n practice -f -\nkubectl get cronjob five -n practice",
+      "verify": "SCHEDULE が */5 * * * *、TIMEZONE が Asia/Tokyo なら正解です。"
+    },
+    {
+      "task": "仮想マシンの中で、five を止めてから、1 回だけ手で動かし、記録を読んでください。",
+      "hint": "suspend と create job --from です。",
+      "answer": "kubectl patch cronjob five -n practice -p '{\"spec\":{\"suspend\":true}}'\nkubectl create job five-now --from=cronjob/five -n practice\nkubectl wait --for=condition=Complete job/five-now -n practice --timeout=120s\nkubectl logs job/five-now -n practice",
+      "verify": "時刻が 1 行出て、kubectl get cronjob five -n practice の SUSPEND が True なら正解です。"
+    }
+  ],
+  "sources": [
+    {
+      "label": "Kubernetes: Jobs",
+      "url": "https://kubernetes.io/docs/concepts/workloads/controllers/job/"
+    },
+    {
+      "label": "Kubernetes: Automatic Cleanup for Finished Jobs",
+      "url": "https://kubernetes.io/docs/concepts/workloads/controllers/ttlafterfinished/"
+    },
+    {
+      "label": "Kubernetes: Indexed Job for Parallel Processing",
+      "url": "https://kubernetes.io/docs/tasks/job/indexed-parallel-processing-static/"
+    },
+    {
+      "label": "Kubernetes: Handling retriable and non-retriable pod failures",
+      "url": "https://kubernetes.io/docs/tasks/job/pod-failure-policy/"
+    },
+    {
+      "label": "Kubernetes: CronJob",
+      "url": "https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/"
+    },
+    {
+      "label": "Kubernetes: Running Automated Tasks with a CronJob",
+      "url": "https://kubernetes.io/docs/tasks/job/automated-tasks-with-cron-jobs/"
+    },
+    {
+      "label": "kubectl create job",
+      "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_create/kubectl_create_job/"
+    },
+    {
+      "label": "kubectl create cronjob",
+      "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_create/kubectl_create_cronjob/"
+    },
+    {
+      "label": "Docker Hub: 取得の上限",
+      "url": "https://docs.docker.com/docker-hub/usage/"
+    },
+    {
+      "label": "Multipass: snapshot",
+      "url": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/snapshot/"
+    }
+  ]
+}
