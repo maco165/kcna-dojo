@@ -154,8 +154,34 @@
       "source": "https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/"
     },
     {
+      "id": "check-before-helm",
+      "text": "Helm を /usr/local/bin に置く前に、どのマシンにいるかを見ます。kcna と出なければ、次の手順を打ちません。",
+      "why": "次の手順は sudo で /usr/local/bin/helm を置きます。自分の PC で打つと、PC に入っている helm を上書きします。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "hostname"
+      },
+      "lines": [
+        {
+          "code": "hostname",
+          "text": "このマシンの名前を出す"
+        }
+      ],
+      "output": "kcna",
+      "read": "kcna と出れば、仮想マシンの中です。",
+      "trouble": [
+        {
+          "symptom": "kcna ではない名前が出る",
+          "check": "行の頭が ubuntu@kcna かを見る",
+          "fix": "ホストにいる。multipass shell kcna で入り、もう一度打つ"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man1/hostname.1.html"
+    },
+    {
       "id": "helm-install",
-      "text": "Helm を、公式の配り場所から版を決めて (v4.3.2) 入れます。取ってきたファイルが壊れたりすり替わったりしていないかを、照合の値で確かめてから使います。",
+      "text": "Helm を、公式の配り場所から版を決めて (v4.3.2) 入れます。取ってきたファイルが壊れていないかを、照合の値で確かめてから使います。",
       "why": "Helm は、Kubernetes の YAML の包み (チャート) を入れたり、上げたり、戻したりする道具です。版を決めて入れると、この章と同じ出力になります。",
       "where": "vm",
       "code": {
@@ -193,7 +219,7 @@
         }
       ],
       "output": "helm-v4.3.2-linux-amd64.tar.gz: OK\nversion.BuildInfo{Version:\"v4.3.2\", GitCommit:\"8346aaa55e7161f7c547212d0a87f01367976727\", GitTreeState:\"clean\", GoVersion:\"go1.27.4\", KubeClientVersion:\"v1.37\"}",
-      "read": "照合の行が OK なら、ファイルは配り場所のものと同じです。FAILED と出たら使いません。helm version の Version が v4.3.2 なら入っています。KubeClientVersion は、Helm が中で使う Kubernetes の部品の版で、クラスター (v1.36) と 1 つ違っても使えます。Helm は、kubectl と同じ kubeconfig (KUBECONFIG) を読んで、クラスターに頼みます。",
+      "read": "照合の行が OK なら、ファイルは取る途中で壊れていません。照合の値は同じ配り場所から取るので、すり替えまでは防げません。すり替えまで防ぐには、公式の手順の署名 (.asc) を確かめます。この章では省きます。FAILED と出たら使いません。helm version の Version が v4.3.2 なら入っています。KubeClientVersion は、Helm が中で使う Kubernetes の部品の版で、クラスター (v1.36) と 1 つ違っても使えます。Helm は、kubectl と同じ kubeconfig (KUBECONFIG) を読んで、クラスターに頼みます。",
       "trouble": [
         {
           "symptom": "sha256sum の行が FAILED と出る",
@@ -925,7 +951,7 @@
         }
       ],
       "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
-      "read": "何もエラーが出なければ止まっています。続けるときは、ホストで multipass shell kcna を打つと、動かして中に入れます。続けるときは cd ~/ch11 を打ちます。戻った直後の 1〜2 分は、一覧が止める前の古い様子のことがあります。少し待ってもう一度見ます。",
+      "read": "何もエラーが出なければ止まっています。続けるときは、ホストで multipass shell kcna を打つと、動かして中に入れます。入ったら cd ~/ch11 を打ちます。戻った直後の 1〜2 分は、一覧が止める前の古い様子のことがあります。少し待ってもう一度見ます。",
       "trouble": [
         {
           "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
@@ -1159,7 +1185,7 @@
         }
       ],
       "output": "release \"demo\" uninstalled\nserviceaccount \"k-demo-web\" deleted from ch11-kust namespace\nconfigmap \"k-greeting-88hbt4854k\" deleted from ch11-kust namespace\nservice \"k-demo-web\" deleted from ch11-kust namespace\ndeployment.apps \"k-demo-web\" deleted from ch11-kust namespace\ncustomresourcedefinition.apiextensions.k8s.io \"notes.dojo.example.com\" deleted\nnamespace \"ch11\" deleted\nnamespace \"ch11-kust\" deleted\nNAME              STATUS   AGE\ndefault           Active   26m\nkube-node-lease   Active   26m\nkube-public       Active   26m\nkube-system       Active   26m\nNAME   SHORTNAMES   APIVERSION   NAMESPACED   KIND\nNAME       \tNAMESPACE  \tREVISION\tUPDATED                                \tSTATUS  \tCHART                      \tAPP VERSION\ntraefik    \tkube-system\t1       \t2026-11-28 02:59:05.218674656 +0000 UTC\tdeployed\ttraefik-40.1.7+up40.1.0    \tv3.7.1\ntraefik-crd\tkube-system\t1       \t2026-11-28 02:58:51.325870018 +0000 UTC\tdeployed\ttraefik-crd-40.1.7+up40.1.0\tv3.7.1",
-      "read": "名前空間は初めからある 4 つだけ、api-resources は見出しの行だけになれば、片付いています。helm list -A には、traefik と traefik-crd が残ります。k3s の helm-controller も、中で Helm を使って入れているので、Helm のリリースとして見えます。これは消しません。helm 本体と、足したチャートの置き場 (helm repo) は残します。消すなら sudo rm /usr/local/bin/helm を打ちます。",
+      "read": "名前空間は初めからある 4 つだけ、api-resources は見出しの行だけになれば、片付いています。helm list -A には、traefik と traefik-crd が残ります。k3s の helm-controller も、中で Helm を使って入れているので、Helm のリリースとして見えます。これは消しません。helm 本体と、足したチャートの置き場 (helm repo) は残します。消すなら sudo rm /usr/local/bin/helm を打ちます。 ~/ch11 に残る Helm の箱 (tar.gz と linux-amd64 のフォルダ) は、もう使わないので消してかまいません。",
       "trouble": [
         {
           "symptom": "消す行がしばらく止まる",

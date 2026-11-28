@@ -11,7 +11,7 @@
     "securityContext で root でなく・書き換えず・力を捨て、restricted の名前空間で断られるのを見る",
     "ImagePullBackOff・Pending・CrashLoopBackOff・OOMKilled・設定の誤り・窓口の選び方の誤りを読んで直す"
   ],
-  "minutes": 130,
+  "minutes": 150,
   "needs": [
     "9 章を終えた仮想マシン kcna (k3s が動き、kubectl が使える)",
     "インターネットへの接続 (イメージを取ってきます)",
@@ -841,7 +841,7 @@
         }
       ],
       "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
-      "read": "何もエラーが出なければ止まっています。続けるときは、ホストで multipass shell kcna を打つと、動かして中に入れます。続けるときは cd ~/ch10 を打ちます。TOKEN と kr は消えていますが、この先では使いません。戻った直後の 1〜2 分は、一覧が止める前の古い様子のことがあります。少し待ってもう一度見ます。",
+      "read": "何もエラーが出なければ止まっています。続けるときは、ホストで multipass shell kcna を打つと、動かして中に入れます。入ったら cd ~/ch10 を打ちます。TOKEN と kr は消えていますが、この先では使いません。戻った直後の 1〜2 分は、一覧が止める前の古い様子のことがあります。少し待ってもう一度見ます。",
       "trouble": [
         {
           "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
@@ -1670,13 +1670,13 @@
     },
     {
       "task": "仮想マシンの中で、practice の Pod big が Pending のままです。理由を見つけ、CPU の約束を 100m に減らして動かしてください。",
-      "hint": "Pod の requests は、ふつうの書き換え (apply・edit) では変えられません (v1.35 からは resize という別の口もあります)。ここでは kubectl replace --force で、消して作り直します。",
+      "hint": "Pod の requests は、ふつうの書き換え (apply・edit) では変えられません (v1.35 からは resize という別の口もあります)。ここでは kubectl replace --force で、消して作り直します。 replace --force は、Pod を消して、同じ名前で作り直します (中身は別の Pod で、RESTARTS も 0 から数え直します)。",
       "answer": "kubectl events -n practice --for=pod/big\nkubectl get pod big -n practice -o yaml | sed 's/cpu: \"8\"/cpu: 100m/' | kubectl replace --force -f -\nkubectl wait --for=condition=Ready pod/big -n practice --timeout=120s",
       "verify": "kubectl get pod big -n practice で STATUS が Running なら正解です。"
     },
     {
       "task": "仮想マシンの中で、practice の Pod hungry が始め直しをくり返しています。止まった理由を見つけ、メモリの上限を 256Mi に上げて動かしてください。",
-      "hint": "kubectl describe pod の Last State に、前の回が止まった理由と終わりの番号 (137) が出ます。",
+      "hint": "kubectl describe pod の Last State に、前の回が止まった理由と終わりの番号 (137) が出ます。 replace --force で作り直すと、RESTARTS は 0 に戻ります。limits だけを書いた Pod は、requests も同じ値になっているので、両方を替えます。",
       "answer": "kubectl describe pod hungry -n practice | grep -A3 'Last State'\nkubectl get pod hungry -n practice -o yaml | sed 's/memory: 32Mi/memory: 256Mi/' | kubectl replace --force -f -\nkubectl wait --for=condition=Ready pod/hungry -n practice --timeout=120s",
       "verify": "kubectl get pod hungry -n practice で STATUS が Running、RESTARTS が 0 なら正解です。"
     },
