@@ -912,31 +912,31 @@
         {
           "id": "w6-l5-q4",
           "type": "choice",
-          "prompt": "Pod のコンテナどうしで一時的なファイルを渡すために emptyDir を使っている。このボリュームの中身が消えるのはいつ?",
+          "prompt": "Deployment web の Pod は emptyDir の /cache にファイルを置いている。この Pod を kubectl delete pod で消すと、Deployment が新しい Pod を作る。新しい Pod の /cache はどうなっている?",
           "choices": [
             {
               "id": "d",
-              "text": "ノードを再起動しても消えず、管理者が手で消すまで残る",
-              "why": "emptyDir は Pod の寿命に従う一時的な置き場で、Pod が消えると中身も消えます。"
+              "text": "Deployment が前の中身を写してから新しい Pod を起動する",
+              "why": "Deployment は emptyDir の中身を写しません。"
             },
             {
               "id": "a",
-              "text": "Pod がそのノードから消されたとき"
+              "text": "空になっている。消した Pod の emptyDir の中身は、Pod がノードから消されたときに消えている"
             },
             {
               "id": "b",
-              "text": "コンテナが落ちて再起動したとき",
-              "why": "ボリュームの中身はコンテナの再起動をまたいで残ります。"
+              "text": "消した Pod のファイルがそのまま残っている",
+              "why": "emptyDir は Pod ごとに作られ、Pod がノードから消されると中身も消えます。新しい Pod には新しい空の emptyDir が作られます。"
             },
             {
               "id": "c",
-              "text": "PVC を消したとき",
-              "why": "emptyDir は PVC を使いません。Pod と一緒に作られ、Pod と一緒に消えます。"
+              "text": "同じノードに置かれたときだけ、前のファイルが見える",
+              "why": "同じノードでも、Pod が消されたときに中身は消えています。"
             }
           ],
           "answer": "a",
-          "explanation": "emptyDir は、Pod がノードに割り当てられたときに空で作られ、Pod がそのノードから消されると中身ごと消える置き場です。コンテナが再起動しても中身は残ります。長く残したいデータは PVC に置きます。",
-          "source": "https://kubernetes.io/docs/concepts/storage/volumes/"
+          "explanation": "emptyDir は、Pod がノードに割り当てられたときに空で作られ、Pod がどんな理由でもノードから消されると中身は消えます。コンテナが落ちただけなら中身は残りますが、Pod を消して作り直すと空から始まります。残したいデータは PVC に置きます。",
+          "source": "https://kubernetes.io/docs/reference/storage/volume-types/#emptydir"
         },
         {
           "id": "w6-l5-q5",

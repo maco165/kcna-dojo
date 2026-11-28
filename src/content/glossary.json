@@ -504,7 +504,8 @@
       "source": "https://kubernetes.io/ja/docs/concepts/workloads/controllers/deployment/",
       "lessons": [
         "w3-l2",
-        "w3-lab"
+        "w3-lab",
+        "w6-l5"
       ]
     },
     {
@@ -1902,8 +1903,7 @@
       ],
       "lessons": [
         "w8-l4",
-        "w8-lab",
-        "w8-l5"
+        "w8-lab"
       ]
     },
     {
@@ -2659,9 +2659,7 @@
           "url": "https://www.cncf.io/people/governing-board/"
         }
       ],
-      "lessons": [
-        "w8-l5"
-      ],
+      "lessons": [],
       "topics": [
         "linux-foundation-cncf"
       ]

@@ -1000,59 +1000,59 @@
         {
           "id": "w8-l5-q1",
           "type": "choice",
-          "prompt": "Kubernetes の KEP (Kubernetes Enhancement Proposal) の説明として正しいのはどれ?",
+          "prompt": "Kubernetes に出す変更のうち、KEP (Kubernetes Enhancement Proposal) を書かなくてよいものはどれ?",
           "choices": [
             {
               "id": "a",
-              "text": "新しい取り組みを提案し、伝え、まとめていくための仕組みで、小さなものを除く新しい機能の多くに使う"
+              "text": "ドキュメントの誤字の直しのような、ごく小さな直し"
             },
             {
               "id": "b",
-              "text": "見つかった不具合を報告するための書式",
-              "why": "不具合は Issue で知らせます。KEP は新しい機能や大きな変更を提案するためのものです。"
+              "text": "ほとんどの新しい機能",
+              "why": "KEP の対象です。ごく小さなものを除く、新しい機能の多くに KEP を書きます。"
             },
             {
               "id": "c",
-              "text": "CNCF のプロジェクトが Graduated になるための申請",
-              "why": "段階の申請は CNCF の TOC の手続きで、KEP は Kubernetes プロジェクトの中の提案の仕組みです。"
+              "text": "今ある機能の大きな変更",
+              "why": "KEP の対象です。"
             },
             {
               "id": "d",
-              "text": "リリースのたびに配る変更の一覧 (リリースノート)",
-              "why": "リリースノートとは別です。KEP は作る前に出す提案で、決めた経緯の記録にもなります。"
+              "text": "プロジェクトの多くに影響する広い変更",
+              "why": "KEP の対象で、ふつうは SIG Architecture を通してまとめます。"
             }
           ],
           "answer": "a",
-          "explanation": "KEP は、Kubernetes プロジェクトに新しい取り組みを提案し、伝え、まとめていくための仕組みです。小さなものを除く新しい機能の多く、既存の機能の大きな変更、議論になりそうな変更などに使います。決めた経緯を後から探せる記録にもなります。",
+          "explanation": "KEP は、新しい取り組みを提案し、伝え、まとめていくための仕組みです。対象は、議論になりそうな変更、ごく小さなものを除く新しい機能の多く、今ある機能の大きな変更、プロジェクトの多くに影響する広い変更です。それ以外にいつ使うかは SIG ごとに決めます。",
           "source": "https://github.com/kubernetes/enhancements/blob/master/keps/README.md"
         },
         {
           "id": "w8-l5-q2",
           "type": "choice",
-          "prompt": "Kubernetes のリリースの「Enhancements Freeze」とは何か?",
+          "prompt": "Kubernetes のリリースの周期の中で、Enhancements Freeze と Code Freeze はどちらが先に来る?",
           "choices": [
             {
               "id": "b",
-              "text": "重大な不具合の直し以外を入れなくなる期間",
-              "why": "それは Code Freeze です。Enhancements Freeze は、もっと早い時期の KEP の締め切りです。"
+              "text": "Code Freeze が先で、Enhancements Freeze があと",
+              "why": "機能の KEP を決める Enhancements Freeze が先です。重大な直し以外を止める Code Freeze は、リリースの近くに来ます。"
             },
             {
               "id": "c",
-              "text": "古い版へのパッチの提供が終わる日",
-              "why": "パッチの提供の終わりとは別のものです。"
+              "text": "2 つは同じ日に始まる",
+              "why": "時期は違い、Enhancements Freeze は 4 週目ごろ、Code Freeze は 12 週目ごろです。"
             },
             {
               "id": "d",
-              "text": "新しい SIG を作れなくなる期間",
-              "why": "SIG の作り方とは関係ありません。"
+              "text": "どちらもリリースのあとに来る",
+              "why": "どちらもリリースより前です。"
             },
             {
               "id": "a",
-              "text": "そのリリースに入れる機能の KEP を、出し終えておく締め切り"
+              "text": "Enhancements Freeze (周期の 4 週目ごろ) が先で、Code Freeze (12 週目ごろ) があと"
             }
           ],
           "answer": "a",
-          "explanation": "Enhancements Freeze は、そのリリースに入れたい機能の KEP を仕上げておく締め切りで、リリースの周期の 4 週目ごろにあります。そのあとの Code Freeze の間は、重大な不具合の直ししか入れません。",
+          "explanation": "Enhancements Freeze は、そのリリースに入れる機能の KEP を仕上げておく締め切りで、周期の 4 週目ごろです。Code Freeze は 12 週目ごろからで、その間は重大な不具合の直ししか入れません。",
           "source": "https://kubernetes.io/releases/release/"
         },
         {
@@ -1087,31 +1087,31 @@
         {
           "id": "w8-l5-q4",
           "type": "choice",
-          "prompt": "Kubernetes のリポジトリで、あるディレクトリのコードを誰がレビューし、誰が受け入れを承認するかは、どこに書かれている?",
+          "prompt": "Kubernetes のコミュニティが従う行動規範 (Code of Conduct) はどれ?",
           "choices": [
             {
               "id": "d",
-              "text": "kubeconfig の users の欄",
-              "why": "kubeconfig はクラスタにつなぐ人の設定で、コードのレビューとは関係ありません。"
+              "text": "クラウドの業者ごとの利用規約",
+              "why": "コミュニティの行動規範は、クラウドの業者の規約とは別です。"
             },
             {
               "id": "a",
-              "text": "そのディレクトリ (か親のディレクトリ) の OWNERS ファイルの reviewers と approvers"
+              "text": "CNCF の行動規範"
             },
             {
               "id": "b",
-              "text": "リポジトリの README の最後",
-              "why": "README ではなく、ディレクトリごとの OWNERS ファイルです。"
+              "text": "行動規範は無く、SIG ごとに自由に決める",
+              "why": "Kubernetes は CNCF の行動規範に従い、違反の知らせは Kubernetes の Code of Conduct Committee が受けます。"
             },
             {
               "id": "c",
-              "text": "CNCF の TOC の名簿",
-              "why": "TOC は CNCF 全体のプロジェクトの段階などを決める集まりで、Kubernetes のコードのレビューの担当は決めません。"
+              "text": "Kubernetes の資格試験の規約",
+              "why": "試験の規約は、コミュニティでのふるまいの決まりではありません。"
             }
           ],
           "answer": "a",
-          "explanation": "Kubernetes のリポジトリでは、ディレクトリ (か親のディレクトリ) の OWNERS ファイルを見ると、そのコードの担当が分かります。reviewers と approvers の欄があり、役割はコードの一部ごとに決まっています。",
-          "source": "https://github.com/kubernetes/community/blob/master/community-membership.md"
+          "explanation": "Kubernetes のコミュニティは CNCF の行動規範に従います。受け入れられないふるまいは、Kubernetes の Code of Conduct Committee に知らせます。",
+          "source": "https://github.com/kubernetes/community/blob/master/code-of-conduct.md"
         },
         {
           "id": "w8-l5-q5",
@@ -1140,36 +1140,36 @@
           ],
           "answer": "a",
           "explanation": "/lgtm は、コードがレビューを通ったことを示します。/approve は、OWNERS ファイルの approver が付けると、最後の確認を通って自動でマージされる準備ができた印になります。",
-          "source": "https://github.com/kubernetes/community/blob/master/contributors/guide/pull-requests.md"
+          "source": "https://github.com/kubernetes/community/blob/master/contributors/guide/owners.md"
         },
         {
           "id": "w8-l5-q6",
           "type": "choice",
-          "prompt": "Kubernetes にはじめてプルリクエストを出す。マージされるまでに、前もって済ませておくことはどれ?",
+          "prompt": "はじめてのプルリクエストに EasyCLA のボットが CLA の署名を求めてきたので、案内のリンクから署名した。そのあと、プルリクエストの CLA の状態を更新するにはどうする?",
           "choices": [
             {
               "id": "b",
-              "text": "Kubernetes の資格 (CKA など) を取る",
-              "why": "資格は求められません。"
+              "text": "プルリクエストを閉じて、同じ変更で作り直す",
+              "why": "作り直さなくても、/easycla とコメントすれば状態が更新されます。"
             },
             {
               "id": "c",
-              "text": "CNCF の TOC の選挙で選ばれる",
-              "why": "TOC は CNCF の技術の委員会で、プルリクエストを出すのに選ばれる必要はありません。"
+              "text": "コミットのメッセージに「CLA に署名済み」と書き足す",
+              "why": "メッセージに書いても CLA の状態は変わりません。"
             },
             {
               "id": "d",
-              "text": "どこかの SIG の chair になる",
-              "why": "役職は要りません。はじめての人もプルリクエストを出せます。"
+              "text": "何もしない。署名は次のプルリクエストから効く",
+              "why": "署名したあと、/easycla とコメントすると、今のプルリクエストの状態が更新されます。"
             },
             {
               "id": "a",
-              "text": "EasyCLA の手順で CLA (Contributor License Agreement) に署名する"
+              "text": "プルリクエストに /easycla とコメントする"
             }
           ],
           "answer": "a",
-          "explanation": "Kubernetes のプルリクエストの手順では、EasyCLA の手順で CLA に署名しておくことが前提です。署名が済んでいないプルリクエストには cncf-cla: no のラベルが付きます。",
-          "source": "https://github.com/kubernetes/community/blob/master/contributors/guide/pull-requests.md"
+          "explanation": "Kubernetes は CLA に署名した人のコードだけを受け入れます。はじめてのプルリクエストには EasyCLA のボットが状態と署名のリンクを返すので、署名したあと /easycla とコメントすると状態が更新されます。会社として貢献する人は、会社のメールアドレスを GitHub のアカウントに結び付けておきます。",
+          "source": "https://github.com/kubernetes/community/blob/master/CLA.md"
         },
         {
           "id": "w8-l5-q7",
