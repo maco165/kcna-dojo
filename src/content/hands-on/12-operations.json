@@ -1,0 +1,1677 @@
+{
+  "id": "operations",
+  "order": 12,
+  "title": "運用と後片付け",
+  "summary": "k3s の記録の控えを取り、v1.36 から v1.37 に上げ、控えから巻き戻してから、もう一度上げます。cordon と drain でノードを空け、任意で 2 台目のノードを足して外します。最後に k3s と仮想マシンを片付けて、学んだことを振り返ります。",
+  "goal": "記録の控えを取り、版を 1 つ上げ、控えから巻き戻し、ノードを空けて戻し、k3s と仮想マシンを片付けられる",
+  "features": [
+    "SQLite の k3s の控えは、止めて db と token を写す。etcd-snapshot は使えない",
+    "上げるときはマイナー版を飛ばさず、前の入れ方の環境変数と引数を付け直す",
+    "巻き戻しは、古い版の k3s と、その版で取った控えの 2 つがそろって初めてできる",
+    "cordon は新しい Pod を止め、drain は PodDisruptionBudget を守りながら Pod を退かせる",
+    "任意: 2 台目を agent として足し、drain・delete node・agent の uninstall で外す"
+  ],
+  "minutes": 150,
+  "needs": [
+    "11 章を終えた仮想マシン kcna (k3s v1.36.6+k3s1 が動き、kubectl が使える)",
+    "インターネットへの接続 (k3s を取ってきます)",
+    "任意の手順をするなら、PC のメモリにさらに 1 GB 以上の余り",
+    "出力について: 「仮想マシンの中」の出力は、2026-11-28 に Linux の QEMU の上で、Ubuntu 24.04 の公式のクラウドイメージ (x86_64・2 コア・2 GB・20 GB) と k3s v1.36.6+k3s1 で取りました。Multipass を打つ手順は実機で確かめていないので、出力を載せていません。M 系の Mac でも手順は同じです。CPU の種類が出るところだけ arm64 か aarch64 になります。"
+  ],
+  "reads": [
+    {
+      "topic": "administration",
+      "label": "クラスタの管理"
+    },
+    {
+      "topic": "k3s-vs-kubernetes",
+      "label": "k3s と Kubernetes の違い"
+    },
+    {
+      "topic": "kubernetes-history",
+      "label": "Kubernetes の歴史と版の数え方"
+    }
+  ],
+  "steps": [
+    {
+      "id": "enter",
+      "text": "11 章を終えた仮想マシン kcna の中に入ります。ホストの端末で打ちます。",
+      "why": "この章のコマンドは、最初と最後のほかは全部、仮想マシンの中で打つためです。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass shell kcna"
+      },
+      "lines": [
+        {
+          "code": "multipass shell kcna",
+          "text": "kcna の中の端末を開く。止まっていれば、動かしてから開く"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "行の頭が ubuntu@kcna:~$ に変われば、中に入っています。",
+      "trouble": [
+        {
+          "symptom": "multipass: command not found、または「認識されません」と出る",
+          "check": "端末を閉じて開き直し、multipass version を打つ",
+          "fix": "開き直しても出るなら、Multipass を入れる手順をもう一度行う"
+        },
+        {
+          "symptom": "kcna が無いと出る",
+          "check": "multipass list で名前を見る",
+          "fix": "0 章から始める"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/shell/"
+    },
+    {
+      "id": "check-host",
+      "text": "仮想マシンの中で、どのマシンにいるかと、クラスターの様子を見ます。hostname が kcna でなければ、先へ進まず multipass shell kcna で入ります。枠は、迷ったら 1 行ずつ貼ります。sudo などのあとの行は、端末によって、まとめて貼ると消えることがあるためです (EOF で終わる書き込みの部分は、EOF まで続けて貼ります)。",
+      "why": "自分の PC の別のクラスターで打たないためです。この章は、k3s を止める・入れ直す・記録を戻す手順が続きます。自分の PC で打つと、PC に入れた k3s や記録を壊します。hostname を見る手順を、そのつど挟みます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "hostname\nkubectl get nodes"
+      },
+      "lines": [
+        {
+          "code": "hostname",
+          "text": "このマシンの名前を出す"
+        },
+        {
+          "code": "kubectl get nodes",
+          "text": "ノードの一覧を出す"
+        }
+      ],
+      "output": "kcna\nNAME   STATUS   ROLES           AGE    VERSION\nkcna   Ready    control-plane   4m6s   v1.36.6+k3s1",
+      "read": "kcna と出て、ノードの STATUS が Ready なら進めます。VERSION が v1.36.6+k3s1 でない人は、出力の版を読み替えます。",
+      "trouble": [
+        {
+          "symptom": "kcna ではない名前が出る",
+          "check": "行の頭が ubuntu@kcna かを見る",
+          "fix": "ホストにいる。multipass shell kcna で入り、もう一度打つ"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        },
+        {
+          "symptom": "permission denied や localhost:8080 と出る",
+          "check": "echo $KUBECONFIG を打つ",
+          "fix": "空なら export KUBECONFIG=~/.kube/k3s.yaml を打つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/architecture/nodes/"
+    },
+    {
+      "id": "words",
+      "text": "最後の章は、クラスターを長く使うための運用です。①記録の控えを取り、②k3s を v1.36 から v1.37 に上げ、③困ったときに控えから戻し、④ノードを空けてから作業する方法 (cordon・drain) を練習します。⑤任意で 2 台目のノードを足して外し、最後に k3s と仮想マシンを片付けます。",
+      "why": "Kubernetes は 1 年に 3 回ほど新しいマイナー版が出て、それぞれ 1 年ほどで直し (patch) が出なくなります。上げる・戻す・空けるは、使い続けるなら避けられない作業です。",
+      "source": "https://kubernetes.io/docs/releases/"
+    },
+    {
+      "id": "prepare",
+      "text": "作業のフォルダと、名前空間 ch12 を作り、更新のあとも残るかを見るための Deployment keep (Pod 2 つ) と ConfigMap memo を置きます。",
+      "why": "上げたり戻したりしたあとに、作ったものが残っているかで、記録が無事かを確かめるためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "mkdir -p ~/ch12\ncd ~/ch12\nkubectl create namespace ch12\nkubectl wait --for=create serviceaccount/default -n ch12 --timeout=60s\nkubectl create deployment keep -n ch12 --image=nginx:1.27-alpine --replicas=2\nkubectl create configmap memo -n ch12 --from-literal=made=before-backup\nkubectl rollout status deployment/keep -n ch12 --timeout=180s"
+      },
+      "lines": [
+        {
+          "code": "mkdir -p ~/ch12",
+          "text": "ch12 というフォルダを作る"
+        },
+        {
+          "code": "cd ~/ch12",
+          "text": "ch12 へ移る"
+        },
+        {
+          "code": "kubectl create namespace ch12",
+          "text": "名前空間 ch12 を作る"
+        },
+        {
+          "code": "kubectl wait --for=create serviceaccount/default -n ch12 --timeout=60s",
+          "text": "Pod を作れるようになるまで待つ"
+        },
+        {
+          "code": "kubectl create deployment keep -n ch12 --image=nginx:1.27-alpine --replicas=2",
+          "text": "Pod 2 つの Deployment keep を作る"
+        },
+        {
+          "code": "kubectl create configmap memo -n ch12 --from-literal=made=before-backup",
+          "text": "控えの前に作った印の ConfigMap memo を作る"
+        },
+        {
+          "code": "kubectl rollout status deployment/keep -n ch12 --timeout=180s",
+          "text": "keep が使えるようになるまで待つ"
+        }
+      ],
+      "output": "namespace/ch12 created\nserviceaccount/default condition met\ndeployment.apps/keep created\nconfigmap/memo created\nWaiting for deployment \"keep\" rollout to finish: 0 of 2 updated replicas are available...\nWaiting for deployment \"keep\" rollout to finish: 1 of 2 updated replicas are available...\ndeployment \"keep\" successfully rolled out",
+      "read": "deployment \"keep\" successfully rolled out が出れば次へ進めます。",
+      "trouble": [
+        {
+          "symptom": "AlreadyExists と出る",
+          "check": "kubectl get namespaces を打つ",
+          "fix": "前に作ったものがある。そのまま使う"
+        },
+        {
+          "symptom": "toomanyrequests や 429 と出る",
+          "check": "kubectl describe の Events で、Failed to pull image の行の終わりを見る",
+          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る。短い「429 Too Many Requests」だけのときは、使いすぎを防ぐ別の上限なので、数分待ってからもう一度行う"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/"
+    },
+    {
+      "id": "record",
+      "text": "上げる前の様子を書き留めます。版と、k3s をどんな設定で動かしているかと、動いているものの一覧です。",
+      "why": "入れ直すと、前の入れ方で付けた設定 (環境変数や引数) は、付け直さないと消えます。何を付けていたかを先に見るためです。比べる一覧は、ファイルに残します。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "k3s --version\nsystemctl cat k3s | grep -A3 '^ExecStart='\nsudo cat /etc/systemd/system/k3s.service.env\nls /etc/rancher/k3s/\nkubectl get pods -A -o wide > ~/ch12/before.txt\nwc -l ~/ch12/before.txt"
+      },
+      "lines": [
+        {
+          "code": "k3s --version",
+          "text": "k3s の版を出す"
+        },
+        {
+          "code": "systemctl cat k3s | grep -A3 '^ExecStart='",
+          "text": "k3s を始める時の命令と引数を出す"
+        },
+        {
+          "code": "sudo cat /etc/systemd/system/k3s.service.env",
+          "text": "入れた時の環境変数のファイルを出す"
+        },
+        {
+          "code": "ls /etc/rancher/k3s/",
+          "text": "k3s の設定ファイルの置き場を出す"
+        },
+        {
+          "code": "kubectl get pods -A -o wide > ~/ch12/before.txt",
+          "text": "全部の Pod の様子をファイルに書く"
+        },
+        {
+          "code": "wc -l ~/ch12/before.txt",
+          "text": "書いた行の数を出す"
+        }
+      ],
+      "output": "k3s version v1.36.6+k3s1 (fa45d6a5)\ngo version go1.26.10\nExecStart=/usr/local/bin/k3s \\\n    server \\\nk3s.yaml\n10 /home/ubuntu/ch12/before.txt",
+      "read": "k3s version v1.36.6+k3s1 です。ExecStart は k3s server だけで、引数はありません。環境変数のファイルは空 (何も出ない) で、/etc/rancher/k3s/ には k3s.yaml しかなく、設定ファイル (config.yaml) もありません。1 章では、版だけを決めて入れたからです。ここに何か出る人は、入れ直す時に同じものを付けます。",
+      "trouble": [
+        {
+          "symptom": "Permission denied と出る",
+          "check": "行の頭に sudo があるかを見る",
+          "fix": "env のファイルは root しか読めない。sudo を付けて打つ"
+        }
+      ],
+      "source": "https://docs.k3s.io/upgrades/manual"
+    },
+    {
+      "id": "channel",
+      "text": "公式の配り先 (チャンネル) で、今の stable がどの版かと、版の上げ方の決まりを確かめます。",
+      "why": "stable は、しばらくの間、使う人たちに試されてきた版です。Kubernetes の決まりで、上げるときはマイナー版 (1.36 の 36) を 1 つずつしか上げられません。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "curl -s -o /dev/null -w '%{redirect_url}\\n' https://update.k3s.io/v1-release/channels/stable\ncurl -s -o /dev/null -w '%{redirect_url}\\n' https://update.k3s.io/v1-release/channels/v1.37"
+      },
+      "lines": [
+        {
+          "code": "curl -s -o /dev/null -w '%{redirect_url}\\n' https://update.k3s.io/v1-release/channels/stable",
+          "text": "stable のチャンネルが送る先 (版のページ) だけを出す。中身は捨てる (-o /dev/null)"
+        },
+        {
+          "code": "curl -s -o /dev/null -w '%{redirect_url}\\n' https://update.k3s.io/v1-release/channels/v1.37",
+          "text": "v1.37 のチャンネルが送る先を出す"
+        }
+      ],
+      "output": "https://github.com/k3s-io/k3s/releases/tag/v1.37.2+k3s1\nhttps://github.com/k3s-io/k3s/releases/tag/v1.37.2+k3s1",
+      "read": "どちらも v1.37.2+k3s1 のページを指します。1.36 から 1.37 は 1 つ上なので、そのまま上げられます。1.35 から 1.37 のように飛ばすときは、1.36 を間に挟みます。同じマイナー版の中では、まず最新の直し (patch) に上げてから、次のマイナー版の最新に上げるのが勧められています。打つ日によって、stable がさらに新しい版を指すことがあります。この章は v1.37.2+k3s1 で進めます。",
+      "trouble": [
+        {
+          "symptom": "空の行だけが出る",
+          "check": "curl -s -o /dev/null -w '%{http_code}\\n' https://update.k3s.io/v1-release/channels/stable を打つ",
+          "fix": "000 ならつながっていない。インターネットにつながってから打つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/releases/version-skew-policy/"
+    },
+    {
+      "id": "check-before-backup",
+      "text": "k3s を止める前に、どのマシンにいるかを見ます。kcna と出なければ、次の手順を打ちません。",
+      "why": "次の手順で k3s を止めます。自分の PC の k3s を止めないためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "hostname"
+      },
+      "lines": [
+        {
+          "code": "hostname",
+          "text": "このマシンの名前を出す"
+        }
+      ],
+      "output": "kcna",
+      "read": "kcna と出れば、仮想マシンの中です。",
+      "trouble": [
+        {
+          "symptom": "kcna ではない名前が出る",
+          "check": "行の頭が ubuntu@kcna かを見る",
+          "fix": "ホストにいる。multipass shell kcna で入り、もう一度打つ"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man1/hostname.1.html"
+    },
+    {
+      "id": "backup",
+      "text": "k3s を止めて、記録 (SQLite のデータベース) の置き場 db と、合い言葉のファイル token を、まるごと写します。写し終えたら、k3s を始めます。",
+      "why": "1 台で動かす k3s は、記録を SQLite という 1 つのファイルのデータベースに置きます。動いている間は書き込みの途中のことがあるので、止めてから写します。token は、k3s が記録の中に置く大事なデータ (クラスターの鍵など、bootstrap data と呼ぶもの) を暗号にする鍵で、戻すときに同じものが要ります。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "sudo systemctl stop k3s\nsudo mkdir -p /root/k3s-backup\nsudo cp -a /var/lib/rancher/k3s/server/db /root/k3s-backup/db\nsudo cp -a /var/lib/rancher/k3s/server/token /root/k3s-backup/token\nsudo systemctl start k3s\nsudo ls -l /root/k3s-backup /root/k3s-backup/db\nkubectl wait --for=condition=Ready node/kcna --timeout=180s"
+      },
+      "lines": [
+        {
+          "code": "sudo systemctl stop k3s",
+          "text": "k3s を止める (動いている Pod の中のコンテナは動き続ける)"
+        },
+        {
+          "code": "sudo mkdir -p /root/k3s-backup",
+          "text": "控えの置き場を作る。root しか読めない場所にする"
+        },
+        {
+          "code": "sudo cp -a /var/lib/rancher/k3s/server/db /root/k3s-backup/db",
+          "text": "記録の置き場を、持ち主や時刻ごとそのまま写す"
+        },
+        {
+          "code": "sudo cp -a /var/lib/rancher/k3s/server/token /root/k3s-backup/token",
+          "text": "合い言葉のファイルを写す"
+        },
+        {
+          "code": "sudo systemctl start k3s",
+          "text": "k3s を始める"
+        },
+        {
+          "code": "sudo ls -l /root/k3s-backup /root/k3s-backup/db",
+          "text": "控えの中身を出す"
+        },
+        {
+          "code": "kubectl wait --for=condition=Ready node/kcna --timeout=180s",
+          "text": "ノードが Ready になるまで待つ"
+        }
+      ],
+      "output": "/root/k3s-backup:\ntotal 8\ndrwx------ 2 root root 4096 Nov 28 05:14 db\n-rw------- 1 root root  109 Nov 28 05:17 token\n\n/root/k3s-backup/db:\ntotal 23420\n-rw-r--r-- 1 root root 12156928 Nov 28 05:18 state.db\n-rw-r--r-- 1 root root    32768 Nov 28 05:18 state.db-shm\n-rw-r--r-- 1 root root 11791472 Nov 28 05:18 state.db-wal\nnode/kcna condition met",
+      "read": "db の中に state.db (記録の本体) と state.db-shm・state.db-wal (書き込み途中の分を置く補助のファイル) があります。止めてから写したので、3 つがそろって同じ時点のものです。控えには、管理者と同じ力のある token が入っているので、root しか読めない場所に置き、人に渡しません。仮想マシンを丸ごと戻す控えなら、Multipass の snapshot (11 章の終わりに取った ch11-end) もあります。/root/k3s-backup は、仮想マシンはそのままに、k3s の記録だけを戻すための控えです。",
+      "trouble": [
+        {
+          "symptom": "Ready になるまで待つ行が timed out になる",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "activating なら、もう少し待って待つ行を打ち直す"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://docs.k3s.io/datastore/backup-restore"
+    },
+    {
+      "id": "etcd-snapshot",
+      "text": "わざと、k3s の控えの道具 etcd-snapshot を打ちます。",
+      "why": "k3s etcd-snapshot は、記録を etcd (k3s では、server を何台も組むときに使う記録の仕組み) に置いたときの道具です。この仮想マシンのように SQLite のときは使えないことを、自分の目で見るためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "sudo k3s etcd-snapshot save"
+      },
+      "lines": [
+        {
+          "code": "sudo k3s etcd-snapshot save",
+          "text": "etcd の控えを取ろうとする"
+        }
+      ],
+      "output": "time=\"2026-11-28T05:19:04Z\" level=fatal msg=\"Error: see server log for details: etcd datastore disabled\"",
+      "read": "etcd datastore disabled のように、etcd を使っていないので取れない、と断られます。SQLite では、さっきのようにファイルを写すのが控えの取り方です (公式の文書も「特別なコマンドは要らない」と書いています)。",
+      "trouble": [
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://docs.k3s.io/cli/etcd-snapshot"
+    },
+    {
+      "id": "check-before-upgrade",
+      "text": "k3s を入れ直す前に、どのマシンにいるかを見ます。kcna と出なければ、次の手順を打ちません。",
+      "why": "次の手順で k3s を入れ直します。自分の PC の k3s を上げてしまわないためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "hostname"
+      },
+      "lines": [
+        {
+          "code": "hostname",
+          "text": "このマシンの名前を出す"
+        }
+      ],
+      "output": "kcna",
+      "read": "kcna と出れば、仮想マシンの中です。",
+      "trouble": [
+        {
+          "symptom": "kcna ではない名前が出る",
+          "check": "行の頭が ubuntu@kcna かを見る",
+          "fix": "ホストにいる。multipass shell kcna で入り、もう一度打つ"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man1/hostname.1.html"
+    },
+    {
+      "id": "upgrade",
+      "text": "k3s を v1.37.2+k3s1 に上げます。1 章と同じ入れ方の、版だけを替えます。2 分ほどかかります。",
+      "why": "入れ方のスクリプトをもう一度動かすと、新しい k3s を取ってきて置き換え、k3s を始め直します。前に付けた環境変数や引数があれば、同じものを付けます (record で何も無いと確かめました)。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=v1.37.2+k3s1 sh -\nfor i in $(seq 60); do [ \"$(kubectl get node kcna -o jsonpath='{.status.nodeInfo.kubeletVersion}' 2> /dev/null)\" = v1.37.2+k3s1 ] && break; sleep 3; done\nkubectl wait --for=condition=Ready node/kcna --timeout=180s\nkubectl get nodes"
+      },
+      "lines": [
+        {
+          "code": "curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=v1.37.2+k3s1 sh -",
+          "text": "v1.37.2+k3s1 の k3s を取ってきて入れ直す"
+        },
+        {
+          "code": "for i in $(seq 60); do [ \"$(kubectl get node kcna -o jsonpath='{.status.nodeInfo.kubeletVersion}' 2> /dev/null)\" = v1.37.2+k3s1 ] && break; sleep 3; done",
+          "text": "ノードの版が v1.37.2+k3s1 になるまで待つ (API サーバーが始め直す間は答えないので、3 秒おきに最大 3 分)"
+        },
+        {
+          "code": "kubectl wait --for=condition=Ready node/kcna --timeout=180s",
+          "text": "ノードが Ready になるまで待つ"
+        },
+        {
+          "code": "kubectl get nodes",
+          "text": "ノードの一覧を出す"
+        }
+      ],
+      "output": "[INFO]  Using v1.37.2+k3s1 as release\n[INFO]  Downloading hash https://github.com/k3s-io/k3s/releases/download/v1.37.2%2Bk3s1/sha256sum-amd64.txt\n[INFO]  Downloading binary https://github.com/k3s-io/k3s/releases/download/v1.37.2%2Bk3s1/k3s\n[INFO]  Verifying binary download\n[INFO]  Installing k3s to /usr/local/bin/k3s\n[INFO]  Skipping installation of SELinux RPM\n[INFO]  Skipping /usr/local/bin/kubectl symlink to k3s, already exists\n[INFO]  Skipping /usr/local/bin/crictl symlink to k3s, already exists\n[INFO]  Skipping /usr/local/bin/ctr symlink to k3s, already exists\n[INFO]  Creating killall script /usr/local/bin/k3s-killall.sh\n[INFO]  Creating uninstall script /usr/local/bin/k3s-uninstall.sh\n[INFO]  env: Creating environment file /etc/systemd/system/k3s.service.env\n[INFO]  systemd: Creating service file /etc/systemd/system/k3s.service\n[INFO]  systemd: Enabling k3s unit\nCreated symlink /etc/systemd/system/multi-user.target.wants/k3s.service → /etc/systemd/system/k3s.service.\n[INFO]  systemd: Starting k3s\nnode/kcna condition met\nNAME   STATUS   ROLES           AGE     VERSION\nkcna   Ready    control-plane   5m14s   v1.37.2+k3s1",
+      "read": "スクリプトの出力は 1 章と同じ形で、最後に systemd: Starting k3s です。ノードの VERSION が v1.37.2+k3s1 になれば上がっています。スクリプトは、上げる前に drain や cordon をしません。ノードが 1 台なので、ここでは空けずに上げました (Pod の中のコンテナは、k3s を始め直す間も動き続けます)。k3s の文書は、空けずに始め直してもふつうは問題ないとしていますが、Kubernetes の本家の決まりは、kubelet のマイナー版を上げる前に、ノードの Pod を空けるよう勧めています。台数があるなら、空けてから上げます。",
+      "trouble": [
+        {
+          "symptom": "待つ行のあとも VERSION が古い",
+          "check": "sudo journalctl -u k3s -n 20 --no-pager を打つ",
+          "fix": "始める途中で止まっている。エラーの行を読む。分からなければ、次の休む所の前に、控えから戻す手順を行う"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://docs.k3s.io/upgrades/manual"
+    },
+    {
+      "id": "after-upgrade",
+      "text": "上げたあと、作ったものが残っているか、部品がそろっているかを確かめます。",
+      "why": "上げた版で、前の記録がそのまま読めているかを見るためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "k3s --version\nkubectl version\nkubectl get deployment keep -n ch12\nkubectl get configmap memo -n ch12 -o jsonpath='{.data.made}{\"\\n\"}'\nkubectl get pods -A -o wide > ~/ch12/after.txt\ndiff <(awk '{print $1, $2}' ~/ch12/before.txt | sort) <(awk '{print $1, $2}' ~/ch12/after.txt | sort) || true"
+      },
+      "lines": [
+        {
+          "code": "k3s --version",
+          "text": "k3s の版を出す"
+        },
+        {
+          "code": "kubectl version",
+          "text": "kubectl (k3s に入っているもの) とクラスターの版を出す"
+        },
+        {
+          "code": "kubectl get deployment keep -n ch12",
+          "text": "keep を出す"
+        },
+        {
+          "code": "kubectl get configmap memo -n ch12 -o jsonpath='{.data.made}{\"\\n\"}'",
+          "text": "memo の中身を出す"
+        },
+        {
+          "code": "kubectl get pods -A -o wide > ~/ch12/after.txt",
+          "text": "上げたあとの Pod の様子を書く"
+        },
+        {
+          "code": "diff <(awk '{print $1, $2}' ~/ch12/before.txt | sort) <(awk '{print $1, $2}' ~/ch12/after.txt | sort) || true",
+          "text": "上げる前とあとで、名前空間と Pod の名前が変わったものを並べる (違いがあっても失敗と扱わない)"
+        }
+      ],
+      "output": "k3s version v1.37.2+k3s1 (f6973cb8)\ngo version go1.26.10\nClient Version: v1.37.2+k3s1\nKustomize Version: v5.8.1\nServer Version: v1.37.2+k3s1\nNAME   READY   UP-TO-DATE   AVAILABLE   AGE\nkeep   2/2     2            2           68s\nbefore-backup\n4a5\n> kube-system helm-install-gateway-api-crd-xzrb5",
+      "read": "版は v1.37.2+k3s1 で、keep は 2/2、memo は before-backup のままです。diff は、上げる前とあとで名前の違う Pod だけを、< (前) と > (あと) で出します。この出力では、v1.37 の k3s が新しく入れる部品 (Gateway API の CRD) を入れる helm-install- の Pod が 1 つ増えただけで、keep を含むほかの Pod は、名前も変わらず動き続けています。少したつと、k3s が traefik などの部品を新しい版に入れ替えて、名前が変わることがあります。",
+      "trouble": [
+        {
+          "symptom": "memo が NotFound になる",
+          "check": "kubectl get configmaps -n ch12 を打つ",
+          "fix": "名前空間が違う。-n ch12 を付けて打ち直す"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/releases/version-skew-policy/"
+    },
+    {
+      "id": "kubeconfig-copy",
+      "text": "~/.kube/k3s.yaml (1 章で作った写し) が、上げたあとも使えるかを見ます。",
+      "why": "写しは、元のファイル (/etc/rancher/k3s/k3s.yaml) が変わっても、自分では変わりません。上げると変わることがあるかを確かめるためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "sudo diff /etc/rancher/k3s/k3s.yaml ~/.kube/k3s.yaml && echo same"
+      },
+      "lines": [
+        {
+          "code": "sudo diff /etc/rancher/k3s/k3s.yaml ~/.kube/k3s.yaml && echo same",
+          "text": "元と写しを比べ、同じなら same と出す"
+        }
+      ],
+      "output": "same",
+      "read": "same と出ます。上げても、クラスターの証明書と鍵は同じなので、写しはそのまま使えます。1 章で見たように、k3s を消して入れ直すと証明書が新しくなるので、そのときは写し直します。",
+      "trouble": [
+        {
+          "symptom": "差の行が出る",
+          "check": "kubectl get nodes を打つ",
+          "fix": "動くなら、そのまま使ってよい。certificate と出るなら、1 章の recopy の手順で写し直す"
+        }
+      ],
+      "source": "https://docs.k3s.io/cluster-access"
+    },
+    {
+      "id": "after-backup-change",
+      "text": "控えを取ったあとに、新しい ConfigMap を作ります。",
+      "why": "次の手順で控えに戻すと、控えより後に作ったものがどうなるかを見るためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl create configmap later -n ch12 --from-literal=made=after-upgrade\nkubectl get configmaps -n ch12"
+      },
+      "lines": [
+        {
+          "code": "kubectl create configmap later -n ch12 --from-literal=made=after-upgrade",
+          "text": "控えのあとに ConfigMap later を作る"
+        },
+        {
+          "code": "kubectl get configmaps -n ch12",
+          "text": "ConfigMap の一覧を出す"
+        }
+      ],
+      "output": "configmap/later created\nNAME               DATA   AGE\nkube-root-ca.crt   1      71s\nlater              1      1s\nmemo               1      69s",
+      "read": "memo と later と kube-root-ca.crt の 3 つが並びます。",
+      "trouble": [
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/configuration/configmap/"
+    },
+    {
+      "id": "break",
+      "text": "ここで休めます。休む人は、exit で出てから、ホストでこの行を打ちます。休まない人は、打たずに印を付けて先へ進みます。",
+      "why": "長い章なので、区切りを置くためです。止めても、作ったものとファイルは残ります。再起動と同じことが起きるので、Pod の中のコンテナは始め直され、Pod の住所も変わります。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass stop kcna"
+      },
+      "lines": [
+        {
+          "code": "multipass stop kcna",
+          "text": "kcna を止める。動いている (Running) ときだけ打てる"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "何もエラーが出なければ止まっています。続けるときは、ホストで multipass shell kcna を打つと、動かして中に入れます。続けるときは cd ~/ch12 を打ちます。戻った直後の 1〜2 分は、一覧が止める前の古い様子のことがあります。少し待ってもう一度見ます。",
+      "trouble": [
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "activating なら、1 分ほど待つ"
+        },
+        {
+          "symptom": "No such file or directory と出る",
+          "check": "pwd を打つ",
+          "fix": "作業のフォルダにいない。cd で移る"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/stop/"
+    },
+    {
+      "id": "check-before-rollback",
+      "text": "k3s を戻す前に、どのマシンにいるかを見ます。kcna と出なければ、次の手順を打ちません。",
+      "why": "次の手順は、k3s を古い版に入れ直し、記録を差し替えます。自分の PC の k3s と記録を壊さないためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "hostname"
+      },
+      "lines": [
+        {
+          "code": "hostname",
+          "text": "このマシンの名前を出す"
+        }
+      ],
+      "output": "kcna",
+      "read": "kcna と出れば、仮想マシンの中です。",
+      "trouble": [
+        {
+          "symptom": "kcna ではない名前が出る",
+          "check": "行の頭が ubuntu@kcna かを見る",
+          "fix": "ホストにいる。multipass shell kcna で入り、もう一度打つ"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man1/hostname.1.html"
+    },
+    {
+      "id": "rollback-binary",
+      "text": "巻き戻しの練習です。まず、古い版 (v1.36.6+k3s1) の k3s を、始めずに入れます。",
+      "why": "公式の巻き戻しは、①古い版の k3s と、②その版で取った記録の控えの 2 つがそろって、初めてできます。公式の文書は「記録を戻せなければ、前のマイナー版には戻せない」と書いています。INSTALL_K3S_SKIP_START=true を付けると、k3s のファイルを入れ替えるだけで、始め直しません。今動いている k3s は、そのまま動き続けます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=v1.36.6+k3s1 INSTALL_K3S_SKIP_START=true sh -\nk3s --version"
+      },
+      "lines": [
+        {
+          "code": "curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=v1.36.6+k3s1 INSTALL_K3S_SKIP_START=true sh -",
+          "text": "v1.36.6+k3s1 の k3s を取ってきて入れる。始め直さない"
+        },
+        {
+          "code": "k3s --version",
+          "text": "置いた k3s の版を出す"
+        }
+      ],
+      "output": "[INFO]  Using v1.36.6+k3s1 as release\n[INFO]  Downloading hash https://github.com/k3s-io/k3s/releases/download/v1.36.6%2Bk3s1/sha256sum-amd64.txt\n[INFO]  Downloading binary https://github.com/k3s-io/k3s/releases/download/v1.36.6%2Bk3s1/k3s\n[INFO]  Verifying binary download\n[INFO]  Installing k3s to /usr/local/bin/k3s\n[INFO]  Skipping installation of SELinux RPM\n[INFO]  Skipping /usr/local/bin/kubectl symlink to k3s, already exists\n[INFO]  Skipping /usr/local/bin/crictl symlink to k3s, already exists\n[INFO]  Skipping /usr/local/bin/ctr symlink to k3s, already exists\n[INFO]  Creating killall script /usr/local/bin/k3s-killall.sh\n[INFO]  Creating uninstall script /usr/local/bin/k3s-uninstall.sh\n[INFO]  env: Creating environment file /etc/systemd/system/k3s.service.env\n[INFO]  systemd: Creating service file /etc/systemd/system/k3s.service\n[INFO]  systemd: Enabling k3s unit\nCreated symlink /etc/systemd/system/multi-user.target.wants/k3s.service → /etc/systemd/system/k3s.service.\nk3s version v1.36.6+k3s1 (fa45d6a5)\ngo version go1.26.10",
+      "read": "出力の終わりに Starting k3s が無く、置いたファイルの版は v1.36.6+k3s1 です。まだ動いているのは、メモリの中の新しい版のままです。",
+      "trouble": [
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://docs.k3s.io/upgrades/roll-back"
+    },
+    {
+      "id": "rollback-db",
+      "text": "k3s を止め、今の記録の置き場を脇へ移してから、控えの記録を戻し、k3s を始めます。",
+      "why": "SQLite の巻き戻しは、記録のファイルを、控えのものに差し替えることです。今の記録は消さずに名前を替えて残し、うまくいかなければ戻せるようにします。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "sudo systemctl stop k3s\nsudo mv /var/lib/rancher/k3s/server/db /var/lib/rancher/k3s/server/db-v1.37\nsudo cp -a /root/k3s-backup/db /var/lib/rancher/k3s/server/db\nsudo cmp /root/k3s-backup/token /var/lib/rancher/k3s/server/token && echo token-same\nsudo systemctl start k3s\nfor i in $(seq 60); do [ \"$(kubectl get node kcna -o jsonpath='{.status.nodeInfo.kubeletVersion}' 2> /dev/null)\" = v1.36.6+k3s1 ] && break; sleep 3; done\nkubectl wait --for=condition=Ready node/kcna --timeout=180s"
+      },
+      "lines": [
+        {
+          "code": "sudo systemctl stop k3s",
+          "text": "k3s を止める"
+        },
+        {
+          "code": "sudo mv /var/lib/rancher/k3s/server/db /var/lib/rancher/k3s/server/db-v1.37",
+          "text": "今の記録の置き場を、db-v1.37 という名前に替えて脇へ置く"
+        },
+        {
+          "code": "sudo cp -a /root/k3s-backup/db /var/lib/rancher/k3s/server/db",
+          "text": "控えの記録を、元の場所に写す"
+        },
+        {
+          "code": "sudo cmp /root/k3s-backup/token /var/lib/rancher/k3s/server/token && echo token-same",
+          "text": "合い言葉が控えと同じかを比べる"
+        },
+        {
+          "code": "sudo systemctl start k3s",
+          "text": "k3s を始める"
+        },
+        {
+          "code": "for i in $(seq 60); do [ \"$(kubectl get node kcna -o jsonpath='{.status.nodeInfo.kubeletVersion}' 2> /dev/null)\" = v1.36.6+k3s1 ] && break; sleep 3; done",
+          "text": "ノードの版が v1.36.6+k3s1 になるまで待つ (API サーバーが始め直す間は答えないので、3 秒おきに最大 3 分)"
+        },
+        {
+          "code": "kubectl wait --for=condition=Ready node/kcna --timeout=180s",
+          "text": "ノードが Ready になるまで待つ"
+        }
+      ],
+      "output": "token-same\nnode/kcna condition met",
+      "read": "token-same と出れば、記録の鍵は控えと同じです (違うときは、控えの token も戻します)。止めている間も、Pod の中のコンテナは動き続けています。",
+      "trouble": [
+        {
+          "symptom": "待つ行のあとも VERSION が新しい",
+          "check": "k3s --version を打つ",
+          "fix": "v1.36.6+k3s1 でなければ、rollback-binary の手順を打ち直す"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://docs.k3s.io/upgrades/roll-back"
+    },
+    {
+      "id": "after-rollback",
+      "text": "戻したあとの様子を確かめます。",
+      "why": "版と、控えの時点の記録に戻ったことの両方を見るためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl get nodes\nkubectl get configmaps -n ch12\nkubectl rollout status deployment/keep -n ch12 --timeout=180s\nkubectl get pods -n ch12"
+      },
+      "lines": [
+        {
+          "code": "kubectl get nodes",
+          "text": "ノードの一覧を出す"
+        },
+        {
+          "code": "kubectl get configmaps -n ch12",
+          "text": "ConfigMap の一覧を出す"
+        },
+        {
+          "code": "kubectl rollout status deployment/keep -n ch12 --timeout=180s",
+          "text": "keep が使えるようになるまで待つ"
+        },
+        {
+          "code": "kubectl get pods -n ch12",
+          "text": "ch12 の Pod を出す"
+        }
+      ],
+      "output": "NAME   STATUS   ROLES           AGE     VERSION\nkcna   Ready    control-plane   5m55s   v1.36.6+k3s1\nNAME               DATA   AGE\nkube-root-ca.crt   1      110s\nmemo               1      108s\ndeployment \"keep\" successfully rolled out\nNAME                    READY   STATUS    RESTARTS   AGE\nkeep-57564d8bff-5lf5t   1/1     Running   0          110s\nkeep-57564d8bff-pzqsg   1/1     Running   0          110s",
+      "read": "VERSION は v1.36.6+k3s1 に戻りました。ConfigMap は memo と kube-root-ca.crt だけで、控えのあとに作った later は消えています。記録が控えの時点に戻ったからです。巻き戻しでは、控えより後の変更は失われます。keep は控えの時点にもあったので、残っています。",
+      "trouble": [
+        {
+          "symptom": "later が残っている",
+          "check": "sudo ls /var/lib/rancher/k3s/server を打つ",
+          "fix": "db と db-v1.37 の両方があるかを見る。無ければ rollback-db を見直す"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://docs.k3s.io/upgrades/roll-back#verification"
+    },
+    {
+      "id": "check-before-upgrade-again",
+      "text": "k3s をもう一度入れ直す前に、どのマシンにいるかを見ます。kcna と出なければ、次の手順を打ちません。",
+      "why": "もう一度入れ直します。自分の PC で打たないためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "hostname"
+      },
+      "lines": [
+        {
+          "code": "hostname",
+          "text": "このマシンの名前を出す"
+        }
+      ],
+      "output": "kcna",
+      "read": "kcna と出れば、仮想マシンの中です。",
+      "trouble": [
+        {
+          "symptom": "kcna ではない名前が出る",
+          "check": "行の頭が ubuntu@kcna かを見る",
+          "fix": "ホストにいる。multipass shell kcna で入り、もう一度打つ"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man1/hostname.1.html"
+    },
+    {
+      "id": "upgrade-again",
+      "text": "学習を続けるために、もう一度 v1.37.2+k3s1 に上げます。",
+      "why": "この先の手順と、このあと使い続けるなら、今の stable の版のほうが、直しや文書がそろっているためです。戻した練習は済んだので、戻る前の新しい記録 (db-v1.37) は使わず、今の記録のまま上げます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=v1.37.2+k3s1 sh -\nfor i in $(seq 60); do [ \"$(kubectl get node kcna -o jsonpath='{.status.nodeInfo.kubeletVersion}' 2> /dev/null)\" = v1.37.2+k3s1 ] && break; sleep 3; done\nkubectl wait --for=condition=Ready node/kcna --timeout=180s\nkubectl get nodes\nsudo rm -r /var/lib/rancher/k3s/server/db-v1.37"
+      },
+      "lines": [
+        {
+          "code": "curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=v1.37.2+k3s1 sh -",
+          "text": "v1.37.2+k3s1 の k3s を入れ直す"
+        },
+        {
+          "code": "for i in $(seq 60); do [ \"$(kubectl get node kcna -o jsonpath='{.status.nodeInfo.kubeletVersion}' 2> /dev/null)\" = v1.37.2+k3s1 ] && break; sleep 3; done",
+          "text": "ノードの版が v1.37.2+k3s1 になるまで待つ (API サーバーが始め直す間は答えないので、3 秒おきに最大 3 分)"
+        },
+        {
+          "code": "kubectl wait --for=condition=Ready node/kcna --timeout=180s",
+          "text": "ノードが Ready になるまで待つ"
+        },
+        {
+          "code": "kubectl get nodes",
+          "text": "ノードの一覧を出す"
+        },
+        {
+          "code": "sudo rm -r /var/lib/rancher/k3s/server/db-v1.37",
+          "text": "脇へ置いた記録の置き場を消す"
+        }
+      ],
+      "output": "[INFO]  Using v1.37.2+k3s1 as release\n[INFO]  Downloading hash https://github.com/k3s-io/k3s/releases/download/v1.37.2%2Bk3s1/sha256sum-amd64.txt\n[INFO]  Downloading binary https://github.com/k3s-io/k3s/releases/download/v1.37.2%2Bk3s1/k3s\n[INFO]  Verifying binary download\n[INFO]  Installing k3s to /usr/local/bin/k3s\n[INFO]  Skipping installation of SELinux RPM\n[INFO]  Skipping /usr/local/bin/kubectl symlink to k3s, already exists\n[INFO]  Skipping /usr/local/bin/crictl symlink to k3s, already exists\n[INFO]  Skipping /usr/local/bin/ctr symlink to k3s, already exists\n[INFO]  Creating killall script /usr/local/bin/k3s-killall.sh\n[INFO]  Creating uninstall script /usr/local/bin/k3s-uninstall.sh\n[INFO]  env: Creating environment file /etc/systemd/system/k3s.service.env\n[INFO]  systemd: Creating service file /etc/systemd/system/k3s.service\n[INFO]  systemd: Enabling k3s unit\nCreated symlink /etc/systemd/system/multi-user.target.wants/k3s.service → /etc/systemd/system/k3s.service.\n[INFO]  systemd: Starting k3s\nnode/kcna condition met\nNAME   STATUS   ROLES           AGE     VERSION\nkcna   Ready    control-plane   6m32s   v1.37.2+k3s1",
+      "read": "VERSION が v1.37.2+k3s1 になります。脇へ置いた db-v1.37 は、もう使わないので消しました。/root/k3s-backup の控えは、最後の片付けまで残します。",
+      "trouble": [
+        {
+          "symptom": "待つ行のあとも VERSION が古い",
+          "check": "sudo journalctl -u k3s -n 20 --no-pager を打つ",
+          "fix": "エラーの行を読む"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://docs.k3s.io/upgrades/manual"
+    },
+    {
+      "id": "cordon",
+      "text": "ノードに「新しい Pod を置かない」印 (cordon) を付けて、Pod を増やすと何が起きるかを見ます。",
+      "why": "cordon は、動いている Pod はそのままに、新しい Pod だけを止めます。ノードの手入れの前に、まず付ける印です。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl cordon kcna\nkubectl get nodes\nkubectl scale deployment keep -n ch12 --replicas=3\nsleep 5\nkubectl get pods -n ch12\nkubectl uncordon kcna\nkubectl rollout status deployment/keep -n ch12 --timeout=120s"
+      },
+      "lines": [
+        {
+          "code": "kubectl cordon kcna",
+          "text": "kcna に新しい Pod を置かない印を付ける"
+        },
+        {
+          "code": "kubectl get nodes",
+          "text": "ノードの一覧を出す"
+        },
+        {
+          "code": "kubectl scale deployment keep -n ch12 --replicas=3",
+          "text": "keep を 3 つに増やす"
+        },
+        {
+          "code": "sleep 5",
+          "text": "5 秒待つ"
+        },
+        {
+          "code": "kubectl get pods -n ch12",
+          "text": "ch12 の Pod を出す"
+        },
+        {
+          "code": "kubectl uncordon kcna",
+          "text": "印を外す"
+        },
+        {
+          "code": "kubectl rollout status deployment/keep -n ch12 --timeout=120s",
+          "text": "3 つ目が動くまで待つ"
+        }
+      ],
+      "output": "node/kcna cordoned\nNAME   STATUS                     ROLES           AGE     VERSION\nkcna   Ready,SchedulingDisabled   control-plane   6m33s   v1.37.2+k3s1\ndeployment.apps/keep scaled\nNAME                    READY   STATUS    RESTARTS   AGE\nkeep-57564d8bff-5lf5t   1/1     Running   0          2m32s\nkeep-57564d8bff-flq7k   0/1     Pending   0          5s\nkeep-57564d8bff-pzqsg   1/1     Running   0          2m32s\nnode/kcna uncordoned\nWaiting for deployment \"keep\" rollout to finish: 2 of 3 updated replicas are available...\ndeployment \"keep\" successfully rolled out",
+      "read": "STATUS が Ready,SchedulingDisabled になり、増やした 3 つ目は Pending です。前からの 2 つは動き続けます。uncordon で印を外すと、Pending の Pod が置かれて動きます。",
+      "trouble": [
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_cordon/"
+    },
+    {
+      "id": "pdb",
+      "text": "Pod を一度にいくつまで止めてよいかの約束 (PodDisruptionBudget) を作り、わざと、それに当たる drain を打ちます。30 秒ほどかかります。",
+      "why": "drain は、ノードに印 (cordon) を付けてから、Pod を退かせます。退かせるときは、この約束を守ります。約束に当たると、drain は待ち続けます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl create poddisruptionbudget keep -n ch12 --selector=app=keep --min-available=3\nkubectl drain kcna --ignore-daemonsets --delete-emptydir-data --timeout=30s\nkubectl uncordon kcna"
+      },
+      "lines": [
+        {
+          "code": "kubectl create poddisruptionbudget keep -n ch12 --selector=app=keep --min-available=3",
+          "text": "keep の Pod を、いつも 3 つは動かしておく約束を作る"
+        },
+        {
+          "code": "kubectl drain kcna --ignore-daemonsets --delete-emptydir-data --timeout=30s",
+          "text": "kcna を空けようとする。30 秒であきらめる"
+        },
+        {
+          "code": "kubectl uncordon kcna",
+          "text": "drain が付けた印を外す"
+        }
+      ],
+      "output": "poddisruptionbudget.policy/keep created\nnode/kcna cordoned\nWarning: ignoring DaemonSet-managed Pods: kube-system/svclb-traefik-f509fe05-lht4m\nevicting pod ch12/keep-57564d8bff-5lf5t\nevicting pod kube-system/traefik-7c8677d4d9-999dz\nevicting pod ch12/keep-57564d8bff-flq7k\nevicting pod ch12/keep-57564d8bff-pzqsg\nevicting pod kube-system/coredns-7cfb7bc9c7-cw6bh\nevicting pod kube-system/helm-install-traefik-gh9vg\nevicting pod kube-system/local-path-provisioner-5598c9cb4c-zxxc2\nevicting pod kube-system/metrics-server-6dc596dfb8-mzdkq\nevicting pod kube-system/helm-install-gateway-api-crd-mmkw9\nevicting pod kube-system/helm-install-traefik-crd-vcz48\nerror when evicting pods/\"keep-57564d8bff-flq7k\" -n \"ch12\" (will retry after 5s): Cannot evict pod as it would violate the pod's disruption budget.\nerror when evicting pods/\"keep-57564d8bff-5lf5t\" -n \"ch12\" (will retry after 5s): Cannot evict pod as it would violate the pod's disruption budget.\nerror when evicting pods/\"keep-57564d8bff-pzqsg\" -n \"ch12\" (will retry after 5s): Cannot evict pod as it would violate the pod's disruption budget.\nevicting pod ch12/keep-57564d8bff-5lf5t\nerror when evicting pods/\"keep-57564d8bff-5lf5t\" -n \"ch12\" (will retry after 5s): Cannot evict pod as it would violate the pod's disruption budget.\nevicting pod ch12/keep-57564d8bff-flq7k\nerror when evicting pods/\"keep-57564d8bff-flq7k\" -n \"ch12\" (will retry after 5s): Cannot evict pod as it would violate the pod's disruption budget.\nevicting pod ch12/keep-57564d8bff-pzqsg\nerror when evicting pods/\"keep-57564d8bff-pzqsg\" -n \"ch12\" (will retry after 5s): Cannot evict pod as it would violate the pod's disruption budget.\nI1128 05:21:28.946120    7657 request.go:754] \"Waited before sending request\" delay=\"1.064891737s\" reason=\"client-side throttling, not priority and fairness\" verb=\"GET\" URL=\"https://127.0.0.1:6443/api/v1/namespaces/kube-system/pods/metrics-server-6dc596dfb8-mzdkq\"\npod/traefik-7c8677d4d9-999dz evicted\npod/coredns-7cfb7bc9c7-cw6bh evicted\npod/metrics-server-6dc596dfb8-mzdkq evicted\npod/local-path-provisioner-5598c9cb4c-zxxc2 evicted\nevicting pod ch12/keep-57564d8bff-5lf5t\nevicting pod ch12/keep-57564d8bff-flq7k\nerror when evicting pods/\"keep-57564d8bff-5lf5t\" -n \"ch12\" (will retry after 5s): Cannot evict pod as it would violate the pod's disruption budget.\nerror when evicting pods/\"keep-57564d8bff-flq7k\" -n \"ch12\" (will retry after 5s): Cannot evict pod as it would violate the pod's disruption budget.\nevicting pod ch12/keep-57564d8bff-pzqsg\nerror when evicting pods/\"keep-57564d8bff-pzqsg\" -n \"ch12\" (will retry after 5s): Cannot evict pod as it would violate the pod's disruption budget.\npod/helm-install-traefik-gh9vg evicted\nevicting pod ch12/keep-57564d8bff-5lf5t\nerror when evicting pods/\"keep-57564d8bff-5lf5t\" -n \"ch12\" (will retry after 5s): Cannot evict pod as it would violate the pod's disruption budget.\nevicting pod ch12/keep-57564d8bff-flq7k\nerror when evicting pods/\"keep-57564d8bff-flq7k\" -n \"ch12\" (will retry after 5s): Cannot evict pod as it would violate the pod's disruption budget.\nevicting pod ch12/keep-57564d8bff-pzqsg\nerror when evicting pods/\"keep-57564d8bff-pzqsg\" -n \"ch12\" (will retry after 5s): Cannot evict pod as it would violate the pod's disruption budget.\npod/helm-install-gateway-api-crd-mmkw9 evicted\nevicting pod ch12/keep-57564d8bff-5lf5t\nerror when evicting pods/\"keep-57564d8bff-5lf5t\" -n \"ch12\" (will retry after 5s): Cannot evict pod as it would violate the pod's disruption budget.\npod/helm-install-traefik-crd-vcz48 evicted\nevicting pod ch12/keep-57564d8bff-flq7k\nerror when evicting pods/\"keep-57564d8bff-flq7k\" -n \"ch12\" (will retry after 5s): Cannot evict pod as it would violate the pod's disruption budget.\nevicting pod ch12/keep-57564d8bff-pzqsg\nerror when evicting pods/\"keep-57564d8bff-pzqsg\" -n \"ch12\" (will retry after 5s): Cannot evict pod as it would violate the pod's disruption budget.\nevicting pod ch12/keep-57564d8bff-5lf5t\nerror when evicting pods/\"keep-57564d8bff-5lf5t\" -n \"ch12\" (will retry after 5s): Cannot evict pod as it would violate the pod's disruption budget.\nevicting pod ch12/keep-57564d8bff-flq7k\nerror when evicting pods/\"keep-57564d8bff-flq7k\" -n \"ch12\" (will retry after 5s): Cannot evict pod as it would violate the pod's disruption budget.\nevicting pod ch12/keep-57564d8bff-pzqsg\nerror when evicting pods/\"keep-57564d8bff-pzqsg\" -n \"ch12\" (will retry after 5s): Cannot evict pod as it would violate the pod's disruption budget.\nevicting pod ch12/keep-57564d8bff-5lf5t\nevicting pod ch12/keep-57564d8bff-flq7k\nevicting pod ch12/keep-57564d8bff-pzqsg\nThere are pending pods in node \"kcna\" when an error occurred: [error when evicting pods/\"keep-57564d8bff-5lf5t\" -n \"ch12\": global timeout reached: 30s, error when evicting pods/\"keep-57564d8bff-flq7k\" -n \"ch12\": global timeout reached: 30s, error when evicting pods/\"keep-57564d8bff-pzqsg\" -n \"ch12\": global timeout reached: 30s]\npod/keep-57564d8bff-5lf5t\npod/keep-57564d8bff-flq7k\npod/keep-57564d8bff-pzqsg\nerror: unable to drain node \"kcna\" due to error: [error when evicting pods/\"keep-57564d8bff-5lf5t\" -n \"ch12\": global timeout reached: 30s, error when evicting pods/\"keep-57564d8bff-flq7k\" -n \"ch12\": global timeout reached: 30s, error when evicting pods/\"keep-57564d8bff-pzqsg\" -n \"ch12\": global timeout reached: 30s], continuing command...\nThere are pending nodes to be drained:\n kcna\nerror when evicting pods/\"keep-57564d8bff-5lf5t\" -n \"ch12\": global timeout reached: 30s\nerror when evicting pods/\"keep-57564d8bff-flq7k\" -n \"ch12\": global timeout reached: 30s\nerror when evicting pods/\"keep-57564d8bff-pzqsg\" -n \"ch12\": global timeout reached: 30s\nnode/kcna uncordoned",
+      "read": "drain は、ほかの Pod を退かせながら、keep には Cannot evict pod as it would violate the pod's disruption budget (約束を破るので退かせない) をくり返し、30 秒で global timeout reached になって、error: unable to drain node で止まります。--ignore-daemonsets は DaemonSet の Pod (svclb-traefik) を退かせずに進む、--delete-emptydir-data は emptyDir の中身が消えてもよい、という同意です。ほかの Pod (coredns など) は退かされ、Deployment がすぐに新しい名前で作り直しています。最後の uncordon で印を外すので、作り直された Pod は kcna に置かれます。",
+      "trouble": [
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/tasks/run-application/configure-pdb/"
+    },
+    {
+      "id": "drain",
+      "text": "約束を外して、1 台しかないノードを空けると何が起きるかを見ます。そのあと、印を外して戻します。",
+      "why": "ふつうは、ほかのノードに Pod を移してから手入れをします。ノードが 1 台だと、移す先がありません。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl delete poddisruptionbudget keep -n ch12\nkubectl drain kcna --ignore-daemonsets --delete-emptydir-data --timeout=120s\nkubectl get pods -A\nkubectl uncordon kcna\nkubectl rollout status deployment/keep -n ch12 --timeout=180s\nkubectl rollout status deployment/coredns -n kube-system --timeout=180s"
+      },
+      "lines": [
+        {
+          "code": "kubectl delete poddisruptionbudget keep -n ch12",
+          "text": "約束を消す"
+        },
+        {
+          "code": "kubectl drain kcna --ignore-daemonsets --delete-emptydir-data --timeout=120s",
+          "text": "kcna を空ける"
+        },
+        {
+          "code": "kubectl get pods -A",
+          "text": "全部の Pod を出す"
+        },
+        {
+          "code": "kubectl uncordon kcna",
+          "text": "印を外す"
+        },
+        {
+          "code": "kubectl rollout status deployment/keep -n ch12 --timeout=180s",
+          "text": "keep が戻るまで待つ"
+        },
+        {
+          "code": "kubectl rollout status deployment/coredns -n kube-system --timeout=180s",
+          "text": "名前を引く部品 coredns が戻るまで待つ"
+        }
+      ],
+      "output": "poddisruptionbudget.policy \"keep\" deleted from ch12 namespace\nnode/kcna cordoned\nWarning: ignoring DaemonSet-managed Pods: kube-system/svclb-traefik-f509fe05-lht4m\nevicting pod kube-system/helm-install-gateway-api-crd-b2pwj\nevicting pod ch12/keep-57564d8bff-5lf5t\nevicting pod kube-system/traefik-7c8677d4d9-zgfs9\nevicting pod kube-system/helm-install-traefik-crd-ckpph\nevicting pod kube-system/helm-install-traefik-pxjv8\nevicting pod kube-system/local-path-provisioner-5598c9cb4c-vclt5\nevicting pod kube-system/metrics-server-6dc596dfb8-ht8mm\nevicting pod kube-system/traefik-68df944ff7-9gnw6\nevicting pod ch12/keep-57564d8bff-flq7k\nevicting pod ch12/keep-57564d8bff-pzqsg\nevicting pod kube-system/coredns-7cfb7bc9c7-zghfm\nI1128 05:22:09.016465    9024 request.go:754] \"Waited before sending request\" delay=\"1.097180563s\" reason=\"client-side throttling, not priority and fairness\" verb=\"GET\" URL=\"https://127.0.0.1:6443/api/v1/namespaces/kube-system/pods/helm-install-gateway-api-crd-b2pwj\"\nI1128 05:22:19.016657    9024 request.go:754] \"Waited before sending request\" delay=\"1.99151537s\" reason=\"client-side throttling, not priority and fairness\" verb=\"GET\" URL=\"https://127.0.0.1:6443/api/v1/namespaces/kube-system/pods/helm-install-traefik-crd-ckpph\"\npod/coredns-7cfb7bc9c7-zghfm evicted\npod/keep-57564d8bff-5lf5t evicted\npod/keep-57564d8bff-pzqsg evicted\npod/keep-57564d8bff-flq7k evicted\npod/metrics-server-6dc596dfb8-ht8mm evicted\npod/local-path-provisioner-5598c9cb4c-vclt5 evicted\npod/traefik-7c8677d4d9-zgfs9 evicted\npod/helm-install-traefik-pxjv8 evicted\npod/helm-install-gateway-api-crd-b2pwj evicted\npod/helm-install-traefik-crd-ckpph evicted\npod/traefik-68df944ff7-9gnw6 evicted\nnode/kcna drained\nNAMESPACE     NAME                                      READY   STATUS    RESTARTS        AGE\nch12          keep-57564d8bff-6n7kl                     0/1     Pending   0               64s\nch12          keep-57564d8bff-fc79h                     0/1     Pending   0               71s\nch12          keep-57564d8bff-t8crj                     0/1     Pending   0               65s\nkube-system   coredns-7cfb7bc9c7-2nmlb                  0/1     Pending   0               71s\nkube-system   helm-install-gateway-api-crd-2sjgl        0/1     Pending   0               52s\nkube-system   helm-install-traefik-crd-ppmvz            0/1     Pending   0               58s\nkube-system   helm-install-traefik-m7dxl                0/1     Pending   0               58s\nkube-system   local-path-provisioner-5598c9cb4c-g2klc   0/1     Pending   0               71s\nkube-system   metrics-server-6dc596dfb8-8w8vv           0/1     Pending   0               71s\nkube-system   svclb-traefik-f509fe05-lht4m              2/2     Running   2 (6m59s ago)   7m36s\nkube-system   traefik-68df944ff7-x8vhh                  0/1     Pending   0               71s\nkube-system   traefik-7c8677d4d9-kb5cq                  0/1     Pending   0               66s\nnode/kcna uncordoned\nWaiting for deployment \"keep\" rollout to finish: 0 of 3 updated replicas are available...\nWaiting for deployment \"keep\" rollout to finish: 1 of 3 updated replicas are available...\nWaiting for deployment \"keep\" rollout to finish: 2 of 3 updated replicas are available...\ndeployment \"keep\" successfully rolled out\ndeployment \"coredns\" successfully rolled out",
+      "read": "drain は node/kcna drained で終わり、全部の Pod が Pending (置き場の無い待ち) になります。I で始まる Waited before sending request ... client-side throttling の行は、kubectl が頼みごとの間をあけたという知らせで、失敗ではありません (前の手順の drain にも出ることがあります)。残るのは DaemonSet の svclb-traefik だけです。この間は、名前を引く coredns も止まっています。1 台のクラスターで drain するのは、全部を止めるのと同じです。退いた Pod は、drain の間に Deployment が新しい名前で作り直していて、置き場が無いので Pending で待っています。uncordon で印を外すと、置き場ができて動き出します。",
+      "trouble": [
+        {
+          "symptom": "drain が global timeout reached で止まる",
+          "check": "kubectl get pdb -A を打つ",
+          "fix": "約束が残っている。消してから打ち直す"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/tasks/administer-cluster/safely-drain-node/"
+    },
+    {
+      "id": "node2-words",
+      "text": "【任意】ここから node2- の手順は、任意です。2 台目の仮想マシン kcna2 を作り、k3s の agent (Pod を動かすだけのノード) として足し、Pod の置き場所が分かれるのを見てから、外します。PC のメモリに 1 GB 以上の余りがあるときだけ行います。しない人は、node2- の手順に印だけ付けて、check-before-delete へ進みます。",
+      "why": "2 台あると、drain で Pod を別のノードへ移す、本来の使い方を見られます。k3s の agent の最小は、CPU 1 つ・メモリ 512 MB です。",
+      "source": "https://docs.k3s.io/installation/requirements"
+    },
+    {
+      "id": "node2-launch",
+      "text": "【任意】kcna から exit で出て (または、ホストの端末をもう 1 つ開いて)、ホストで 2 台目の仮想マシン kcna2 を、CPU 1 つ・メモリ 1 GB で作り、kcna の住所 (IP) を見ます。最後に kcna に入り直します。",
+      "why": "agent は、server (kcna) の住所に向けてつなぎます。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass launch 24.04 --name kcna2 --cpus 1 --memory 1G --disk 10G\nmultipass info kcna\nmultipass shell kcna"
+      },
+      "lines": [
+        {
+          "code": "multipass launch 24.04 --name kcna2 --cpus 1 --memory 1G --disk 10G",
+          "text": "kcna2 を作る"
+        },
+        {
+          "code": "multipass info kcna",
+          "text": "kcna の様子を出す。IPv4 の行が住所"
+        },
+        {
+          "code": "multipass shell kcna",
+          "text": "kcna に入り直す"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "Launched: kcna2 が出て、info の IPv4 に kcna の住所が出ます。次の手順で使うので、控えます。最後の行で、行の頭が ubuntu@kcna に戻ります。",
+      "trouble": [
+        {
+          "symptom": "メモリが足りないと出る",
+          "check": "ほかのアプリを閉じる",
+          "fix": "それでも足りなければ、node2- の手順はしない"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/launch/"
+    },
+    {
+      "id": "node2-token",
+      "text": "【任意】kcna の中で、kcna2 を参加させるための、1 時間で切れる合い言葉 (bootstrap token) を作ります。",
+      "why": "server の token (/var/lib/rancher/k3s/server/token) でも参加できますが、それを持つ人は管理者と同じことができます。参加させるだけなら、期限つきの合い言葉を作って渡します。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "sudo k3s token create --ttl 1h --description kcna2"
+      },
+      "lines": [
+        {
+          "code": "sudo k3s token create --ttl 1h --description kcna2",
+          "text": "1 時間だけ使える参加用の合い言葉を作る"
+        }
+      ],
+      "output": "K10d9b82eb2d8ae687444c0a3377de52cfa9eb70e57f846732d970ef09c50794492::xxxxxx.xxxxxxxxxxxxxxxx",
+      "read": "K10 で始まり、:: のあとに「6 文字.16 文字」が続く合い言葉が 1 行出ます。K10 から :: までは、クラスターの証明書の指紋 (参加する側が、本物の kcna かを確かめるのに使う) で、:: のあとが合い言葉の本体です (この画面では本体を x で伏せています)。次の手順で使うので控え、人に見せません。1 時間たつと使えなくなります。",
+      "trouble": [
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://docs.k3s.io/cli/token"
+    },
+    {
+      "id": "node2-join",
+      "text": "【任意】kcna から exit で出て、ホストで kcna2 の中に入り、kcna の住所と合い言葉を付けて、k3s を agent として入れます。kcna の中で打たないように、入れる行は、名前が kcna2 のときだけ動く形にしてあります。",
+      "why": "K3S_URL を付けて入れると、k3s は server ではなく agent として入ります。kcna の中で打つと、kcna に agent が足されてしまいます。版は、server と同じにします (agent が server より新しいのは決まりで許されません)。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass shell kcna2\nhostname\nexport K3S_URL=https://192.0.2.10:6443\nexport K3S_TOKEN='K10xxxx::xxxxxx.xxxxxxxxxxxxxxxx'\n[ \"$(hostname)\" = kcna2 ] && curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=v1.37.2+k3s1 sh -\nsystemctl is-active k3s-agent\nexit\nmultipass shell kcna"
+      },
+      "lines": [
+        {
+          "code": "multipass shell kcna2",
+          "text": "kcna2 の中に入る"
+        },
+        {
+          "code": "hostname",
+          "text": "このマシンの名前を出す (kcna2 と出るか)"
+        },
+        {
+          "code": "export K3S_URL=https://192.0.2.10:6443",
+          "text": "つなぐ先。192.0.2.10 を、控えた kcna の IPv4 に替えて打つ"
+        },
+        {
+          "code": "export K3S_TOKEN='K10xxxx::xxxxxx.xxxxxxxxxxxxxxxx'",
+          "text": "合い言葉。控えた 1 行全部に替えて打つ"
+        },
+        {
+          "code": "[ \"$(hostname)\" = kcna2 ] && curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=v1.37.2+k3s1 sh -",
+          "text": "名前が kcna2 のときだけ、agent として入れる"
+        },
+        {
+          "code": "systemctl is-active k3s-agent",
+          "text": "agent が動いているかを出す"
+        },
+        {
+          "code": "exit",
+          "text": "kcna2 から出る"
+        },
+        {
+          "code": "multipass shell kcna",
+          "text": "kcna に入り直す"
+        }
+      ],
+      "unverified": "kcna2 の中で打つ手順は、Multipass の中の手順なので実機では確かめていません。この章を書いた環境では、QEMU の仮想マシン 2 台で、IP と合い言葉を自分のものに替えて同じ流れを試しました。",
+      "read": "hostname が kcna2 のときだけ、続けて打ちます。入れる出力の最後が systemd: Starting k3s-agent で、active と出れば参加しています。agent には kubectl の設定が無いので、様子は kcna で見ます。",
+      "trouble": [
+        {
+          "symptom": "active にならない",
+          "check": "sudo journalctl -u k3s-agent -n 20 --no-pager を打つ",
+          "fix": "住所か合い言葉が違う。export の 2 行を見直して打ち直す"
+        },
+        {
+          "symptom": "入れる行が何も出さずに終わる",
+          "check": "hostname を打つ",
+          "fix": "kcna2 の中にいない。multipass shell kcna2 で入る"
+        }
+      ],
+      "source": "https://docs.k3s.io/quick-start"
+    },
+    {
+      "id": "node2-nodes",
+      "text": "【任意】kcna で、kcna2 が参加したことを見ます。cd ~/ch12 から打ちます。",
+      "why": "agent は、server に名乗り出て、ノードとして加わります。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cd ~/ch12\nkubectl wait --for=condition=Ready node/kcna2 --timeout=180s\nkubectl get nodes -o wide"
+      },
+      "lines": [
+        {
+          "code": "cd ~/ch12",
+          "text": "作業のフォルダへ移る"
+        },
+        {
+          "code": "kubectl wait --for=condition=Ready node/kcna2 --timeout=180s",
+          "text": "kcna2 が Ready になるまで待つ"
+        },
+        {
+          "code": "kubectl get nodes -o wide",
+          "text": "ノードの一覧を、住所と版つきで出す"
+        }
+      ],
+      "output": "node/kcna2 condition met\nNAME    STATUS   ROLES           AGE     VERSION        INTERNAL-IP   EXTERNAL-IP   OS-IMAGE             KERNEL-VERSION              CONTAINER-RUNTIME\nkcna    Ready    control-plane   9m22s   v1.37.2+k3s1   10.0.2.15     <none>        Ubuntu 24.04.5 LTS   6.8.0-147-generic (amd64)   containerd://2.3.7-k3s1\nkcna2   Ready    <none>          4s      v1.37.2+k3s1   10.0.3.15     <none>        Ubuntu 24.04.5 LTS   6.8.0-147-generic (amd64)   containerd://2.3.7-k3s1",
+      "read": "kcna2 が加わり、ROLES が <none> (control-plane でない、Pod を動かすだけのノード) です。INTERNAL-IP は、それぞれの仮想マシンの住所です (この出力は、この章を書いた環境の住所です。Multipass では、multipass info で見た住所が出ます)。",
+      "trouble": [
+        {
+          "symptom": "kcna2 が NotFound になる",
+          "check": "30 秒待ってもう一度打つ",
+          "fix": "参加の途中。2 分たっても出なければ、node2-join を見直す"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/architecture/nodes/"
+    },
+    {
+      "id": "node2-spread",
+      "text": "【任意】keep を 4 つに増やし、Pod が 2 台に分かれて置かれるのを見ます。",
+      "why": "スケジューラーは、空いているノードに Pod を散らして置きます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl scale deployment keep -n ch12 --replicas=4\nkubectl rollout status deployment/keep -n ch12 --timeout=180s\nkubectl get pods -n ch12 -o wide"
+      },
+      "lines": [
+        {
+          "code": "kubectl scale deployment keep -n ch12 --replicas=4",
+          "text": "keep を 4 つにする"
+        },
+        {
+          "code": "kubectl rollout status deployment/keep -n ch12 --timeout=180s",
+          "text": "4 つ動くまで待つ"
+        },
+        {
+          "code": "kubectl get pods -n ch12 -o wide",
+          "text": "Pod を、置かれたノードつきで出す"
+        }
+      ],
+      "output": "deployment.apps/keep scaled\nWaiting for deployment \"keep\" rollout to finish: 3 of 4 updated replicas are available...\ndeployment \"keep\" successfully rolled out\nNAME                    READY   STATUS    RESTARTS   AGE     IP           NODE    NOMINATED NODE   READINESS GATES\nkeep-57564d8bff-6d8qn   1/1     Running   0          16s     10.42.1.2    kcna2   <none>           <none>\nkeep-57564d8bff-6n7kl   1/1     Running   0          2m9s    10.42.0.36   kcna    <none>           <none>\nkeep-57564d8bff-fc79h   1/1     Running   0          2m16s   10.42.0.40   kcna    <none>           <none>\nkeep-57564d8bff-t8crj   1/1     Running   0          2m10s   10.42.0.39   kcna    <none>           <none>",
+      "read": "NODE の欄に kcna と kcna2 の両方が出ます。前からの Pod は kcna のまま動き続け、増やした分が空いている kcna2 に置かれます。動いている Pod を、わざわざ移すことはしません。kcna2 の Pod は、kcna2 がイメージを取ってきてから動くので、少し遅れます。",
+      "trouble": [
+        {
+          "symptom": "toomanyrequests や 429 と出る",
+          "check": "kubectl describe の Events で、Failed to pull image の行の終わりを見る",
+          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る。短い「429 Too Many Requests」だけのときは、使いすぎを防ぐ別の上限なので、数分待ってからもう一度行う"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/scheduling-eviction/kube-scheduler/"
+    },
+    {
+      "id": "node2-drain",
+      "text": "【任意】kcna2 を空けて、Pod が kcna に移るのを見ます。",
+      "why": "2 台あれば、drain は印を付けてから Pod を退かせ、Deployment が残りのノードに作り直します。手入れの前の、本来の使い方です。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl drain kcna2 --ignore-daemonsets --delete-emptydir-data --timeout=120s\nkubectl rollout status deployment/keep -n ch12 --timeout=180s\nkubectl get pods -n ch12 -o wide"
+      },
+      "lines": [
+        {
+          "code": "kubectl drain kcna2 --ignore-daemonsets --delete-emptydir-data --timeout=120s",
+          "text": "kcna2 を空ける"
+        },
+        {
+          "code": "kubectl rollout status deployment/keep -n ch12 --timeout=180s",
+          "text": "keep が 4 つそろうまで待つ"
+        },
+        {
+          "code": "kubectl get pods -n ch12 -o wide",
+          "text": "Pod の置き場所を出す"
+        }
+      ],
+      "output": "node/kcna2 cordoned\nWarning: ignoring DaemonSet-managed Pods: kube-system/svclb-traefik-f509fe05-th9pj\nevicting pod ch12/keep-57564d8bff-6d8qn\npod/keep-57564d8bff-6d8qn evicted\nnode/kcna2 drained\ndeployment \"keep\" successfully rolled out\nNAME                    READY   STATUS    RESTARTS   AGE     IP           NODE   NOMINATED NODE   READINESS GATES\nkeep-57564d8bff-6n7kl   1/1     Running   0          2m14s   10.42.0.36   kcna   <none>           <none>\nkeep-57564d8bff-fc79h   1/1     Running   0          2m21s   10.42.0.40   kcna   <none>           <none>\nkeep-57564d8bff-t8crj   1/1     Running   0          2m15s   10.42.0.39   kcna   <none>           <none>\nkeep-57564d8bff-vhsjs   1/1     Running   0          4s      10.42.0.42   kcna   <none>           <none>",
+      "read": "evicting pod のあと node/kcna2 drained と出て、keep の Pod は全部 kcna で動きます。kcna2 にあった Pod は、kcna に作り直されました (名前が変わっています)。",
+      "trouble": [
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/tasks/administer-cluster/safely-drain-node/"
+    },
+    {
+      "id": "node2-uninstall",
+      "text": "【任意】kcna から exit で出て (または、ホストの端末をもう 1 つ開いて)、ホストから kcna2 の中の agent の k3s を消し、kcna に入り直します。",
+      "why": "ノードを外すときは、空けたあと、そのマシンの k3s (kubelet) を止めてから、一覧から消します。動いたまま一覧から消すと、名乗り出直すことがあるためです。agent を消す道具は k3s-agent-uninstall.sh です (server は k3s-uninstall.sh)。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass exec kcna2 -- hostname\nmultipass exec kcna2 -- sudo /usr/local/bin/k3s-agent-uninstall.sh\nmultipass shell kcna"
+      },
+      "lines": [
+        {
+          "code": "multipass exec kcna2 -- hostname",
+          "text": "kcna2 の名前を出す (kcna2 と出るか)"
+        },
+        {
+          "code": "multipass exec kcna2 -- sudo /usr/local/bin/k3s-agent-uninstall.sh",
+          "text": "kcna2 の中で、agent の k3s を消す"
+        },
+        {
+          "code": "multipass shell kcna",
+          "text": "kcna に入り直す"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "1 行目で kcna2 と出たときだけ、2 行目を打ちます。2 行目は、消したものの一覧を出して終わります。",
+      "trouble": [
+        {
+          "symptom": "kcna2 が見つからないと出る",
+          "check": "multipass list を打つ",
+          "fix": "もう消えている"
+        }
+      ],
+      "source": "https://docs.k3s.io/installation/uninstall"
+    },
+    {
+      "id": "node2-delete",
+      "text": "【任意】kcna で、kcna2 をクラスターのノードの一覧から消します。cd ~/ch12 から打ちます。",
+      "why": "k3s を止めたノードは、一覧に NotReady で残ります。一覧から消して、外し終えます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cd ~/ch12\nkubectl get nodes\nkubectl delete node kcna2\nkubectl get nodes\nkubectl scale deployment keep -n ch12 --replicas=2"
+      },
+      "lines": [
+        {
+          "code": "cd ~/ch12",
+          "text": "作業のフォルダへ移る"
+        },
+        {
+          "code": "kubectl get nodes",
+          "text": "ノードの一覧を出す"
+        },
+        {
+          "code": "kubectl delete node kcna2",
+          "text": "kcna2 をノードの一覧から消す"
+        },
+        {
+          "code": "kubectl get nodes",
+          "text": "ノードの一覧をもう一度出す"
+        },
+        {
+          "code": "kubectl scale deployment keep -n ch12 --replicas=2",
+          "text": "keep を 2 つに戻す"
+        }
+      ],
+      "output": "node \"kcna2\" deleted\nNAME   STATUS   ROLES           AGE     VERSION\nkcna   Ready    control-plane   9m44s   v1.37.2+k3s1\ndeployment.apps/keep scaled",
+      "read": "消す前の一覧で、kcna2 は Ready のままのことがあります (止まったと分かるまで、少し時間がかかるためです)。時間がたつと NotReady,SchedulingDisabled になります。node \"kcna2\" deleted のあとの一覧は、kcna だけです。",
+      "trouble": [
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/architecture/nodes/#manual-node-administration"
+    },
+    {
+      "id": "node2-remove",
+      "text": "【任意】kcna から exit で出て、ホストで kcna2 を消し、kcna に入り直します。",
+      "why": "もう使わない仮想マシンは、PC の場所を使うので消します。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass delete --purge kcna2\nmultipass list\nmultipass shell kcna"
+      },
+      "lines": [
+        {
+          "code": "multipass delete --purge kcna2",
+          "text": "kcna2 を消す (元に戻せない)"
+        },
+        {
+          "code": "multipass list",
+          "text": "仮想マシンの一覧を出す"
+        },
+        {
+          "code": "multipass shell kcna",
+          "text": "kcna に入り直す"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "一覧に kcna2 が出なくなれば、片付いています。",
+      "trouble": [
+        {
+          "symptom": "kcna2 が見つからないと出る",
+          "check": "multipass list を打つ",
+          "fix": "もう消えている"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/delete/"
+    },
+    {
+      "id": "review",
+      "text": "0 章: 仮想マシンを作り、入る・止める・控える・戻す。1 章: k3s を入れ、部品と記録の置き場を見て、消して入れ直す。2 章: コンテナとイメージ。3 章: 消しても戻る仕組み。4 章: 増やす・減らす・置き場所の決まり。5 章: 更新と巻き戻し。6 章: Service・DNS・Ingress・NetworkPolicy。7 章: ConfigMap と Secret。8 章: 消えない置き場。9 章: Job と CronJob。10 章: 権限と守りと、壊れたものの直し方。11 章: Helm・Kustomize・CRD と、様子の見方。12 章: 控え・更新・巻き戻し・ノードの手入れ。どれも、YAML で「こうあってほしい」を書き、仕組みがそれに合わせ続ける、という同じ考えの上にあります。",
+      "why": "次に何を学ぶかを決めるには、何をもうできるかを並べるのが早いからです。",
+      "source": "https://kubernetes.io/docs/home/"
+    },
+    {
+      "id": "next",
+      "text": "①Kubernetes の公式の文書 (kubernetes.io/docs) の Tasks と Tutorials は、この教材と同じく、手を動かしながら読めます。②次の試験には、運用の CKA (Certified Kubernetes Administrator)、アプリを作る側の CKAD、守りの CKS があり、どれも KCNA と違って、コマンドラインで問題を解く実技の試験です。中身は CNCF と Linux Foundation の試験の案内 (出題の範囲の一覧) で確かめます。③k3s の文書 (docs.k3s.io) の高可用性 (server 3 台と etcd) は、この章の控えと戻しの続きです。④11 章の観測の道具 (Prometheus・OpenTelemetry) や GitOps (Argo CD・Flux) を、メモリに余裕のある環境で入れてみると、名前で覚えたものの中身が分かります。",
+      "why": "どれも、公式の文書と、公式の試験の案内から選んでいます。",
+      "source": "https://www.cncf.io/training/certification/"
+    },
+    {
+      "id": "check-before-delete",
+      "text": "名前空間と控えを消す前に、どのマシンにいるかを見ます。kcna と出なければ、次の手順を打ちません。",
+      "why": "名前空間と、root の控えを消します。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "hostname"
+      },
+      "lines": [
+        {
+          "code": "hostname",
+          "text": "このマシンの名前を出す"
+        }
+      ],
+      "output": "kcna",
+      "read": "kcna と出れば、仮想マシンの中です。",
+      "trouble": [
+        {
+          "symptom": "kcna ではない名前が出る",
+          "check": "行の頭が ubuntu@kcna かを見る",
+          "fix": "ホストにいる。multipass shell kcna で入り、もう一度打つ"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man1/hostname.1.html"
+    },
+    {
+      "id": "delete-namespace",
+      "text": "名前空間 ch12 と、/root/k3s-backup の控えを消します。前の手順で kcna と出たときだけ打ちます。",
+      "why": "控えには、管理者と同じ力のある token が入っています。使い終わったら、残しません。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cd ~\nkubectl delete namespace ch12\nsudo rm -r /root/k3s-backup\nrm -r ~/ch12\nkubectl get namespaces"
+      },
+      "lines": [
+        {
+          "code": "cd ~",
+          "text": "ホームへ戻る"
+        },
+        {
+          "code": "kubectl delete namespace ch12",
+          "text": "ch12 を中のものごと消す"
+        },
+        {
+          "code": "sudo rm -r /root/k3s-backup",
+          "text": "控えを消す"
+        },
+        {
+          "code": "rm -r ~/ch12",
+          "text": "作業のフォルダを消す"
+        },
+        {
+          "code": "kubectl get namespaces",
+          "text": "残りを出す"
+        }
+      ],
+      "output": "namespace \"ch12\" deleted\nNAME              STATUS   AGE\ndefault           Active   10m\nkube-node-lease   Active   10m\nkube-public       Active   10m\nkube-system       Active   10m",
+      "read": "初めからある 4 つの名前空間だけになれば、片付いています。",
+      "trouble": [
+        {
+          "symptom": "消す行がしばらく止まる",
+          "check": "1 分ほど待つ",
+          "fix": "中の Pod が終わるのを待っている"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/"
+    },
+    {
+      "id": "leave",
+      "text": "仮想マシンから出ます。",
+      "why": "次は、ホストで控えを取るためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "exit"
+      },
+      "lines": [
+        {
+          "code": "exit",
+          "text": "今の端末を終える。仮想マシンは動き続ける"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "行の頭が、自分の PC のものに戻ります。",
+      "trouble": [
+        {
+          "symptom": "行の頭が ubuntu@kcna のまま",
+          "check": "もう一度見る",
+          "fix": "もう一度 exit を打つ"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man1/bash.1.html"
+    },
+    {
+      "id": "snapshot",
+      "text": "ホストで、この章を終えた状態の控えを ch12-end という名前で取り、仮想マシンに入り直します。",
+      "why": "最後の片付けで k3s を消す前に、ここへ戻れるようにするためです。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass stop kcna\nmultipass snapshot --name ch12-end kcna\nmultipass list --snapshots\nmultipass shell kcna"
+      },
+      "lines": [
+        {
+          "code": "multipass stop kcna",
+          "text": "止める。控えは、止まっているときだけ取れる。stop は動いている (Running) ときだけ打てる"
+        },
+        {
+          "code": "multipass snapshot --name ch12-end kcna",
+          "text": "今の状態を ch12-end という名前で控える"
+        },
+        {
+          "code": "multipass list --snapshots",
+          "text": "控えの一覧を出す"
+        },
+        {
+          "code": "multipass shell kcna",
+          "text": "止まっている kcna を動かし、中に入り直す"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "一覧に ch12-end が並べば取れています。戻すときは、止めてから multipass restore kcna.ch12-end を打ちます。今の状態も控えるかを聞かれたら、要らなければ no と答えます。最後の行で、行の頭が ubuntu@kcna:~$ に変わります。課題と後片付けは、この中で続けます。",
+      "trouble": [
+        {
+          "symptom": "止まっていないので取れないと出る",
+          "check": "multipass list で State を見る",
+          "fix": "multipass stop kcna で止めてから取る"
+        },
+        {
+          "symptom": "ch12-end がもうあると出る",
+          "check": "multipass list --snapshots を打つ",
+          "fix": "前の控えを使うか、--name ch12-endb のように別の名前にする"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/snapshot/"
+    }
+  ],
+  "cleanup": [
+    {
+      "id": "check-vm",
+      "text": "後片付けは、もう使わないときだけ行います。仮想マシンの中で、どのマシンにいるかを見ます。kcna と出なければ止まり、multipass shell kcna で入ります。",
+      "why": "次の手順は、つないでいるマシンの k3s を消します。自分の PC で打つと、PC の k3s を消してしまうためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "hostname"
+      },
+      "lines": [
+        {
+          "code": "hostname",
+          "text": "このマシンの名前を出す"
+        }
+      ],
+      "output": "kcna",
+      "read": "kcna と出れば、仮想マシンの中です。",
+      "trouble": [
+        {
+          "symptom": "kcna ではない名前が出る",
+          "check": "行の頭が ubuntu@kcna かを見る",
+          "fix": "ホストにいる。multipass shell kcna で入り、もう一度打つ"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man1/hostname.1.html"
+    },
+    {
+      "id": "uninstall-k3s",
+      "text": "前の手順で kcna と出たときだけ、k3s を消します (1 章で一度行ったことの復習です)。",
+      "why": "k3s-uninstall.sh は、k3s を止め、動いている Pod も止めて、記録・ノードの設定・道具を消します。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "/usr/local/bin/k3s-uninstall.sh > ~/uninstall.log 2>&1\ntail -n 2 ~/uninstall.log\nls /usr/local/bin\nsudo ls -A /etc/rancher /var/lib/rancher\nls ~/.kube"
+      },
+      "lines": [
+        {
+          "code": "/usr/local/bin/k3s-uninstall.sh > ~/uninstall.log 2>&1",
+          "text": "k3s を消す。経過はファイルに書く"
+        },
+        {
+          "code": "tail -n 2 ~/uninstall.log",
+          "text": "経過の終わり 2 行を出す"
+        },
+        {
+          "code": "ls /usr/local/bin",
+          "text": "k3s の道具が残っていないかを見る"
+        },
+        {
+          "code": "sudo ls -A /etc/rancher /var/lib/rancher",
+          "text": "設定と記録の置き場を出す"
+        },
+        {
+          "code": "ls ~/.kube",
+          "text": "自分で作った写しを見る"
+        }
+      ],
+      "output": "+ remove_uninstall\n+ rm -f /usr/local/bin/k3s-uninstall.sh\nhelm\n/etc/rancher:\nnode\n\n/var/lib/rancher:\ncache\nk3s.yaml",
+      "read": "経過の終わりで、スクリプトが自分自身を消しています。/usr/local/bin に残るのは、11 章で自分で入れた helm だけです。ほかに残るのは、/etc/rancher/node と、空の /var/lib/rancher、自分で作った ~/.kube の中身 (写しの k3s.yaml と、kubectl が作った API の一覧の控え cache) と ~/.bashrc の KUBECONFIG の行です。",
+      "trouble": [
+        {
+          "symptom": "No such file or directory と出る",
+          "check": "ls /usr/local/bin を打つ",
+          "fix": "もう消えている"
+        }
+      ],
+      "source": "https://docs.k3s.io/installation/uninstall"
+    },
+    {
+      "id": "tidy",
+      "text": "自分で作った写しと記録と、11 章で入れた helm とその設定を消し、~/.bashrc の KUBECONFIG の行を取ります。",
+      "why": "k3s が無いのに残っていても、使えないからです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "rm -r ~/.kube\nrm ~/uninstall.log\nsudo rm /usr/local/bin/helm\nrm -r ~/.config/helm ~/.cache/helm\nsed -i '/^export KUBECONFIG=~\\/.kube\\/k3s.yaml$/d' ~/.bashrc\ngrep -c KUBECONFIG ~/.bashrc || true"
+      },
+      "lines": [
+        {
+          "code": "rm -r ~/.kube",
+          "text": "~/.kube を、写しと kubectl の控えごと消す"
+        },
+        {
+          "code": "rm ~/uninstall.log",
+          "text": "経過のファイルを消す"
+        },
+        {
+          "code": "sudo rm /usr/local/bin/helm",
+          "text": "helm を消す"
+        },
+        {
+          "code": "rm -r ~/.config/helm ~/.cache/helm",
+          "text": "helm の設定と、取ってきたチャートの一覧を消す"
+        },
+        {
+          "code": "sed -i '/^export KUBECONFIG=~\\/.kube\\/k3s.yaml$/d' ~/.bashrc",
+          "text": "~/.bashrc から、1 章で足した行だけを消す"
+        },
+        {
+          "code": "grep -c KUBECONFIG ~/.bashrc || true",
+          "text": "KUBECONFIG の行が残っていないかを数える"
+        }
+      ],
+      "output": "0",
+      "read": "0 と出れば、行が消えています。11 章の作業のフォルダ (~/ch11 など) は、要らなければ rm -r で消します。",
+      "trouble": [
+        {
+          "symptom": "0 でない数が出る",
+          "check": "grep KUBECONFIG ~/.bashrc を打つ",
+          "fix": "自分で別の行を足している。要らなければ、エディタで消す"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man1/sed.1.html"
+    },
+    {
+      "id": "delete-vm",
+      "text": "ホストで、仮想マシン kcna を、控え (snapshot) ごと消します。消すと元に戻せません。また使うなら打ちません (0 章の delete の復習です)。",
+      "why": "仮想マシンは、止めていても PC の場所を使うためです。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "exit\nmultipass delete --purge kcna\nmultipass list"
+      },
+      "lines": [
+        {
+          "code": "exit",
+          "text": "kcna から出る"
+        },
+        {
+          "code": "multipass delete --purge kcna",
+          "text": "kcna を控えごと消す"
+        },
+        {
+          "code": "multipass list",
+          "text": "仮想マシンの一覧を出す"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "No instances found. と出れば、全部片付いています。もう一度始めるときは、0 章から作り直します。",
+      "trouble": [
+        {
+          "symptom": "kcna が無いと出る",
+          "check": "multipass list を打つ",
+          "fix": "もう消えている"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/delete/"
+    }
+  ],
+  "challenges": [
+    {
+      "task": "仮想マシンの中で、practice という名前空間に Deployment web (Pod 2 つ、イメージ nginx:1.27-alpine) を作り、Pod を 1 つまでしか止めない約束 (maxUnavailable 1) の PodDisruptionBudget を作ってください。",
+      "hint": "kubectl create poddisruptionbudget には --max-unavailable があります。",
+      "answer": "kubectl create namespace practice\nkubectl wait --for=create serviceaccount/default -n practice --timeout=60s\nkubectl create deployment web -n practice --image=nginx:1.27-alpine --replicas=2\nkubectl create poddisruptionbudget web -n practice --selector=app=web --max-unavailable=1\nkubectl rollout status deployment/web -n practice --timeout=120s",
+      "verify": "kubectl get pdb web -n practice で ALLOWED DISRUPTIONS が 1 なら正解です。"
+    },
+    {
+      "task": "仮想マシンの中で、今の k3s のノードの版と、コンテナを動かす道具 (containerd) の版を、kubectl だけで 1 行ずつ出してください。",
+      "hint": "ノードの status.nodeInfo にあります。",
+      "answer": "kubectl get node kcna -o jsonpath='{.status.nodeInfo.kubeletVersion}{\"\\n\"}'\nkubectl get node kcna -o jsonpath='{.status.nodeInfo.containerRuntimeVersion}{\"\\n\"}'",
+      "verify": "v1.37.2+k3s1 と containerd:// で始まる版が出れば正解です。"
+    },
+    {
+      "task": "仮想マシンの中で、k3s の記録の置き場にあるファイルを、大きさつきで並べてください。",
+      "hint": "置き場は /var/lib/rancher/k3s/server/db で、root しか読めません。",
+      "answer": "sudo ls -l /var/lib/rancher/k3s/server/db",
+      "verify": "state.db・state.db-shm・state.db-wal が並べば正解です。"
+    }
+  ],
+  "sources": [
+    {
+      "label": "K3s: Manual Upgrades",
+      "url": "https://docs.k3s.io/upgrades/manual"
+    },
+    {
+      "label": "K3s: Rolling Back K3s",
+      "url": "https://docs.k3s.io/upgrades/roll-back"
+    },
+    {
+      "label": "K3s: Backup and Restore",
+      "url": "https://docs.k3s.io/datastore/backup-restore"
+    },
+    {
+      "label": "K3s: etcd-snapshot",
+      "url": "https://docs.k3s.io/cli/etcd-snapshot"
+    },
+    {
+      "label": "K3s: Stopping K3s",
+      "url": "https://docs.k3s.io/upgrades/killall"
+    },
+    {
+      "label": "K3s: token",
+      "url": "https://docs.k3s.io/cli/token"
+    },
+    {
+      "label": "K3s: Requirements",
+      "url": "https://docs.k3s.io/installation/requirements"
+    },
+    {
+      "label": "K3s: Quick-Start Guide",
+      "url": "https://docs.k3s.io/quick-start"
+    },
+    {
+      "label": "K3s: Uninstalling K3s",
+      "url": "https://docs.k3s.io/installation/uninstall"
+    },
+    {
+      "label": "K3s: release channels",
+      "url": "https://update.k3s.io/v1-release/channels"
+    },
+    {
+      "label": "Kubernetes: Version Skew Policy",
+      "url": "https://kubernetes.io/docs/releases/version-skew-policy/"
+    },
+    {
+      "label": "Kubernetes: Releases",
+      "url": "https://kubernetes.io/docs/releases/"
+    },
+    {
+      "label": "Kubernetes: Safely Drain a Node",
+      "url": "https://kubernetes.io/docs/tasks/administer-cluster/safely-drain-node/"
+    },
+    {
+      "label": "Kubernetes: Disruptions",
+      "url": "https://kubernetes.io/docs/concepts/workloads/pods/disruptions/"
+    },
+    {
+      "label": "Kubernetes: Specifying a Disruption Budget for your Application",
+      "url": "https://kubernetes.io/docs/tasks/run-application/configure-pdb/"
+    },
+    {
+      "label": "kubectl drain",
+      "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_drain/"
+    },
+    {
+      "label": "kubectl cordon",
+      "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_cordon/"
+    },
+    {
+      "label": "Kubernetes: Nodes",
+      "url": "https://kubernetes.io/docs/concepts/architecture/nodes/"
+    },
+    {
+      "label": "CNCF: Certification",
+      "url": "https://www.cncf.io/training/certification/"
+    },
+    {
+      "label": "Multipass: launch",
+      "url": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/launch/"
+    },
+    {
+      "label": "Multipass: delete",
+      "url": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/delete/"
+    },
+    {
+      "label": "Docker Hub: 取得の上限",
+      "url": "https://docs.docker.com/docker-hub/usage/"
+    }
+  ]
+}
