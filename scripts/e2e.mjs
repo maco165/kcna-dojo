@@ -674,6 +674,9 @@ async function run(browser, name, width, height) {
   check((await page.locator('.lesson__main a[href="/kcna-dojo/hands-on/run-containers/"]').count()) === 1, `${tag} 章が覆った実習の頭に、章へのリンクが出る`);
   await page.goto(`${BASE}progress/`);
   await page.getByRole('heading', { name: '週ごとの進み具合 (問題演習)' }).waitFor();
+  // 受験の目安: 何もしていなければ 13 細目とも足りず、足りない細目からレッスンとハンドブックへ行ける
+  check((await page.getByText(/^まだです \(足りない細目 13/).count()) === 1 && (await page.locator('.readiness__links a[href*="/handbook/storage/"]').count()) === 1 && (await page.locator('.readiness__links a[href*="/lesson/w6-l5/"]').count()) === 1, `${tag} 進捗に受験の目安と、足りない細目へのリンクが出る`);
+  await noHorizontalOverflow(page, width, `${tag} 進捗 (受験の目安)`);
   check((await page.getByRole('listitem').filter({ hasText: '第 1 週 コンテナの基礎' }).last().innerText()).includes(`/ ${exercises.length}`) && (await page.getByRole('listitem').filter({ hasText: '週ごとの実習' }).count()) === 0, `${tag} 進捗は、問題演習と実践を別に数え、全部覆った週ごとの実習の行は出さない`);
   // 無い章は「見つかりませんでした」と一覧へのリンク
   await page.goto(`${BASE}hands-on/no-such-chapter/`);
@@ -1109,6 +1112,7 @@ async function run(browser, name, width, height) {
   check(true, `${tag} ハンドブックから練習のレッスンへ飛べる`);
   await page.goto(`${BASE}guide/`);
   check(await page.getByRole('heading', { name: '学び方' }).isVisible(), `${tag} 説明のページに学び方が出る`);
+  check((await page.locator('#exam-day h3').count()) === 7 && (await page.locator('#exam-day li a[href^="https://docs.linuxfoundation.org/"]').count()) >= 7, `${tag} 説明のページに、申し込みから結果までの案内が出典つきで出る`);
   await page.getByRole('link', { name: 'Kubernetes Core Concepts' }).click();
   await page.waitForURL(/\/handbook\/core-concepts\//);
   check(true, `${tag} 説明のページの学習要領の表からハンドブックへ飛べる`);

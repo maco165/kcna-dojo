@@ -17,6 +17,12 @@ export const SOURCES = {
   language: { label: '試験の言語', url: 'https://docs.linuxfoundation.org/tc-docs/certification/lf-handbook2/language' },
   curriculum: { label: 'CNCF の公開カリキュラム (KCNA_Curriculum.pdf)', url: 'https://github.com/cncf/curriculum/blob/master/KCNA_Curriculum.pdf' },
   agreement: { label: '認定試験の同意書 (守秘)', url: 'https://docs.linuxfoundation.org/tc-docs/certification/lf-cert-agreement/' },
+  kcna: { label: 'LF の KCNA のページ (英語)', url: 'https://training.linuxfoundation.org/certification/kubernetes-cloud-native-associate/' },
+  scheduling: { label: '受験者ハンドブック: 予約・変更・取り消し', url: 'https://docs.linuxfoundation.org/tc-docs/certification/lf-handbook2/scheduling-or-rescheduling-an-exam' },
+  identification: { label: '受験者ハンドブック: 本人確認', url: 'https://docs.linuxfoundation.org/tc-docs/certification/lf-handbook2/candidate-identification-and-authentication' },
+  takingExam: { label: '受験者ハンドブック: 受験の当日', url: 'https://docs.linuxfoundation.org/tc-docs/certification/lf-handbook2/taking-the-exam' },
+  noPass: { label: '受験者ハンドブック: 不合格のとき', url: 'https://docs.linuxfoundation.org/tc-docs/certification/lf-handbook2/exam-scoring-and-notification/exam-results-no-pass' },
+  certificates: { label: '受験者ハンドブック: 認定と有効期限', url: 'https://docs.linuxfoundation.org/tc-docs/certification/lf-handbook2/certificates-and-certification' },
 } satisfies Record<string, Source>;
 
 /** Kubernetes の名前と生まれ */
@@ -55,6 +61,76 @@ export const EXAM_FACTS: { label: string; value: string; note?: string; sources:
   { label: '言語', value: '問題は日本語。日本語版として申し込む。監督者は英語を話すが、試験のブラウザで日本語を選ぶと監督者・サポートとのやり取りは自動翻訳の日本語になる', sources: [SOURCES.kcnaJp, SOURCES.language] },
   { label: '有効期間', value: '2 年', sources: [SOURCES.kcnaJp] },
   { label: '受験料', value: '$250 (再受験 1 回つき)', sources: [SOURCES.kcnaJp] },
+];
+
+/** 受験の当日までの案内を確かめた日。出典を開き直して文を変えたら、ここも直す (CHECKED_AT と同じ考え) */
+export const EXAM_DAY_CHECKED_AT = '2026-11-28';
+
+/**
+ * 受験の当日までの案内 (申し込みから更新まで)。項目ごとに、確かめた公式の文書を出典に持つ。
+ * 公式に無いこと (休憩の扱いなど) は書かない
+ */
+export const EXAM_DAY: { id: string; title: string; items: { text: string; sources: Source[] }[] }[] = [
+  {
+    id: 'register',
+    title: '申し込みと予約',
+    items: [
+      { text: '申し込んだ日から 12 か月のうちに、予約して受験します。', sources: [SOURCES.kcnaJp, SOURCES.scheduling] },
+      { text: '予約は 90 日先まで取れます。前日までに取る必要があり (24 時間前から)、受験の開始の 24 時間前を切ると、予約の変更も取り消しもできません。', sources: [SOURCES.scheduling] },
+      { text: '予約した時刻に受けなかった (no-show) ときは、受験料は返らず、再受験もできません。', sources: [SOURCES.scheduling] },
+    ],
+  },
+  {
+    id: 'identity',
+    title: '本人確認',
+    items: [
+      { text: '有効期限内の、政府が発行した身分証の原本が要ります。コピーや電子のものは使えず、仮の身分証も使えません。', sources: [SOURCES.identification, SOURCES.mcInstructions] },
+      { text: '身分証の姓と名は、受験のチェックリストに登録した名前と完全に一致している必要があります。身分証のつづりのとおりに登録します。', sources: [SOURCES.identification, SOURCES.mcInstructions] },
+      { text: '名前・写真・署名のある身分証を使います。パスポート、運転免許証、マイナンバーカードなどが挙がっています。', sources: [SOURCES.identification] },
+    ],
+  },
+  {
+    id: 'room',
+    title: '機材と部屋',
+    items: [
+      { text: '試験は PSI のセキュアブラウザで受けます。開始の時刻になるとダウンロードできます。', sources: [SOURCES.mcInstructions, SOURCES.takingExam] },
+      { text: 'Web カメラは、部屋を映して回せるものにします。マイクは始める前に動くか確かめます。モニターは 1 台だけで、2 台は使えません。', sources: [SOURCES.mcInstructions] },
+      { text: '人のいない静かな個室で受け、ドアがあれば閉めます。机の上には、受験に使う機器のほかに紙・筆記用具・電子機器などを置きません。', sources: [SOURCES.mcInstructions] },
+    ],
+  },
+  {
+    id: 'day',
+    title: '当日の流れ',
+    items: [
+      { text: '予約の 30 分前から、My Portal の Take Exam で始められます。セキュアブラウザで、同意書への同意・身分証の写真・自分の写真を出し (自己チェックイン)、担当者が部屋と机をカメラで確かめたあと、監督者が付きます。', sources: [SOURCES.takingExam] },
+      { text: '予約の時刻から 30 分のうちに始めないと、no-show になります。', sources: [SOURCES.takingExam] },
+      { text: '多肢選択式の 60 問を 90 分で解きます。途中で切れたらセキュアブラウザから入り直しますが、時間は止まりません。', sources: [SOURCES.mcInstructions, SOURCES.takingExam] },
+    ],
+  },
+  {
+    id: 'result',
+    title: '結果',
+    items: [
+      { text: '終わってから 24 時間のうちに、結果がメールで届きます。', sources: [SOURCES.mcFaq, SOURCES.mcInstructions] },
+      { text: '多肢選択式の試験は 75% 以上で合格です (LF の多肢選択式の試験に共通の記述)。', sources: [SOURCES.mcFaq] },
+    ],
+  },
+  {
+    id: 'retake',
+    title: '再受験',
+    items: [
+      { text: '受験料には再受験 1 回が含まれます。合格しなかったら、受験のチェックリストの「Claim Your Retake」から再受験を申し込みます。', sources: [SOURCES.kcnaJp, SOURCES.noPass] },
+    ],
+  },
+  {
+    id: 'renew',
+    title: '有効期限と更新',
+    items: [
+      { text: '認定は 2 年 (24 か月) で切れます。', sources: [SOURCES.kcnaJp, SOURCES.certificates] },
+      { text: '切れる前に同じ試験にもう一度合格すると、その日から 2 年に延びます。', sources: [SOURCES.mcFaq, SOURCES.certificates] },
+      { text: 'CKA か CKAD に合格すると、KCNA は自動で更新されます (CARE の仕組み)。', sources: [SOURCES.mcFaq] },
+    ],
+  },
 ];
 
 export const EXAM_PURPOSE =

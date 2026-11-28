@@ -72,7 +72,7 @@ export default function ReadinessCard({ r }: { r: Readiness }) {
         </VStack>
         <Text type="supporting">
           {`${pct(PASS_MARK)} は LF の多肢選択式の試験に共通の合格の目安で、KCNA と名指しの数字ではありません。`}
-          <a href={guideHref}>試験と当日の案内</a>
+          <a href={`${guideHref}#exam-day`}>申し込みから結果までの案内</a>
         </Text>
       </VStack>
     </Card>
