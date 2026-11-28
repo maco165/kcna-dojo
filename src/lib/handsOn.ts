@@ -20,11 +20,14 @@ export const handsOnOs = (p: Progress, ua: string = typeof navigator === 'undefi
 /** その OS の人がする手順 (ほかの OS だけの手順を除く) */
 export const stepsFor = <S extends { os?: HandsOnOs }>(steps: S[], os: HandsOnOs): S[] => steps.filter((s) => !s.os || s.os === os);
 
-/** 印を付けた手順の数と、その OS の人がする手順の数。ほかの OS の手順と、無くなった手順の印は数えない */
-export function markedCount(chapter: Pick<HandsOnMeta, 'steps'>, rec: HandsOnRecord | undefined, os: HandsOnOs): { marked: number; total: number } {
-  const mine = stepsFor(chapter.steps, os);
+/** 印を付けた手順の数と、その OS の人がする手順の数。ほかの OS の手順・任意の手順 (optional)・無くなった手順の印は数えない */
+export function markedCount(chapter: { steps: Pick<HandsOnMeta['steps'][number], 'id' | 'os' | 'optional'>[] }, rec: HandsOnRecord | undefined, os: HandsOnOs): { marked: number; total: number } {
+  const mine = stepsFor(chapter.steps, os).filter((s) => !s.optional);
   return { marked: mine.filter((s) => rec?.steps.includes(s.id)).length, total: mine.length };
 }
+
+/** 章の頭の手順の数。任意の手順は完了の数に入れないので、括弧で分けて出す (例 30 手順 (任意 10)) */
+export const stepCount = (required: number, optional: number) => `${required} 手順${optional > 0 ? ` (任意 ${optional})` : ''}`;
 
 /** 完了にできるか: その OS の人がする手順が 1 つ以上あり、全部に印がある */
 export const canComplete = (n: { marked: number; total: number }) => n.total > 0 && n.marked >= n.total;

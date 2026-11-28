@@ -318,7 +318,7 @@ export async function buildPages(load, { chapters } = {}) {
   // 実践: 一覧と章 (手順は全部の OS の分を書く。課題の答えは、画面と同じく折りたたむ)。chapters はテストが見本の章を渡すため
   const handsOn = await load('/src/content/handsOn.ts');
   const { HANDS_ON_CHAPTERS } = await load('/src/content/handsOnAll.ts');
-  const { OS_LABEL, WHERE_LABEL } = await load('/src/lib/handsOn.ts');
+  const { OS_LABEL, WHERE_LABEL, stepCount } = await load('/src/lib/handsOn.ts');
   const { exercisesOf } = await load('/src/lib/lessonStatus.ts');
   const { COVERED_LEAD, COVERED_REST, chapterNo, chaptersOfLab, handsOnLabel, handsOnLinks, listedLabs, restLabs, restLead } = await load('/src/content/coveredLabs.ts');
   const chapterList = chapters ?? HANDS_ON_CHAPTERS;
@@ -347,7 +347,7 @@ export async function buildPages(load, { chapters } = {}) {
     const stuckHtml = (s, where) => `<p><a href="${esc(stuckIssueUrl({ chapter: c, step: s, where, k3s: chapterK3s(c.id, versions), pathname: `${BASE}hands-on/${c.id}/` }))}" aria-label="${esc(`${where} で詰まった (GitHub に書く)`)}">ここで詰まった (GitHub に書く)</a></p>`;
     const lineHtml = (s) => `<p>${s.code.language === 'bash' || s.code.language === 'powershell' ? 'コマンドの意味' : '1 行ずつの意味'}</p><dl>${s.lines.map((l) => `<dt><code>${(s.code.language === 'bash' ? linkShell(l.code, COMMAND_BRIEFS).pieces : [l.code]).map((p) => (typeof p === 'string' ? esc(p) : link(`commands/${p.id}/`, p.text))).join('')}</code></dt><dd>${esc(l.text)}</dd>`).join('')}</dl>`;
     const stepHtml = (s, where) => {
-      const tags = [s.os && `${OS_LABEL[s.os]} の手順`, s.where && WHERE_LABEL[s.where]].filter(Boolean);
+      const tags = [s.optional && '【任意】完了の数に入らない', s.os && `${OS_LABEL[s.os]} の手順`, s.where && WHERE_LABEL[s.where]].filter(Boolean);
       return [
         `<li id="step-${esc(s.id)}">`,
         tags.length ? `<p>${esc(tags.join(' · '))}</p>` : '',
@@ -373,7 +373,8 @@ export async function buildPages(load, { chapters } = {}) {
       entity: article(c.title, [...c.sources, ...[...c.steps, ...c.cleanup].filter((s) => s.source && !c.sources.some((x) => x.url === s.source)).map((s) => ({ label: new URL(s.source).hostname, url: s.source }))]),
       body: [
         `<h1>${esc(c.title)}</h1>`,
-        `<p>${esc(chapterNo(c))} · 約 ${c.minutes} 分</p>`,
+        // 手順の数は、全部の OS の手順を書くので全部の OS で数え、任意の手順は括弧で分ける (画面と同じ形)
+        `<p>${esc(chapterNo(c))} · 約 ${c.minutes} 分 · ${esc(stepCount(c.steps.filter((s) => !s.optional).length, c.steps.filter((s) => s.optional).length))}</p>`,
         `<p>${esc(c.summary)}</p>`,
         '<h2>始める前に</h2>',
         `<h3>この章でできるようになること</h3><p>${esc(c.goal)}</p>`,

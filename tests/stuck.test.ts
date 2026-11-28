@@ -54,10 +54,13 @@ describe('ここで詰まった', () => {
     expect(['a', 'b', 'c', 'd', 'e'].map((id) => chapterK3s(id, list))).toEqual([undefined, 'v1.1.1+k3s1', 'v1.1.1+k3s1', null, null]);
     const k3s = (v: string | null | undefined) => new URL(stuckIssueUrl({ chapter, step, where: '手順 1', k3s: v, pathname: '/' })).searchParams.get('chapter-k3s');
     expect([k3s(undefined), k3s(null), k3s('v1.36.6+k3s1')]).toEqual(['この章では k3s を使わない', '章の版は分からない', 'v1.36.6+k3s1']);
-    // 実際の章: 0 章は使わない、1 章から後は 1 章が入れた版
+    // 実際の章: 0 章は使わない、1 章から 11 章は 1 章が入れた版、12 章は上げた先の版 (章の中で上げて、戻して、もう一度上げる)
     const v = k3sInstallOf(codesOf(HANDS_ON_CHAPTERS.find((c) => c.order === 1)!));
     expect(v).toMatch(/^v1\.\d+\.\d+\+k3s\d+$/);
-    expect(HANDS_ON.map((c) => chapterK3s(c.id, HANDS_ON))).toEqual(HANDS_ON.map((c) => (c.order === 0 ? undefined : v)));
+    const up = k3sInstallOf(codesOf(HANDS_ON_CHAPTERS.find((c) => c.order === 12)!));
+    expect(up).toMatch(/^v1\.\d+\.\d+\+k3s\d+$/);
+    expect(up).not.toBe(v);
+    expect(HANDS_ON.map((c) => chapterK3s(c.id, HANDS_ON))).toEqual(HANDS_ON.map((c) => (c.order === 0 ? undefined : c.order >= 12 ? up : v)));
   });
   it('書式 (stuck.yml) の欄の id と、URL の query の名前が合う。出力の欄は shell で、消してから貼ると書いてある', () => {
     const yml = readFileSync(path.join(process.cwd(), '.github/ISSUE_TEMPLATE', STUCK_TEMPLATE), 'utf8');

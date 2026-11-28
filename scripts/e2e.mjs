@@ -130,6 +130,12 @@ async function checkChapterPage(page, width, tag, c, flow) {
     check((await page.getByRole('checkbox').count()) === mine.length, `${tag} 章の ${label} の手順は ${mine.length}`);
     await noHorizontalOverflow(page, width, `${tag} 章 ${c.id} ${label}`);
   }
+  // 任意の手順のある章: 章の頭の数は任意を分け (最後に選んだ OS は Linux)、印の読み上げ名でも任意と分かる
+  const linux = c.steps.filter((s) => !s.os || s.os === 'linux');
+  const opt = linux.filter((s) => s.optional);
+  if (opt.length > 0) {
+    check((await page.locator('.hb-head').innerText()).includes(`${linux.length - opt.length} 手順 (任意 ${opt.length})`) && (await page.getByRole('checkbox', { name: /^手順 \d+ \(任意\) を確かめた$/ }).count()) === opt.length, `${tag} 章 ${c.id} の頭の数と印の読み上げ名で、任意の手順 ${opt.length} が分かる`);
+  }
   if (width < 768) {
     await page.setViewportSize({ width: 320, height: 844 });
     await noHorizontalOverflow(page, 320, `${tag} 章 ${c.id} 320`);
