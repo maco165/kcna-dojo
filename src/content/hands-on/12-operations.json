@@ -925,7 +925,7 @@
     {
       "id": "node2-words",
       "optional": true,
-      "text": "【任意】ここから node2- の手順は、任意です。2 台目の仮想マシン kcna2 を作り、k3s の agent (Pod を動かすだけのノード) として足し、Pod の置き場所が分かれるのを見てから、外します。PC のメモリに 1 GB 以上の余りがあるときだけ行います。しない人は飛ばしてかまいません (完了の数に入りません)。check-before-delete へ進みます。",
+      "text": "ここから node2- の手順は、任意です。2 台目の仮想マシン kcna2 を作り、k3s の agent (Pod を動かすだけのノード) として足し、Pod の置き場所が分かれるのを見てから、外します。PC のメモリに 1 GB 以上の余りがあるときだけ行います。しない人は飛ばしてかまいません (完了の数に入りません)。check-before-delete へ進みます。",
       "why": "2 台あると、drain で Pod を別のノードへ移す、本来の使い方を見られます。k3s の agent の最小は、CPU 1 つ・メモリ 512 MB です。",
       "source": "https://docs.k3s.io/installation/requirements"
     },
