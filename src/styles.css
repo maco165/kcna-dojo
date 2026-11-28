@@ -3403,3 +3403,9 @@ html[data-loading='true'] body::before {
 .readiness__more > .readiness__list {
   margin-top: 8px;
 }
+
+/* 受験の目安の中の文のリンクは、地の文と見分けられる色と下線にする */
+a.readiness__a {
+  color: var(--color-text-accent);
+  text-decoration: underline;
+}

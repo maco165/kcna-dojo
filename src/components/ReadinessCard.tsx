@@ -69,7 +69,7 @@ export default function ReadinessCard({ r }: { r: Readiness }) {
           <h3 className="h-xs">模擬試験の直近 {RECENT_EXAMS} 回</h3>
           {r.exam.recent.length === 0 ? (
             <Text type="supporting">
-              まだ受けていません。<a href={examHref}>模擬試験へ</a>
+              まだ受けていません。<a className="readiness__a" href={examHref}>模擬試験へ</a>
             </Text>
           ) : (
             <ul className="readiness__list">
@@ -89,7 +89,7 @@ export default function ReadinessCard({ r }: { r: Readiness }) {
           </Text>
         </details>
         <Text type="supporting">
-          <a href={`${guideHref}#exam-day`}>申し込みから結果までの案内</a>
+          <a className="readiness__a" href={`${guideHref}#exam-day`}>申し込みから結果までの案内</a>
         </Text>
       </VStack>
     </Card>
