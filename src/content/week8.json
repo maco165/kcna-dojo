@@ -1168,7 +1168,7 @@
             }
           ],
           "answer": "a",
-          "explanation": "Kubernetes は CLA に署名した人のコードだけを受け入れます。はじめてのプルリクエストには EasyCLA のボットが状態と署名のリンクを返すので、署名したあと /easycla とコメントすると状態が更新されます。会社として貢献する人は、会社のメールアドレスを GitHub のアカウントに結び付けておきます。",
+          "explanation": "Kubernetes は CLA に署名した人のコードだけを受け入れます。はじめてのプルリクエストには EasyCLA のボットが状態と署名のリンクを返すので、署名したあと /easycla とコメントすると状態が更新されます。会社として貢献する人は、会社のメールアドレスを GitHub のアカウントに結び付けておきます。試験で問われやすいのは、はじめて出す前に CLA に署名しておくことです。",
           "source": "https://github.com/kubernetes/community/blob/master/CLA.md"
         },
         {
