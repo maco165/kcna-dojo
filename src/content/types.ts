@@ -55,6 +55,11 @@ export type QuizLesson = {
    * 13 細目すべてに専用のレッスンがあることは tests/competency.test.ts が見る
    */
   competency?: string;
+  /**
+   * 公開のあとに足したレッスンの、足した日 (YYYY-MM-DD)。計画との差 (lib/lessonStatus.ts の planStatus) は、利用者の週の最後の日がこの日より前の週では、
+   * このレッスンを「終わっているはずの数」に入れない (足す前にその週を終えた人を遅れにしない)。週の n/m と「次」には入れる
+   */
+  since?: string;
   questions: Question[];
 };
 

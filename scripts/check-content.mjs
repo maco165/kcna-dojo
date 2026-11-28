@@ -228,6 +228,7 @@ for (const file of files) {
     }
     // 週のレッスンは、学習要領の細目のどれか 1 つを持つ (模擬試験用の問題は細目が混ざるので持たない)
     if (!examFile && !COMPETENCIES.has(lesson.competency)) ng(lid, `competency が学習要領の細目のどれでもありません (${lesson.competency})`);
+    if (lesson.since !== undefined && (examFile || !/^\d{4}-\d{2}-\d{2}$/.test(lesson.since) || Number.isNaN(Date.parse(lesson.since)))) ng(lid, 'since (足した日) は週のレッスンにだけ、YYYY-MM-DD で書きます');
     if (examFile && lesson.competency !== undefined) ng(lid, '模擬試験用のファイルのレッスンには competency を書きません');
     if (!Array.isArray(lesson.questions) || lesson.questions.length < MIN_QUESTIONS) {
       ng(lid, `questions は ${MIN_QUESTIONS} 問以上要ります (${lesson.questions?.length ?? 0} 問)`);

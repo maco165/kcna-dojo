@@ -120,6 +120,22 @@ describe('進捗の画面の数字', () => {
     expect(planStatus(p, at('2027-05-10')).expected).toBe(lessons.filter((l) => l.kind === 'quiz').length);
   });
 
+  it('計画: 後から足したレッスン (since) は、足す前に週を終えた人の遅れに数えない。足したあとに週を終える人には数える', () => {
+    const added = WEEKS.flatMap((w) => (w.content?.lessons ?? []).filter((l) => l.kind === 'quiz' && l.since).map((l) => ({ id: l.id, since: (l as { since?: string }).since!, week: w.week })));
+    expect(added.map((x) => x.id)).toEqual(['w6-l5', 'w7-l5', 'w8-l5']);
+    const older = WEEKS.flatMap((w) => (w.content?.lessons ?? []).filter((l) => l.kind === 'quiz' && !(l as { since?: string }).since).map((l) => l.id));
+    // 2026-10-09 に始めた人: 第 6 週は 11-13〜11-19、第 8 週は 11-27〜12-03。足す前のレッスンを全部終えている
+    const early = startedOn(withDone(older), '2026-10-09');
+    expect(planStatus(early, at('2026-12-01'))).toEqual({ expected: older.filter((id) => Number(id.slice(1, 2)) <= 7).length, done: older.filter((id) => Number(id.slice(1, 2)) <= 7).length });
+    // 第 8 週の最後の日 (12-03) は足した日より後なので、w8-l5 は数える
+    expect(planStatus(early, at('2026-12-10')).expected - planStatus(early, at('2026-12-10')).done).toBe(1);
+    // 足した日に始めた人には、全部を数える
+    const late = startedOn(withDone(older), '2026-11-28');
+    expect(planStatus(late, at('2027-03-01'))).toEqual({ expected: older.length + added.length, done: older.length });
+    // since の無いレッスンは今までどおり: 週の最後の日が過ぎれば数える
+    expect(planStatus(startedOn(emptyProgress(), '2026-10-09'), at('2026-10-16')).expected).toBe(lessons.filter((l) => l.kind === 'quiz').length);
+  });
+
   it('計画: 問題を全部終えて実習だけ残るなら遅れにしない (実習は数に入れない)', () => {
     const s = planStatus(startedOn(withDone(lessons.filter((l) => l.kind === 'quiz').map((l) => l.id))), at('2026-11-30'));
     expect(s).toEqual({ expected: lessons.length - 1, done: lessons.length - 1 });

@@ -832,6 +832,7 @@
       "summary": "YAML の穴埋めと 4 択 · 6 問",
       "domain": "Container Orchestration",
       "competency": "Storage",
+      "since": "2026-11-28",
       "questions": [
         {
           "id": "w6-l5-q1",

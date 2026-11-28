@@ -12,7 +12,8 @@
       "source": "https://kubernetes.io/ja/docs/concepts/containers/images/",
       "lessons": [
         "w1-l2",
-        "w1-lab"
+        "w1-lab",
+        "w7-l5"
       ]
     },
     {
@@ -340,7 +341,8 @@
         "w6-l3",
         "w6-l4",
         "w8-l3",
-        "w8-l4"
+        "w8-l4",
+        "w7-l5"
       ]
     },
     {
@@ -539,7 +541,8 @@
       "lessons": [
         "w3-l1",
         "w3-l2",
-        "w3-l3"
+        "w3-l3",
+        "w6-l5"
       ]
     },
     {
@@ -703,7 +706,8 @@
         }
       ],
       "lessons": [
-        "w4-l1"
+        "w4-l1",
+        "w7-l5"
       ]
     },
     {
@@ -1293,7 +1297,8 @@
       "lessons": [
         "w3-l4",
         "w6-l3",
-        "w6-lab"
+        "w6-lab",
+        "w6-l5"
       ]
     },
     {
@@ -1315,7 +1320,8 @@
       "lessons": [
         "w6-l3",
         "w6-l4",
-        "w6-lab"
+        "w6-lab",
+        "w6-l5"
       ]
     },
     {
@@ -1335,7 +1341,8 @@
       ],
       "lessons": [
         "w6-l3",
-        "w6-lab"
+        "w6-lab",
+        "w6-l5"
       ]
     },
     {
@@ -1365,7 +1372,8 @@
       "lessons": [
         "w6-l4",
         "w7-l1",
-        "w7-l4"
+        "w7-l4",
+        "w7-l5"
       ]
     },
     {
@@ -1866,7 +1874,8 @@
       "lessons": [
         "w5-l4",
         "w8-l4",
-        "w8-lab"
+        "w8-lab",
+        "w8-l5"
       ]
     },
     {
@@ -1893,7 +1902,8 @@
       ],
       "lessons": [
         "w8-l4",
-        "w8-lab"
+        "w8-lab",
+        "w8-l5"
       ]
     },
     {
@@ -2649,7 +2659,9 @@
           "url": "https://www.cncf.io/people/governing-board/"
         }
       ],
-      "lessons": [],
+      "lessons": [
+        "w8-l5"
+      ],
       "topics": [
         "linux-foundation-cncf"
       ]

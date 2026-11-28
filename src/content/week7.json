@@ -881,6 +881,7 @@
       "summary": "コマンドの穴埋めと 4 択 · 6 問",
       "domain": "Cloud Native Application Delivery",
       "competency": "Debugging",
+      "since": "2026-11-28",
       "questions": [
         {
           "id": "w7-l5-q1",

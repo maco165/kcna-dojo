@@ -995,6 +995,7 @@
       "summary": "4 択とコマンドの穴埋め · 7 問",
       "domain": "Cloud Native Architecture",
       "competency": "Cloud Native Community and Collaboration",
+      "since": "2026-11-28",
       "questions": [
         {
           "id": "w8-l5-q1",
