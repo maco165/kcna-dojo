@@ -12,6 +12,8 @@ import SiteLogo from '../components/SiteLogo';
 import { dueReviewCount, isExamQuestionId, isKnownQuestion } from '../content';
 import { ReviewForecast, StudyCalendar } from '../components/StudyCalendar';
 import MasteryCard from '../components/MasteryCard';
+import ReadinessCard from '../components/ReadinessCard';
+import { readiness } from '../lib/readiness';
 import { cardData } from '../lib/summaryCard';
 import { useMemo, useState } from 'react';
 import SummaryCard from '../components/SummaryCard';
@@ -38,6 +40,7 @@ function Body({ progress }: { progress: Progress }) {
   const due = dueReviewCount(progress, now);
   const freeze = freezeStatus(progress, now);
   const mastery = useMemo(() => masteryByDomain(progress), [progress]);
+  const ready = useMemo(() => readiness(progress), [progress]);
   const labs = listedLabs(WEEKS).map((x) => x.lab);
   const planText =
     plan.expected === 0 ? 'これから' : plan.done >= plan.expected ? '予定どおり' : `${plan.expected - plan.done} レッスン遅れ`;
@@ -101,6 +104,8 @@ function Body({ progress }: { progress: Progress }) {
           })}
         </VStack>
       </Card>
+
+      <ReadinessCard r={ready} />
 
       <MasteryCard rows={mastery} />
 

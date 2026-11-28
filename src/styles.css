@@ -3356,3 +3356,39 @@ html[data-loading='true'] body::before {
   margin: 0;
   font-size: 13px;
 }
+
+/* 進捗の「受験の目安」 */
+.readiness__state {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.readiness__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.readiness__list > li {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.readiness__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.h-xs {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
