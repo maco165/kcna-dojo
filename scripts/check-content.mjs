@@ -48,6 +48,13 @@ function isHttpsUrl(v) {
   }
 }
 
+/** 実在する日付 (YYYY-MM-DD) か。日付に直して戻した文字と同じかで見る (2026-02-31 は落とす)。src/lib/progress.ts の isValidDay と同じ考え */
+function isValidDay(v) {
+  if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
+  const [y, m, d] = v.split('-').map(Number);
+  const t = new Date(y, m - 1, d);
+  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}` === v;
+}
 const isObject = (v) => typeof v === 'object' && v !== null && !Array.isArray(v);
 const isId = (v) => typeof v === 'string' && /^[a-z0-9-]+$/.test(v);
 
@@ -228,7 +235,7 @@ for (const file of files) {
     }
     // 週のレッスンは、学習要領の細目のどれか 1 つを持つ (模擬試験用の問題は細目が混ざるので持たない)
     if (!examFile && !COMPETENCIES.has(lesson.competency)) ng(lid, `competency が学習要領の細目のどれでもありません (${lesson.competency})`);
-    if (lesson.since !== undefined && (examFile || !/^\d{4}-\d{2}-\d{2}$/.test(lesson.since) || Number.isNaN(Date.parse(lesson.since)))) ng(lid, 'since (足した日) は週のレッスンにだけ、YYYY-MM-DD で書きます');
+    if (lesson.since !== undefined && (examFile || !isValidDay(lesson.since))) ng(lid, 'since (足した日) は週のレッスンにだけ、YYYY-MM-DD で書きます');
     if (examFile && lesson.competency !== undefined) ng(lid, '模擬試験用のファイルのレッスンには competency を書きません');
     if (!Array.isArray(lesson.questions) || lesson.questions.length < MIN_QUESTIONS) {
       ng(lid, `questions は ${MIN_QUESTIONS} 問以上要ります (${lesson.questions?.length ?? 0} 問)`);

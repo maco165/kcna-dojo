@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { LessonMeta } from '../src/content/types';
 import { WEEKS } from '../src/content/curriculum';
 import { domainAccuracy, doneLessons, exercisesOf, labsOf, lessonCaption, lessonCorrect, lessonStatuses, planStatus, weeklyXp } from '../src/lib/lessonStatus';
-import { emptyProgress, type Progress } from '../src/lib/progress';
+import { addDays, emptyProgress, type Progress } from '../src/lib/progress';
 
 const lessons: LessonMeta[] = WEEKS[0].content!.lessons;
 const quiz = lessons[0];
@@ -132,6 +132,12 @@ describe('進捗の画面の数字', () => {
     // 足した日に始めた人には、全部を数える
     const late = startedOn(withDone(older), '2026-11-28');
     expect(planStatus(late, at('2027-03-01'))).toEqual({ expected: older.length + added.length, done: older.length });
+    // 境の日: 第 6 週の最後の日が since と同じ人には数えず、1 日あとの人には数える (since はデータから読む)
+    const since = added[0].since;
+    const startFor = (lastDayOfWeek6: string) => addDays(lastDayOfWeek6, -41);
+    const w6 = (start: string) => planStatus(startedOn(withDone(older), start), at(addDays(start, 41 + 1)));
+    expect(w6(startFor(since))).toEqual({ expected: older.filter((id) => Number(id.slice(1, 2)) <= 6).length, done: older.filter((id) => Number(id.slice(1, 2)) <= 6).length });
+    expect(w6(startFor(addDays(since, 1))).expected - w6(startFor(addDays(since, 1))).done).toBe(1);
     // since の無いレッスンは今までどおり: 週の最後の日が過ぎれば数える
     expect(planStatus(startedOn(emptyProgress(), '2026-10-09'), at('2026-10-16')).expected).toBe(lessons.filter((l) => l.kind === 'quiz').length);
   });

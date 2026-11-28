@@ -91,7 +91,8 @@ export function weeklyXp(progress: Progress, now: Date): { day: string; xp: numb
 
 /**
  * 計画との差。終わっているはずの週 (利用者の開始日から数えた週の 7 日目が昨日まで) の問題のレッスンの数と、そのうち終えた数。
- * 実習は実践のページで別に数えるので、入れない。週の最後の日より後に足したレッスン (since) も入れない。
+ * 実習は実践のページで別に数えるので、入れない。後から足したレッスン (since) は、週の最後の日が since より後の週でだけ数える
+ * (最後の日が since と同じか前なら、その週は足す前に終わっていたとみなし入れない)。
  * expected が 0 なら、まだ計画の週が終わっていない
  */
 export function planStatus(progress: Progress, now: Date): { expected: number; done: number } {
@@ -102,8 +103,8 @@ export function planStatus(progress: Progress, now: Date): { expected: number; d
   for (const w of WEEKS) {
     const end = addDays(weekStartDay(start, w.week), 6);
     if (end >= today) continue;
-    // 週の最後の日より後に足したレッスンは、その週を終えたあとに増えたものなので入れない
-    const lessons = exercisesOf(w).filter((l) => !l.since || end >= l.since);
+    // 週の最後の日が since 以前なら、その週を終えたあとに増えたものなので入れない (境の日も入れない)
+    const lessons = exercisesOf(w).filter((l) => !l.since || end > l.since);
     expected += lessons.length;
     done += doneLessons(lessons, progress);
   }
