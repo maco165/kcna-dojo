@@ -1,4 +1,4 @@
-// 章が覆った旧い実習と、その章。w2-lab は、ノード 1 台で見える範囲を章が覆った。複数ノードの見え方 (agent・置き場所の分かれ方) は実習のページに残す。 w4-lab は、requests を付ける順番が章では逆 (無いまま失敗させてから足す)。w5-lab は、使い捨ての Pod の代わりに置いたままの Pod から試し、クラスターの外からの道はホストの手順 (実機で未確認) と仮想マシンの中の両方で見る。
+// 章が覆った旧い実習と、その章。w2-lab は、ノード 1 台で見える範囲を章が覆った。複数ノードの見え方 (agent・置き場所の分かれ方) は実習のページに残す。 w4-lab は、requests を付ける順番が章では逆 (無いまま失敗させてから足す)。w3-lab の CronJob は、章では tick (毎分) で動かす。w5-lab は、使い捨ての Pod の代わりに置いたままの Pod から試し、クラスターの外からの道はホストの手順 (実機で未確認) と仮想マシンの中の両方で見る。
 // ホームが最初に読むので、章のデータ (handsOn.ts) は読まず、章の id・番号・題だけをここに持つ
 // (週の「先に読む」と同じ持ち方。実在と、番号と題が章のデータと同じことは tests/handsOn.test.tsx が見る)。対応の中身は docs/design.md
 import { labsOf } from '../lib/lessonStatus';
@@ -15,6 +15,10 @@ export const COVERED_LABS: Record<string, readonly ChapterRef[]> = {
     { id: 'self-healing', order: 3, title: '壊れても戻る仕組みを見る' },
   ],
   'w4-lab': [{ id: 'scaling', order: 4, title: '増やす、減らす' }],
+  'w3-lab': [
+    { id: 'rollout', order: 5, title: '更新して、巻き戻す' },
+    { id: 'batch', order: 9, title: '決まった仕事を動かす' },
+  ],
   'w5-lab': [{ id: 'networking', order: 6, title: 'つなぐ' }],
 };
 

@@ -1,0 +1,2045 @@
+{
+  "id": "storage",
+  "order": 8,
+  "title": "消えない所に保存する",
+  "summary": "コンテナに書いたものが消える場面と、消えない置き場所の作り方を見ます。PVC で置き場所を申し込み、Pod を消しても残ること、消すと消えること、StatefulSet で 1 つずつ専用の置き場所を持つことを動かします。",
+  "goal": "置き場所ごとに何をしたら消えるかを言い分け、PVC と StatefulSet でデータを残し、片付けられる",
+  "features": [
+    "コンテナの書き込みは、コンテナを始め直すと消える",
+    "emptyDir は Pod が消えるまで残り、hostPath はノードに残る",
+    "PVC は申し込み、PV は用意された置き場所、StorageClass は用意のしかた",
+    "local-path は使う Pod が決まるまで作らず、ノードに縛られ、容量を守らない",
+    "StatefulSet は名前と PVC を Pod ごとに持ち、減らしても PVC を残す"
+  ],
+  "minutes": 150,
+  "needs": [
+    "7 章を終えた仮想マシン kcna (k3s が動き、kubectl が使える)",
+    "インターネットへの接続 (イメージを取ってきます)",
+    "出力について: 「仮想マシンの中」の出力は、2026-11-27 に Linux の QEMU の上で、Ubuntu 24.04 の公式のクラウドイメージ (x86_64・2 コア・2 GB・20 GB) と k3s v1.36.6+k3s1 で取りました。Multipass を打つ手順は実機で確かめていないので、出力を載せていません。M 系の Mac でも手順は同じです。CPU の種類が出るところだけ arm64 か aarch64 になります。"
+  ],
+  "reads": [
+    {
+      "topic": "storage",
+      "label": "ストレージ"
+    }
+  ],
+  "steps": [
+    {
+      "id": "enter",
+      "text": "7 章を終えた仮想マシンの中に入ります。ホストの端末で打ちます。",
+      "why": "この章のコマンドは、最初と最後のほかは全部、仮想マシンの中で打つためです。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass shell kcna"
+      },
+      "lines": [
+        {
+          "code": "multipass shell kcna",
+          "text": "kcna の中の端末を開く。止まっていれば、動かしてから開く"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "行の頭が ubuntu@kcna:~$ に変われば、中に入っています。",
+      "trouble": [
+        {
+          "symptom": "multipass: command not found、または「認識されません」と出る",
+          "check": "端末を閉じて開き直し、multipass version を打つ",
+          "fix": "開き直しても出るなら、Multipass を入れる手順をもう一度行う"
+        },
+        {
+          "symptom": "kcna が無いと出る",
+          "check": "multipass list で名前を見る",
+          "fix": "0 章から始める"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/shell/"
+    },
+    {
+      "id": "check-host",
+      "text": "仮想マシンの中で、どのマシンにいるかと、クラスターの様子を見ます。hostname が kcna でなければ、先へ進まず multipass shell kcna で入ります。枠は、迷ったら 1 行ずつ貼ります。sudo などのあとの行は、端末によって、まとめて貼ると消えることがあるためです (EOF で終わる書き込みの部分は、EOF まで続けて貼ります)。",
+      "why": "自分の PC の別のクラスターで打たないためです。この章では、ノードのフォルダも見ます。見る・消すのは、この章で作ったものだけです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "hostname\nkubectl get nodes"
+      },
+      "lines": [
+        {
+          "code": "hostname",
+          "text": "このマシンの名前を出す"
+        },
+        {
+          "code": "kubectl get nodes",
+          "text": "ノードの一覧を出す"
+        }
+      ],
+      "output": "kcna\nNAME   STATUS   ROLES           AGE     VERSION\nkcna   Ready    control-plane   2m45s   v1.36.6+k3s1",
+      "read": "kcna と出て、ノードの STATUS が Ready なら進めます。VERSION が v1.36.6+k3s1 でない人は、出力の版を読み替えます。",
+      "trouble": [
+        {
+          "symptom": "kcna ではない名前が出る",
+          "check": "行の頭が ubuntu@kcna かを見る",
+          "fix": "ホストにいる。multipass shell kcna で入り、もう一度打つ"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        },
+        {
+          "symptom": "permission denied や localhost:8080 と出る",
+          "check": "echo $KUBECONFIG を打つ",
+          "fix": "空なら export KUBECONFIG=~/.kube/k3s.yaml を打つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/architecture/nodes/"
+    },
+    {
+      "id": "words",
+      "text": "コンテナの中に書いたファイルは、コンテナが作り直されると消えます。消えては困るもの (データベースの中身や、上げてもらったファイル) は、コンテナの外の置き場所 (ボリューム) に書きます。この章では、Pod の間だけ残る置き場所から始めて、Pod を消しても残る置き場所 (PersistentVolume) まで進みます。",
+      "why": "どの置き場所が、何をしたら消えるのかを、自分で消して確かめます。分かっていれば、消えて困るものを、消える所に置かずに済みます。",
+      "source": "https://kubernetes.io/docs/concepts/storage/volumes/"
+    },
+    {
+      "id": "prepare",
+      "text": "作業のフォルダと、練習用の名前空間 ch8 を作ります。",
+      "why": "作るものを、まとめて片付けられるようにするためです。端末を開き直したときや再起動のあとは、cd ~/ch8 を打ちます。PV_NAME のような覚えた値は、それを決めた行を打ち直します。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "mkdir -p ~/ch8\ncd ~/ch8\nkubectl create namespace ch8\nkubectl wait --for=create serviceaccount/default -n ch8 --timeout=60s"
+      },
+      "lines": [
+        {
+          "code": "mkdir -p ~/ch8",
+          "text": "ch8 というフォルダを作る"
+        },
+        {
+          "code": "cd ~/ch8",
+          "text": "ch8 へ移る"
+        },
+        {
+          "code": "kubectl create namespace ch8",
+          "text": "名前空間 ch8 を作る"
+        },
+        {
+          "code": "kubectl wait --for=create serviceaccount/default -n ch8 --timeout=60s",
+          "text": "ch8 で Pod を作れるようになるまで待つ"
+        }
+      ],
+      "output": "namespace/ch8 created\nserviceaccount/default condition met",
+      "read": "namespace/ch8 created が出れば次へ進めます。",
+      "trouble": [
+        {
+          "symptom": "AlreadyExists と出る",
+          "check": "kubectl get namespaces を打つ",
+          "fix": "前に作ったものがある。そのまま使う"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/"
+    },
+    {
+      "id": "layer",
+      "text": "コンテナの中にファイルを書き、コンテナを始め直すと消えることを見ます。",
+      "why": "コンテナの書き込みは、イメージの上に重ねた、そのコンテナだけの層に入ります。始め直したコンテナは、新しい層から始まります。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cat > layer.yaml <<'EOF'\napiVersion: v1\nkind: Pod\nmetadata:\n  name: layer\nspec:\n  terminationGracePeriodSeconds: 1\n  containers:\n  - name: main\n    image: busybox:1.37\n    command: ['sh', '-c', 'trap \"exit 1\" TERM; while true; do sleep 1; done']\nEOF\nkubectl apply -f layer.yaml -n ch8\nkubectl wait --for=condition=Ready pod/layer -n ch8 --timeout=180s\nkubectl exec layer -n ch8 -- sh -c 'echo keep-me > /tmp/note.txt; cat /tmp/note.txt'\nkubectl exec layer -n ch8 -- kill 1\nfor i in $(seq 30); do [ \"$(kubectl get pod layer -n ch8 -o jsonpath='{.status.containerStatuses[0].restartCount}')\" -ge 1 ] 2> /dev/null && break; sleep 2; done\nkubectl wait --for=condition=Ready pod/layer -n ch8 --timeout=180s\nkubectl exec layer -n ch8 -- sh -c 'cat /tmp/note.txt || echo 消えた'\nkubectl get pod layer -n ch8"
+      },
+      "lines": [
+        {
+          "code": "cat > layer.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま layer.yaml というファイルに書く"
+        },
+        {
+          "code": "apiVersion: v1",
+          "text": "Pod のある API"
+        },
+        {
+          "code": "kind: Pod",
+          "text": "1 つきりの Pod"
+        },
+        {
+          "code": "metadata:",
+          "text": "呼び名など"
+        },
+        {
+          "code": "  name: layer",
+          "text": "呼び名は layer"
+        },
+        {
+          "code": "spec:",
+          "text": "中身"
+        },
+        {
+          "code": "  terminationGracePeriodSeconds: 1",
+          "text": "終わるのを待つ秒数"
+        },
+        {
+          "code": "  containers:",
+          "text": "コンテナたち"
+        },
+        {
+          "code": "  - name: main",
+          "text": "コンテナの呼び名"
+        },
+        {
+          "code": "    image: busybox:1.37",
+          "text": "小さな道具のイメージ"
+        },
+        {
+          "code": "    command: ['sh', '-c', 'trap \"exit 1\" TERM; while true; do sleep 1; done']",
+          "text": "終わりの合図 (TERM) を受けたら失敗で終わり、それまでは待ち続ける"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "kubectl apply -f layer.yaml -n ch8",
+          "text": "Pod を作る"
+        },
+        {
+          "code": "kubectl wait --for=condition=Ready pod/layer -n ch8 --timeout=180s",
+          "text": "使えるようになるまで待つ"
+        },
+        {
+          "code": "kubectl exec layer -n ch8 -- sh -c 'echo keep-me > /tmp/note.txt; cat /tmp/note.txt'",
+          "text": "ファイルを書いて読む"
+        },
+        {
+          "code": "kubectl exec layer -n ch8 -- kill 1",
+          "text": "中の 1 番のプロセスに終わりの合図を送り、コンテナを終わらせる"
+        },
+        {
+          "code": "for i in $(seq 30); do [ \"$(kubectl get pod layer -n ch8 -o jsonpath='{.status.containerStatuses[0].restartCount}')\" -ge 1 ] 2> /dev/null && break; sleep 2; done",
+          "text": "始め直すまで見て待つ (最大 1 分)"
+        },
+        {
+          "code": "kubectl wait --for=condition=Ready pod/layer -n ch8 --timeout=180s",
+          "text": "使えるようになるまで待つ"
+        },
+        {
+          "code": "kubectl exec layer -n ch8 -- sh -c 'cat /tmp/note.txt || echo 消えた'",
+          "text": "もう一度読む"
+        },
+        {
+          "code": "kubectl get pod layer -n ch8",
+          "text": "一覧に出す"
+        }
+      ],
+      "output": "pod/layer created\npod/layer condition met\nkeep-me\npod/layer condition met\ncat: can't open '/tmp/note.txt': No such file or directory\n消えた\nNAME    READY   STATUS    RESTARTS     AGE\nlayer   1/1     Running   1 (3s ago)   9s",
+      "read": "RESTARTS が 1 になり、ファイルは消えました。Pod は同じでも、コンテナが新しくなると、書いたものは残りません。",
+      "trouble": [
+        {
+          "symptom": "toomanyrequests や 429 と出る",
+          "check": "kubectl describe の Events で、Failed to pull image の行の終わりを見る",
+          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る。短い「429 Too Many Requests」だけのときは、使いすぎを防ぐ別の上限なので、数分待ってからもう一度行う"
+        },
+        {
+          "symptom": "RESTARTS が 0 のまま",
+          "check": "kubectl describe pod layer -n ch8 の Events を見る",
+          "fix": "終わりの合図が届いていない。kill の行を打ち直す"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/storage/ephemeral-volumes/"
+    },
+    {
+      "id": "emptydir",
+      "text": "emptyDir に書き、コンテナを始め直しても残り、Pod を消すと消えることを見ます。",
+      "why": "emptyDir は Pod に付いた空のフォルダです。同じ Pod の中のコンテナで分け合えて、コンテナの始め直しでは消えません。Pod が消えると、一緒に消えます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cat > scratch.yaml <<'EOF'\napiVersion: v1\nkind: Pod\nmetadata:\n  name: scratch\nspec:\n  terminationGracePeriodSeconds: 1\n  volumes:\n  - name: work\n    emptyDir: {}\n  - name: fast\n    emptyDir:\n      medium: Memory\n  containers:\n  - name: main\n    image: busybox:1.37\n    command: ['sh', '-c', 'trap \"exit 1\" TERM; while true; do sleep 1; done']\n    volumeMounts:\n    - name: work\n      mountPath: /work\n    - name: fast\n      mountPath: /fast\nEOF\nkubectl apply -f scratch.yaml -n ch8\nkubectl wait --for=condition=Ready pod/scratch -n ch8 --timeout=180s\nkubectl exec scratch -n ch8 -- sh -c 'echo keep-me > /work/note.txt; df -h /work /fast | tail -n 2'\nkubectl exec scratch -n ch8 -- kill 1\nfor i in $(seq 30); do [ \"$(kubectl get pod scratch -n ch8 -o jsonpath='{.status.containerStatuses[0].restartCount}')\" -ge 1 ] 2> /dev/null && break; sleep 2; done\nkubectl wait --for=condition=Ready pod/scratch -n ch8 --timeout=180s\nkubectl exec scratch -n ch8 -- cat /work/note.txt\nkubectl delete pod scratch -n ch8\nkubectl apply -f scratch.yaml -n ch8\nkubectl wait --for=condition=Ready pod/scratch -n ch8 --timeout=180s\nkubectl exec scratch -n ch8 -- sh -c 'cat /work/note.txt || echo 消えた'\nkubectl delete pod layer scratch -n ch8"
+      },
+      "lines": [
+        {
+          "code": "cat > scratch.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま scratch.yaml というファイルに書く"
+        },
+        {
+          "code": "apiVersion: v1",
+          "text": "Pod のある API"
+        },
+        {
+          "code": "kind: Pod",
+          "text": "1 つきりの Pod"
+        },
+        {
+          "code": "metadata:",
+          "text": "呼び名など"
+        },
+        {
+          "code": "  name: scratch",
+          "text": "呼び名は scratch"
+        },
+        {
+          "code": "spec:",
+          "text": "中身"
+        },
+        {
+          "code": "  terminationGracePeriodSeconds: 1",
+          "text": "終わるのを待つ秒数"
+        },
+        {
+          "code": "  volumes:",
+          "text": "Pod が持つ置き場所"
+        },
+        {
+          "code": "  - name: work",
+          "text": "置き場所の名前"
+        },
+        {
+          "code": "    emptyDir: {}",
+          "text": "空のフォルダから始める。ノードのディスクを使う"
+        },
+        {
+          "code": "  - name: fast",
+          "text": "2 つ目の置き場所"
+        },
+        {
+          "code": "    emptyDir:",
+          "text": "空のフォルダ"
+        },
+        {
+          "code": "      medium: Memory",
+          "text": "メモリの上に置く (tmpfs)。速いが、使う量はメモリに数えられる"
+        },
+        {
+          "code": "  containers:",
+          "text": "コンテナたち"
+        },
+        {
+          "code": "  - name: main",
+          "text": "コンテナの呼び名"
+        },
+        {
+          "code": "    image: busybox:1.37",
+          "text": "小さな道具のイメージ"
+        },
+        {
+          "code": "    command: ['sh', '-c', 'trap \"exit 1\" TERM; while true; do sleep 1; done']",
+          "text": "終わりの合図 (TERM) を受けたら失敗で終わり、それまでは待ち続ける"
+        },
+        {
+          "code": "    volumeMounts:",
+          "text": "置き場所を見せる"
+        },
+        {
+          "code": "    - name: work",
+          "text": "work を"
+        },
+        {
+          "code": "      mountPath: /work",
+          "text": "/work に"
+        },
+        {
+          "code": "    - name: fast",
+          "text": "fast を"
+        },
+        {
+          "code": "      mountPath: /fast",
+          "text": "/fast に"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "kubectl apply -f scratch.yaml -n ch8",
+          "text": "Pod を作る"
+        },
+        {
+          "code": "kubectl wait --for=condition=Ready pod/scratch -n ch8 --timeout=180s",
+          "text": "使えるようになるまで待つ"
+        },
+        {
+          "code": "kubectl exec scratch -n ch8 -- sh -c 'echo keep-me > /work/note.txt; df -h /work /fast | tail -n 2'",
+          "text": "書いて、2 つの置き場所の種類を見る"
+        },
+        {
+          "code": "kubectl exec scratch -n ch8 -- kill 1",
+          "text": "中の 1 番のプロセスに終わりの合図を送り、コンテナを終わらせる"
+        },
+        {
+          "code": "for i in $(seq 30); do [ \"$(kubectl get pod scratch -n ch8 -o jsonpath='{.status.containerStatuses[0].restartCount}')\" -ge 1 ] 2> /dev/null && break; sleep 2; done",
+          "text": "始め直すまで見て待つ (最大 1 分)"
+        },
+        {
+          "code": "kubectl wait --for=condition=Ready pod/scratch -n ch8 --timeout=180s",
+          "text": "使えるようになるまで待つ"
+        },
+        {
+          "code": "kubectl exec scratch -n ch8 -- cat /work/note.txt",
+          "text": "始め直したあとに読む"
+        },
+        {
+          "code": "kubectl delete pod scratch -n ch8",
+          "text": "Pod を消す"
+        },
+        {
+          "code": "kubectl apply -f scratch.yaml -n ch8",
+          "text": "同じものを作り直す"
+        },
+        {
+          "code": "kubectl wait --for=condition=Ready pod/scratch -n ch8 --timeout=180s",
+          "text": "使えるようになるまで待つ"
+        },
+        {
+          "code": "kubectl exec scratch -n ch8 -- sh -c 'cat /work/note.txt || echo 消えた'",
+          "text": "作り直したあとに読む"
+        },
+        {
+          "code": "kubectl delete pod layer scratch -n ch8",
+          "text": "2 つの Pod を消す"
+        }
+      ],
+      "output": "pod/scratch created\npod/scratch condition met\n/dev/vda1                18.3G      2.8G     15.5G  15% /work\ntmpfs                     1.9G         0      1.9G   0% /fast\npod/scratch condition met\nkeep-me\npod \"scratch\" deleted from ch8 namespace\npod/scratch created\npod/scratch condition met\ncat: can't open '/work/note.txt': No such file or directory\n消えた\npod \"layer\" deleted from ch8 namespace\npod \"scratch\" deleted from ch8 namespace",
+      "read": "/fast は tmpfs (メモリ)、/work はノードのディスクの上です。始め直しでは keep-me が残り、Pod を作り直すと消えました。メモリの上の置き場所は、使った分がその Pod のメモリの上限まで数えられます (sizeLimit で絞れます)。一時置き場や、Pod の中のコンテナどうしの受け渡しに使います。",
+      "trouble": [
+        {
+          "symptom": "作り直す行で AlreadyExists と出る",
+          "check": "kubectl get pod scratch -n ch8 を打つ",
+          "fix": "消える途中。数秒待ってから打ち直す"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/storage/ephemeral-volumes/"
+    },
+    {
+      "id": "check-before-hostpath",
+      "text": "ノードのフォルダを Pod に見せる前に、どのマシンにいるかを見ます。kcna と出なければ、次の手順を打ちません。",
+      "why": "次の手順は、ノードに書き込みます。自分の PC で動いているクラスターに打つと、PC のフォルダに書くことになるためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "hostname"
+      },
+      "lines": [
+        {
+          "code": "hostname",
+          "text": "このマシンの名前を出す"
+        }
+      ],
+      "output": "kcna",
+      "read": "kcna と出れば、仮想マシンの中です。",
+      "trouble": [
+        {
+          "symptom": "kcna ではない名前が出る",
+          "check": "行の頭が ubuntu@kcna かを見る",
+          "fix": "ホストにいる。multipass shell kcna で入り、もう一度打つ"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man1/hostname.1.html"
+    },
+    {
+      "id": "hostpath",
+      "text": "hostPath で、ノードのフォルダを Pod に見せます。練習のためだけに使う形です。前の手順で kcna と出たときだけ打ちます。",
+      "why": "hostPath は、Pod の中から、ノードのファイルを直に読み書きさせます。Pod が別のノードに移ると別の中身になり、中身しだいでノードを壊せるので、公式の Pod のセキュリティの基準でも禁止の扱いです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cat > hostpath.yaml <<'EOF'\napiVersion: v1\nkind: Pod\nmetadata:\n  name: hp\nspec:\n  terminationGracePeriodSeconds: 1\n  volumes:\n  - name: node-dir\n    hostPath:\n      path: /var/tmp/kcna-ch8\n      type: DirectoryOrCreate\n  - name: node-etc\n    hostPath:\n      path: /etc\n      type: Directory\n  containers:\n  - name: main\n    image: busybox:1.37\n    command: ['sh', '-c', 'trap \"exit 1\" TERM; while true; do sleep 1; done']\n    volumeMounts:\n    - name: node-dir\n      mountPath: /node-dir\n    - name: node-etc\n      mountPath: /node-etc\n      readOnly: true\nEOF\nkubectl apply -f hostpath.yaml -n ch8\nkubectl wait --for=condition=Ready pod/hp -n ch8 --timeout=180s\nkubectl exec hp -n ch8 -- sh -c 'echo from-pod > /node-dir/note.txt; cat /node-etc/hostname'\nls -l /var/tmp/kcna-ch8\nkubectl delete pod hp -n ch8\ncat /var/tmp/kcna-ch8/note.txt"
+      },
+      "lines": [
+        {
+          "code": "cat > hostpath.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま hostpath.yaml というファイルに書く"
+        },
+        {
+          "code": "apiVersion: v1",
+          "text": "Pod のある API"
+        },
+        {
+          "code": "kind: Pod",
+          "text": "1 つきりの Pod"
+        },
+        {
+          "code": "metadata:",
+          "text": "呼び名など"
+        },
+        {
+          "code": "  name: hp",
+          "text": "呼び名は hp"
+        },
+        {
+          "code": "spec:",
+          "text": "中身"
+        },
+        {
+          "code": "  terminationGracePeriodSeconds: 1",
+          "text": "終わるのを待つ秒数"
+        },
+        {
+          "code": "  volumes:",
+          "text": "Pod が持つ置き場所"
+        },
+        {
+          "code": "  - name: node-dir",
+          "text": "置き場所の名前"
+        },
+        {
+          "code": "    hostPath:",
+          "text": "ノードのフォルダを使う"
+        },
+        {
+          "code": "      path: /var/tmp/kcna-ch8",
+          "text": "ノードのこのフォルダ (この章のために作る)"
+        },
+        {
+          "code": "      type: DirectoryOrCreate",
+          "text": "無ければ作る"
+        },
+        {
+          "code": "  - name: node-etc",
+          "text": "2 つ目の置き場所"
+        },
+        {
+          "code": "    hostPath:",
+          "text": "ノードのフォルダを使う"
+        },
+        {
+          "code": "      path: /etc",
+          "text": "ノードの設定のフォルダ"
+        },
+        {
+          "code": "      type: Directory",
+          "text": "あるはずのフォルダ"
+        },
+        {
+          "code": "  containers:",
+          "text": "コンテナたち"
+        },
+        {
+          "code": "  - name: main",
+          "text": "コンテナの呼び名"
+        },
+        {
+          "code": "    image: busybox:1.37",
+          "text": "小さな道具のイメージ"
+        },
+        {
+          "code": "    command: ['sh', '-c', 'trap \"exit 1\" TERM; while true; do sleep 1; done']",
+          "text": "終わりの合図 (TERM) を受けたら失敗で終わり、それまでは待ち続ける"
+        },
+        {
+          "code": "    volumeMounts:",
+          "text": "置き場所を見せる"
+        },
+        {
+          "code": "    - name: node-dir",
+          "text": "node-dir を"
+        },
+        {
+          "code": "      mountPath: /node-dir",
+          "text": "/node-dir に"
+        },
+        {
+          "code": "    - name: node-etc",
+          "text": "node-etc を"
+        },
+        {
+          "code": "      mountPath: /node-etc",
+          "text": "/node-etc に"
+        },
+        {
+          "code": "      readOnly: true",
+          "text": "読むだけにする"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "kubectl apply -f hostpath.yaml -n ch8",
+          "text": "Pod を作る"
+        },
+        {
+          "code": "kubectl wait --for=condition=Ready pod/hp -n ch8 --timeout=180s",
+          "text": "使えるようになるまで待つ"
+        },
+        {
+          "code": "kubectl exec hp -n ch8 -- sh -c 'echo from-pod > /node-dir/note.txt; cat /node-etc/hostname'",
+          "text": "ノードのフォルダに書き、ノードのホスト名を読む"
+        },
+        {
+          "code": "ls -l /var/tmp/kcna-ch8",
+          "text": "仮想マシン (ノード) の側から見る"
+        },
+        {
+          "code": "kubectl delete pod hp -n ch8",
+          "text": "Pod を消す"
+        },
+        {
+          "code": "cat /var/tmp/kcna-ch8/note.txt",
+          "text": "Pod を消したあと、ノードの側で読む"
+        }
+      ],
+      "output": "pod/hp created\npod/hp condition met\nkcna\ntotal 4\n-rw-r--r-- 1 root root 9 Nov 27 05:04 note.txt\npod \"hp\" deleted from ch8 namespace\nfrom-pod",
+      "read": "Pod の中から、ノードのホスト名 kcna が読めました。読むだけにしても、ノードの設定が丸見えです。書いたファイルは root の持ち物でノードに残り、Pod を消しても消えません。誰も片付けないので、たまっていきます。",
+      "trouble": [
+        {
+          "symptom": "Permission denied と出る",
+          "check": "volumeMounts の readOnly を見る",
+          "fix": "/node-etc は読むだけ。書くのは /node-dir"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/security/pod-security-standards/"
+    },
+    {
+      "id": "check-before-rm-hostpath",
+      "text": "ノードのフォルダを消す前に、どのマシンにいるかを見ます。kcna と出なければ、次の手順を打ちません。",
+      "why": "次の手順はノードのファイルを消します。自分の PC で打つと、PC のファイルを消すことになります。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "hostname"
+      },
+      "lines": [
+        {
+          "code": "hostname",
+          "text": "このマシンの名前を出す"
+        }
+      ],
+      "output": "kcna",
+      "read": "kcna と出れば、仮想マシンの中です。",
+      "trouble": [
+        {
+          "symptom": "kcna ではない名前が出る",
+          "check": "行の頭が ubuntu@kcna かを見る",
+          "fix": "ホストにいる。multipass shell kcna で入り、もう一度打つ"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man1/hostname.1.html"
+    },
+    {
+      "id": "rm-hostpath",
+      "text": "前の手順で作ったノードのフォルダを消します。kcna と出たときだけ打ちます。",
+      "why": "hostPath の置き場所は、だれも片付けないためです。消すのは、この章で作った /var/tmp/kcna-ch8 だけです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "sudo rm -r /var/tmp/kcna-ch8\nls /var/tmp"
+      },
+      "lines": [
+        {
+          "code": "sudo rm -r /var/tmp/kcna-ch8",
+          "text": "この章で作ったフォルダを、中身ごと消す"
+        },
+        {
+          "code": "ls /var/tmp",
+          "text": "残りを見る"
+        }
+      ],
+      "output": "cloud-init\nsystemd-private-73300523ae054ded8f38cfcfaaecdc86-ModemManager.service-ofclds\nsystemd-private-73300523ae054ded8f38cfcfaaecdc86-polkit.service-LmIZpw\nsystemd-private-73300523ae054ded8f38cfcfaaecdc86-systemd-logind.service-9zVdse\nsystemd-private-73300523ae054ded8f38cfcfaaecdc86-systemd-resolved.service-FH7IG6\nsystemd-private-73300523ae054ded8f38cfcfaaecdc86-systemd-timesyncd.service-CxWjhq",
+      "read": "kcna-ch8 が無くなっていれば片付いています。",
+      "trouble": [
+        {
+          "symptom": "No such file or directory と出る",
+          "check": "ls /var/tmp を打つ",
+          "fix": "もう無い。そのまま進む"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man1/rm.1.html"
+    },
+    {
+      "id": "storageclass",
+      "text": "PersistentVolume の用意のしかた (StorageClass) を見ます。",
+      "why": "Pod を消しても残る置き場所を、PersistentVolume (PV) と呼びます。PV が欲しい時は、PersistentVolumeClaim (PVC、置き場所の申し込み) を出します。StorageClass は「どう用意するか」の決まりで、k3s には local-path が入っています。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl get storageclass\nkubectl get configmap local-path-config -n kube-system -o jsonpath='{.data.config\\.json}{\"\\n\"}'"
+      },
+      "lines": [
+        {
+          "code": "kubectl get storageclass",
+          "text": "StorageClass の一覧を出す"
+        },
+        {
+          "code": "kubectl get configmap local-path-config -n kube-system -o jsonpath='{.data.config\\.json}{\"\\n\"}'",
+          "text": "local-path がノードのどこに置くかの設定を出す"
+        }
+      ],
+      "output": "NAME                   PROVISIONER             RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE\nlocal-path (default)   rancher.io/local-path   Delete          WaitForFirstConsumer   false                  3m11s\n{\n  \"nodePathMap\":[\n  {\n    \"node\":\"DEFAULT_PATH_FOR_NON_LISTED_NODES\",\n    \"paths\":[\"/var/lib/rancher/k3s/storage\"]\n  }\n  ]\n}",
+      "read": "(default) は「PVC に何も書かなければこれ」の印です。PROVISIONER の rancher.io/local-path が、申し込みを受けて PV を作る部品です。RECLAIMPOLICY の Delete は「PVC を消したら中身も消す」、VOLUMEBINDINGMODE の WaitForFirstConsumer は「使う Pod が決まるまで作らない」です。置き場所は、ノードの /var/lib/rancher/k3s/storage です。",
+      "trouble": [
+        {
+          "symptom": "local-path が無い",
+          "check": "kubectl get pods -n kube-system を打つ",
+          "fix": "local-path-provisioner が動いていなければ待つ"
+        }
+      ],
+      "source": "https://docs.k3s.io/add-ons/storage"
+    },
+    {
+      "id": "pvc-pending",
+      "text": "PVC だけを出し、Pending のままになることを見ます。10 秒待ちます。",
+      "why": "失敗ではありません。使う Pod が決まるまで、わざと待つ決まり (WaitForFirstConsumer) だからです。Pod の置かれるノードに作るためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cat > notes-pvc.yaml <<'EOF'\napiVersion: v1\nkind: PersistentVolumeClaim\nmetadata:\n  name: notes\nspec:\n  accessModes:\n  - ReadWriteOnce\n  storageClassName: local-path\n  resources:\n    requests:\n      storage: 64Mi\nEOF\nkubectl apply -f notes-pvc.yaml -n ch8\nsleep 10\nkubectl get pvc notes -n ch8\nkubectl get events -n ch8 --field-selector involvedObject.name=notes -o custom-columns=REASON:.reason,MESSAGE:.message"
+      },
+      "lines": [
+        {
+          "code": "cat > notes-pvc.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま notes-pvc.yaml というファイルに書く"
+        },
+        {
+          "code": "apiVersion: v1",
+          "text": "PVC のある API"
+        },
+        {
+          "code": "kind: PersistentVolumeClaim",
+          "text": "置き場所の申し込み"
+        },
+        {
+          "code": "metadata:",
+          "text": "呼び名など"
+        },
+        {
+          "code": "  name: notes",
+          "text": "呼び名は notes"
+        },
+        {
+          "code": "spec:",
+          "text": "中身"
+        },
+        {
+          "code": "  accessModes:",
+          "text": "使い方"
+        },
+        {
+          "code": "  - ReadWriteOnce",
+          "text": "1 台のノードから読み書きする"
+        },
+        {
+          "code": "  storageClassName: local-path",
+          "text": "用意のしかた (k3s に入っているもの)"
+        },
+        {
+          "code": "  resources:",
+          "text": "大きさ"
+        },
+        {
+          "code": "    requests:",
+          "text": "申し込む量"
+        },
+        {
+          "code": "      storage: 64Mi",
+          "text": "64Mi"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "kubectl apply -f notes-pvc.yaml -n ch8",
+          "text": "PVC を出す"
+        },
+        {
+          "code": "sleep 10",
+          "text": "10 秒待つ"
+        },
+        {
+          "code": "kubectl get pvc notes -n ch8",
+          "text": "一覧に出す"
+        },
+        {
+          "code": "kubectl get events -n ch8 --field-selector involvedObject.name=notes -o custom-columns=REASON:.reason,MESSAGE:.message",
+          "text": "PVC のイベントを出す"
+        }
+      ],
+      "output": "persistentvolumeclaim/notes created\nNAME    STATUS    VOLUME   CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE\nnotes   Pending                                      local-path     <unset>                 10s\nREASON                 MESSAGE\nWaitForFirstConsumer   waiting for first consumer to be created before binding",
+      "read": "STATUS は Pending で、イベントに waiting for first consumer (使う人を待っている) と出ます。",
+      "trouble": [
+        {
+          "symptom": "Bound になっている",
+          "check": "kubectl get pods -n ch8 を打つ",
+          "fix": "もう使う Pod がある。そのまま進む"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/storage/storage-classes/"
+    },
+    {
+      "id": "pvc-use",
+      "text": "PVC を使う Deployment を作り、PVC が Bound になることを見ます。",
+      "why": "Pod が置かれると、local-path がそのノードに PV を作り、PVC と結び付けます (Bound)。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cat > notes.yaml <<'EOF'\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: notes\nspec:\n  replicas: 1\n  strategy:\n    type: Recreate\n  selector:\n    matchLabels:\n      app: notes\n  template:\n    metadata:\n      labels:\n        app: notes\n    spec:\n      terminationGracePeriodSeconds: 1\n      volumes:\n      - name: data\n        persistentVolumeClaim:\n          claimName: notes\n      containers:\n      - name: main\n        image: busybox:1.37\n        command: ['sh', '-c', 'echo \"started $(date +%T) by $HOSTNAME\" >> /data/log.txt; sleep 86400']\n        volumeMounts:\n        - name: data\n          mountPath: /data\nEOF\nkubectl apply -f notes.yaml -n ch8\nkubectl rollout status deployment/notes -n ch8 --timeout=180s\nkubectl get pvc notes -n ch8\nkubectl get pv\nkubectl exec deployment/notes -n ch8 -- sh -c \"echo hello > /data/hello.txt; cat /data/hello.txt\"\nkubectl exec deployment/notes -n ch8 -- cat /data/log.txt"
+      },
+      "lines": [
+        {
+          "code": "cat > notes.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま notes.yaml というファイルに書く"
+        },
+        {
+          "code": "apiVersion: apps/v1",
+          "text": "Deployment のある API"
+        },
+        {
+          "code": "kind: Deployment",
+          "text": "Pod の数を保つ部品"
+        },
+        {
+          "code": "metadata:",
+          "text": "呼び名など"
+        },
+        {
+          "code": "  name: notes",
+          "text": "呼び名"
+        },
+        {
+          "code": "spec:",
+          "text": "中身"
+        },
+        {
+          "code": "  replicas: 1",
+          "text": "Pod は 1 つ"
+        },
+        {
+          "code": "  strategy:",
+          "text": "入れ替え方"
+        },
+        {
+          "code": "    type: Recreate",
+          "text": "前の Pod を止めてから新しく作る (1 台用の置き場所を取り合わないため)"
+        },
+        {
+          "code": "  selector:",
+          "text": "自分の Pod を見分ける決まり"
+        },
+        {
+          "code": "    matchLabels:",
+          "text": "このラベルの Pod"
+        },
+        {
+          "code": "      app: notes",
+          "text": "app=notes"
+        },
+        {
+          "code": "  template:",
+          "text": "Pod のひな型"
+        },
+        {
+          "code": "    metadata:",
+          "text": "Pod に付けるもの"
+        },
+        {
+          "code": "      labels:",
+          "text": "ラベル"
+        },
+        {
+          "code": "        app: notes",
+          "text": "app=notes"
+        },
+        {
+          "code": "    spec:",
+          "text": "Pod の中身"
+        },
+        {
+          "code": "      terminationGracePeriodSeconds: 1",
+          "text": "終わるのを待つ秒数"
+        },
+        {
+          "code": "      volumes:",
+          "text": "Pod が持つ置き場所"
+        },
+        {
+          "code": "      - name: data",
+          "text": "置き場所の名前"
+        },
+        {
+          "code": "        persistentVolumeClaim:",
+          "text": "中身は PVC から"
+        },
+        {
+          "code": "          claimName: notes",
+          "text": "notes という PVC"
+        },
+        {
+          "code": "      containers:",
+          "text": "コンテナたち"
+        },
+        {
+          "code": "      - name: main",
+          "text": "コンテナの呼び名"
+        },
+        {
+          "code": "        image: busybox:1.37",
+          "text": "小さな道具のイメージ"
+        },
+        {
+          "code": "        command: ['sh', '-c', 'echo \"started $(date +%T) by $HOSTNAME\" >> /data/log.txt; sleep 86400']",
+          "text": "始めた時刻と自分の名前を、ファイルの最後に足してから待つ"
+        },
+        {
+          "code": "        volumeMounts:",
+          "text": "置き場所を見せる"
+        },
+        {
+          "code": "        - name: data",
+          "text": "data を"
+        },
+        {
+          "code": "          mountPath: /data",
+          "text": "/data に見せる"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "kubectl apply -f notes.yaml -n ch8",
+          "text": "Deployment を作る"
+        },
+        {
+          "code": "kubectl rollout status deployment/notes -n ch8 --timeout=180s",
+          "text": "使えるようになるまで待つ"
+        },
+        {
+          "code": "kubectl get pvc notes -n ch8",
+          "text": "PVC を出す"
+        },
+        {
+          "code": "kubectl get pv",
+          "text": "PV を出す"
+        },
+        {
+          "code": "kubectl exec deployment/notes -n ch8 -- sh -c \"echo hello > /data/hello.txt; cat /data/hello.txt\"",
+          "text": "置き場所に書いて読む"
+        },
+        {
+          "code": "kubectl exec deployment/notes -n ch8 -- cat /data/log.txt",
+          "text": "置き場所のファイルを読む"
+        }
+      ],
+      "output": "deployment.apps/notes created\nWaiting for deployment \"notes\" rollout to finish: 0 of 1 updated replicas are available...\ndeployment \"notes\" successfully rolled out\nNAME    STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE\nnotes   Bound    pvc-d52dd088-0592-4a33-bfff-33d67d668e75   64Mi       RWO            local-path     <unset>                 20s\nNAME                                       CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM       STORAGECLASS   VOLUMEATTRIBUTESCLASS   REASON   AGE\npvc-d52dd088-0592-4a33-bfff-33d67d668e75   64Mi       RWO            Delete           Bound    ch8/notes   local-path     <unset>                          2s\nhello\nstarted 05:04:38 by notes-f8c4ddc9c-9f968",
+      "read": "STATUS が Bound、VOLUME に pvc- で始まる PV の名前が出ます。PV の CLAIM は ch8/notes で、どの申し込みに結ばれたかが分かります。PV は名前空間の外のものなので、-n を付けずに出します。",
+      "trouble": [
+        {
+          "symptom": "Pending のまま",
+          "check": "kubectl describe pod -l app=notes -n ch8 の Events を見る",
+          "fix": "Pod が置けていないと、PV も作られない"
+        },
+        {
+          "symptom": "toomanyrequests や 429 と出る",
+          "check": "kubectl describe の Events で、Failed to pull image の行の終わりを見る",
+          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る。短い「429 Too Many Requests」だけのときは、使いすぎを防ぐ別の上限なので、数分待ってからもう一度行う"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/"
+    },
+    {
+      "id": "where",
+      "text": "PV の中身が、ノードのどこにあるかを見ます。",
+      "why": "local-path の PV は、ノードのフォルダそのものです。だから、その PV を使う Pod は、そのノードにしか置けません。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "PV_NAME=$(kubectl get pvc notes -n ch8 -o jsonpath='{.spec.volumeName}')\nkubectl get pv $PV_NAME -o jsonpath='{.spec.local.path}{\"\\n\"}{.spec.nodeAffinity.required.nodeSelectorTerms[0].matchExpressions[0].values}{\"\\n\"}'\nsudo ls /var/lib/rancher/k3s/storage\nsudo cat /var/lib/rancher/k3s/storage/${PV_NAME}_ch8_notes/hello.txt"
+      },
+      "lines": [
+        {
+          "code": "PV_NAME=$(kubectl get pvc notes -n ch8 -o jsonpath='{.spec.volumeName}')",
+          "text": "PVC に結ばれた PV の名前を覚える。今の端末だけで使える"
+        },
+        {
+          "code": "kubectl get pv $PV_NAME -o jsonpath='{.spec.local.path}{\"\\n\"}{.spec.nodeAffinity.required.nodeSelectorTerms[0].matchExpressions[0].values}{\"\\n\"}'",
+          "text": "PV の置き場所 (local 型の PV の path) と、結び付いたノードを出す"
+        },
+        {
+          "code": "sudo ls /var/lib/rancher/k3s/storage",
+          "text": "ノードの、local-path の置き場所の中身を出す"
+        },
+        {
+          "code": "sudo cat /var/lib/rancher/k3s/storage/${PV_NAME}_ch8_notes/hello.txt",
+          "text": "ノードの側から、Pod が書いたファイルを読む"
+        }
+      ],
+      "output": "/var/lib/rancher/k3s/storage/pvc-d52dd088-0592-4a33-bfff-33d67d668e75_ch8_notes\n[\"kcna\"]\npvc-d52dd088-0592-4a33-bfff-33d67d668e75_ch8_notes\nhello",
+      "read": "この版の k3s の local-path は、local という型の PV を作ります (ノードのフォルダを、そのノードだけで使う型)。PV の名前・名前空間・PVC の名前をつないだフォルダに、hello が入っています。結び付いたノードは kcna です。ノードが壊れると、この中身にはどこからも届かなくなります。",
+      "trouble": [
+        {
+          "symptom": "No such file or directory と出る",
+          "check": "echo $PV_NAME を打つ",
+          "fix": "空なら、1 行目から打ち直す"
+        }
+      ],
+      "source": "https://docs.k3s.io/add-ons/storage"
+    },
+    {
+      "id": "survive",
+      "text": "Pod を消しても、Deployment を作り直しても、中身が残ることを見ます。",
+      "why": "これが PV を使う理由です。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl delete pod -l app=notes -n ch8\nkubectl rollout status deployment/notes -n ch8 --timeout=180s\nkubectl exec deployment/notes -n ch8 -- cat /data/log.txt\nkubectl delete deployment notes -n ch8\nkubectl get pvc notes -n ch8\nkubectl apply -f notes.yaml -n ch8\nkubectl rollout status deployment/notes -n ch8 --timeout=180s\nkubectl exec deployment/notes -n ch8 -- cat /data/log.txt"
+      },
+      "lines": [
+        {
+          "code": "kubectl delete pod -l app=notes -n ch8",
+          "text": "Pod を消す"
+        },
+        {
+          "code": "kubectl rollout status deployment/notes -n ch8 --timeout=180s",
+          "text": "使えるようになるまで待つ"
+        },
+        {
+          "code": "kubectl exec deployment/notes -n ch8 -- cat /data/log.txt",
+          "text": "置き場所のファイルを読む"
+        },
+        {
+          "code": "kubectl delete deployment notes -n ch8",
+          "text": "Deployment ごと消す"
+        },
+        {
+          "code": "kubectl get pvc notes -n ch8",
+          "text": "PVC が残っているかを見る"
+        },
+        {
+          "code": "kubectl apply -f notes.yaml -n ch8",
+          "text": "同じ Deployment を作り直す"
+        },
+        {
+          "code": "kubectl rollout status deployment/notes -n ch8 --timeout=180s",
+          "text": "使えるようになるまで待つ"
+        },
+        {
+          "code": "kubectl exec deployment/notes -n ch8 -- cat /data/log.txt",
+          "text": "置き場所のファイルを読む"
+        }
+      ],
+      "output": "pod \"notes-f8c4ddc9c-9f968\" deleted from ch8 namespace\ndeployment \"notes\" successfully rolled out\nstarted 05:04:38 by notes-f8c4ddc9c-9f968\nstarted 05:04:40 by notes-f8c4ddc9c-lnzkx\ndeployment.apps \"notes\" deleted from ch8 namespace\nNAME    STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE\nnotes   Bound    pvc-d52dd088-0592-4a33-bfff-33d67d668e75   64Mi       RWO            local-path     <unset>                 25s\ndeployment.apps/notes created\nWaiting for deployment \"notes\" rollout to finish: 0 of 1 updated replicas are available...\ndeployment \"notes\" successfully rolled out\nstarted 05:04:38 by notes-f8c4ddc9c-9f968\nstarted 05:04:40 by notes-f8c4ddc9c-lnzkx\nstarted 05:04:45 by notes-f8c4ddc9c-8bmsc",
+      "read": "started の行が 3 つに増えています。Pod は 3 回とも別の名前ですが、書いたものは同じ置き場所に残りました。PVC が消えない限り、中身は残ります。",
+      "trouble": [
+        {
+          "symptom": "行が増えていない",
+          "check": "kubectl get pvc -n ch8 を打つ",
+          "fix": "PVC が無いと、作り直した時に新しく空の置き場所ができる"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/"
+    },
+    {
+      "id": "break",
+      "text": "ここで休めます。休む人は、exit で出てから、ホストでこの行を打ちます。休まない人は、打たずに印を付けて先へ進みます。",
+      "why": "長い章なので、区切りを置くためです。止めても、作ったものとファイルは残ります。再起動と同じことが起きるので、Pod の中のコンテナは始め直され、Pod の住所も変わります。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass stop kcna"
+      },
+      "lines": [
+        {
+          "code": "multipass stop kcna",
+          "text": "kcna を止める。動いている (Running) ときだけ打てる"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "何もエラーが出なければ止まっています。続けるときは、ホストで multipass shell kcna を打つと、動かして中に入れます。そのあと cd ~/ch8 を打ち、kubectl rollout status deployment/notes -n ch8 で使えるようになるまで待ち、container not found と出なくなるまで少し待ってから、kubectl exec deployment/notes -n ch8 -- cat /data/log.txt を打ちます。started の行が 1 つ増えて、前の行も残っていれば、マシンを止めても中身が残ったということです。戻った直後の 1〜2 分は、一覧が止める前の古い様子のことがあります。少し待ってもう一度見ます。",
+      "trouble": [
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "activating なら、1 分ほど待つ"
+        },
+        {
+          "symptom": "No such file or directory と出る",
+          "check": "pwd を打つ",
+          "fix": "作業のフォルダにいない。cd で移る"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/stop/"
+    },
+    {
+      "id": "capacity",
+      "text": "申し込んだ 64Mi より大きいファイルを書きます。",
+      "why": "容量 (storage) を守るかどうかは、用意する部品しだいです。local-path は守りません。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "for i in $(seq 60); do kubectl exec deployment/notes -n ch8 -- true 2> /dev/null && break; sleep 2; done\nkubectl exec deployment/notes -n ch8 -- sh -c \"head -c 104857600 /dev/zero > /data/big.bin\"\nkubectl exec deployment/notes -n ch8 -- ls -lh /data\nkubectl exec deployment/notes -n ch8 -- rm /data/big.bin"
+      },
+      "lines": [
+        {
+          "code": "for i in $(seq 60); do kubectl exec deployment/notes -n ch8 -- true 2> /dev/null && break; sleep 2; done",
+          "text": "notes の中で打てるようになるまで見て待つ (最大 2 分余り。休んだあとは少しかかる)"
+        },
+        {
+          "code": "kubectl exec deployment/notes -n ch8 -- sh -c \"head -c 104857600 /dev/zero > /data/big.bin\"",
+          "text": "0 が並ぶだけの 100 MiB のファイルを書く"
+        },
+        {
+          "code": "kubectl exec deployment/notes -n ch8 -- ls -lh /data",
+          "text": "置き場所の中身を出す"
+        },
+        {
+          "code": "kubectl exec deployment/notes -n ch8 -- rm /data/big.bin",
+          "text": "大きいファイルを消す"
+        }
+      ],
+      "output": "total 100M\n-rw-r--r--    1 root     root      100.0M Nov 27 05:04 big.bin\n-rw-r--r--    1 root     root           6 Nov 27 05:04 hello.txt\n-rw-r--r--    1 root     root         126 Nov 27 05:04 log.txt",
+      "read": "64Mi を申し込んだのに、100 MiB 書けました。local-path の容量は、目安の数でしかありません。ノードのディスクが埋まると、そのノードの Pod 全部が困ります。容量を本当に守る置き場所もあり、それは部品の説明を見て選びます。",
+      "trouble": [
+        {
+          "symptom": "No space left on device と出る",
+          "check": "df -h / を打つ",
+          "fix": "仮想マシンのディスクが足りない。104857600 を 20971520 (20 MiB) に減らして試す"
+        },
+        {
+          "symptom": "container not found と出る",
+          "check": "kubectl get pods -n ch8 を打つ",
+          "fix": "休んだあとは、Running と出てもコンテナがまだ始まっていないことがある。1 行目の待つ行から打ち直す"
+        }
+      ],
+      "source": "https://github.com/rancher/local-path-provisioner"
+    },
+    {
+      "id": "access",
+      "text": "同じ PVC を、もう 1 つの Pod から使います。",
+      "why": "accessModes の ReadWriteOnce は「1 台のノードから読み書き」で、「1 つの Pod から」ではありません。同じノードなら、ほかの Pod からも使えます。1 つの Pod だけに限るなら ReadWriteOncePod を使います。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cat > reader.yaml <<'EOF'\napiVersion: v1\nkind: Pod\nmetadata:\n  name: reader\nspec:\n  terminationGracePeriodSeconds: 1\n  volumes:\n  - name: data\n    persistentVolumeClaim:\n      claimName: notes\n  containers:\n  - name: main\n    image: busybox:1.37\n    command: ['sh', '-c', 'sleep 86400']\n    volumeMounts:\n    - name: data\n      mountPath: /data\n      readOnly: true\nEOF\nkubectl apply -f reader.yaml -n ch8\nkubectl wait --for=condition=Ready pod/reader -n ch8 --timeout=180s\nkubectl exec reader -n ch8 -- cat /data/hello.txt\nkubectl delete pod reader -n ch8"
+      },
+      "lines": [
+        {
+          "code": "cat > reader.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま reader.yaml というファイルに書く"
+        },
+        {
+          "code": "apiVersion: v1",
+          "text": "Pod のある API"
+        },
+        {
+          "code": "kind: Pod",
+          "text": "1 つきりの Pod"
+        },
+        {
+          "code": "metadata:",
+          "text": "呼び名など"
+        },
+        {
+          "code": "  name: reader",
+          "text": "呼び名は reader"
+        },
+        {
+          "code": "spec:",
+          "text": "中身"
+        },
+        {
+          "code": "  terminationGracePeriodSeconds: 1",
+          "text": "終わるのを待つ秒数"
+        },
+        {
+          "code": "  volumes:",
+          "text": "Pod が持つ置き場所"
+        },
+        {
+          "code": "  - name: data",
+          "text": "置き場所の名前"
+        },
+        {
+          "code": "    persistentVolumeClaim:",
+          "text": "PVC から"
+        },
+        {
+          "code": "      claimName: notes",
+          "text": "同じ notes"
+        },
+        {
+          "code": "  containers:",
+          "text": "コンテナたち"
+        },
+        {
+          "code": "  - name: main",
+          "text": "コンテナの呼び名"
+        },
+        {
+          "code": "    image: busybox:1.37",
+          "text": "小さな道具のイメージ"
+        },
+        {
+          "code": "    command: ['sh', '-c', 'sleep 86400']",
+          "text": "動かすもの"
+        },
+        {
+          "code": "    volumeMounts:",
+          "text": "置き場所を見せる"
+        },
+        {
+          "code": "    - name: data",
+          "text": "data を"
+        },
+        {
+          "code": "      mountPath: /data",
+          "text": "/data に"
+        },
+        {
+          "code": "      readOnly: true",
+          "text": "読むだけ"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "kubectl apply -f reader.yaml -n ch8",
+          "text": "Pod を作る"
+        },
+        {
+          "code": "kubectl wait --for=condition=Ready pod/reader -n ch8 --timeout=180s",
+          "text": "使えるようになるまで待つ"
+        },
+        {
+          "code": "kubectl exec reader -n ch8 -- cat /data/hello.txt",
+          "text": "2 つ目の Pod から読む"
+        },
+        {
+          "code": "kubectl delete pod reader -n ch8",
+          "text": "消す"
+        }
+      ],
+      "output": "pod/reader created\npod/reader condition met\nhello\npod \"reader\" deleted from ch8 namespace",
+      "read": "もう 1 つの Pod からも読めました。ノードが何台もあるクラスターで、別のノードに置かれた Pod は、この PVC を使えません。",
+      "trouble": [
+        {
+          "symptom": "Pending のまま",
+          "check": "kubectl describe pod reader -n ch8 を見る",
+          "fix": "別のノードに置こうとしている。ノードが 1 台なら起きない"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/"
+    },
+    {
+      "id": "in-use",
+      "text": "わざと、使っている途中の PVC を消します。15 秒待ちます。",
+      "why": "中身を守る仕組み (保護) が働くことを見ます。PVC を消すと中身も消える決まりなので、使っている途中は止めてくれます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl delete pvc notes -n ch8 --wait=false\nsleep 15\nkubectl get pvc notes -n ch8\nkubectl get pvc notes -n ch8 -o jsonpath='{.metadata.finalizers}{\"\\n\"}'\nkubectl exec deployment/notes -n ch8 -- cat /data/log.txt"
+      },
+      "lines": [
+        {
+          "code": "kubectl delete pvc notes -n ch8 --wait=false",
+          "text": "PVC を消すよう頼む (終わるのを待たない)"
+        },
+        {
+          "code": "sleep 15",
+          "text": "15 秒待つ"
+        },
+        {
+          "code": "kubectl get pvc notes -n ch8",
+          "text": "一覧に出す"
+        },
+        {
+          "code": "kubectl get pvc notes -n ch8 -o jsonpath='{.metadata.finalizers}{\"\\n\"}'",
+          "text": "消すのを止めている印 (finalizer) を出す"
+        },
+        {
+          "code": "kubectl exec deployment/notes -n ch8 -- cat /data/log.txt",
+          "text": "置き場所のファイルを読む"
+        }
+      ],
+      "output": "persistentvolumeclaim \"notes\" deleted from ch8 namespace\nNAME    STATUS        VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE\nnotes   Terminating   pvc-d52dd088-0592-4a33-bfff-33d67d668e75   64Mi       RWO            local-path     <unset>                 52s\n[\"kubernetes.io/pvc-protection\"]\nstarted 05:04:38 by notes-f8c4ddc9c-9f968\nstarted 05:04:40 by notes-f8c4ddc9c-lnzkx\nstarted 05:04:45 by notes-f8c4ddc9c-8bmsc",
+      "read": "STATUS は Terminating のまま止まっています。kubernetes.io/pvc-protection が、使っている Pod がある間は消させない印です。Pod はそのまま動いていて、読めます。",
+      "trouble": [
+        {
+          "symptom": "もう消えている",
+          "check": "kubectl get pods -n ch8 を打つ",
+          "fix": "使う Pod が無かった。notes を作り直してから試す"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/"
+    },
+    {
+      "id": "check-before-release",
+      "text": "PVC の中身を消す前に、どのマシンにいるかを見ます。kcna と出なければ、次の手順を打ちません。",
+      "why": "次の手順で、PV とノードの中身が消えるためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "hostname"
+      },
+      "lines": [
+        {
+          "code": "hostname",
+          "text": "このマシンの名前を出す"
+        }
+      ],
+      "output": "kcna",
+      "read": "kcna と出れば、仮想マシンの中です。",
+      "trouble": [
+        {
+          "symptom": "kcna ではない名前が出る",
+          "check": "行の頭が ubuntu@kcna かを見る",
+          "fix": "ホストにいる。multipass shell kcna で入り、もう一度打つ"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man1/hostname.1.html"
+    },
+    {
+      "id": "release",
+      "text": "使う Pod を止めると、PVC と PV と中身が消えることを見ます。前の手順で kcna と出たときだけ打ちます。",
+      "why": "RECLAIMPOLICY が Delete なので、申し込みが消えると、用意したものも片付けられます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "PV_NAME=$(kubectl get pv -o jsonpath='{range .items[?(@.spec.claimRef.name==\"notes\")]}{.metadata.name}{end}')\nkubectl delete deployment notes -n ch8\nkubectl wait --for=delete pvc/notes -n ch8 --timeout=120s\nkubectl wait --for=delete pv/$PV_NAME --timeout=120s\nfor i in $(seq 30); do [ \"$(sudo ls /var/lib/rancher/k3s/storage | grep -c _ch8_notes)\" = 0 ] && break; sleep 2; done\nsudo ls /var/lib/rancher/k3s/storage | grep -c _ch8_notes || true"
+      },
+      "lines": [
+        {
+          "code": "PV_NAME=$(kubectl get pv -o jsonpath='{range .items[?(@.spec.claimRef.name==\"notes\")]}{.metadata.name}{end}')",
+          "text": "notes に結ばれた PV の名前を覚え直す"
+        },
+        {
+          "code": "kubectl delete deployment notes -n ch8",
+          "text": "使っている Deployment を消す"
+        },
+        {
+          "code": "kubectl wait --for=delete pvc/notes -n ch8 --timeout=120s",
+          "text": "PVC が消えるまで待つ"
+        },
+        {
+          "code": "kubectl wait --for=delete pv/$PV_NAME --timeout=120s",
+          "text": "PV が消えるまで待つ"
+        },
+        {
+          "code": "for i in $(seq 30); do [ \"$(sudo ls /var/lib/rancher/k3s/storage | grep -c _ch8_notes)\" = 0 ] && break; sleep 2; done",
+          "text": "ノードのフォルダが消えるまで見て待つ (最大 1 分)"
+        },
+        {
+          "code": "sudo ls /var/lib/rancher/k3s/storage | grep -c _ch8_notes || true",
+          "text": "ノードに notes のフォルダが残っているかを数える (|| true は、0 の時も失敗にしない書き方)"
+        }
+      ],
+      "output": "deployment.apps \"notes\" deleted from ch8 namespace\npersistentvolumeclaim/notes condition met\npersistentvolume/pvc-d52dd088-0592-4a33-bfff-33d67d668e75 condition met\n0",
+      "read": "待っていた PVC が消え、PV も消え、ノードのフォルダも 0 になりました。中身は戻せません。消えては困るなら、reclaimPolicy を Retain にした StorageClass や PV を使います。Retain なら、PVC を消しても PV は Released (使い手の無い状態) で残り、中身の片付けは人がします。",
+      "trouble": [
+        {
+          "symptom": "wait が timed out",
+          "check": "kubectl get pods -n ch8 を打つ",
+          "fix": "notes の Pod が Terminating なら、もう少し待つ"
+        },
+        {
+          "symptom": "1 と出る",
+          "check": "30 秒待って最後の行を打つ",
+          "fix": "片付けの途中"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/"
+    },
+    {
+      "id": "sts-create",
+      "text": "StatefulSet と headless Service で、名前の決まった 3 つの Pod を作ります。1 分ほどかかります。",
+      "why": "StatefulSet は、Pod に 0、1、2 と番号の付いた変わらない名前を付け、1 つずつ順に作り、Pod ごとに専用の PVC を作ります。データベースのように、1 つ 1 つが自分の中身を持つもののための部品です。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cat > sts.yaml <<'EOF'\napiVersion: v1\nkind: Service\nmetadata:\n  name: store\nspec:\n  clusterIP: None\n  selector:\n    app: store\n  ports:\n  - port: 80\n---\napiVersion: apps/v1\nkind: StatefulSet\nmetadata:\n  name: store\nspec:\n  serviceName: store\n  replicas: 3\n  selector:\n    matchLabels:\n      app: store\n  template:\n    metadata:\n      labels:\n        app: store\n    spec:\n      terminationGracePeriodSeconds: 1\n      containers:\n      - name: main\n        image: busybox:1.37\n        command: ['sh', '-c', 'echo \"$HOSTNAME started $(date +%T)\" >> /data/log.txt; sleep 86400']\n        volumeMounts:\n        - name: data\n          mountPath: /data\n  volumeClaimTemplates:\n  - metadata:\n      name: data\n    spec:\n      accessModes: [ReadWriteOnce]\n      storageClassName: local-path\n      resources:\n        requests:\n          storage: 32Mi\nEOF\nkubectl apply -f sts.yaml -n ch8\nfor i in $(seq 20); do echo \"$(kubectl get pods -l app=store -n ch8 --no-headers 2> /dev/null | awk '{print $1\"=\"$3}' | tr '\\n' ' ')\"; [ \"$(kubectl get statefulset store -n ch8 -o jsonpath='{.status.readyReplicas}')\" = 3 ] && break; sleep 3; done\nkubectl get pvc -n ch8"
+      },
+      "lines": [
+        {
+          "code": "cat > sts.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま sts.yaml というファイルに書く"
+        },
+        {
+          "code": "apiVersion: v1",
+          "text": "Service のある API"
+        },
+        {
+          "code": "kind: Service",
+          "text": "名前の決まった Pod を引くための Service"
+        },
+        {
+          "code": "metadata:",
+          "text": "呼び名など"
+        },
+        {
+          "code": "  name: store",
+          "text": "呼び名"
+        },
+        {
+          "code": "spec:",
+          "text": "中身"
+        },
+        {
+          "code": "  clusterIP: None",
+          "text": "住所を持たない (headless)。Pod ごとの名前を DNS に出す"
+        },
+        {
+          "code": "  selector:",
+          "text": "選ぶ Pod"
+        },
+        {
+          "code": "    app: store",
+          "text": "app=store"
+        },
+        {
+          "code": "  ports:",
+          "text": "番号"
+        },
+        {
+          "code": "  - port: 80",
+          "text": "80 番"
+        },
+        {
+          "code": "---",
+          "text": "次のもの"
+        },
+        {
+          "code": "apiVersion: apps/v1",
+          "text": "StatefulSet のある API"
+        },
+        {
+          "code": "kind: StatefulSet",
+          "text": "名前と置き場所を Pod ごとに持つ部品"
+        },
+        {
+          "code": "metadata:",
+          "text": "呼び名など"
+        },
+        {
+          "code": "  name: store",
+          "text": "呼び名"
+        },
+        {
+          "code": "spec:",
+          "text": "中身"
+        },
+        {
+          "code": "  serviceName: store",
+          "text": "名前に使う headless Service"
+        },
+        {
+          "code": "  replicas: 3",
+          "text": "Pod は 3 つ"
+        },
+        {
+          "code": "  selector:",
+          "text": "自分の Pod を見分ける決まり"
+        },
+        {
+          "code": "    matchLabels:",
+          "text": "このラベルの Pod"
+        },
+        {
+          "code": "      app: store",
+          "text": "app=store"
+        },
+        {
+          "code": "  template:",
+          "text": "Pod のひな型"
+        },
+        {
+          "code": "    metadata:",
+          "text": "Pod に付けるもの"
+        },
+        {
+          "code": "      labels:",
+          "text": "ラベル"
+        },
+        {
+          "code": "        app: store",
+          "text": "app=store"
+        },
+        {
+          "code": "    spec:",
+          "text": "Pod の中身"
+        },
+        {
+          "code": "      terminationGracePeriodSeconds: 1",
+          "text": "終わるのを待つ秒数"
+        },
+        {
+          "code": "      containers:",
+          "text": "コンテナたち"
+        },
+        {
+          "code": "      - name: main",
+          "text": "コンテナの呼び名"
+        },
+        {
+          "code": "        image: busybox:1.37",
+          "text": "小さな道具のイメージ"
+        },
+        {
+          "code": "        command: ['sh', '-c', 'echo \"$HOSTNAME started $(date +%T)\" >> /data/log.txt; sleep 86400']",
+          "text": "自分の名前と時刻を、自分の置き場所に足す"
+        },
+        {
+          "code": "        volumeMounts:",
+          "text": "置き場所を見せる"
+        },
+        {
+          "code": "        - name: data",
+          "text": "data を"
+        },
+        {
+          "code": "          mountPath: /data",
+          "text": "/data に"
+        },
+        {
+          "code": "  volumeClaimTemplates:",
+          "text": "Pod ごとに作る PVC のひな型"
+        },
+        {
+          "code": "  - metadata:",
+          "text": "PVC の情報"
+        },
+        {
+          "code": "      name: data",
+          "text": "名前の頭。data-store-0 のようになる"
+        },
+        {
+          "code": "    spec:",
+          "text": "中身"
+        },
+        {
+          "code": "      accessModes: [ReadWriteOnce]",
+          "text": "1 台のノードから読み書き"
+        },
+        {
+          "code": "      storageClassName: local-path",
+          "text": "用意のしかた"
+        },
+        {
+          "code": "      resources:",
+          "text": "大きさ"
+        },
+        {
+          "code": "        requests:",
+          "text": "申し込む量"
+        },
+        {
+          "code": "          storage: 32Mi",
+          "text": "32Mi"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "kubectl apply -f sts.yaml -n ch8",
+          "text": "Service と StatefulSet を作る"
+        },
+        {
+          "code": "for i in $(seq 20); do echo \"$(kubectl get pods -l app=store -n ch8 --no-headers 2> /dev/null | awk '{print $1\"=\"$3}' | tr '\\n' ' ')\"; [ \"$(kubectl get statefulset store -n ch8 -o jsonpath='{.status.readyReplicas}')\" = 3 ] && break; sleep 3; done",
+          "text": "3 秒おきに、Pod の名前と様子を 1 行に並べる。3 つとも使えるようになったら止める (最大 1 分)"
+        },
+        {
+          "code": "kubectl get pvc -n ch8",
+          "text": "PVC を出す"
+        }
+      ],
+      "output": "service/store created\nstatefulset.apps/store created\nstore-0=Pending\nstore-0=Pending\nstore-0=Running store-1=Pending\nstore-0=Running store-1=ContainerCreating\nstore-0=Running store-1=Running store-2=Pending\nstore-0=Running store-1=Running store-2=Running\nNAME           STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE\ndata-store-0   Bound    pvc-f24a089b-a109-4ce3-91ce-cda5769aa35b   32Mi       RWO            local-path     <unset>                 17s\ndata-store-1   Bound    pvc-c9731841-803f-4f32-9a5b-6e87c1beed44   32Mi       RWO            local-path     <unset>                 12s\ndata-store-2   Bound    pvc-e86e70d0-62ab-41bf-98e0-a31791ef4547   32Mi       RWO            local-path     <unset>                 6s",
+      "read": "1 行ごとに、store-0、store-1、store-2 と 1 つずつ増えます。前の Pod が使えるようになってから、次を作るためです。PVC は data-store-0 のように、Pod ごとに 1 つです。並びの行の数は、マシンの速さで変わります。",
+      "trouble": [
+        {
+          "symptom": "toomanyrequests や 429 と出る",
+          "check": "kubectl describe の Events で、Failed to pull image の行の終わりを見る",
+          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る。短い「429 Too Many Requests」だけのときは、使いすぎを防ぐ別の上限なので、数分待ってからもう一度行う"
+        },
+        {
+          "symptom": "store-0 から進まない",
+          "check": "kubectl describe pod store-0 -n ch8 の Events を見る",
+          "fix": "PVC が Bound か、イメージを取れたかを見る"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/"
+    },
+    {
+      "id": "sts-dns",
+      "text": "Pod ごとの名前を、DNS で引きます。",
+      "why": "headless Service と StatefulSet を組むと、「Pod の名前.Service の名前」で、決まった 1 つを呼べます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl run probe --image=busybox:1.37 -n ch8 -- sleep 86400\nkubectl wait --for=condition=Ready pod/probe -n ch8 --timeout=180s\nfor i in $(seq 30); do kubectl exec probe -n ch8 -- nslookup store-1.store.ch8.svc.cluster.local. > /dev/null 2>&1 && break; sleep 2; done\nkubectl exec probe -n ch8 -- nslookup store-1.store.ch8.svc.cluster.local.\nkubectl get pod store-1 -n ch8 -o jsonpath='{.status.podIP}{\"\\n\"}'"
+      },
+      "lines": [
+        {
+          "code": "kubectl run probe --image=busybox:1.37 -n ch8 -- sleep 86400",
+          "text": "引くための Pod を作る"
+        },
+        {
+          "code": "kubectl wait --for=condition=Ready pod/probe -n ch8 --timeout=180s",
+          "text": "使えるようになるまで待つ"
+        },
+        {
+          "code": "for i in $(seq 30); do kubectl exec probe -n ch8 -- nslookup store-1.store.ch8.svc.cluster.local. > /dev/null 2>&1 && break; sleep 2; done",
+          "text": "引けるようになるまで見て待つ (最大 1 分)"
+        },
+        {
+          "code": "kubectl exec probe -n ch8 -- nslookup store-1.store.ch8.svc.cluster.local.",
+          "text": "store-1 を名指しで引く"
+        },
+        {
+          "code": "kubectl get pod store-1 -n ch8 -o jsonpath='{.status.podIP}{\"\\n\"}'",
+          "text": "store-1 の住所を出す"
+        }
+      ],
+      "output": "pod/probe created\npod/probe condition met\nServer:\t\t10.43.0.10\nAddress:\t10.43.0.10:53\n\nName:\tstore-1.store.ch8.svc.cluster.local\nAddress: 10.42.0.27\n10.42.0.27",
+      "read": "引いた住所が、store-1 の住所と同じです。Deployment の Pod では、名前が作り直すたびに変わるので、こうはいきません。",
+      "trouble": [
+        {
+          "symptom": "server can't find と出る",
+          "check": "kubectl get service store -n ch8 を打つ",
+          "fix": "CLUSTER-IP が None か、serviceName が store かを見る"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/"
+    },
+    {
+      "id": "sts-recreate",
+      "text": "store-1 を消して、同じ名前と同じ置き場所で戻ることを見ます。",
+      "why": "StatefulSet の Pod は、作り直されても、名前と PVC が変わりません。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl delete pod store-1 -n ch8\nfor i in $(seq 30); do [ \"$(kubectl get pod store-1 -n ch8 -o jsonpath='{.status.containerStatuses[0].ready}' 2> /dev/null)\" = true ] && break; sleep 2; done\nkubectl exec store-1 -n ch8 -- cat /data/log.txt\nkubectl get pod store-1 -n ch8 -o jsonpath='{.spec.volumes[0].persistentVolumeClaim.claimName}{\"\\n\"}'"
+      },
+      "lines": [
+        {
+          "code": "kubectl delete pod store-1 -n ch8",
+          "text": "store-1 を消す"
+        },
+        {
+          "code": "for i in $(seq 30); do [ \"$(kubectl get pod store-1 -n ch8 -o jsonpath='{.status.containerStatuses[0].ready}' 2> /dev/null)\" = true ] && break; sleep 2; done",
+          "text": "store-1 が戻って使えるようになるまで見て待つ (最大 1 分)"
+        },
+        {
+          "code": "kubectl exec store-1 -n ch8 -- cat /data/log.txt",
+          "text": "store-1 の置き場所を読む"
+        },
+        {
+          "code": "kubectl get pod store-1 -n ch8 -o jsonpath='{.spec.volumes[0].persistentVolumeClaim.claimName}{\"\\n\"}'",
+          "text": "使っている PVC を出す"
+        }
+      ],
+      "output": "pod \"store-1\" deleted from ch8 namespace\nstore-1 started 05:05:31\nstore-1 started 05:05:43\ndata-store-1",
+      "read": "store-1 started の行が 2 つになりました。同じ data-store-1 を使い続けています。",
+      "trouble": [
+        {
+          "symptom": "行が 1 つ",
+          "check": "kubectl get pod store-1 -n ch8 を打つ",
+          "fix": "まだ戻る前に読んだ。数秒待って打ち直す"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/"
+    },
+    {
+      "id": "sts-scale",
+      "text": "2 つ減らしてから、また 3 つに戻します。1 分ほどかかります。",
+      "why": "減らす時は、番号の大きいほうから止めます。PVC は消しません。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl scale statefulset store --replicas=1 -n ch8\nkubectl wait --for=delete pod/store-2 pod/store-1 -n ch8 --timeout=90s\nkubectl get pods,pvc -n ch8\nkubectl scale statefulset store --replicas=3 -n ch8\nkubectl rollout status statefulset/store -n ch8 --timeout=120s\nkubectl exec store-2 -n ch8 -- cat /data/log.txt"
+      },
+      "lines": [
+        {
+          "code": "kubectl scale statefulset store --replicas=1 -n ch8",
+          "text": "1 つにする"
+        },
+        {
+          "code": "kubectl wait --for=delete pod/store-2 pod/store-1 -n ch8 --timeout=90s",
+          "text": "2 と 1 が消えるまで待つ"
+        },
+        {
+          "code": "kubectl get pods,pvc -n ch8",
+          "text": "Pod と PVC を出す"
+        },
+        {
+          "code": "kubectl scale statefulset store --replicas=3 -n ch8",
+          "text": "3 つに戻す"
+        },
+        {
+          "code": "kubectl rollout status statefulset/store -n ch8 --timeout=120s",
+          "text": "3 つとも使えるようになるまで待つ"
+        },
+        {
+          "code": "kubectl exec store-2 -n ch8 -- cat /data/log.txt",
+          "text": "store-2 の置き場所を読む"
+        }
+      ],
+      "output": "statefulset.apps/store scaled\npod/store-2 condition met\npod/store-1 condition met\nNAME          READY   STATUS    RESTARTS   AGE\npod/probe     1/1     Running   0          14s\npod/store-0   1/1     Running   0          31s\n\nNAME                                 STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE\npersistentvolumeclaim/data-store-0   Bound    pvc-f24a089b-a109-4ce3-91ce-cda5769aa35b   32Mi       RWO            local-path     <unset>                 31s\npersistentvolumeclaim/data-store-1   Bound    pvc-c9731841-803f-4f32-9a5b-6e87c1beed44   32Mi       RWO            local-path     <unset>                 26s\npersistentvolumeclaim/data-store-2   Bound    pvc-e86e70d0-62ab-41bf-98e0-a31791ef4547   32Mi       RWO            local-path     <unset>                 20s\nstatefulset.apps/store scaled\nWaiting for 2 pods to be ready...\nWaiting for 1 pods to be ready...\nWaiting for 1 pods to be ready...\npartitioned roll out complete: 3 new pods have been updated...\nstore-2 started 05:05:36\nstore-2 started 05:05:55",
+      "read": "1 つの時も、PVC は 3 つ残っていました。戻した store-2 は、前の中身の続きに書いています。消すのは、中身を守るため、わざと人の仕事にしてあります。",
+      "trouble": [
+        {
+          "symptom": "wait が timed out",
+          "check": "kubectl get pods -n ch8 を打つ",
+          "fix": "消える途中。もう少し待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/"
+    },
+    {
+      "id": "sts-delete",
+      "text": "StatefulSet を消しても、PVC が残ることを見て、PVC を片付けます。",
+      "why": "残った PVC は、だれかが消すまで、ノードのディスクを使い続けます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl delete statefulset store -n ch8\nkubectl wait --for=delete pod -l app=store -n ch8 --timeout=90s\nkubectl get pvc -n ch8\nkubectl delete pvc -l app=store -n ch8\nkubectl get pvc -n ch8"
+      },
+      "lines": [
+        {
+          "code": "kubectl delete statefulset store -n ch8",
+          "text": "StatefulSet を消す"
+        },
+        {
+          "code": "kubectl wait --for=delete pod -l app=store -n ch8 --timeout=90s",
+          "text": "Pod が消えるまで待つ"
+        },
+        {
+          "code": "kubectl get pvc -n ch8",
+          "text": "PVC を出す"
+        },
+        {
+          "code": "kubectl delete pvc -l app=store -n ch8",
+          "text": "store の PVC を全部消す (ひな型のラベルが付いている)"
+        },
+        {
+          "code": "kubectl get pvc -n ch8",
+          "text": "もう一度出す"
+        }
+      ],
+      "output": "statefulset.apps \"store\" deleted from ch8 namespace\npod/store-0 condition met\npod/store-1 condition met\npod/store-2 condition met\nNAME           STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE\ndata-store-0   Bound    pvc-f24a089b-a109-4ce3-91ce-cda5769aa35b   32Mi       RWO            local-path     <unset>                 40s\ndata-store-1   Bound    pvc-c9731841-803f-4f32-9a5b-6e87c1beed44   32Mi       RWO            local-path     <unset>                 35s\ndata-store-2   Bound    pvc-e86e70d0-62ab-41bf-98e0-a31791ef4547   32Mi       RWO            local-path     <unset>                 29s\npersistentvolumeclaim \"data-store-0\" deleted from ch8 namespace\npersistentvolumeclaim \"data-store-1\" deleted from ch8 namespace\npersistentvolumeclaim \"data-store-2\" deleted from ch8 namespace\nNo resources found in ch8 namespace.",
+      "read": "Pod が消えても PVC は 3 つ残り、ラベルで選んで消しました。PVC を自動で消す設定 (persistentVolumeClaimRetentionPolicy。1.32 から正式な機能) もあります。",
+      "trouble": [
+        {
+          "symptom": "No resources found と出ない",
+          "check": "kubectl get pvc -n ch8 --show-labels を打つ",
+          "fix": "ラベルが無ければ、名前で kubectl delete pvc data-store-0 data-store-1 data-store-2 -n ch8"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/"
+    },
+    {
+      "id": "more",
+      "text": "最後に、言葉だけ押さえます。PVC の容量を、あとから増やせる用意のしかたもあります (StorageClass の allowVolumeExpansion)。中身をある時点で写し取る仕組みを、VolumeSnapshot と呼びます。どちらも、置き場所を用意する部品 (多くは CSI ドライバー) が対応している時だけ使えます。CSI は、いろいろな置き場所を Kubernetes につなぐための決まりです。",
+      "why": "クラウドの置き場所を使う時は、まず、その部品が何に対応しているかを見ます。",
+      "source": "https://kubernetes.io/docs/concepts/storage/volume-snapshots/"
+    },
+    {
+      "id": "check-before-delete",
+      "text": "名前空間を消す前に、どのマシンにいるかを見ます。kcna と出なければ、次の手順を打ちません。",
+      "why": "名前空間と、その中の置き場所を消すためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "hostname"
+      },
+      "lines": [
+        {
+          "code": "hostname",
+          "text": "このマシンの名前を出す"
+        }
+      ],
+      "output": "kcna",
+      "read": "kcna と出れば、仮想マシンの中です。",
+      "trouble": [
+        {
+          "symptom": "kcna ではない名前が出る",
+          "check": "行の頭が ubuntu@kcna かを見る",
+          "fix": "ホストにいる。multipass shell kcna で入り、もう一度打つ"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man1/hostname.1.html"
+    },
+    {
+      "id": "delete-namespace",
+      "text": "名前空間 ch8 を消し、ノードの置き場所が空になったことを見ます。前の手順で kcna と出たときだけ打ちます。",
+      "why": "PVC が残っていると、ノードのフォルダも残ります。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cd ~\nkubectl delete namespace ch8\nkubectl get pv\nsudo ls /var/lib/rancher/k3s/storage | grep -c _ch8_ || true"
+      },
+      "lines": [
+        {
+          "code": "cd ~",
+          "text": "ホームへ戻る"
+        },
+        {
+          "code": "kubectl delete namespace ch8",
+          "text": "中のものごと消す。1 分ほどかかることがある"
+        },
+        {
+          "code": "kubectl get pv",
+          "text": "PV を出す"
+        },
+        {
+          "code": "sudo ls /var/lib/rancher/k3s/storage | grep -c _ch8_ || true",
+          "text": "ノードに ch8 のフォルダが残っていないかを数える"
+        }
+      ],
+      "output": "namespace \"ch8\" deleted\nNo resources found\n0",
+      "read": "PV が無く、数が 0 なら片付いています。~/ch8 の YAML は残ります。",
+      "trouble": [
+        {
+          "symptom": "数が 0 でない",
+          "check": "30 秒待って最後の行を打つ",
+          "fix": "片付けの途中"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://docs.k3s.io/add-ons/storage"
+    },
+    {
+      "id": "leave",
+      "text": "仮想マシンから出ます。",
+      "why": "次は、ホストで控えを取るためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "exit"
+      },
+      "lines": [
+        {
+          "code": "exit",
+          "text": "今の端末を終える。仮想マシンは動き続ける"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "行の頭が、自分の PC のものに戻ります。",
+      "trouble": [
+        {
+          "symptom": "行の頭が ubuntu@kcna のまま",
+          "check": "もう一度見る",
+          "fix": "もう一度 exit を打つ"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man1/bash.1.html"
+    },
+    {
+      "id": "snapshot",
+      "text": "ホストで、この章を終えた状態の控えを ch8-end という名前で取り、仮想マシンに入り直します。",
+      "why": "次の章で失敗しても、ここへ戻れるようにするためです。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass stop kcna\nmultipass snapshot --name ch8-end kcna\nmultipass list --snapshots\nmultipass shell kcna"
+      },
+      "lines": [
+        {
+          "code": "multipass stop kcna",
+          "text": "止める。控えは、止まっているときだけ取れる。stop は動いている (Running) ときだけ打てる"
+        },
+        {
+          "code": "multipass snapshot --name ch8-end kcna",
+          "text": "今の状態を ch8-end という名前で控える"
+        },
+        {
+          "code": "multipass list --snapshots",
+          "text": "控えの一覧を出す"
+        },
+        {
+          "code": "multipass shell kcna",
+          "text": "止まっている kcna を動かし、中に入り直す"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "一覧に ch8-end が並べば取れています。戻すときは、止めてから multipass restore kcna.ch8-end を打ちます。今の状態も控えるかを聞かれたら、要らなければ no と答えます。最後の行で、行の頭が ubuntu@kcna:~$ に変わります。課題と後片付けは、この中で続けます。",
+      "trouble": [
+        {
+          "symptom": "止まっていないので取れないと出る",
+          "check": "multipass list で State を見る",
+          "fix": "multipass stop kcna で止めてから取る"
+        },
+        {
+          "symptom": "ch8-end がもうあると出る",
+          "check": "multipass list --snapshots を打つ",
+          "fix": "前の控えを使うか、--name ch8-endb のように別の名前にする"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/snapshot/"
+    }
+  ],
+  "cleanup": [
+    {
+      "id": "check-vm",
+      "text": "仮想マシンの中で、どのマシンにいるかを見ます。kcna と出なければ止まり、multipass shell kcna で入ります。",
+      "why": "次の手順は、つないでいるクラスターのものを消します。自分の PC の別のクラスターで打たないためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "hostname"
+      },
+      "lines": [
+        {
+          "code": "hostname",
+          "text": "このマシンの名前を出す"
+        }
+      ],
+      "output": "kcna",
+      "read": "kcna と出れば、仮想マシンの中です。",
+      "trouble": [
+        {
+          "symptom": "kcna ではない名前が出る",
+          "check": "行の頭が ubuntu@kcna かを見る",
+          "fix": "ホストにいる。multipass shell kcna で入り、もう一度打つ"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man1/hostname.1.html"
+    },
+    {
+      "id": "delete-practice",
+      "text": "仮想マシンの中で、課題で作った名前空間を消します。課題をしていなければ、何も起きません。",
+      "why": "次の章を、k3s の部品だけの状態から始めるためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl delete namespace practice --ignore-not-found\nkubectl get namespaces"
+      },
+      "lines": [
+        {
+          "code": "kubectl delete namespace practice --ignore-not-found",
+          "text": "practice を消す。無くてもエラーにしない (--ignore-not-found)"
+        },
+        {
+          "code": "kubectl get namespaces",
+          "text": "名前空間の一覧を出す"
+        }
+      ],
+      "output": "namespace \"practice\" deleted\nNAME              STATUS   AGE\ndefault           Active   7m8s\nkube-node-lease   Active   7m8s\nkube-public       Active   7m8s\nkube-system       Active   7m8s",
+      "read": "default と kube- で始まる 4 つだけになれば、片付いています。k3s は消しません。",
+      "trouble": [
+        {
+          "symptom": "消す行がしばらく止まる",
+          "check": "1 分ほど待つ",
+          "fix": "中の Pod が終わるのを待っている。そのまま待つ"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_delete/"
+    },
+    {
+      "id": "rest",
+      "text": "今日はここまでにするときは、exit で出てから、ホストで仮想マシンを止めます。止まっていれば (Stopped)、打ちません。",
+      "why": "動いている間は PC のメモリを使うためです。次の章でも使うので、消しません。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass stop kcna"
+      },
+      "lines": [
+        {
+          "code": "multipass stop kcna",
+          "text": "kcna を止める"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "続けるときは multipass shell kcna で、動かして中に入れます。k3s は自分で始まります。",
+      "trouble": [
+        {
+          "symptom": "止まったか分からない",
+          "check": "multipass list で State を見る",
+          "fix": "Stopped なら止まっている。Running なら、もう一度止める"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/stop/"
+    }
+  ],
+  "challenges": [
+    {
+      "task": "仮想マシンの中で、practice という名前空間に 16Mi の PVC keep を作り、それを /keep に見せる Pod を動かして、ファイルを 1 つ書いてください。",
+      "hint": "PVC は Pod を作るまで Pending のままです。",
+      "answer": "kubectl create namespace practice\nkubectl wait --for=create serviceaccount/default -n practice --timeout=60s\ncat > ~/keep.yaml <<'EOF'\napiVersion: v1\nkind: PersistentVolumeClaim\nmetadata:\n  name: keep\nspec:\n  accessModes: [ReadWriteOnce]\n  resources:\n    requests:\n      storage: 16Mi\n---\napiVersion: v1\nkind: Pod\nmetadata:\n  name: keeper\nspec:\n  containers:\n  - name: main\n    image: busybox:1.37\n    command: ['sh', '-c', 'echo saved > /keep/a.txt; sleep 86400']\n    volumeMounts:\n    - name: v\n      mountPath: /keep\n  volumes:\n  - name: v\n    persistentVolumeClaim:\n      claimName: keep\nEOF\nkubectl apply -f ~/keep.yaml -n practice\nkubectl wait --for=condition=Ready pod/keeper -n practice --timeout=180s\nkubectl get pvc keep -n practice",
+      "verify": "STATUS が Bound で、kubectl exec keeper -n practice -- cat /keep/a.txt で saved と出れば正解です。"
+    },
+    {
+      "task": "仮想マシンの中で、keeper を消して作り直し、ファイルが残っていることを確かめてください。",
+      "hint": "同じ YAML を apply し直せば、Pod だけが作り直されます。",
+      "answer": "kubectl delete pod keeper -n practice\nkubectl apply -f ~/keep.yaml -n practice\nkubectl wait --for=condition=Ready pod/keeper -n practice --timeout=180s\nkubectl exec keeper -n practice -- cat /keep/a.txt\nrm ~/keep.yaml",
+      "verify": "saved と出れば正解です (Pod の command が同じファイルに書き直すので、行は 1 つのままです)。"
+    },
+    {
+      "task": "仮想マシンの中で、keeper が動いている間に PVC keep を消そうとし、Terminating で止まることを確かめてから、Pod を消して PVC も消えるのを見てください。",
+      "hint": "--wait=false を付けると、消すのを待たずに戻ります。",
+      "answer": "kubectl delete pvc keep -n practice --wait=false\nsleep 5\nkubectl get pvc keep -n practice\nkubectl delete pod keeper -n practice\nkubectl wait --for=delete pvc/keep -n practice --timeout=120s",
+      "verify": "途中の STATUS が Terminating で、最後に condition met (消えた) と出れば正解です。"
+    }
+  ],
+  "sources": [
+    {
+      "label": "Kubernetes: Volumes",
+      "url": "https://kubernetes.io/docs/concepts/storage/volumes/"
+    },
+    {
+      "label": "Kubernetes: Ephemeral Volumes",
+      "url": "https://kubernetes.io/docs/concepts/storage/ephemeral-volumes/"
+    },
+    {
+      "label": "Kubernetes: Resource Management for Pods and Containers",
+      "url": "https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/"
+    },
+    {
+      "label": "Kubernetes: Persistent Volumes",
+      "url": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/"
+    },
+    {
+      "label": "Kubernetes: Storage Classes",
+      "url": "https://kubernetes.io/docs/concepts/storage/storage-classes/"
+    },
+    {
+      "label": "Kubernetes: Dynamic Volume Provisioning",
+      "url": "https://kubernetes.io/docs/concepts/storage/dynamic-provisioning/"
+    },
+    {
+      "label": "Kubernetes: Volume Snapshots",
+      "url": "https://kubernetes.io/docs/concepts/storage/volume-snapshots/"
+    },
+    {
+      "label": "Kubernetes: StatefulSets",
+      "url": "https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/"
+    },
+    {
+      "label": "Kubernetes: StatefulSet Basics",
+      "url": "https://kubernetes.io/docs/tutorials/stateful-application/basic-stateful-set/"
+    },
+    {
+      "label": "Kubernetes: Pod Security Standards (hostPath)",
+      "url": "https://kubernetes.io/docs/concepts/security/pod-security-standards/"
+    },
+    {
+      "label": "K3s: Volumes and Storage",
+      "url": "https://docs.k3s.io/add-ons/storage"
+    },
+    {
+      "label": "Local Path Provisioner",
+      "url": "https://github.com/rancher/local-path-provisioner"
+    },
+    {
+      "label": "Docker Hub: 取得の上限",
+      "url": "https://docs.docker.com/docker-hub/usage/"
+    },
+    {
+      "label": "Multipass: snapshot",
+      "url": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/snapshot/"
+    }
+  ]
+}
