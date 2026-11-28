@@ -458,7 +458,7 @@
         }
       ],
       "output": "k3s version v1.37.2+k3s1 (f6973cb8)\ngo version go1.26.10\nClient Version: v1.37.2+k3s1\nKustomize Version: v5.8.1\nServer Version: v1.37.2+k3s1\nNAME   READY   UP-TO-DATE   AVAILABLE   AGE\nkeep   2/2     2            2           60s\nbefore-backup\n4a5\n> kube-system helm-install-gateway-api-crd-llhz6",
-      "read": "版は v1.37.2+k3s1 で、keep は 2/2、memo は before-backup のままです。diff は、上げる前とあとで名前の違う Pod だけを、< (前) と > (あと) で出します。この出力では、v1.37 の k3s が新しく入れる部品 (Gateway API の CRD) を入れる helm-install- の Pod が 1 つ増えただけで、keep を含むほかの Pod は、名前も変わらず動き続けています。少したつと、k3s が traefik などの部品を新しい版に入れ替えて、名前が変わることがあります。",
+      "read": "版は v1.37.2+k3s1 で、keep は 2/2、memo は before-backup のままです。diff は、上げる前とあとで名前の違う Pod だけを、< (前) と > (あと) で出します。出てくるのは、k3s が部品を入れる helm-install- の Pod です。v1.37 の k3s は Gateway API の CRD を新しく入れるので、その分が増えます。traefik の分は、打つ時によって、名前を変えて入れ直されています。keep を含む、ほかの Pod は名前も変わらず動き続けています。少したつと、k3s が traefik などの部品を新しい版に入れ替えて、名前が変わることもあります。",
       "trouble": [
         {
           "symptom": "memo が NotFound になる",
