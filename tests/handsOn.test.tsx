@@ -8,7 +8,7 @@ import { buildPages, renderPage, sitemap } from '../scripts/prerender.mjs';
 import type { HandsOnChapter } from '../src/content/types';
 import { WEEKS } from '../src/content/curriculum';
 import { COVERED_LABS, FIRST_CHAPTER, handsOnLabel, COVERED_REST, chaptersOfLab, handsOnLinks, listedLabs } from '../src/content/coveredLabs';
-import { HANDS_ON, chapterTitle } from '../src/content/handsOn';
+import { HANDS_ON, NO_LABS, chapterTitle } from '../src/content/handsOn';
 import ProgressScreen from '../src/screens/ProgressScreen';
 import { summary } from '../src/screens/Settings';
 import Home from '../src/screens/Home';
@@ -271,8 +271,10 @@ describe('画面', { timeout: 30_000 }, () => {
       expect(chapters).toEqual(chapters.map((r) => HANDS_ON.find((c) => c.id === r.id)).map((c) => ({ id: c?.id, order: c?.order, title: c?.title })));
       expect(chapters.map((c) => c.order)).toEqual(chapters.map((c) => c.order).sort((a, b) => a - b));
     }
-    expect(chaptersOfLab('w6-lab')).toEqual([]);
-    expect(listedLabs(WEEKS).map((x) => `${x.week} ${x.lab.id}`)).toEqual([6, 7, 8].map((w) => `${w} w${w}-lab`));
+    expect(chaptersOfLab('w6-lab').map((c) => c.id)).toEqual(['storage', 'security-troubleshoot']);
+    expect(chaptersOfLab('no-such-lab')).toEqual([]);
+    // 8 週の実習を全部、章が覆った
+    expect(listedLabs(WEEKS)).toEqual([]);
     const week2 = JSON.parse(readFileSync(path.resolve(process.cwd(), 'src/content/week2.json'), 'utf8'));
     const lesson = week2.lessons.find((l: { id: string }) => l.id === 'w2-lab');
     const el = document.createElement('div');
@@ -295,44 +297,54 @@ describe('画面', { timeout: 30_000 }, () => {
     const paths = (w: number) => handsOnLinks(WEEKS[w - 1]).map((l) => l.path);
     expect(paths(1)).toEqual(['hands-on/vm-setup/', 'hands-on/run-containers/']);
     expect(paths(2)).toEqual(['hands-on/vm-setup/', 'hands-on/install-k3s/', 'hands-on/self-healing/']);
-    expect([1, 2, 3, 4, 5, 6].map((w) => handsOnLabel(WEEKS[w - 1]).includes('0 章から順に'))).toEqual([true, true, true, true, true, false]);
+    expect(WEEKS.map((w) => handsOnLabel(w).includes('0 章から順に'))).toEqual(WEEKS.map(() => true));
     expect(paths(3)).toEqual(['hands-on/vm-setup/', 'hands-on/rollout/', 'hands-on/batch/']);
-    expect(paths(6)).toEqual(['lesson/w6-lab/']);
+    expect(paths(6)).toEqual(['hands-on/vm-setup/', 'hands-on/storage/', 'hands-on/security-troubleshoot/']);
+    expect(paths(7)).toEqual(['hands-on/vm-setup/', 'hands-on/deliver-observe/']);
+    expect(paths(8)).toEqual(['hands-on/vm-setup/', 'hands-on/deliver-observe/']);
     expect(paths(4)).toEqual(['hands-on/vm-setup/', 'hands-on/scaling/']);
     expect(paths(5)).toEqual(['hands-on/vm-setup/', 'hands-on/networking/']);
     vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} }));
-    for (const w of [1, 2, 3, 4, 5, 6]) {
+    for (const w of [1, 2, 3, 4, 5, 6, 7, 8]) {
       const el = await show(<Home week={w} progress={emptyProgress()} />);
       expect([...el.querySelectorAll('nav[aria-label="この週の実践"] a')].map((x) => x.getAttribute('href'))).toEqual([...paths(w), 'hands-on/'].map((x) => `${BASE}${x}`));
     }
     vi.unstubAllGlobals();
   });
-  it('進捗の週ごとの実習の n / m に、章が覆った実習は入れない。設定の「完了した実践」には記録のとおり数える', async () => {
+  it('章が全部の実習を覆ったので、進捗に週ごとの実習の n / m を出さない。設定の「完了した実践」には記録のとおり数える', async () => {
     const done = { done: true as const, best: 1, at: '' };
     const p = completeHandsOn({ ...emptyProgress(), lessons: { 'w1-lab': done, 'w6-lab': done, 'w1-l1': done } }, 'run-containers', 10, at);
     vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} }));
     const el = await show(<ProgressScreen progress={p} />);
     const row = (name: string) => [...el.querySelectorAll('li')].find((x) => x.textContent?.startsWith(name))!.textContent;
-    expect(row('週ごとの実習')).toBe('週ごとの実習1 / 3');
+    expect([...el.querySelectorAll('li')].some((x) => x.textContent?.startsWith('週ごとの実習'))).toBe(false);
     expect(row('章')).toBe(`章1 / ${HANDS_ON.length}`);
     expect(summary(p)).toContain('完了したレッスン 1 · 完了した実践 3 ·');
     vi.unstubAllGlobals();
   });
-  it('一覧は、章と旧い実習の完了を別々に数える。章が無くても壊れない', async () => {
+  it('一覧は、章と旧い実習の完了を別々に数える。章が無くても、覆っていない実習が無くても壊れない', async () => {
     const el = document.createElement('div');
     document.body.appendChild(el);
     const root = createRoot(el);
     mounted.push(() => act(() => root.unmount()));
     const p = completeHandsOn({ ...emptyProgress(), lessons: { 'w1-lab': { done: true, best: 1, at: '' }, 'w6-lab': { done: true, best: 1, at: '' }, 'w1-l1': { done: true, best: 1, at: '' } } }, 'sample', 10, at);
-    await act(async () => root.render(<HandsOnIndex progress={p} chapters={[sample]} />));
+    // 覆っていない実習があったときの数え方は、w6〜w8 の実習を渡して見る
+    const some = WEEKS.flatMap((w) => labsOf(w).map((lab) => ({ lab, week: w.week }))).filter((x) => x.week >= 6);
+    await act(async () => root.render(<HandsOnIndex progress={p} chapters={[sample]} labs={some} />));
     const counts = () => [...el.querySelectorAll('h2 .hb-muted')].map((x) => x.textContent);
     expect(counts()).toEqual(['1 / 1 完了', '1 / 3 完了']);
     expect(el.querySelectorAll(`a.cmp-card[href^="${BASE}lesson/w"]`)).toHaveLength(3);
     expect(el.querySelector(`a.cmp-card[href="${BASE}hands-on/sample/"]`)).not.toBeNull();
     expect([...el.querySelectorAll('p a')].map((a) => a.getAttribute('href'))).toEqual(expect.arrayContaining([`${BASE}lesson/w2-lab/`, `${BASE}lesson/w5-lab/`]));
-    await act(async () => root.render(<HandsOnIndex progress={p} chapters={[]} />));
+    await act(async () => root.render(<HandsOnIndex progress={p} chapters={[]} labs={some} />));
     expect(counts()).toEqual(['1 / 3 完了']);
     expect(el.textContent).toContain('章は準備中です');
+    // 今の中身 (全部覆った) では、実習の数と並びを出さず、その旨と残る実習へのリンクだけを出す
+    await act(async () => root.render(<HandsOnIndex progress={p} chapters={[sample]} />));
+    expect(counts()).toEqual(['1 / 1 完了']);
+    expect(el.querySelectorAll(`a.cmp-card[href^="${BASE}lesson/w"]`)).toHaveLength(0);
+    expect(el.textContent).toContain(NO_LABS);
+    expect([...el.querySelectorAll('p a')].map((a) => a.getAttribute('href'))).toEqual(expect.arrayContaining([`${BASE}lesson/w2-lab/`, `${BASE}lesson/w5-lab/`]));
   });
 });
 
@@ -347,8 +359,8 @@ describe('書き出す HTML', { timeout: 60_000 }, () => {
   it('章が覆った実習は、書き出した一覧に並べず、実習のページから章へつなぐ', () => {
     const body = (p: string) => new DOMParser().parseFromString(renderPage(readFileSync(path.resolve(process.cwd(), 'index.html'), 'utf8'), pages.find((x) => x.path === p)), 'text/html');
     const hrefs = [...body('hands-on/').querySelectorAll('#root a')].map((a) => a.getAttribute('href')).filter((h) => h!.includes('-lab/'));
-    // 先頭の w2-lab と w5-lab は、一覧の説明の「この実習も役に立ちます」のリンク
-    expect(hrefs).toEqual([2, 5, 6, 7, 8].map((w) => `${BASE}lesson/w${w}-lab/`));
+    // 全部の実習を章が覆ったので、残るのは一覧の説明の「この実習も役に立ちます」の w2-lab と w5-lab だけ
+    expect(hrefs).toEqual([2, 5].map((w) => `${BASE}lesson/w${w}-lab/`));
     expect(body('lesson/w2-lab/').querySelector('#root')!.textContent).toContain(COVERED_REST['w2-lab']);
     expect(body('lesson/w5-lab/').querySelector('#root')!.textContent).toContain(COVERED_REST['w5-lab']);
     expect(body('hands-on/').querySelector('#root')!.textContent).toContain('クラスターの外の機械から試したい人は、この実習も役に立ちます:');

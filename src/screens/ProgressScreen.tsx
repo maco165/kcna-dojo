@@ -171,7 +171,7 @@ function Body({ progress }: { progress: Progress }) {
 
       <List hasDividers header={<h2 className="h-sm">実践</h2>}>
         <ListItem href={handsOnHref()} label="章" endContent={<Text type="supporting">{HANDS_ON.length > 0 ? `${doneChapters(HANDS_ON, progress)} / ${HANDS_ON.length}` : '準備中'}</Text>} />
-        <ListItem href={handsOnHref()} label="週ごとの実習" endContent={<Text type="supporting">{`${doneLessons(labs, progress)} / ${labs.length}`}</Text>} />
+        {labs.length > 0 && <ListItem href={handsOnHref()} label="週ごとの実習" endContent={<Text type="supporting">{`${doneLessons(labs, progress)} / ${labs.length}`}</Text>} />}
       </List>
     </VStack>
   );
