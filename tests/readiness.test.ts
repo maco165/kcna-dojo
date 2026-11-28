@@ -57,6 +57,12 @@ describe('受験の目安', () => {
     expect(at(need - 1).short.map((c) => c.en)).toEqual(['Storage']);
     expect(at(need - 1).ready).toBe(false);
   });
+  it('境: 細目の割合がちょうど 75% (4 問中 3 問) なら届き、それより下なら届かない', () => {
+    const synth = CURRICULUM.flatMap((c) => c.competencies).map((c, i) => ({ en: c.en, lessons: [{ id: `l${i}`, questions: [0, 1, 2, 3].map((n) => `c${i}-q${n}`) }] }));
+    const ids = (k: number) => synth.flatMap((_, i) => [0, 1, 2, 3].slice(0, k).map((n) => `c${i}-q${n}`));
+    expect(readiness(withExams(twice(ids(3)), [exam(45, 4), exam(45)]), synth)).toMatchObject({ ready: true, short: [] });
+    expect(readiness(withExams(twice(ids(2)), [exam(45, 4), exam(45)]), synth).short).toHaveLength(13);
+  });
   it('境: 模擬試験は 45/60 で届き、44/60 では届かない。直近 2 回のどちらかでも下なら届かない', () => {
     expect(readiness(withExams(allTwice, [exam(45, 4), exam(45, 1)])).ready).toBe(true);
     expect(readiness(withExams(allTwice, [exam(44, 4), exam(60, 1)])).ready).toBe(false);
