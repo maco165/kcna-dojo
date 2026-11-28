@@ -20,9 +20,9 @@ export const handsOnOs = (p: Progress, ua: string = typeof navigator === 'undefi
 /** その OS の人がする手順 (ほかの OS だけの手順を除く) */
 export const stepsFor = <S extends { os?: HandsOnOs }>(steps: S[], os: HandsOnOs): S[] => steps.filter((s) => !s.os || s.os === os);
 
-/** 印を付けた手順の数と、その OS の人がする手順の数。ほかの OS の手順と、無くなった手順の印は数えない */
-export function markedCount(chapter: Pick<HandsOnMeta, 'steps'>, rec: HandsOnRecord | undefined, os: HandsOnOs): { marked: number; total: number } {
-  const mine = stepsFor(chapter.steps, os);
+/** 印を付けた手順の数と、その OS の人がする手順の数。ほかの OS の手順・任意の手順 (optional)・無くなった手順の印は数えない */
+export function markedCount(chapter: { steps: Pick<HandsOnMeta['steps'][number], 'id' | 'os' | 'optional'>[] }, rec: HandsOnRecord | undefined, os: HandsOnOs): { marked: number; total: number } {
+  const mine = stepsFor(chapter.steps, os).filter((s) => !s.optional);
   return { marked: mine.filter((s) => rec?.steps.includes(s.id)).length, total: mine.length };
 }
 

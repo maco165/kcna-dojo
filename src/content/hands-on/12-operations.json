@@ -924,12 +924,14 @@
     },
     {
       "id": "node2-words",
-      "text": "【任意】ここから node2- の手順は、任意です。2 台目の仮想マシン kcna2 を作り、k3s の agent (Pod を動かすだけのノード) として足し、Pod の置き場所が分かれるのを見てから、外します。PC のメモリに 1 GB 以上の余りがあるときだけ行います。しない人は、node2- の手順に印だけ付けて、check-before-delete へ進みます。",
+      "optional": true,
+      "text": "【任意】ここから node2- の手順は、任意です。2 台目の仮想マシン kcna2 を作り、k3s の agent (Pod を動かすだけのノード) として足し、Pod の置き場所が分かれるのを見てから、外します。PC のメモリに 1 GB 以上の余りがあるときだけ行います。しない人は飛ばしてかまいません (完了の数に入りません)。check-before-delete へ進みます。",
       "why": "2 台あると、drain で Pod を別のノードへ移す、本来の使い方を見られます。k3s の agent の最小は、CPU 1 つ・メモリ 512 MB です。",
       "source": "https://docs.k3s.io/installation/requirements"
     },
     {
       "id": "node2-launch",
+      "optional": true,
       "text": "【任意】kcna から exit で出て (または、ホストの端末をもう 1 つ開いて)、ホストで 2 台目の仮想マシン kcna2 を、CPU 1 つ・メモリ 1 GB で作り、kcna の住所 (IP) を見ます。最後に kcna に入り直します。",
       "why": "agent は、server (kcna) の住所に向けてつなぎます。",
       "where": "host",
@@ -964,6 +966,7 @@
     },
     {
       "id": "node2-token",
+      "optional": true,
       "text": "【任意】kcna の中で、kcna2 を参加させるための、1 時間で切れる合い言葉 (bootstrap token) を作ります。",
       "why": "server の token (/var/lib/rancher/k3s/server/token) でも参加できますが、それを持つ人は管理者と同じことができます。参加させるだけなら、期限つきの合い言葉を作って渡します。",
       "where": "vm",
@@ -990,6 +993,7 @@
     },
     {
       "id": "node2-join",
+      "optional": true,
       "text": "【任意】kcna から exit で出て、ホストで kcna2 の中に入り、kcna の住所と合い言葉を付けて、k3s を agent として入れます。kcna の中で打たないように、入れる行は、名前が kcna2 のときだけ動く形にしてあります。",
       "why": "K3S_URL を付けて入れると、k3s は server ではなく agent として入ります。kcna の中で打つと、kcna に agent が足されてしまいます。版は、server と同じにします (agent が server より新しいのは決まりで許されません)。",
       "where": "host",
@@ -1049,6 +1053,7 @@
     },
     {
       "id": "node2-nodes",
+      "optional": true,
       "text": "【任意】kcna で、kcna2 が参加したことを見ます。cd ~/ch12 から打ちます。",
       "why": "agent は、server に名乗り出て、ノードとして加わります。",
       "where": "vm",
@@ -1083,6 +1088,7 @@
     },
     {
       "id": "node2-spread",
+      "optional": true,
       "text": "【任意】keep を 4 つに増やし、Pod が 2 台に分かれて置かれるのを見ます。",
       "why": "スケジューラーは、空いているノードに Pod を散らして置きます。",
       "where": "vm",
@@ -1117,6 +1123,7 @@
     },
     {
       "id": "node2-drain",
+      "optional": true,
       "text": "【任意】kcna2 を空けて、Pod が kcna に移るのを見ます。",
       "why": "2 台あれば、drain は印を付けてから Pod を退かせ、Deployment が残りのノードに作り直します。手入れの前の、本来の使い方です。",
       "where": "vm",
@@ -1151,6 +1158,7 @@
     },
     {
       "id": "node2-uninstall",
+      "optional": true,
       "text": "【任意】kcna から exit で出て (または、ホストの端末をもう 1 つ開いて)、ホストから kcna2 の中の agent の k3s を消し、kcna に入り直します。",
       "why": "ノードを外すときは、空けたあと、そのマシンの k3s (kubelet) を止めてから、一覧から消します。動いたまま一覧から消すと、名乗り出直すことがあるためです。agent を消す道具は k3s-agent-uninstall.sh です (server は k3s-uninstall.sh)。",
       "where": "host",
@@ -1185,6 +1193,7 @@
     },
     {
       "id": "node2-delete",
+      "optional": true,
       "text": "【任意】kcna で、kcna2 をクラスターのノードの一覧から消します。cd ~/ch12 から打ちます。",
       "why": "k3s を止めたノードは、一覧に NotReady で残ります。一覧から消して、外し終えます。",
       "where": "vm",
@@ -1227,6 +1236,7 @@
     },
     {
       "id": "node2-remove",
+      "optional": true,
       "text": "【任意】kcna から exit で出て、ホストで kcna2 を消し、kcna に入り直します。",
       "why": "もう使わない仮想マシンは、PC の場所を使うので消します。",
       "where": "host",

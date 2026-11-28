@@ -61,7 +61,7 @@ const isId = (v) => typeof v === 'string' && /^[a-z0-9-]+$/.test(v);
 /* ---------- 実践の章 (src/content/hands-on/*.json) ---------- */
 
 const CHAPTER_KEYS = ['id', 'order', 'title', 'short', 'summary', 'goal', 'features', 'minutes', 'needs', 'reads', 'steps', 'cleanup', 'challenges', 'sources'];
-const STEP_KEYS = ['id', 'text', 'why', 'os', 'where', 'code', 'lines', 'output', 'read', 'trouble', 'source', 'unverified'];
+const STEP_KEYS = ['id', 'text', 'why', 'os', 'where', 'code', 'lines', 'output', 'read', 'trouble', 'source', 'unverified', 'optional'];
 /** code のある手順だけが持つ欄 */
 const CODE_ONLY_KEYS = ['lines', 'output', 'read', 'trouble', 'unverified'];
 const CODE_LANGUAGES = ['bash', 'powershell', 'yaml', 'text'];
@@ -121,6 +121,8 @@ function checkChapter(c, name, ng, claimId) {
       else stepIds.add(s.id);
       for (const k of ['text', 'why']) if (!isNonEmptyString(s[k])) ng(cid, `${w} に ${k} がありません`);
       if (s.os !== undefined && !OSES.includes(s.os)) ng(cid, `${w} の os は windows / mac / linux のどれかにします`);
+      if (s.optional !== undefined && s.optional !== true) ng(cid, `${w} の optional は true だけを書きます`);
+      if (s.optional !== undefined && key === 'cleanup') ng(cid, `${w} の optional は手順 (steps) にだけ書きます`);
       if (s.where !== undefined && !['host', 'vm'].includes(s.where)) ng(cid, `${w} の where は host か vm にします`);
       for (const k of ['output', 'read', 'unverified']) if (s[k] !== undefined && !isNonEmptyString(s[k])) ng(cid, `${w} の ${k} は空でない文字列にします`);
       if (s.source !== undefined && !isHttpsUrl(s.source)) ng(cid, `${w} の source は https の URL にします`);
@@ -155,7 +157,8 @@ function checkChapter(c, name, ng, claimId) {
 
   // どの OS を選んでも、する手順があること (0 件だと、何もせずに完了にできてしまう)
   if (Array.isArray(c.steps)) {
-    for (const os of OSES) if (!c.steps.some((s) => s?.os === undefined || s?.os === os)) ng(cid, `${os} の人がする手順 (steps) が 1 つもありません`);
+    // 任意の手順 (optional) は完了の条件に入らないので、任意でない手順で数える
+    for (const os of OSES) if (!c.steps.some((s) => !s?.optional && (s?.os === undefined || s?.os === os))) ng(cid, `${os} の人がする手順 (steps。任意でないもの) が 1 つもありません`);
   }
   for (const w of privateWords(strings(c).join('\n'))) ng(cid, `載せてはいけない名前・住所があります: ${w}`);
 

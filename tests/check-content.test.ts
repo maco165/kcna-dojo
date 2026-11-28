@@ -176,6 +176,9 @@ describe('check-content: 実践の章', { timeout: 120_000 }, () => {
     ['Windows のログイン名', (d) => (step(d).output = 'PS C:\\Users\\taro>'), /載せてはいけない.*Users/],
     ['端末の行頭の利用者名', (d) => (step(d).output = 'taro@kcna:~$ id -u'), /載せてはいけない.*taro@kcna/],
     ['端末の行頭のホスト名', (d) => (step(d).output = 'ubuntu@mypc:~$ id -u\n1000'), /載せてはいけない.*ubuntu@mypc/],
+    ['任意の手順しかない', (d) => d.steps.forEach((s: any) => (s.optional = true)), /手順 \(steps。任意でないもの\) が 1 つもありません/],
+    ['optional に false', (d) => (d.steps[0].optional = false), /optional は true だけ/],
+    ['後片付けに optional', (d) => (d.cleanup[0].optional = true), /optional は手順 \(steps\) にだけ/],
     ['長い題名に short が無い', (d) => (d.title = 'あ'.repeat(36)), /short/],
     ['後片付けの手順も同じ検査', (d) => (d.cleanup[0].code = { language: 'bash', text: 'exit' }), /cleanup\[0\].*lines/],
   ];

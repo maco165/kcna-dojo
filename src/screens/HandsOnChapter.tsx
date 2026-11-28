@@ -58,7 +58,7 @@ function Source({ url }: { url: string }) {
 
 /** 1 手順の中身。ask があれば、AI に聞く折りたたみを付ける */
 function StepBody({ step, text, why, ask, stuck }: { step: HandsOnStep; text: TermPiece[]; why: TermPiece[]; ask?: string; stuck: { href: string; where: string } }) {
-  const tags = [step.os && `${OS_LABEL[step.os]} の手順`, step.where && WHERE_LABEL[step.where]].filter(Boolean);
+  const tags = [step.optional && '【任意】完了の数に入らない', step.os && `${OS_LABEL[step.os]} の手順`, step.where && WHERE_LABEL[step.where]].filter(Boolean);
   return (
     <>
       {tags.length > 0 && <p className="ho-tags">{tags.map((t) => <span key={t} className="hb-scope">{t}</span>)}</p>}

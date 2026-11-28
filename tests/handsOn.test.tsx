@@ -249,6 +249,17 @@ describe('画面', { timeout: 30_000 }, () => {
     const v = await mount(macUser(), { ...sample, steps: [s] });
     expect([...v.el.querySelectorAll('.hb-lines dd')].map((x) => x.textContent)).toEqual(['1 回目', '2 回目']);
   });
+  it('任意の手順は【任意】の印が付き、印を付けられるが、全部未完でも完了にできる', async () => {
+    const extra = { ...sample.steps[0], id: 'extra', text: '2 台目を足します。', optional: true as const };
+    const v = await mount(macUser(), { ...sample, steps: [...sample.steps, extra] });
+    expect(v.boxes()).toHaveLength(4);
+    expect(v.el.querySelector('#step-extra')!.textContent).toContain('【任意】完了の数に入らない');
+    for (const b of v.boxes().slice(0, 3)) await act(async () => b.click());
+    expect(v.disabled()).toBe(false);
+    expect(markedCount({ steps: [...sample.steps, extra] }, { steps: ['extra'], at: '' }, 'mac')).toEqual({ marked: 0, total: 3 });
+    await act(async () => v.boxes()[3].click());
+    expect(v.progress().handsOn!.sample.steps).toContain('extra');
+  });
   it('途中で閉じても、開き直すと印が残っている', async () => {
     const v = await mount(markHandsOnStep(macUser(), 'sample', 'install-mac', true, at));
     expect(v.boxes().map((b) => b.checked)).toEqual([false, true, false]);
@@ -379,6 +390,20 @@ describe('書き出す HTML', { timeout: 60_000 }, () => {
     expect(body('lesson/w4-lab/').querySelector(`#root a[href="${BASE}hands-on/scaling/"]`)).not.toBeNull();
     expect(body('lesson/w5-lab/').querySelector(`#root a[href="${BASE}hands-on/networking/"]`)).not.toBeNull();
     expect(body('lesson/w3-lab/').querySelector(`#root a[href="${BASE}hands-on/batch/"]`)).not.toBeNull();
+  });
+  it('一覧と完了の数に使う軽い形 (?meta) にも、任意の印が入っている', async () => {
+    const { HANDS_ON } = await import('../src/content/handsOn');
+    const { HANDS_ON_CHAPTERS } = await import('../src/content/handsOnAll');
+    for (const c of HANDS_ON_CHAPTERS) expect(HANDS_ON.find((m) => m.id === c.id)!.steps.filter((x) => x.optional).map((x) => x.id), c.id).toEqual(c.steps.filter((x) => x.optional).map((x) => x.id));
+    expect(HANDS_ON_CHAPTERS.flatMap((c) => c.steps.filter((x) => x.optional))).toHaveLength(10);
+  });
+  it('任意の手順は、書き出しにも【任意】と書く', async () => {
+    const extra = { ...sample.steps[0], id: 'extra', optional: true as const };
+    const ps = await buildPages((m: string) => import(/* @vite-ignore */ path.join(process.cwd(), m)), { chapters: [{ ...sample, steps: [...sample.steps, extra] }] });
+    const html = renderPage(readFileSync(path.resolve(process.cwd(), 'index.html'), 'utf8'), ps.find((p: { path: string }) => p.path === 'hands-on/sample/'));
+    const d = new DOMParser().parseFromString(html, 'text/html');
+    expect(d.querySelector('#step-extra')!.textContent).toContain('【任意】完了の数に入らない');
+    expect(d.querySelector(`#step-${sample.steps[0].id}`)!.textContent).not.toContain('【任意】');
   });
   it('手順ごとに「ここで詰まった」のリンクを書く (JS なしでも開ける。OS は選んでいない)', () => {
     const links = [...doc.querySelectorAll('#root a')].filter((a) => a.textContent === 'ここで詰まった (GitHub に書く)').map((a) => new URL(a.getAttribute('href')!));

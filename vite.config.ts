@@ -31,10 +31,10 @@ function lightLessons(): Plugin {
       // ?meta は実践の章の一覧と題名に使う軽い形 (手順は id と OS だけ)。形は src/content/types.ts の HandsOnMeta
       if (query === 'meta' && file.endsWith('.json')) {
         this.addWatchFile(file);
-        const c = JSON.parse(await readFile(file, 'utf8')) as Record<string, unknown> & { steps: { id: string; os?: string }[] };
+        const c = JSON.parse(await readFile(file, 'utf8')) as Record<string, unknown> & { steps: { id: string; os?: string; optional?: true }[] };
         const { id: cid, order, title, short, summary, minutes } = c;
         // k3s は、その章が入れる k3s の版 (「ここで詰まった」の章の版。src/lib/stuck.ts)
-        return { code: jsonModule({ id: cid, order, title, short, summary, minutes, k3s: k3sInstallOf(codesOf(c as never)), steps: c.steps.map((s) => ({ id: s.id, os: s.os })) }), moduleType: 'js' };
+        return { code: jsonModule({ id: cid, order, title, short, summary, minutes, k3s: k3sInstallOf(codesOf(c as never)), steps: c.steps.map((s) => ({ id: s.id, os: s.os, optional: (s as { optional?: true }).optional })) }), moduleType: 'js' };
       }
       if ((query !== 'light' && query !== 'ids') || !file.endsWith('.json')) return null;
       this.addWatchFile(file);

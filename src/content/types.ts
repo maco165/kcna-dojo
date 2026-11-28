@@ -126,6 +126,8 @@ export type HandsOnStep = {
   trouble?: HandsOnTrouble[];
   source?: string;
   unverified?: string;
+  /** 任意の手順 (true だけを書く)。章の完了の条件に入れない (印は付けられる)。手順にだけ書け、後片付けには書かない */
+  optional?: true;
 };
 
 /** 答えは折りたたんで出す。verify は、できたことの確かめ方 */
@@ -156,4 +158,4 @@ export type HandsOnChapter = {
 };
 
 /** 一覧と題名に使う軽い章 (vite.config.ts の ?meta。手順は id と OS だけ) */
-export type HandsOnMeta = Pick<HandsOnChapter, 'id' | 'order' | 'title' | 'short' | 'summary' | 'minutes'> & { /** その章が入れる k3s の版 (入れないなら無し、版を決めずに入れるなら null) */ k3s?: string | null; steps: Pick<HandsOnStep, 'id' | 'os'>[] };
+export type HandsOnMeta = Pick<HandsOnChapter, 'id' | 'order' | 'title' | 'short' | 'summary' | 'minutes'> & { /** その章が入れる k3s の版 (入れないなら無し、版を決めずに入れるなら null) */ k3s?: string | null; steps: Pick<HandsOnStep, 'id' | 'os' | 'optional'>[] };

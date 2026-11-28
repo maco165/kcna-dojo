@@ -347,7 +347,7 @@ export async function buildPages(load, { chapters } = {}) {
     const stuckHtml = (s, where) => `<p><a href="${esc(stuckIssueUrl({ chapter: c, step: s, where, k3s: chapterK3s(c.id, versions), pathname: `${BASE}hands-on/${c.id}/` }))}" aria-label="${esc(`${where} で詰まった (GitHub に書く)`)}">ここで詰まった (GitHub に書く)</a></p>`;
     const lineHtml = (s) => `<p>${s.code.language === 'bash' || s.code.language === 'powershell' ? 'コマンドの意味' : '1 行ずつの意味'}</p><dl>${s.lines.map((l) => `<dt><code>${(s.code.language === 'bash' ? linkShell(l.code, COMMAND_BRIEFS).pieces : [l.code]).map((p) => (typeof p === 'string' ? esc(p) : link(`commands/${p.id}/`, p.text))).join('')}</code></dt><dd>${esc(l.text)}</dd>`).join('')}</dl>`;
     const stepHtml = (s, where) => {
-      const tags = [s.os && `${OS_LABEL[s.os]} の手順`, s.where && WHERE_LABEL[s.where]].filter(Boolean);
+      const tags = [s.optional && '【任意】完了の数に入らない', s.os && `${OS_LABEL[s.os]} の手順`, s.where && WHERE_LABEL[s.where]].filter(Boolean);
       return [
         `<li id="step-${esc(s.id)}">`,
         tags.length ? `<p>${esc(tags.join(' · '))}</p>` : '',
