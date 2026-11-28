@@ -60,6 +60,8 @@ const CODE_ONLY_KEYS = ['lines', 'output', 'read', 'trouble', 'unverified'];
 const CODE_LANGUAGES = ['bash', 'powershell', 'yaml', 'text'];
 /** ページの題名の上限 (src/lib/pageTitle.ts の TITLE_MAX) */
 const TITLE_MAX = 35;
+/** 学習要領の細目 (ハンドブックの試験の範囲のトピックの competency。その正本の CURRICULUM との一致は tests/handbook.test.ts が見る) */
+const COMPETENCIES = new Set(readdirSync(join(CONTENT_DIR, 'handbook')).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(readFileSync(join(CONTENT_DIR, 'handbook', f), 'utf8'))).filter((d) => !String(d.domain).startsWith('付録')).flatMap((d) => d.topics.map((t) => t.competency)));
 const OSES = ['windows', 'mac', 'linux'];
 const seenOrders = new Map(); // order -> file
 const topicIds = new Set(readdirSync(join(CONTENT_DIR, 'handbook')).filter((f) => f.endsWith('.json')).flatMap((f) => JSON.parse(readFileSync(join(CONTENT_DIR, 'handbook', f), 'utf8')).topics.map((t) => t.id)));
@@ -224,6 +226,9 @@ for (const file of files) {
       ng(lid, `kind は quiz か lab にします (${lesson?.kind})`);
       continue;
     }
+    // 週のレッスンは、学習要領の細目のどれか 1 つを持つ (模擬試験用の問題は細目が混ざるので持たない)
+    if (!examFile && !COMPETENCIES.has(lesson.competency)) ng(lid, `competency が学習要領の細目のどれでもありません (${lesson.competency})`);
+    if (examFile && lesson.competency !== undefined) ng(lid, '模擬試験用のファイルのレッスンには competency を書きません');
     if (!Array.isArray(lesson.questions) || lesson.questions.length < MIN_QUESTIONS) {
       ng(lid, `questions は ${MIN_QUESTIONS} 問以上要ります (${lesson.questions?.length ?? 0} 問)`);
     }

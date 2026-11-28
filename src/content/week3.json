@@ -7,6 +7,7 @@
       "title": "Pod とマニフェスト",
       "summary": "YAML とコマンドの穴埋めと 4 択 · 7 問",
       "domain": "Kubernetes Fundamentals",
+      "competency": "Kubernetes Core Concepts",
       "questions": [
         {
           "id": "w3-l1-q1",
@@ -203,6 +204,7 @@
       "title": "ReplicaSet と Deployment",
       "summary": "YAML とコマンドの穴埋めと 4 択 · 7 問",
       "domain": "Kubernetes Fundamentals",
+      "competency": "Kubernetes Core Concepts",
       "questions": [
         {
           "id": "w3-l2-q1",
@@ -388,6 +390,7 @@
       "title": "StatefulSet・DaemonSet・Job・CronJob",
       "summary": "YAML の穴埋めと 4 択・出力を読む · 7 問",
       "domain": "Kubernetes Fundamentals",
+      "competency": "Kubernetes Core Concepts",
       "questions": [
         {
           "id": "w3-l3-q1",
@@ -581,6 +584,7 @@
       "title": "Namespace・ラベル・ConfigMap",
       "summary": "YAML とコマンドの穴埋めと 4 択 · 8 問",
       "domain": "Kubernetes Fundamentals",
+      "competency": "Kubernetes Core Concepts",
       "questions": [
         {
           "id": "w3-l4-q1",

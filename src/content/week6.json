@@ -7,6 +7,7 @@
       "title": "RBAC と ServiceAccount",
       "summary": "マニフェストとコマンドの穴埋めと 4 択 · 8 問",
       "domain": "Container Orchestration",
+      "competency": "Security",
       "questions": [
         {
           "id": "w6-l1-q1",
@@ -230,6 +231,7 @@
       "title": "Secret と Pod のセキュリティ",
       "summary": "マニフェストとコマンドの穴埋めと 4 択 · 7 問",
       "domain": "Container Orchestration",
+      "competency": "Security",
       "questions": [
         {
           "id": "w6-l2-q1",
@@ -424,6 +426,7 @@
       "title": "PV・PVC・StorageClass",
       "summary": "マニフェストの穴埋めと 4 択 · 7 問",
       "domain": "Container Orchestration",
+      "competency": "Storage",
       "questions": [
         {
           "id": "w6-l3-q1",
@@ -622,6 +625,7 @@
       "title": "障害対応: 状態とコマンドを読む",
       "summary": "出力を読む・コマンドの穴埋め · 7 問",
       "domain": "Container Orchestration",
+      "competency": "Troubleshooting",
       "questions": [
         {
           "id": "w6-l4-q1",
@@ -818,6 +822,178 @@
             "serviceaccount": "set serviceaccount は Pod が使う ServiceAccount を変えるものです。"
           },
           "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_set/kubectl_set_image/"
+        }
+      ]
+    },
+    {
+      "id": "w6-l5",
+      "kind": "quiz",
+      "title": "StatefulSet のストレージと PV の後始末",
+      "summary": "YAML の穴埋めと 4 択 · 6 問",
+      "domain": "Container Orchestration",
+      "competency": "Storage",
+      "questions": [
+        {
+          "id": "w6-l5-q1",
+          "type": "fill",
+          "prompt": "StatefulSet db の Pod ごとに、別々の PVC を自動で作りたい。空欄に入る欄の名前は?",
+          "language": "yaml",
+          "code": "apiVersion: apps/v1\nkind: StatefulSet\nmetadata:\n  name: db\nspec:\n  serviceName: db\n  replicas: 3\n  selector:\n    matchLabels:\n      app: db\n  template:\n    metadata:\n      labels:\n        app: db\n    spec:\n      containers:\n      - name: db\n        image: postgres:17\n        volumeMounts:\n        - name: data\n          mountPath: /var/lib/postgresql/data\n  {{blank}}:\n  - metadata:\n      name: data\n    spec:\n      accessModes: [\"ReadWriteOnce\"]\n      resources:\n        requests:\n          storage: 1Gi",
+          "answers": [
+            "volumeClaimTemplates"
+          ],
+          "candidates": [
+            "volumeClaimTemplates",
+            "volumes",
+            "persistentVolumeClaim",
+            "volumeMounts"
+          ],
+          "explanation": "StatefulSet の .spec.volumeClaimTemplates に PVC のひな形を書くと、Pod ごとに 1 つずつ PVC が作られ、それぞれの Pod に安定したストレージを用意できます。",
+          "wrongNotes": {
+            "volumes": "volumes は Pod のひな形 (template.spec) に書く欄で、全部の Pod が同じものを指します。Pod ごとに別の PVC は作られません。",
+            "persistentVolumeClaim": "persistentVolumeClaim は volumes の中で、すでにある PVC を名前で指す書き方です。PVC を作るひな形ではありません。",
+            "volumeMounts": "volumeMounts はコンテナの中のどこに見せるかを書く欄で、コンテナの下に書きます。"
+          },
+          "source": "https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#volume-claim-templates"
+        },
+        {
+          "id": "w6-l5-q2",
+          "type": "choice",
+          "prompt": "volumeClaimTemplates を持つ StatefulSet web を replicas 3 から 1 に減らした。persistentVolumeClaimRetentionPolicy は書いていない。web-1 と web-2 の PVC はどうなる?",
+          "choices": [
+            {
+              "id": "b",
+              "text": "Pod と一緒に消され、中のデータも消える",
+              "why": "減らしたり消したりしても、既定では StatefulSet の PVC は消されません。データを守るためです。"
+            },
+            {
+              "id": "c",
+              "text": "web-0 の PVC にまとめられる",
+              "why": "PVC は Pod ごとに別で、ほかの Pod の PVC にまとめることはありません。"
+            },
+            {
+              "id": "d",
+              "text": "PVC は残るが、次に増やすときは新しい PVC が作られる",
+              "why": "残った PVC は同じ名前の Pod に、もう一度つながります。"
+            },
+            {
+              "id": "a",
+              "text": "消されずに残り、また 3 に増やすと web-1 と web-2 がそれぞれの PVC を使う"
+            }
+          ],
+          "answer": "a",
+          "explanation": "StatefulSet を減らしたり消したりしても、既定では結びついたボリュームは消されません (データを守るため)。persistentVolumeClaimRetentionPolicy の既定は whenDeleted・whenScaled とも Retain です。",
+          "source": "https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#persistentvolumeclaim-retention"
+        },
+        {
+          "id": "w6-l5-q3",
+          "type": "fill",
+          "prompt": "StatefulSet web の replicas を減らしたときは、減った Pod の PVC も消したい。StatefulSet 自体を消したときは PVC を残す。空欄に入る欄の名前は?",
+          "language": "yaml",
+          "code": "apiVersion: apps/v1\nkind: StatefulSet\nmetadata:\n  name: web\nspec:\n  persistentVolumeClaimRetentionPolicy:\n    whenDeleted: Retain\n    {{blank}}: Delete",
+          "answers": [
+            "whenScaled"
+          ],
+          "candidates": [
+            "whenScaled",
+            "whenDeleted",
+            "reclaimPolicy",
+            "onScaleDown"
+          ],
+          "explanation": "persistentVolumeClaimRetentionPolicy の whenScaled は、replicas を減らしたときの PVC の扱いです。Delete にすると、減った Pod の PVC だけが、Pod が消えたあとに消されます。whenDeleted は StatefulSet を消したときの扱いです。",
+          "wrongNotes": {
+            "whenDeleted": "whenDeleted は StatefulSet そのものを消したときの扱いで、このマニフェストではもう Retain と書いてあります。",
+            "reclaimPolicy": "reclaimPolicy は StorageClass の欄で、PVC を消したあとの PV の扱いを決めます。",
+            "onScaleDown": "onScaleDown という欄はありません。"
+          },
+          "source": "https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#persistentvolumeclaim-retention"
+        },
+        {
+          "id": "w6-l5-q4",
+          "type": "choice",
+          "prompt": "Pod のコンテナどうしで一時的なファイルを渡すために emptyDir を使っている。このボリュームの中身が消えるのはいつ?",
+          "choices": [
+            {
+              "id": "d",
+              "text": "ノードを再起動しても消えず、管理者が手で消すまで残る",
+              "why": "emptyDir は Pod の寿命に従う一時的な置き場で、Pod が消えると中身も消えます。"
+            },
+            {
+              "id": "a",
+              "text": "Pod がそのノードから消されたとき"
+            },
+            {
+              "id": "b",
+              "text": "コンテナが落ちて再起動したとき",
+              "why": "ボリュームの中身はコンテナの再起動をまたいで残ります。"
+            },
+            {
+              "id": "c",
+              "text": "PVC を消したとき",
+              "why": "emptyDir は PVC を使いません。Pod と一緒に作られ、Pod と一緒に消えます。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "emptyDir は、Pod がノードに割り当てられたときに空で作られ、Pod がそのノードから消されると中身ごと消える置き場です。コンテナが再起動しても中身は残ります。長く残したいデータは PVC に置きます。",
+          "source": "https://kubernetes.io/docs/concepts/storage/volumes/"
+        },
+        {
+          "id": "w6-l5-q5",
+          "type": "choice",
+          "prompt": "PV の persistentVolumeReclaimPolicy に書ける値のうち、非推奨 (deprecated) で、代わりに動的プロビジョニングを使うよう勧められているのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "Recycle"
+            },
+            {
+              "id": "b",
+              "text": "Retain",
+              "why": "Retain は、PVC を消しても PV とデータを残し、手で片付ける方式で、非推奨ではありません。"
+            },
+            {
+              "id": "c",
+              "text": "Delete",
+              "why": "Delete は、PV と外のストレージを一緒に消す方式で、動的に作る PV の既定です。"
+            },
+            {
+              "id": "d",
+              "text": "Released",
+              "why": "Released は PV の状態 (phase) の名前で、reclaimPolicy に書く値ではありません。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "Recycle は、ボリュームの中身を消して次の PVC に回す方式で、非推奨です。代わりに動的プロビジョニングが勧められています。",
+          "source": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/#recycle"
+        },
+        {
+          "id": "w6-l5-q6",
+          "type": "choice",
+          "prompt": "allowVolumeExpansion: true の StorageClass で作った 20Gi の PVC を、使わなくなった分を返すために 10Gi に減らしたい。どうなる?",
+          "choices": [
+            {
+              "id": "b",
+              "text": "PVC の requests.storage を 10Gi に書き換えれば縮む",
+              "why": "Kubernetes は、PVC を今の大きさより小さくすることに対応していません。"
+            },
+            {
+              "id": "c",
+              "text": "新しい 10Gi の PV が作られ、データが移される",
+              "why": "大きさを変えても新しい PV は作られません。広げるときも、今のボリュームの大きさを変えます。"
+            },
+            {
+              "id": "d",
+              "text": "allowVolumeExpansion が true なら、広げるのも縮めるのもできる",
+              "why": "この欄で許されるのは広げることだけです。"
+            },
+            {
+              "id": "a",
+              "text": "PVC を今より小さくすることはできない"
+            }
+          ],
+          "answer": "a",
+          "explanation": "allowVolumeExpansion が true なら PVC を書き換えて広げられますが、Kubernetes は PVC を今の大きさより小さくすることに対応していません。小さくしたいときは、新しい PVC を作ってデータを移します。",
+          "source": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/#expanding-persistent-volumes-claims"
         }
       ]
     },
