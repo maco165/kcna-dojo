@@ -361,6 +361,8 @@ describe('書き出す HTML', { timeout: 60_000 }, () => {
     const hrefs = [...body('hands-on/').querySelectorAll('#root a')].map((a) => a.getAttribute('href')).filter((h) => h!.includes('-lab/'));
     // 全部の実習を章が覆ったので、残るのは一覧の説明の「この実習も役に立ちます」の w2-lab と w5-lab だけ
     expect(hrefs).toEqual([2, 5].map((w) => `${BASE}lesson/w${w}-lab/`));
+    expect(body('hands-on/').querySelector('#root')!.textContent).toContain(NO_LABS);
+    expect([...body('hands-on/').querySelectorAll('#root ul')].filter((u) => u.children.length === 0)).toHaveLength(0);
     expect(body('lesson/w2-lab/').querySelector('#root')!.textContent).toContain(COVERED_REST['w2-lab']);
     expect(body('lesson/w5-lab/').querySelector('#root')!.textContent).toContain(COVERED_REST['w5-lab']);
     expect(body('hands-on/').querySelector('#root')!.textContent).toContain('クラスターの外の機械から試したい人は、この実習も役に立ちます:');

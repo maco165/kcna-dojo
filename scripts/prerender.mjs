@@ -332,8 +332,8 @@ export async function buildPages(load, { chapters } = {}) {
       `<p>${esc(chapterList.length > 0 ? handsOn.CHAPTERS_LEAD : handsOn.NO_CHAPTERS)}</p>`,
       chapterList.length > 0 ? `<ul>${chapterList.map((c) => `<li>${esc(chapterNo(c))}: ${link(`hands-on/${c.id}/`, c.title)} (約 ${c.minutes} 分): ${esc(c.summary)}</li>`).join('')}</ul>` : '',
       '<h2>週ごとの実習</h2>',
-      `<p>${esc(handsOn.LABS_LEAD)}${restLabs(WEEKS).map((l) => ` ${esc(restLead(l.id))} ${link(`lesson/${l.id}/`, l.title)}`).join('')}</p>`,
-      `<ul>${labList.map(({ lab, week }) => `<li>第 ${week} 週: ${link(`lesson/${lab.id}/`, lab.title)}: ${esc(lab.goal)}</li>`).join('')}</ul>`,
+      `<p>${esc(labList.length > 0 ? handsOn.LABS_LEAD : handsOn.NO_LABS)}${restLabs(WEEKS).map((l) => ` ${esc(restLead(l.id))} ${link(`lesson/${l.id}/`, l.title)}`).join('')}</p>`,
+      labList.length > 0 ? `<ul>${labList.map(({ lab, week }) => `<li>第 ${week} 週: ${link(`lesson/${lab.id}/`, lab.title)}: ${esc(lab.goal)}</li>`).join('')}</ul>` : '',
     ]
       .filter(Boolean)
       .join('\n'),

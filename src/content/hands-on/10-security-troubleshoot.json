@@ -463,7 +463,7 @@
     {
       "id": "aggregate",
       "text": "view の中身が、ほかの ClusterRole を集めて作られていることを見ます。",
-      "why": "view・edit・admin は、決まった札 (ラベル) の付いた ClusterRole を自分で集めます。部品を足すと、その部品を読む決まりも、view に自動で入ります。",
+      "why": "view・edit・admin には、決まった札 (ラベル) の付いた ClusterRole が、コントロールプレーンの仕組みで自動で集められます。札の付いた ClusterRole を一緒に入れる部品なら、その部品を読む決まりも view に入ります。",
       "where": "vm",
       "code": {
         "language": "bash",
@@ -532,7 +532,7 @@
         }
       ],
       "output": "pod/plain created\npod/plain condition met\nuid=0(root) gid=0(root) groups=0(root),1(bin),2(daemon),3(sys),4(adm),6(disk),10(wheel),11(floppy),20(dialout),26(tape),27(video)\nca.crt\nnamespace\ntoken\nch10",
-      "read": "uid=0(root) は、いちばん強い利用者 (root) で動いていることです。置き場には ca.crt・namespace・token の 3 つがあり、token の中身は default のトークンです (画面に出しません)。default は、何も結んでいなければ何もできません。でも、アプリが乗っ取られたときに使われる鍵は、少ないほうが安全です。使わないなら、置かないようにします (次の手順)。",
+      "read": "uid=0(root) は、いちばん強い利用者 (root) で動いていることです。置き場には ca.crt・namespace・token の 3 つがあり、token の中身は default のトークンです (画面に出しません)。default は、何も結んでいなければ、API の一覧や自分の名前を見るような、ごく基本のことしかできません。でも、アプリが乗っ取られたときに使われる鍵は、少ないほうが安全です。使わないなら、置かないようにします (次の手順)。",
       "trouble": [
         {
           "symptom": "toomanyrequests や 429 と出る",
@@ -550,7 +550,7 @@
     {
       "id": "safe-pod",
       "text": "守りを固めた Pod を書きます。トークンを置かず、root でなく動き、ファイルを書き換えられず、強い力 (capabilities) を全部捨てます。",
-      "why": "securityContext は、コンテナに許すことを狭める書き方です。乗っ取られても、できることを減らすためです。",
+      "why": "securityContext は、コンテナの権限を決める書き方です。この Pod では、許すことを狭める向きに使います。乗っ取られても、できることを減らすためです。",
       "where": "vm",
       "code": {
         "language": "bash",
@@ -683,7 +683,7 @@
         }
       ],
       "output": "pod/safe created\npod/safe condition met\nuid=1000 gid=0(root) groups=0(root)",
-      "read": "uid=1000 で動いています。gid=0 は、イメージが決めた組のままです (runAsGroup で替えられます)。",
+      "read": "uid=1000 で動いています。gid=0 は、runAsGroup を書かなかったときの既定の root の組です (runAsGroup で替えられます)。",
       "trouble": [
         {
           "symptom": "toomanyrequests や 429 と出る",
@@ -730,7 +730,7 @@
         }
       ],
       "output": "touch: /hello: Read-only file system\ncommand terminated with exit code 1\nls: /var/run/secrets/kubernetes.io/serviceaccount: No such file or directory\ncommand terminated with exit code 1\nCapEff:\t0000000000000000\nCapEff:\t00000000a80425fb",
-      "read": "1 行目は Read-only file system、3 行目は No such file or directory で断られ、2 行目だけ通ります。CapEff は、持っている力を 16 進数の札で並べたものです。safe は全部 0 (何も無い)、plain は 0 でない数で、いくつも持っています。command terminated with exit code 1 は、中の命令が失敗したという印です。",
+      "read": "打った行の 1 つめは Read-only file system、3 つめは No such file or directory で断られ、2 つめ (/tmp に作る) は何も出さずに通ります。CapEff は、持っている力を 16 進数の札で並べたものです。safe は全部 0 (何も無い)、plain は 0 でない数で、いくつも持っています。command terminated with exit code 1 は、中の命令が失敗したという印です。",
       "trouble": [
         {
           "symptom": "1 行目が通ってしまう",
@@ -1299,7 +1299,7 @@
         }
       ],
       "output": "namespace/practice created\nserviceaccount/default condition met\ndeployment.apps/crash created\npod/big created\npod/hungry created\npod/needs-config created\npod/web created\nservice/web created\nNAME                     READY   STATUS                       RESTARTS      AGE\nbig                      0/1     Pending                      0             20s\ncrash-659d69dc46-cqmzb   0/1     Error                        2 (16s ago)   20s\nhungry                   1/1     Running                      2 (14s ago)   20s\nneeds-config             0/1     CreateContainerConfigError   0             20s\nweb                      1/1     Running                      0             20s",
-      "read": "web だけ Running で、big は Pending、crash は Error、hungry は OOMKilled、needs-config は CreateContainerConfigError です。crash と hungry は RESTARTS (始め直した回数) が増えていき、始め直した直後に見ると Running のこともあります。打つ時によっては、始め直しの間をおいている印の CrashLoopBackOff と出ます。どちらも「動いては止まるのをくり返している」という意味です。web の窓口は Running でも、まだ壊れています (課題で探します)。",
+      "read": "web は Running、big は Pending、needs-config は CreateContainerConfigError です。crash と hungry は RESTARTS (始め直した回数) が増えていき、STATUS は見た時によって Error・OOMKilled・Running のどれかです (この出力では crash が Error、hungry が始め直した直後の Running)。打つ時によっては、始め直しの間をおいている印の CrashLoopBackOff と出ます。どちらも「動いては止まるのをくり返している」という意味です。web の窓口は Running でも、まだ壊れています (課題で探します)。",
       "trouble": [
         {
           "symptom": "toomanyrequests や 429 と出る",
@@ -1360,7 +1360,7 @@
       "lines": [
         {
           "code": "kubectl get events -n ch10 --sort-by=.lastTimestamp | tail -3",
-          "text": "ch10 の出来事を、新しい順の終わり 3 つだけ出す"
+          "text": "ch10 の出来事を古い順に並べ、終わりの 3 つ (いちばん新しい 3 つ) だけ出す"
         },
         {
           "code": "kubectl logs plain -n ch10 --tail=2 --timestamps",
@@ -1670,7 +1670,7 @@
     },
     {
       "task": "仮想マシンの中で、practice の Pod big が Pending のままです。理由を見つけ、CPU の約束を 100m に減らして動かしてください。",
-      "hint": "Pod の requests は、作ったあとには変えられません。kubectl replace --force は、消して作り直します。",
+      "hint": "Pod の requests は、ふつうの書き換え (apply・edit) では変えられません (v1.35 からは resize という別の口もあります)。ここでは kubectl replace --force で、消して作り直します。",
       "answer": "kubectl events -n practice --for=pod/big\nkubectl get pod big -n practice -o yaml | sed 's/cpu: \"8\"/cpu: 100m/' | kubectl replace --force -f -\nkubectl wait --for=condition=Ready pod/big -n practice --timeout=120s",
       "verify": "kubectl get pod big -n practice で STATUS が Running なら正解です。"
     },

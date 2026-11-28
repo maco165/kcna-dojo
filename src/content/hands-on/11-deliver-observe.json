@@ -377,7 +377,7 @@
         }
       ],
       "output": "Release \"demo\" has been upgraded. Happy Helming!\nNAME: demo\nLAST DEPLOYED: Sat Nov 28 03:24:13 2026\nNAMESPACE: ch11\nSTATUS: deployed\nREVISION: 2\nDESCRIPTION: Upgrade complete\nNOTES:\n1. Get the application URL by running these commands:\n  export POD_NAME=$(kubectl get pods --namespace ch11 -l \"app.kubernetes.io/name=web,app.kubernetes.io/instance=demo\" -o jsonpath=\"{.items[0].metadata.name}\")\n  export CONTAINER_PORT=$(kubectl get pod --namespace ch11 $POD_NAME -o jsonpath=\"{.spec.containers[0].ports[0].containerPort}\")\n  echo \"Visit http://127.0.0.1:8080 to use your application\"\n  kubectl --namespace ch11 port-forward $POD_NAME 8080:$CONTAINER_PORT\nWaiting for deployment \"demo-web\" rollout to finish: 1 of 2 updated replicas are available...\ndeployment \"demo-web\" successfully rolled out\nREVISION\tUPDATED                 \tSTATUS    \tCHART    \tAPP VERSION\tDESCRIPTION\n1       \tSat Nov 28 03:24:10 2026\tsuperseded\tweb-0.1.0\t1.16.0     \tInstall complete\n2       \tSat Nov 28 03:24:13 2026\tdeployed  \tweb-0.1.0\t1.16.0     \tUpgrade complete\nUSER-SUPPLIED VALUES:\nimage:\n  tag: 1.27-alpine\nreplicaCount: 2",
-      "read": "REVISION 1 が superseded (置き換えられた)、2 が deployed です。helm get values は、upgrade で渡した値だけを出します。upgrade では、前に --set で渡した値は引き継がれません。値は毎回、全部渡します (ファイルにしておく理由です)。",
+      "read": "REVISION 1 が superseded (置き換えられた)、2 が deployed です。helm get values は、upgrade で渡した値だけを出します。upgrade で値を 1 つでも渡すと、前に --set で渡した値は引き継がれません (何も渡さないときだけ、前の値をそのまま使います)。値は毎回、全部渡します (ファイルにしておく理由です)。",
       "trouble": [
         {
           "symptom": "helm: command not found と出る",
@@ -385,9 +385,9 @@
           "fix": "無ければ、helm-install の手順を初めから打つ。sudo の行のあとが消えていないかも見る"
         },
         {
-          "symptom": "Pod が ImagePullBackOff になる",
-          "check": "kubectl get pods -n ch11 で IMAGE を見る",
-          "fix": "tag の行が抜けて 1.16.0 になった。values-dev.yaml を見直して、もう一度 upgrade する"
+          "symptom": "イメージが nginx:1.16.0 になる",
+          "check": "kubectl get deployment demo-web -n ch11 -o wide で IMAGES を見る",
+          "fix": "tag の行が抜けて、appVersion の 1.16.0 が使われた。values-dev.yaml を見直して、もう一度 upgrade する"
         }
       ],
       "source": "https://helm.sh/docs/helm/helm_upgrade/"
@@ -446,11 +446,11 @@
         },
         {
           "code": "helm show values prometheus-community/kube-prometheus-stack | grep -c ''",
-          "text": "そのチャートで替えられる値の行の数を数える"
+          "text": "そのチャートの、既定の値のファイル (注釈を含む) の行の数を数える"
         }
       ],
       "output": "\"prometheus-community\" has been added to your repositories\nNAME                                      \tCHART VERSION\tAPP VERSION\tDESCRIPTION\nprometheus-community/kube-prometheus-stack\t94.2.0       \tv0.95.2    \tkube-prometheus-stack collects Kubernetes manif...\n6404",
-      "read": "CHART VERSION と APP VERSION が出ます (配る人が上げるので、打つ日によって変わります)。値の行は数千あり、Prometheus・Grafana・通知 (Alertmanager) などをまとめて入れる大きなチャートです。この仮想マシンの 2 GB では、メモリが足りないので入れません。入れるときは、helm install に --version を付けて、チャートの版を決めます。",
+      "read": "CHART VERSION と APP VERSION が出ます (配る人が上げるので、打つ日によって変わります)。値のファイルは数千行あり、Prometheus・Grafana・通知 (Alertmanager) などをまとめて入れる大きなチャートです。この仮想マシンの 2 GB では、メモリが足りないので入れません。入れるときは、helm install に --version を付けて、チャートの版を決めます。",
       "trouble": [
         {
           "symptom": "helm: command not found と出る",
@@ -677,7 +677,7 @@
     },
     {
       "id": "which",
-      "text": "Helm は、ひな形と値で、同じチャートを名前を替えて何度も入れられ、リリースの歴史 (rollback) を持ちます。人が配るチャートを使うのにも向きます。Kustomize は、ひな形を使わず、ふつうの YAML に環境ごとの差分を重ね、kubectl だけで使えます。2 つを組み合わせて、Helm で描いた YAML に Kustomize で重ねることもできます。どちらの YAML も、Git に置いて、Git の中身をクラスターに当て続ける仕組みに任せるのが GitOps です。Argo CD と Flux が代表で、どちらも CNCF の Graduated のプロジェクトです。人が kubectl apply を打つ代わりに、クラスターの中の仕組みが Git を見張り、ずれていたら Git のとおりに戻します。この仮想マシンには入れません。",
+      "text": "Helm は、ひな形と値で、同じチャートを名前を替えて何度も入れられ、リリースの歴史 (rollback) を持ちます。人が配るチャートを使うのにも向きます。Kustomize は、ひな形を使わず、ふつうの YAML に環境ごとの差分を重ね、kubectl だけで使えます。2 つを組み合わせて、Helm で描いた YAML に Kustomize で重ねることもできます。どちらの YAML も、Git に置いて、Git の中身をクラスターに当て続ける仕組みに任せるのが GitOps です。Argo CD と Flux が代表で、どちらも CNCF の Graduated のプロジェクトです。人が kubectl apply を打つ代わりに、クラスターの中の仕組みが Git を見張り、ずれを見つけて、Git のとおりに戻します (自動で戻すかは設定で決めます)。この仮想マシンには入れません。",
       "why": "どれも「同じものを、何度でも同じに入れる」ための道具で、試験でも違いが問われます。",
       "source": "https://helm.sh/docs/intro/"
     },
@@ -968,7 +968,7 @@
         }
       ],
       "output": "NAME             READY   UP-TO-DATE   AVAILABLE   AGE\nmetrics-server   1/1     1            1           26m\nNAME   CPU(cores)   CPU(%)   MEMORY(bytes)   MEMORY(%)\nkcna   756m         37%      1356Mi          68%\nNAMESPACE     NAME                                      CPU(cores)   MEMORY(bytes)\nkube-system   traefik-7c8677d4d9-2clgx                  2m           120Mi\nkube-system   metrics-server-6dc596dfb8-k6lrb           11m          72Mi\nkube-system   coredns-7cfb7bc9c7-65n4f                  3m           68Mi\nkube-system   local-path-provisioner-5598c9cb4c-88qrf   1m           45Mi\nch11          demo-web-565949cb54-sq7c6                 5m           2Mi",
-      "read": "READY が 1/1 なら使えます。CPU の m はミリコア (1000m で 1 コア)、MEMORY の Mi はメビバイトです。ノードのメモリの割合が大きいのは、k3s と、この章までに動かしたものの分です。いちばん多いのは、たいてい traefik か metrics-server か coredns です。値は、数十秒ごとに集めた、少し前の量です。",
+      "read": "READY が 1/1 なら使えます。CPU の m はミリコア (1000m で 1 コア)、MEMORY の Mi はメビバイトです。ノードのメモリの割合が大きいのは、k3s と、この章までに動かしたものの分です。いちばん多いのは、たいてい traefik か metrics-server か coredns です。値は、15 秒ごと (k3s の metrics-server の設定) に集めた、少し前の量です。",
       "trouble": [
         {
           "symptom": "error: Metrics API not available と出る",
@@ -1114,7 +1114,7 @@
     {
       "id": "delete-all",
       "text": "入れたものを全部片付けます。前の手順で kcna と出たときだけ打ちます。CRD は、名前空間を消しても残るので、別に消します。",
-      "why": "CRD を消すと、その種類のもの (Note) も全部消えます。消し忘れると、次に同じ名前の CRD を足すときに困ります。",
+      "why": "CRD を消すと、その種類のもの (Note) も全部消えます。CRD はクラスター全体のものなので、名前空間を消しても残ります。",
       "where": "vm",
       "code": {
         "language": "bash",
@@ -1274,7 +1274,7 @@
     {
       "id": "delete-practice",
       "text": "仮想マシンの中で、課題で作った名前空間を消します。課題をしていなければ、何も起きません。",
-      "why": "次の章を、k3s の部品だけの状態から始めるためです。",
+      "why": "この先の練習を、k3s の部品だけの状態から始めるためです。",
       "where": "vm",
       "code": {
         "language": "bash",
@@ -1309,7 +1309,7 @@
     {
       "id": "rest",
       "text": "今日はここまでにするときは、exit で出てから、ホストで仮想マシンを止めます。止まっていれば (Stopped)、打ちません。",
-      "why": "動いている間は PC のメモリを使うためです。次の章でも使うので、消しません。",
+      "why": "動いている間は PC のメモリを使うためです。また使うかもしれないので、ここでは消しません (消すのは次の手順)。",
       "where": "host",
       "code": {
         "language": "bash",
@@ -1369,7 +1369,7 @@
     {
       "task": "仮想マシンの中で、~/ch11/kust/base の土台に、名前の頭を p- にし、名前空間を practice にし、Pod を 1 つにする overlay を kust/overlays/prod に作って入れてください。",
       "hint": "Pod の数は replicas で替えます (name に元の名前、count に数)。",
-      "answer": "cd ~/ch11\nmkdir -p kust/overlays/prod\nprintf 'resources:\\n- ../../base\\nnamespace: practice\\nnamePrefix: p-\\nreplicas:\\n- name: demo-web\\n  count: 1\\n' > kust/overlays/prod/kustomization.yaml\nkubectl apply -k kust/overlays/prod\nkubectl rollout status deployment/p-demo-web -n practice --timeout=180s",
+      "answer": "cd ~/ch11\nkubectl create namespace practice --dry-run=client -o yaml | kubectl apply -f -\nmkdir -p kust/overlays/prod\nprintf 'resources:\\n- ../../base\\nnamespace: practice\\nnamePrefix: p-\\nreplicas:\\n- name: demo-web\\n  count: 1\\n' > kust/overlays/prod/kustomization.yaml\nkubectl apply -k kust/overlays/prod\nkubectl rollout status deployment/p-demo-web -n practice --timeout=180s",
       "verify": "kubectl get deployment p-demo-web -n practice で READY が 1/1 なら正解です。"
     },
     {
