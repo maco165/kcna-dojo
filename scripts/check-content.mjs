@@ -48,6 +48,13 @@ function isHttpsUrl(v) {
   }
 }
 
+/** 実在する日付 (YYYY-MM-DD) か。日付に直して戻した文字と同じかで見る (2026-02-31 は落とす)。src/lib/progress.ts の isValidDay と同じ考え */
+function isValidDay(v) {
+  if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
+  const [y, m, d] = v.split('-').map(Number);
+  const t = new Date(y, m - 1, d);
+  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}` === v;
+}
 const isObject = (v) => typeof v === 'object' && v !== null && !Array.isArray(v);
 const isId = (v) => typeof v === 'string' && /^[a-z0-9-]+$/.test(v);
 
@@ -60,6 +67,8 @@ const CODE_ONLY_KEYS = ['lines', 'output', 'read', 'trouble', 'unverified'];
 const CODE_LANGUAGES = ['bash', 'powershell', 'yaml', 'text'];
 /** ページの題名の上限 (src/lib/pageTitle.ts の TITLE_MAX) */
 const TITLE_MAX = 35;
+/** 学習要領の細目 (ハンドブックの試験の範囲のトピックの competency。その正本の CURRICULUM との一致は tests/handbook.test.ts が見る) */
+const COMPETENCIES = new Set(readdirSync(join(CONTENT_DIR, 'handbook')).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(readFileSync(join(CONTENT_DIR, 'handbook', f), 'utf8'))).filter((d) => !String(d.domain).startsWith('付録')).flatMap((d) => d.topics.map((t) => t.competency)));
 const OSES = ['windows', 'mac', 'linux'];
 const seenOrders = new Map(); // order -> file
 const topicIds = new Set(readdirSync(join(CONTENT_DIR, 'handbook')).filter((f) => f.endsWith('.json')).flatMap((f) => JSON.parse(readFileSync(join(CONTENT_DIR, 'handbook', f), 'utf8')).topics.map((t) => t.id)));
@@ -224,6 +233,10 @@ for (const file of files) {
       ng(lid, `kind は quiz か lab にします (${lesson?.kind})`);
       continue;
     }
+    // 週のレッスンは、学習要領の細目のどれか 1 つを持つ (模擬試験用の問題は細目が混ざるので持たない)
+    if (!examFile && !COMPETENCIES.has(lesson.competency)) ng(lid, `competency が学習要領の細目のどれでもありません (${lesson.competency})`);
+    if (lesson.since !== undefined && (examFile || !isValidDay(lesson.since))) ng(lid, 'since (足した日) は週のレッスンにだけ、YYYY-MM-DD で書きます');
+    if (examFile && lesson.competency !== undefined) ng(lid, '模擬試験用のファイルのレッスンには competency を書きません');
     if (!Array.isArray(lesson.questions) || lesson.questions.length < MIN_QUESTIONS) {
       ng(lid, `questions は ${MIN_QUESTIONS} 問以上要ります (${lesson.questions?.length ?? 0} 問)`);
     }

@@ -41,7 +41,8 @@ function lightLessons(): Plugin {
       const week = JSON.parse(await readFile(file, 'utf8')) as { week: number; lessons: Lesson[] & { domain?: string }[] };
       // ?ids は問題の id とレッスンの分野だけ (進捗の画面の到達の数が、模擬試験用の問題の本文を読まないため)
       if (query === 'ids') return jsonModule({ week: week.week, lessons: week.lessons.map((l) => ({ kind: l.kind, domain: (l as { domain?: string }).domain, ids: (l.questions ?? []).map((q) => q.id) })) });
-      const lessons = week.lessons.map((l) => (l.kind === 'quiz' ? { ...l, questions: l.questions!.map(({ id: qid, type, prompt }) => ({ id: qid, type, prompt })) } : l));
+      // 細目 (competency) は最初の画面で使わないので落とす (全文の lessons.ts にはある)
+      const lessons = week.lessons.map((l) => (l.kind === 'quiz' ? (({ competency: _c, ...rest }) => ({ ...rest, questions: l.questions!.map(({ id: qid, type, prompt }) => ({ id: qid, type, prompt })) }))(l as Lesson & { competency?: string }) : l));
       return jsonModule({ week: week.week, lessons });
     },
   };

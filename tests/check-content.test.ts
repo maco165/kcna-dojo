@@ -52,7 +52,8 @@ describe('check-content', { timeout: 30_000 }, () => {
   it('模擬試験用のファイル (exam/ の下) は week 0 で、x- の quiz と x- の問題だけを許す', () => {
     const toExam = (d: any) => {
       d.week = 0;
-      d.lessons = d.lessons.filter((l: any) => l.kind === 'quiz').slice(0, 1).map((l: any) => ({ ...l, id: 'x-t', questions: l.questions.map((q: any, i: number) => ({ ...q, id: `x-t-${i}` })) }));
+      // 模擬試験用のファイルは細目を持たない
+      d.lessons = d.lessons.filter((l: any) => l.kind === 'quiz').slice(0, 1).map(({ competency: _c, ...l }: any) => ({ ...l, id: 'x-t', questions: l.questions.map((q: any, i: number) => ({ ...q, id: `x-t-${i}` })) }));
     };
     expect(run(mutate('exam-ok', toExam, 'exam')).code).toBe(0);
     const notQuiz = run(mutate('exam-ng', (d) => (d.week = 0), 'exam'));
@@ -115,6 +116,16 @@ describe('check-content', { timeout: 30_000 }, () => {
       expect(r.code, name).toBe(1);
       expect(r.out, name).toContain(id);
     }
+  });
+
+  it('週のレッスンは学習要領の細目を持つ。模擬試験用のファイルのレッスンは持たない', () => {
+    expect(run(mutate('no-competency', (d) => delete d.lessons[0].competency)).out).toMatch(/w1-l1: competency が学習要領の細目のどれでもありません \(undefined\)/);
+    expect(run(mutate('bad-competency', (d) => (d.lessons[0].competency = 'Containers'))).out).toMatch(/w1-l1: competency が.*\(Containers\)/);
+    expect(run(mutate('bad-since', (d) => (d.lessons[0].since = '11-28'))).out).toMatch(/w1-l1: since .*YYYY-MM-DD/);
+    expect(run(mutate('feb31-since', (d) => (d.lessons[0].since = '2026-02-31'))).out).toMatch(/w1-l1: since .*YYYY-MM-DD/);
+    expect(run(mutate('ok-since', (d) => (d.lessons[0].since = '2026-11-28'))).code).toBe(0);
+    const exam = run(mutate('exam-comp', (d) => { d.week = 0; d.lessons = d.lessons.filter((l: any) => l.kind === 'quiz').slice(0, 1).map((l: any) => ({ ...l, id: 'x-t', questions: l.questions.map((q: any, i: number) => ({ ...q, id: `x-t-${i}` })) })); }, 'exam'));
+    expect(exam.out).toMatch(/competency を書きません/);
   });
 
   it('5 問に満たないレッスンは NG', () => {

@@ -7,6 +7,7 @@
       "title": "ログ・メトリクス・トレース",
       "summary": "4 択と穴埋め · 7 問",
       "domain": "Cloud Native Architecture",
+      "competency": "Observability",
       "questions": [
         {
           "id": "w8-l1-q1",
@@ -208,6 +209,7 @@
       "title": "Prometheus・Grafana と SLO",
       "summary": "4 択とコマンドの穴埋め · 7 問",
       "domain": "Cloud Native Architecture",
+      "competency": "Observability",
       "questions": [
         {
           "id": "w8-l2-q1",
@@ -419,6 +421,7 @@
       "title": "オートスケール",
       "summary": "コマンドと YAML の穴埋めと 4 択 · 9 問",
       "domain": "Cloud Native Architecture",
+      "competency": "Cloud Native Ecosystem and Principles",
       "questions": [
         {
           "id": "w8-l3-q1",
@@ -667,6 +670,7 @@
       "title": "サーバーレスと CNCF・オープンな標準",
       "summary": "4 択とコマンドの穴埋め · 11 問",
       "domain": "Cloud Native Architecture",
+      "competency": "Cloud Native Ecosystem and Principles",
       "questions": [
         {
           "id": "w8-l4-q1",
@@ -981,6 +985,215 @@
             "json": "-o json も中身を丸ごと出す形で、列の一覧にはなりません。"
           },
           "source": "https://kubernetes.io/docs/tasks/administer-cluster/migrating-from-dockershim/find-out-runtime-you-use/"
+        }
+      ]
+    },
+    {
+      "id": "w8-l5",
+      "kind": "quiz",
+      "title": "Kubernetes のコミュニティと貢献の流れ",
+      "summary": "4 択とコマンドの穴埋め · 7 問",
+      "domain": "Cloud Native Architecture",
+      "competency": "Cloud Native Community and Collaboration",
+      "since": "2026-11-28",
+      "questions": [
+        {
+          "id": "w8-l5-q1",
+          "type": "choice",
+          "prompt": "Kubernetes に出す変更のうち、KEP (Kubernetes Enhancement Proposal) を書かなくてよいものはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "ドキュメントの誤字の直しのような、ごく小さな直し"
+            },
+            {
+              "id": "b",
+              "text": "ほとんどの新しい機能",
+              "why": "KEP の対象です。ごく小さなものを除く、新しい機能の多くに KEP を書きます。"
+            },
+            {
+              "id": "c",
+              "text": "今ある機能の大きな変更",
+              "why": "KEP の対象です。"
+            },
+            {
+              "id": "d",
+              "text": "プロジェクトの多くに影響する広い変更",
+              "why": "KEP の対象で、ふつうは SIG Architecture を通してまとめます。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "KEP は、新しい取り組みを提案し、伝え、まとめていくための仕組みです。対象は、議論になりそうな変更、ごく小さなものを除く新しい機能の多く、今ある機能の大きな変更、プロジェクトの多くに影響する広い変更です。それ以外にいつ使うかは SIG ごとに決めます。",
+          "source": "https://github.com/kubernetes/enhancements/blob/master/keps/README.md"
+        },
+        {
+          "id": "w8-l5-q2",
+          "type": "choice",
+          "prompt": "Kubernetes のリリースの周期の中で、Enhancements Freeze と Code Freeze はどちらが先に来る?",
+          "choices": [
+            {
+              "id": "b",
+              "text": "Code Freeze が先で、Enhancements Freeze があと",
+              "why": "機能の KEP を決める Enhancements Freeze が先です。重大な直し以外を止める Code Freeze は、リリースの近くに来ます。"
+            },
+            {
+              "id": "c",
+              "text": "2 つは同じ日に始まる",
+              "why": "時期は違い、Enhancements Freeze は 4 週目ごろ、Code Freeze は 12 週目ごろです。"
+            },
+            {
+              "id": "d",
+              "text": "どちらもリリースのあとに来る",
+              "why": "どちらもリリースより前です。"
+            },
+            {
+              "id": "a",
+              "text": "Enhancements Freeze (周期の 4 週目ごろ) が先で、Code Freeze (12 週目ごろ) があと"
+            }
+          ],
+          "answer": "a",
+          "explanation": "Enhancements Freeze は、そのリリースに入れる機能の KEP を仕上げておく締め切りで、周期の 4 週目ごろです。Code Freeze は 12 週目ごろからで、その間は重大な不具合の直ししか入れません。",
+          "source": "https://kubernetes.io/releases/release/"
+        },
+        {
+          "id": "w8-l5-q3",
+          "type": "choice",
+          "prompt": "Kubernetes のマイナー版 (1.35・1.36 など) は、今どのくらいの頻度で出ている?",
+          "choices": [
+            {
+              "id": "c",
+              "text": "2 年に 1 回",
+              "why": "もっと多く、年に約 3 回出ています。"
+            },
+            {
+              "id": "d",
+              "text": "決まった頻度は無く、機能がそろったときに出す",
+              "why": "周期を決めて出しており、今は年に約 3 回です。"
+            },
+            {
+              "id": "a",
+              "text": "1 年におよそ 3 回"
+            },
+            {
+              "id": "b",
+              "text": "毎月 1 回",
+              "why": "マイナー版は年に数回です。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "Kubernetes のリリースは、今はおよそ 1 年に 3 回です。周期の中に Enhancements Freeze や Code Freeze などの段階があります。",
+          "source": "https://kubernetes.io/releases/release/"
+        },
+        {
+          "id": "w8-l5-q4",
+          "type": "choice",
+          "prompt": "Kubernetes のコミュニティが従う行動規範 (Code of Conduct) はどれ?",
+          "choices": [
+            {
+              "id": "d",
+              "text": "クラウドの業者ごとの利用規約",
+              "why": "コミュニティの行動規範は、クラウドの業者の規約とは別です。"
+            },
+            {
+              "id": "a",
+              "text": "CNCF の行動規範"
+            },
+            {
+              "id": "b",
+              "text": "行動規範は無く、SIG ごとに自由に決める",
+              "why": "Kubernetes は CNCF の行動規範に従い、違反の知らせは Kubernetes の Code of Conduct Committee が受けます。"
+            },
+            {
+              "id": "c",
+              "text": "Kubernetes の資格試験の規約",
+              "why": "試験の規約は、コミュニティでのふるまいの決まりではありません。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "Kubernetes のコミュニティは CNCF の行動規範に従います。受け入れられないふるまいは、Kubernetes の Code of Conduct Committee に知らせます。",
+          "source": "https://github.com/kubernetes/community/blob/master/code-of-conduct.md"
+        },
+        {
+          "id": "w8-l5-q5",
+          "type": "choice",
+          "prompt": "Kubernetes のプルリクエストに付く /lgtm と /approve の違いとして正しいのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "/lgtm はレビューを通った印、/approve は OWNERS の approver による最後の確認で、自動のマージへ進む印"
+            },
+            {
+              "id": "b",
+              "text": "/lgtm を付けると、それだけですぐにマージされる",
+              "why": "マージへ進むには、OWNERS の approver の /approve も要ります。"
+            },
+            {
+              "id": "c",
+              "text": "/approve は誰でも付けられ、/lgtm は Steering Committee だけが付けられる",
+              "why": "/approve は OWNERS の approver が付ける印です。"
+            },
+            {
+              "id": "d",
+              "text": "どちらも同じ意味で、どちらか 1 つあればよい",
+              "why": "/lgtm はレビュー、/approve は受け入れの最後の確認で、役割が違います。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "/lgtm は、コードがレビューを通ったことを示します。/approve は、OWNERS ファイルの approver が付けると、最後の確認を通って自動でマージされる準備ができた印になります。",
+          "source": "https://github.com/kubernetes/community/blob/master/contributors/guide/owners.md"
+        },
+        {
+          "id": "w8-l5-q6",
+          "type": "choice",
+          "prompt": "はじめてのプルリクエストに EasyCLA のボットが CLA の署名を求めてきたので、案内のリンクから署名した。そのあと、プルリクエストの CLA の状態を更新するにはどうする?",
+          "choices": [
+            {
+              "id": "b",
+              "text": "プルリクエストを閉じて、同じ変更で作り直す",
+              "why": "作り直さなくても、/easycla とコメントすれば状態が更新されます。"
+            },
+            {
+              "id": "c",
+              "text": "コミットのメッセージに「CLA に署名済み」と書き足す",
+              "why": "メッセージに書いても CLA の状態は変わりません。"
+            },
+            {
+              "id": "d",
+              "text": "何もしない。署名は次のプルリクエストから効く",
+              "why": "署名したあと、/easycla とコメントすると、今のプルリクエストの状態が更新されます。"
+            },
+            {
+              "id": "a",
+              "text": "プルリクエストに /easycla とコメントする"
+            }
+          ],
+          "answer": "a",
+          "explanation": "Kubernetes は CLA に署名した人のコードだけを受け入れます。はじめてのプルリクエストには EasyCLA のボットが状態と署名のリンクを返すので、署名したあと /easycla とコメントすると状態が更新されます。会社として貢献する人は、会社のメールアドレスを GitHub のアカウントに結び付けておきます。試験で問われやすいのは、はじめて出す前に CLA に署名しておくことです。",
+          "source": "https://github.com/kubernetes/community/blob/master/CLA.md"
+        },
+        {
+          "id": "w8-l5-q7",
+          "type": "fill",
+          "prompt": "DCO (Developer Certificate of Origin) を求めるオープンソースのプロジェクトに出すため、コミットのメッセージの最後に Signed-off-by の行を付けたい。空欄に入るオプションは?",
+          "language": "bash",
+          "code": "git commit {{blank}} -m \"Fix typo in README\"",
+          "answers": [
+            "-s",
+            "--signoff"
+          ],
+          "candidates": [
+            "-s",
+            "-S",
+            "-a",
+            "--amend"
+          ],
+          "explanation": "git commit の -s (--signoff) は、コミットのメッセージの最後に Signed-off-by の行を足します。その意味はプロジェクトごとに決まっていて、DCO のように、出す権利があることを示すのに使われます。",
+          "wrongNotes": {
+            "-S": "大文字の -S (--gpg-sign) は、コミットに GPG で署名するオプションで、Signed-off-by の行は足しません。",
+            "-a": "-a (--all) は、変更・削除したファイルを自動でコミットに含めるオプションです。",
+            "--amend": "--amend は、直前のコミットを作り直すオプションです。"
+          },
+          "source": "https://git-scm.com/docs/git-commit"
         }
       ]
     },

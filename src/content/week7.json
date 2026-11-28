@@ -7,6 +7,7 @@
       "title": "CI/CD と GitOps",
       "summary": "4 択と YAML の穴埋め · 7 問",
       "domain": "Cloud Native Application Delivery",
+      "competency": "Application Delivery",
       "questions": [
         {
           "id": "w7-l1-q1",
@@ -213,6 +214,7 @@
       "title": "Helm のチャートとリリース",
       "summary": "コマンドの穴埋めと 4 択 · 7 問",
       "domain": "Cloud Native Application Delivery",
+      "competency": "Application Delivery",
       "questions": [
         {
           "id": "w7-l2-q1",
@@ -406,6 +408,7 @@
       "title": "Kustomize の base と overlay",
       "summary": "kustomization.yaml とコマンドの穴埋め · 8 問",
       "domain": "Cloud Native Application Delivery",
+      "competency": "Application Delivery",
       "questions": [
         {
           "id": "w7-l3-q1",
@@ -622,6 +625,7 @@
       "title": "デプロイの戦略とデバッグ",
       "summary": "4 択とコマンドの穴埋め · 9 問",
       "domain": "Cloud Native Application Delivery",
+      "competency": "Application Delivery",
       "questions": [
         {
           "id": "w7-l4-q1",
@@ -867,6 +871,185 @@
           "answer": "c",
           "explanation": "Pod がノードに置かれたのに動けずに待っているとき、いちばん多い原因はイメージを取れないことです。イメージの名前が正しいか、レジストリに push してあるか、手で pull できるかを確かめます。",
           "source": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-pods/"
+        }
+      ]
+    },
+    {
+      "id": "w7-l5",
+      "kind": "quiz",
+      "title": "kubectl debug と再起動の間隔",
+      "summary": "コマンドの穴埋めと 4 択 · 6 問",
+      "domain": "Cloud Native Application Delivery",
+      "competency": "Debugging",
+      "since": "2026-11-28",
+      "questions": [
+        {
+          "id": "w7-l5-q1",
+          "type": "choice",
+          "prompt": "本番で動いている Pod web の中で、いま動いているプロセスの様子を、Pod を作り直さずにそのまま調べたい。kubectl debug の使い方として合うのはどれ?",
+          "choices": [
+            {
+              "id": "a",
+              "text": "--copy-to を付けずに、Pod web にエフェメラルコンテナを足して入る"
+            },
+            {
+              "id": "b",
+              "text": "--copy-to で写しの Pod を作って入る",
+              "why": "--copy-to で作るのは別の新しい Pod です。元の Pod web で動いているプロセスは、写しの中にはありません。"
+            },
+            {
+              "id": "c",
+              "text": "Pod web を消し、デバッグ用のコンテナを足したマニフェストで作り直す",
+              "why": "作り直すと、調べたかった今のプロセスの様子は失われます。"
+            },
+            {
+              "id": "d",
+              "text": "kubectl edit で Pod web の containers にデバッグ用のコンテナを書き足す",
+              "why": "動いている Pod の containers には後から足せません。調べるコンテナは、エフェメラルコンテナとして専用の窓口から足します。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "--copy-to を付けない kubectl debug は、動いている Pod にエフェメラルコンテナを足すので、Pod を作り直さずに今のプロセスを調べられます。--copy-to は元の Pod を変えずに、設定を変えた別の Pod (写し) を作る使い方で、起動してすぐ落ちるコンテナのコマンドを替えて調べるときなどに向きます。",
+          "source": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-running-pod/#ephemeral-container"
+        },
+        {
+          "id": "w7-l5-q2",
+          "type": "choice",
+          "prompt": "kubectl debug で足すエフェメラルコンテナ (一時的なコンテナ) の説明として正しいのはどれ?",
+          "choices": [
+            {
+              "id": "b",
+              "text": "ports や readinessProbe を書いて、Service から通信を受けられる",
+              "why": "エフェメラルコンテナは ports を持てず、livenessProbe・readinessProbe も書けません。"
+            },
+            {
+              "id": "c",
+              "text": "Pod の spec を書き換えるコマンドで、spec に書き足して作る",
+              "why": "Pod の spec に直接は書けず、API の ephemeralcontainers という専用の窓口から足します。"
+            },
+            {
+              "id": "d",
+              "text": "アプリを長く動かすための部品として使う",
+              "why": "資源や実行の保証が無く、自動で再起動もされないので、アプリを作るのには向きません。調べるためのものです。"
+            },
+            {
+              "id": "a",
+              "text": "落ちても自動では再起動されず、一度足すと変えることも取り除くこともできない"
+            }
+          ],
+          "answer": "a",
+          "explanation": "エフェメラルコンテナは、資源や実行の保証が無く、自動で再起動されません。ports・probe・resources は書けず、一度足すと変えることも取り除くこともできません。Pod の spec ではなく専用の窓口から足すので、Pod の編集では足せません。調べるための一時的なコンテナです。",
+          "source": "https://kubernetes.io/docs/concepts/workloads/pods/ephemeral-containers/"
+        },
+        {
+          "id": "w7-l5-q3",
+          "type": "choice",
+          "prompt": "kubectl debug -it web --image=busybox:1.36 で、--target を付けずにエフェメラルコンテナを足した。その中で ps を打つと busybox のプロセスしか見えず、コンテナ web のプロセスが見えない。理由として正しいのはどれ?",
+          "choices": [
+            {
+              "id": "c",
+              "text": "コンテナ web が止まっているから",
+              "why": "止まっていなくても、プロセスの名前空間が別なら見えません。"
+            },
+            {
+              "id": "d",
+              "text": "--copy-to を付けないと、ほかのコンテナは見えないから",
+              "why": "--copy-to は写しの Pod を作るフラグで、今の Pod のプロセスを見るのには使いません。"
+            },
+            {
+              "id": "a",
+              "text": "足したコンテナが、コンテナ web とは別のプロセスの名前空間で動いているから。--target=web を付けると web のプロセスの名前空間に入る"
+            },
+            {
+              "id": "b",
+              "text": "エフェメラルコンテナは ps を打てない作りだから",
+              "why": "ps が打てるかはイメージの中身によります。busybox には ps があります。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "--target は、足すコンテナを別のコンテナのプロセスの名前空間に入れます。付けないと (Pod がプロセスの名前空間を共有していなければ) 別の名前空間で動くので、ps にはほかのコンテナのプロセスが出ません。--target はコンテナランタイムが対応している必要があり、対応していないと名前空間が分かれたままになることがあります。",
+          "source": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-running-pod/#ephemeral-container"
+        },
+        {
+          "id": "w7-l5-q4",
+          "type": "choice",
+          "prompt": "kubectl debug myapp -it --image=ubuntu --share-processes --copy-to=myapp-debug の --share-processes は何のため?",
+          "choices": [
+            {
+              "id": "d",
+              "text": "ubuntu のコンテナを、ほかのコンテナと同じイメージで起動する",
+              "why": "イメージは --image で決めます。--share-processes はプロセスの見え方の設定です。"
+            },
+            {
+              "id": "a",
+              "text": "写しの Pod の中で、コンテナどうしがほかのコンテナのプロセスを見られるようにする"
+            },
+            {
+              "id": "b",
+              "text": "元の Pod myapp と写しの Pod で、同じプロセスを共有する",
+              "why": "写しは別の Pod で、元の Pod のプロセスとはつながりません。"
+            },
+            {
+              "id": "c",
+              "text": "写しの Pod を、元の Pod と同じノードに置く",
+              "why": "置く場所を決めるフラグではありません。"
+            }
+          ],
+          "answer": "a",
+          "explanation": "--share-processes は、写しの Pod の中のコンテナどうしで、ほかのコンテナのプロセスを見られるようにします (Pod のプロセスの名前空間の共有)。写しは元の Pod とは別の Pod なので、元の Pod のプロセスは見えません。",
+          "source": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-running-pod/#copying-a-pod-while-adding-a-new-container"
+        },
+        {
+          "id": "w7-l5-q5",
+          "type": "fill",
+          "prompt": "Pod myapp のコンテナがすぐ落ちる。写しの myapp-debug を作り、写しでは全部のコンテナのイメージを ubuntu に替えて調べたい。空欄に入るフラグは?",
+          "language": "bash",
+          "code": "kubectl debug myapp --copy-to=myapp-debug --{{blank}}=*=ubuntu",
+          "answers": [
+            "set-image"
+          ],
+          "candidates": [
+            "set-image",
+            "image",
+            "target",
+            "replace"
+          ],
+          "explanation": "--set-image は、写しのコンテナのイメージを替えます。書き方は kubectl set image と同じ「コンテナの名前=イメージ」で、*=ubuntu は全部のコンテナを ubuntu にする意味です。",
+          "wrongNotes": {
+            "image": "--image は足すコンテナのイメージで、すでにあるコンテナのイメージは替えません。",
+            "target": "--target はプロセスを見る先のコンテナを決めるフラグで、イメージは替えません。",
+            "replace": "kubectl debug に --replace というフラグはありません。"
+          },
+          "source": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-running-pod/#copying-a-pod-while-changing-container-images"
+        },
+        {
+          "id": "w7-l5-q6",
+          "type": "choice",
+          "prompt": "コンテナが起動しては落ちる。kubelet の設定を変えていないとき、kubelet が再起動するまで待つ間隔はどう変わる?",
+          "choices": [
+            {
+              "id": "b",
+              "text": "毎回すぐ再起動し、5 回落ちると Pod が消される",
+              "why": "すぐではなく、間を空けて再起動します。回数で Pod が消されることもありません。"
+            },
+            {
+              "id": "c",
+              "text": "いつも 10 秒ごとに再起動する",
+              "why": "待つ間隔は再起動のたびに倍に延びます。"
+            },
+            {
+              "id": "d",
+              "text": "1 時間待ってから再起動する",
+              "why": "既定の上限は 5 分です。"
+            },
+            {
+              "id": "a",
+              "text": "10 秒・20 秒・40 秒…と倍に延び、5 分 (300 秒) で止まる。10 分問題なく動けば最初に戻る"
+            }
+          ],
+          "answer": "a",
+          "explanation": "コンテナが終わると、kubelet は 10 秒・20 秒・40 秒…と倍に延びる間隔を置いて再起動し、間隔は既定で 300 秒 (5 分) で止まります。10 分問題なく動くと、間隔は最初に戻ります。この待っている状態が CrashLoopBackOff です。上限はノードの kubelet の設定で変えられます。",
+          "source": "https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#container-restarts"
         }
       ]
     },

@@ -122,6 +122,7 @@ export const SOURCE_SITES: Record<string, Source> = {
   'opengitops.dev': { label: 'OpenGitOps (GitOps の原則)', url: 'https://opengitops.dev/' },
   'knative.dev': { label: 'Knative の公式ドキュメント', url: 'https://knative.dev/docs/' },
   'sre.google': { label: 'Google の SRE の本', url: 'https://sre.google/books/' },
+  'git-scm.com': { label: 'Git の公式ドキュメント', url: 'https://git-scm.com/docs' },
   'github.com': { label: 'GitHub 上の各プロジェクトのリポジトリ', url: 'https://github.com/' },
 };
 
