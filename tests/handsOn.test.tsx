@@ -254,6 +254,9 @@ describe('画面', { timeout: 30_000 }, () => {
     const v = await mount(macUser(), { ...sample, steps: [...sample.steps, extra] });
     expect(v.boxes()).toHaveLength(4);
     expect(v.el.querySelector('#step-extra')!.textContent).toContain('【任意】完了の数に入らない');
+    // 章の頭の数は任意を分け、印の読み上げ名でも任意と分かる
+    expect(v.el.querySelector('.hb-head')!.textContent).toContain('3 手順 (任意 1)');
+    expect(v.boxes().map((b) => b.closest('label')?.textContent ?? document.querySelector(`label[for="${b.id}"]`)?.textContent)).toEqual(['手順 1 を確かめた', '手順 2 を確かめた', '手順 3 を確かめた', '手順 4 (任意) を確かめた']);
     for (const b of v.boxes().slice(0, 3)) await act(async () => b.click());
     expect(v.disabled()).toBe(false);
     expect(markedCount({ steps: [...sample.steps, extra] }, { steps: ['extra'], at: '' }, 'mac')).toEqual({ marked: 0, total: 3 });
@@ -403,6 +406,7 @@ describe('書き出す HTML', { timeout: 60_000 }, () => {
     const html = renderPage(readFileSync(path.resolve(process.cwd(), 'index.html'), 'utf8'), ps.find((p: { path: string }) => p.path === 'hands-on/sample/'));
     const d = new DOMParser().parseFromString(html, 'text/html');
     expect(d.querySelector('#step-extra')!.textContent).toContain('【任意】完了の数に入らない');
+    expect(d.querySelector('#root')!.textContent).toContain(`${sample.steps.length} 手順 (任意 1)`);
     expect(d.querySelector(`#step-${sample.steps[0].id}`)!.textContent).not.toContain('【任意】');
   });
   it('手順ごとに「ここで詰まった」のリンクを書く (JS なしでも開ける。OS は選んでいない)', () => {

@@ -318,7 +318,7 @@ export async function buildPages(load, { chapters } = {}) {
   // 実践: 一覧と章 (手順は全部の OS の分を書く。課題の答えは、画面と同じく折りたたむ)。chapters はテストが見本の章を渡すため
   const handsOn = await load('/src/content/handsOn.ts');
   const { HANDS_ON_CHAPTERS } = await load('/src/content/handsOnAll.ts');
-  const { OS_LABEL, WHERE_LABEL } = await load('/src/lib/handsOn.ts');
+  const { OS_LABEL, WHERE_LABEL, stepCount } = await load('/src/lib/handsOn.ts');
   const { exercisesOf } = await load('/src/lib/lessonStatus.ts');
   const { COVERED_LEAD, COVERED_REST, chapterNo, chaptersOfLab, handsOnLabel, handsOnLinks, listedLabs, restLabs, restLead } = await load('/src/content/coveredLabs.ts');
   const chapterList = chapters ?? HANDS_ON_CHAPTERS;
@@ -373,7 +373,8 @@ export async function buildPages(load, { chapters } = {}) {
       entity: article(c.title, [...c.sources, ...[...c.steps, ...c.cleanup].filter((s) => s.source && !c.sources.some((x) => x.url === s.source)).map((s) => ({ label: new URL(s.source).hostname, url: s.source }))]),
       body: [
         `<h1>${esc(c.title)}</h1>`,
-        `<p>${esc(chapterNo(c))} · 約 ${c.minutes} 分</p>`,
+        // 手順の数は、全部の OS の手順を書くので全部の OS で数え、任意の手順は括弧で分ける (画面と同じ形)
+        `<p>${esc(chapterNo(c))} · 約 ${c.minutes} 分 · ${esc(stepCount(c.steps.filter((s) => !s.optional).length, c.steps.filter((s) => s.optional).length))}</p>`,
         `<p>${esc(c.summary)}</p>`,
         '<h2>始める前に</h2>',
         `<h3>この章でできるようになること</h3><p>${esc(c.goal)}</p>`,

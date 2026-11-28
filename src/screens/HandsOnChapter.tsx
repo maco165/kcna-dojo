@@ -28,7 +28,7 @@ import type { HandsOnChapter as Chapter, HandsOnMeta, HandsOnOs, HandsOnStep } f
 import { handsOnStepText } from '../lib/askAi';
 import { chapterK3s, stuckIssueUrl } from '../lib/stuck';
 import { XP_PER_LAB } from '../lib/grade';
-import { OS_CHOICES, OS_LABEL, WHERE_LABEL, canComplete, handsOnOs, markedCount, stepsFor } from '../lib/handsOn';
+import { OS_CHOICES, OS_LABEL, WHERE_LABEL, canComplete, handsOnOs, markedCount, stepCount, stepsFor } from '../lib/handsOn';
 import { completeHandsOn, goalXp, markHandsOnStep, restartHandsOn, setProfile, todayXp, type Progress } from '../lib/progress';
 import { handbookHref, handsOnHref, type Route } from '../lib/route';
 import { SITE_NAME } from '../lib/site';
@@ -162,7 +162,7 @@ export function ChapterView({ chapter: c, chapters, progress, updateProgress }: 
     <TermTipArea key={c.id} meanings={MEANINGS} className="hb" aria-labelledby="hb-title">
       <Crumbs items={[{ name: HANDS_ON_TITLE, href: handsOnHref() }, { name: c.title }]} />
       <div className="hb-head">
-        <span className="hb-muted">{`${chapterNo(c)} · 約 ${c.minutes} 分 · ${total} 手順`}</span>
+        <span className="hb-muted">{`${chapterNo(c)} · 約 ${c.minutes} 分 · ${stepCount(total, stepsFor(c.steps, os).filter((s) => s.optional).length)}`}</span>
         <h1 id="hb-title" className="week-title">
           {c.title}
         </h1>
@@ -229,7 +229,7 @@ export function ChapterView({ chapter: c, chapters, progress, updateProgress }: 
             <li key={step.id} id={`step-${step.id}`}>
               <div className="hb-step">
                 <StepBody step={step} text={text} why={why} ask={handsOnStepText(c.title, step, i, OS_LABEL[os])} stuck={stuckOf(step, `手順 ${i + 1}`)} />
-                <CheckboxInput label={`手順 ${i + 1} を確かめた`} value={rec?.steps.includes(step.id) === true} onChange={(on) => updateProgress((p) => markHandsOnStep(p, c.id, step.id, on, new Date()))} />
+                <CheckboxInput label={`手順 ${i + 1}${step.optional ? ' (任意)' : ''} を確かめた`} value={rec?.steps.includes(step.id) === true} onChange={(on) => updateProgress((p) => markHandsOnStep(p, c.id, step.id, on, new Date()))} />
               </div>
             </li>
           ))}
