@@ -1,0 +1,1778 @@
+{
+  "id": "security-troubleshoot",
+  "order": 10,
+  "title": "守る・直す",
+  "summary": "誰が・何を・どこでしてよいかを ServiceAccount と RBAC で決め、Pod の守り (securityContext・Pod Security) で入口を固めます。後半は、わざと壊したものを、STATUS・出来事・記録の順に読んで直します。",
+  "goal": "自分の名前と強さを説明し、読むだけの権限を作って確かめ、守りを固めた Pod を作り、動かない Pod の原因を読む順に探して直せる",
+  "features": [
+    "認証 (誰か)・認可 (RBAC)・受け入れの検査 (Pod Security) の 3 つの関所",
+    "k3s の管理者の kubeconfig は system:masters で、RBAC を通らない",
+    "Role と RoleBinding で、読むだけ・Secret なし・名前空間の中だけを許し、can-i --as で確かめる",
+    "securityContext で root でなく・書き換えず・力を捨て、restricted の名前空間で断られるのを見る",
+    "ImagePullBackOff・Pending・CrashLoopBackOff・OOMKilled・設定の誤り・窓口の選び方の誤りを読んで直す"
+  ],
+  "minutes": 150,
+  "needs": [
+    "9 章を終えた仮想マシン kcna (k3s が動き、kubectl が使える)",
+    "インターネットへの接続 (イメージを取ってきます)",
+    "出力について: 「仮想マシンの中」の出力は、2026-11-28 に Linux の QEMU の上で、Ubuntu 24.04 の公式のクラウドイメージ (x86_64・2 コア・2 GB・20 GB) と k3s v1.36.6+k3s1 で取りました。Multipass を打つ手順は実機で確かめていないので、出力を載せていません。M 系の Mac でも手順は同じです。CPU の種類が出るところだけ arm64 か aarch64 になります。"
+  ],
+  "reads": [
+    {
+      "topic": "security",
+      "label": "セキュリティ"
+    },
+    {
+      "topic": "troubleshooting",
+      "label": "障害対応"
+    },
+    {
+      "topic": "authn-authz-basics",
+      "label": "認証と認可の基本"
+    }
+  ],
+  "steps": [
+    {
+      "id": "enter",
+      "text": "9 章を終えた仮想マシンの中に入ります。ホストの端末で打ちます。",
+      "why": "この章のコマンドは、最初と最後のほかは全部、仮想マシンの中で打つためです。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass shell kcna"
+      },
+      "lines": [
+        {
+          "code": "multipass shell kcna",
+          "text": "kcna の中の端末を開く。止まっていれば、動かしてから開く"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "行の頭が ubuntu@kcna:~$ に変われば、中に入っています。",
+      "trouble": [
+        {
+          "symptom": "multipass: command not found、または「認識されません」と出る",
+          "check": "端末を閉じて開き直し、multipass version を打つ",
+          "fix": "開き直しても出るなら、Multipass を入れる手順をもう一度行う"
+        },
+        {
+          "symptom": "kcna が無いと出る",
+          "check": "multipass list で名前を見る",
+          "fix": "0 章から始める"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/shell/"
+    },
+    {
+      "id": "check-host",
+      "text": "仮想マシンの中で、どのマシンにいるかと、クラスターの様子を見ます。hostname が kcna でなければ、先へ進まず multipass shell kcna で入ります。枠は、迷ったら 1 行ずつ貼ります。sudo などのあとの行は、端末によって、まとめて貼ると消えることがあるためです (EOF で終わる書き込みの部分は、EOF まで続けて貼ります)。",
+      "why": "自分の PC の別のクラスターで打たないためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "hostname\nkubectl get nodes"
+      },
+      "lines": [
+        {
+          "code": "hostname",
+          "text": "このマシンの名前を出す"
+        },
+        {
+          "code": "kubectl get nodes",
+          "text": "ノードの一覧を出す"
+        }
+      ],
+      "output": "kcna\nNAME   STATUS   ROLES           AGE   VERSION\nkcna   Ready    control-plane   31m   v1.36.6+k3s1",
+      "read": "kcna と出て、ノードの STATUS が Ready なら進めます。VERSION が v1.36.6+k3s1 でない人は、出力の版を読み替えます。",
+      "trouble": [
+        {
+          "symptom": "kcna ではない名前が出る",
+          "check": "行の頭が ubuntu@kcna かを見る",
+          "fix": "ホストにいる。multipass shell kcna で入り、もう一度打つ"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        },
+        {
+          "symptom": "permission denied や localhost:8080 と出る",
+          "check": "echo $KUBECONFIG を打つ",
+          "fix": "空なら export KUBECONFIG=~/.kube/k3s.yaml を打つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/architecture/nodes/"
+    },
+    {
+      "id": "words",
+      "text": "クラスターへの頼みごとは、3 つの関所を通ります。1 つめは「誰か」を確かめる認証 (authentication)、2 つめは「それをしてよいか」を決める認可 (authorization)、3 つめは「中身が決まりに合うか」を見る受け入れの検査 (admission) です。この章の前半で 3 つを順に試し、後半で、動かないものを直す読み方を練習します。",
+      "why": "守りの設定は、どの関所の話かを分けると読めます。RBAC は 2 つめ、Pod Security は 3 つめです。",
+      "source": "https://kubernetes.io/docs/concepts/security/controlling-access/"
+    },
+    {
+      "id": "prepare",
+      "text": "作業のフォルダと、練習用の名前空間 ch10 を作ります。",
+      "why": "作るものを、まとめて片付けられるようにするためです。端末を開き直したときや再起動のあとは、cd ~/ch10 を打ちます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "mkdir -p ~/ch10\ncd ~/ch10\nkubectl create namespace ch10\nkubectl wait --for=create serviceaccount/default -n ch10 --timeout=60s"
+      },
+      "lines": [
+        {
+          "code": "mkdir -p ~/ch10",
+          "text": "ch10 というフォルダを作る"
+        },
+        {
+          "code": "cd ~/ch10",
+          "text": "ch10 へ移る"
+        },
+        {
+          "code": "kubectl create namespace ch10",
+          "text": "名前空間 ch10 を作る"
+        },
+        {
+          "code": "kubectl wait --for=create serviceaccount/default -n ch10 --timeout=60s",
+          "text": "ch10 で Pod を作れるようになるまで待つ"
+        }
+      ],
+      "output": "namespace/ch10 created\nserviceaccount/default condition met",
+      "read": "namespace/ch10 created が出れば次へ進めます。",
+      "trouble": [
+        {
+          "symptom": "AlreadyExists と出る",
+          "check": "kubectl get namespaces を打つ",
+          "fix": "前に作ったものがある。そのまま使う"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/"
+    },
+    {
+      "id": "whoami",
+      "text": "今の自分が、クラスターから誰に見えているかを出します。",
+      "why": "kubectl は、kubeconfig (~/.kube/k3s.yaml) に書いた証明書で名乗っています。その名前と組 (グループ) が、何でもできる管理者のものだと知るためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl auth whoami\nkubectl config view --minify\nkubectl config view --raw --minify -o jsonpath='{.users[0].user.client-certificate-data}' | base64 -d | openssl x509 -noout -subject -issuer -enddate"
+      },
+      "lines": [
+        {
+          "code": "kubectl auth whoami",
+          "text": "クラスターから見た自分の名前と組を出す"
+        },
+        {
+          "code": "kubectl config view --minify",
+          "text": "kubeconfig のうち、今使っている分を出す。鍵などの中身は伏せて出る"
+        },
+        {
+          "code": "kubectl config view --raw --minify -o jsonpath='{.users[0].user.client-certificate-data}' | base64 -d | openssl x509 -noout -subject -issuer -enddate",
+          "text": "kubeconfig の証明書 (鍵ではない) を取り出し、誰の名前か・誰が出したか・いつまで使えるかを出す"
+        }
+      ],
+      "output": "ATTRIBUTE                                           VALUE\nUsername                                            system:admin\nGroups                                              [system:masters system:authenticated]\nExtra: authentication.kubernetes.io/credential-id   [X509SHA256=45a17bec5b71a1b67f33e5fc2546a1ad66d2f8b68754f52359987a932ba164b2]\napiVersion: v1\nclusters:\n- cluster:\n    certificate-authority-data: DATA+OMITTED\n    server: https://127.0.0.1:6443\n  name: default\ncontexts:\n- context:\n    cluster: default\n    user: default\n  name: default\ncurrent-context: default\nkind: Config\nusers:\n- name: default\n  user:\n    client-certificate-data: DATA+OMITTED\n    client-key-data: DATA+OMITTED\nsubject=O = system:masters, CN = system:admin\nissuer=CN = k3s-client-ca@1795834675\nnotAfter=Nov 28 01:57:55 2027 GMT",
+      "read": "Username が system:admin、Groups に system:masters があります。system:masters の組は、認可 (RBAC) を通さずに何でもできます。証明書の subject の O が組、CN が名前で、issuer は k3s が自分で作った認証局です。DATA+OMITTED は、中身を伏せたという印です。~/.kube/k3s.yaml を人に渡すと、このクラスターを丸ごと渡すことになります。人や仕組みには、次の手順からの、できることを絞った名前を渡します。",
+      "trouble": [
+        {
+          "symptom": "permission denied や localhost:8080 と出る",
+          "check": "echo $KUBECONFIG を打つ",
+          "fix": "空なら export KUBECONFIG=~/.kube/k3s.yaml を打つ"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        },
+        {
+          "symptom": "openssl: command not found と出る",
+          "check": "which openssl を打つ",
+          "fix": "Ubuntu の公式イメージには入っている。無ければ sudo apt-get install -y openssl で入れる"
+        }
+      ],
+      "source": "https://docs.k3s.io/cluster-access"
+    },
+    {
+      "id": "sa-token",
+      "text": "ServiceAccount (仕組みのための名前) reader を作り、その名前で使える合い言葉 (トークン) を作ります。そのトークンだけで名乗る kubectl を、kr という短い呼び名にします。",
+      "why": "人の名前 (証明書) とは別に、Pod や仕組みには ServiceAccount を使います。トークンは期限つきです。kr を使うと、管理者ではなく reader として頼めます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl create serviceaccount reader -n ch10\nTOKEN=$(kubectl create token reader -n ch10 --duration=1h)\necho ${#TOKEN}\nkubectl config view --raw --minify -o jsonpath='{.clusters[0].cluster.certificate-authority-data}' | base64 -d > ca.crt\nkr() { kubectl --kubeconfig=/dev/null --server=https://127.0.0.1:6443 --certificate-authority=$HOME/ch10/ca.crt --token=\"$TOKEN\" \"$@\"; }\nkr auth whoami"
+      },
+      "lines": [
+        {
+          "code": "kubectl create serviceaccount reader -n ch10",
+          "text": "ServiceAccount reader を作る"
+        },
+        {
+          "code": "TOKEN=$(kubectl create token reader -n ch10 --duration=1h)",
+          "text": "reader のトークンを 1 時間の期限で作り、変数 TOKEN に入れる (画面には出さない)"
+        },
+        {
+          "code": "echo ${#TOKEN}",
+          "text": "トークンの文字の数だけを出す"
+        },
+        {
+          "code": "kubectl config view --raw --minify -o jsonpath='{.clusters[0].cluster.certificate-authority-data}' | base64 -d > ca.crt",
+          "text": "クラスターの認証局の証明書を ca.crt に書く。相手が本物のクラスターかを確かめるのに使う (秘密ではない)"
+        },
+        {
+          "code": "kr() { kubectl --kubeconfig=/dev/null --server=https://127.0.0.1:6443 --certificate-authority=$HOME/ch10/ca.crt --token=\"$TOKEN\" \"$@\"; }",
+          "text": "kr という呼び名を決める。kubeconfig を読まず (/dev/null)、相手の住所・認証局・トークンだけで頼む kubectl になる"
+        },
+        {
+          "code": "kr auth whoami",
+          "text": "kr で名乗った自分を出す"
+        }
+      ],
+      "output": "serviceaccount/reader created\n928\nATTRIBUTE                                           VALUE\nUsername                                            system:serviceaccount:ch10:reader\nUID                                                 49017810-8503-4c39-9f6d-6401d84f3a47\nGroups                                              [system:serviceaccounts system:serviceaccounts:ch10 system:authenticated]\nExtra: authentication.kubernetes.io/credential-id   [JTI=f86eb03d-3a91-46af-a5c9-1c3d4bc5e8e7]",
+      "read": "トークンは 900 文字ほどの長い文字列です (中身はこの画面に出しません。人に見せません)。kr auth whoami の Username が system:serviceaccount:ch10:reader に変われば、reader として名乗れています。Groups の system:serviceaccounts:ch10 は「ch10 の ServiceAccount みんな」の組です。TOKEN と kr は今の端末だけのもので、端末を閉じると消えます。",
+      "trouble": [
+        {
+          "symptom": "Unauthorized と出る",
+          "check": "TOKEN を作ってから 1 時間たったか、端末を開き直したかを思い出す",
+          "fix": "合い言葉が切れたか、消えた。sa-token の手順の TOKEN= の行と kr の行を、もう一度打つ"
+        },
+        {
+          "symptom": "Unable to connect to the server と出る",
+          "check": "echo $TOKEN | wc -c と ls ~/ch10/ca.crt を打つ",
+          "fix": "ca.crt が無ければ、ca.crt を書く行をもう一度打つ"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_create/kubectl_create_token/"
+    },
+    {
+      "id": "sa-forbidden",
+      "text": "わざと、まだ何も許していない reader で、Pod の一覧を頼みます。",
+      "why": "名前を確かめる関所 (認証) は通っても、許す決まりが無ければ、次の関所 (認可) で止まることを見るためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kr get pods -n ch10"
+      },
+      "lines": [
+        {
+          "code": "kr get pods -n ch10",
+          "text": "reader として Pod の一覧を頼む"
+        }
+      ],
+      "output": "Error from server (Forbidden): pods is forbidden: User \"system:serviceaccount:ch10:reader\" cannot list resource \"pods\" in API group \"\" in the namespace \"ch10\"",
+      "read": "Forbidden と断られます。User \"system:serviceaccount:ch10:reader\" cannot list resource \"pods\" は、誰が・何を (list)・どれに (pods)・どこで (ch10) の 4 つを並べています。断られた文を読めば、足りない決まりが分かります。",
+      "trouble": [
+        {
+          "symptom": "Unauthorized と出る",
+          "check": "TOKEN を作ってから 1 時間たったか、端末を開き直したかを思い出す",
+          "fix": "合い言葉が切れたか、消えた。sa-token の手順の TOKEN= の行と kr の行を、もう一度打つ"
+        },
+        {
+          "symptom": "kr: command not found と出る",
+          "check": "端末を開き直したか、休んだかを思い出す",
+          "fix": "kr は今の端末だけのもの。sa-token の手順の TOKEN= の行から kr の行までを、もう一度打つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/access-authn-authz/authorization/"
+    },
+    {
+      "id": "role",
+      "text": "Pod を読むだけの決まり (Role) を書き、reader に結びます (RoleBinding)。結んだあと、できることを kubectl auth can-i で確かめます。",
+      "why": "Role は「何をしてよいか」の一覧、RoleBinding は「それを誰に与えるか」です。2 つに分けるので、同じ Role を何人にも配れます。--as は、管理者のまま、ほかの名前になりきって確かめる書き方です。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cat > role.yaml <<'EOF'\napiVersion: rbac.authorization.k8s.io/v1\nkind: Role\nmetadata:\n  name: pod-reader\nrules:\n- apiGroups: [\"\"]\n  resources: [\"pods\"]\n  verbs: [\"get\", \"list\", \"watch\"]\nEOF\nkubectl apply -f role.yaml -n ch10\nkubectl create rolebinding reader-pods --role=pod-reader --serviceaccount=ch10:reader -n ch10\nkubectl auth can-i list pods -n ch10 --as=system:serviceaccount:ch10:reader\nkubectl auth can-i delete pods -n ch10 --as=system:serviceaccount:ch10:reader\nkubectl auth can-i list secrets -n ch10 --as=system:serviceaccount:ch10:reader\nkubectl auth can-i list pods -n default --as=system:serviceaccount:ch10:reader"
+      },
+      "lines": [
+        {
+          "code": "cat > role.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま role.yaml というファイルに書く"
+        },
+        {
+          "code": "apiVersion: rbac.authorization.k8s.io/v1",
+          "text": "RBAC の API"
+        },
+        {
+          "code": "kind: Role",
+          "text": "名前空間の中だけで効く決まり"
+        },
+        {
+          "code": "metadata:",
+          "text": "呼び名など"
+        },
+        {
+          "code": "  name: pod-reader",
+          "text": "呼び名は pod-reader"
+        },
+        {
+          "code": "rules:",
+          "text": "許すことの一覧"
+        },
+        {
+          "code": "- apiGroups: [\"\"]",
+          "text": "Pod は、いちばん元の API の組 (\"\" と書く) にある"
+        },
+        {
+          "code": "  resources: [\"pods\"]",
+          "text": "相手は Pod"
+        },
+        {
+          "code": "  verbs: [\"get\", \"list\", \"watch\"]",
+          "text": "1 つを読む・一覧を出す・見張るだけを許す"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "kubectl apply -f role.yaml -n ch10",
+          "text": "Role を作る"
+        },
+        {
+          "code": "kubectl create rolebinding reader-pods --role=pod-reader --serviceaccount=ch10:reader -n ch10",
+          "text": "pod-reader を reader に結ぶ"
+        },
+        {
+          "code": "kubectl auth can-i list pods -n ch10 --as=system:serviceaccount:ch10:reader",
+          "text": "reader は ch10 の Pod の一覧を出せるか"
+        },
+        {
+          "code": "kubectl auth can-i delete pods -n ch10 --as=system:serviceaccount:ch10:reader",
+          "text": "Pod を消せるか"
+        },
+        {
+          "code": "kubectl auth can-i list secrets -n ch10 --as=system:serviceaccount:ch10:reader",
+          "text": "Secret の一覧を出せるか"
+        },
+        {
+          "code": "kubectl auth can-i list pods -n default --as=system:serviceaccount:ch10:reader",
+          "text": "ほかの名前空間 (default) の Pod の一覧を出せるか"
+        }
+      ],
+      "output": "role.rbac.authorization.k8s.io/pod-reader created\nrolebinding.rbac.authorization.k8s.io/reader-pods created\nyes\nno\nno\nno",
+      "read": "yes・no・no・no と出ます。決まりに書いたことだけができて、書いていない消す・Secret・ほかの名前空間はできません。RBAC は「許すこと」だけを書く仕組みで、「禁じること」は書けません。書かなければ、できません。",
+      "trouble": [
+        {
+          "symptom": "can-i が全部 yes になる",
+          "check": "--as を付け忘れていないかを見る",
+          "fix": "--as が無いと、管理者の自分について答える"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/access-authn-authz/rbac/"
+    },
+    {
+      "id": "role-try",
+      "text": "reader として、本当に頼んでみます。",
+      "why": "can-i の答えと、本当に頼んだときの結果が同じかを見るためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kr get pods -n ch10\nkr get secrets -n ch10"
+      },
+      "lines": [
+        {
+          "code": "kr get pods -n ch10",
+          "text": "Pod の一覧を頼む"
+        },
+        {
+          "code": "kr get secrets -n ch10",
+          "text": "Secret の一覧を頼む"
+        }
+      ],
+      "output": "No resources found in ch10 namespace.\nError from server (Forbidden): secrets is forbidden: User \"system:serviceaccount:ch10:reader\" cannot list resource \"secrets\" in API group \"\" in the namespace \"ch10\"",
+      "read": "1 行目は No resources found (Pod がまだ無い) で、断られずに通ります。2 行目は Forbidden です。Secret を読めると、合い言葉をまとめて持ち出せてしまいます。読む役に Secret を許さないのは、そのためです。",
+      "trouble": [
+        {
+          "symptom": "Unauthorized と出る",
+          "check": "TOKEN を作ってから 1 時間たったか、端末を開き直したかを思い出す",
+          "fix": "合い言葉が切れたか、消えた。sa-token の手順の TOKEN= の行と kr の行を、もう一度打つ"
+        },
+        {
+          "symptom": "kr: command not found と出る",
+          "check": "端末を開き直したか、休んだかを思い出す",
+          "fix": "kr は今の端末だけのもの。sa-token の手順の TOKEN= の行から kr の行までを、もう一度打つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/access-authn-authz/rbac/#role-and-clusterrole"
+    },
+    {
+      "id": "default-roles",
+      "text": "初めからある、人に配るための 4 つの ClusterRole を見ます。そのうち view を、RoleBinding で ch10 の中だけ reader に結びます。",
+      "why": "ClusterRole はクラスター全体で使える決まりです。RoleBinding で結べば、その名前空間の中だけで効きます。よく使う形は、自分で書かずに、初めからある view・edit・admin を使えます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl get clusterroles cluster-admin admin edit view\nfor r in view edit admin; do echo \"$r: secrets $(kubectl get clusterrole $r -o yaml | grep -c ' secrets$')\"; done\nkubectl create rolebinding reader-view --clusterrole=view --serviceaccount=ch10:reader -n ch10\nkubectl auth can-i list configmaps -n ch10 --as=system:serviceaccount:ch10:reader\nkubectl auth can-i get secrets -n ch10 --as=system:serviceaccount:ch10:reader\nkubectl auth can-i list pods -n kube-system --as=system:serviceaccount:ch10:reader"
+      },
+      "lines": [
+        {
+          "code": "kubectl get clusterroles cluster-admin admin edit view",
+          "text": "4 つの ClusterRole を出す"
+        },
+        {
+          "code": "for r in view edit admin; do echo \"$r: secrets $(kubectl get clusterrole $r -o yaml | grep -c ' secrets$')\"; done",
+          "text": "3 つそれぞれの決まりに、secrets が何回出るかを数える"
+        },
+        {
+          "code": "kubectl create rolebinding reader-view --clusterrole=view --serviceaccount=ch10:reader -n ch10",
+          "text": "view を、ch10 の中だけ reader に結ぶ"
+        },
+        {
+          "code": "kubectl auth can-i list configmaps -n ch10 --as=system:serviceaccount:ch10:reader",
+          "text": "ConfigMap の一覧を出せるか"
+        },
+        {
+          "code": "kubectl auth can-i get secrets -n ch10 --as=system:serviceaccount:ch10:reader",
+          "text": "Secret を読めるか"
+        },
+        {
+          "code": "kubectl auth can-i list pods -n kube-system --as=system:serviceaccount:ch10:reader",
+          "text": "ほかの名前空間の Pod の一覧を出せるか"
+        }
+      ],
+      "output": "NAME            CREATED AT\ncluster-admin   2026-11-28T02:58:02Z\nadmin           2026-11-28T02:58:02Z\nedit            2026-11-28T02:58:02Z\nview            2026-11-28T02:58:02Z\nview: secrets 0\nedit: secrets 2\nadmin: secrets 2\nrolebinding.rbac.authorization.k8s.io/reader-view created\nyes\nno\nno",
+      "read": "view は 0 回、edit と admin には secrets が出ます。view は「読むだけ、ただし Secret は読まない」決まりです。結んだあと、ConfigMap は yes、Secret は no のままです。ClusterRole を結んでも、RoleBinding なら ch10 の外 (kube-system) は no です。クラスター全体で効かせるのは ClusterRoleBinding で、これは強いので、必要なときだけ使います。cluster-admin は何でもできる決まりです。",
+      "trouble": [
+        {
+          "symptom": "can-i の答えが no ばかり",
+          "check": "--as のつづりを見る",
+          "fix": "system:serviceaccount:ch10:reader の、コロンの位置を見直す"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/access-authn-authz/rbac/#user-facing-roles"
+    },
+    {
+      "id": "aggregate",
+      "text": "view の中身が、ほかの ClusterRole を集めて作られていることを見ます。",
+      "why": "view・edit・admin には、決まった札 (ラベル) の付いた ClusterRole が、コントロールプレーンの仕組みで自動で集められます。札の付いた ClusterRole を一緒に入れる部品なら、その部品を読む決まりも view に入ります。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl get clusterrole view -o jsonpath='{.aggregationRule}{\"\\n\"}'\nkubectl get clusterroles -l rbac.authorization.k8s.io/aggregate-to-view=true\nkubectl auth can-i list pods.metrics.k8s.io -n ch10 --as=system:serviceaccount:ch10:reader"
+      },
+      "lines": [
+        {
+          "code": "kubectl get clusterrole view -o jsonpath='{.aggregationRule}{\"\\n\"}'",
+          "text": "view が何を集めているかを出す"
+        },
+        {
+          "code": "kubectl get clusterroles -l rbac.authorization.k8s.io/aggregate-to-view=true",
+          "text": "その札の付いた ClusterRole を出す"
+        },
+        {
+          "code": "kubectl auth can-i list pods.metrics.k8s.io -n ch10 --as=system:serviceaccount:ch10:reader",
+          "text": "reader は、Pod の使用量 (metrics) を読めるか"
+        }
+      ],
+      "output": "{\"clusterRoleSelectors\":[{\"matchLabels\":{\"rbac.authorization.k8s.io/aggregate-to-view\":\"true\"}}]}\nNAME                               CREATED AT\nsystem:aggregate-to-view           2026-11-28T02:58:02Z\nsystem:aggregated-metrics-reader   2026-11-28T02:58:09Z\nyes",
+      "read": "view は aggregate-to-view=true の札の付いたものを集めます。system:aggregated-metrics-reader は、k3s が入れた metrics-server の部品が足した決まりです。そのため、view を結んだ reader は、使用量も読めます (yes)。自分の部品の決まりを view に足すときも、この札を付けます。",
+      "trouble": [
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/access-authn-authz/rbac/#aggregated-clusterroles"
+    },
+    {
+      "id": "least",
+      "text": "誰に何を許すかは、①何もできない所から始め、②要る動作 (verbs) と相手 (resources) だけを、③要る名前空間の中だけ (RoleBinding) で足します。Secret を読むこと、Pod を作ること (作った Pod の ServiceAccount を借りられる)、RBAC の決まりを書き換えること、ノードや名前空間をまたぐことは、特に強い力なので、渡す前に考えます。人の管理者の kubeconfig (system:masters) は、日々の作業には使わない、と決める所もあります。",
+      "why": "決まりは、足すのは簡単で、減らすのは怖いものです。初めに狭く作るためです。",
+      "source": "https://kubernetes.io/docs/concepts/security/rbac-good-practices/"
+    },
+    {
+      "id": "token-in-pod",
+      "text": "ふつうの Pod の中に、トークンが置かれていることを見ます。",
+      "why": "Pod は、名前空間の default という ServiceAccount のトークンを、何もしなくても持っています。中のアプリが、クラスターに頼みごとをするためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl run plain -n ch10 --image=nginx:1.27-alpine\nkubectl wait --for=condition=Ready pod/plain -n ch10 --timeout=120s\nkubectl exec plain -n ch10 -- id\nkubectl exec plain -n ch10 -- ls /var/run/secrets/kubernetes.io/serviceaccount\nkubectl exec plain -n ch10 -- cat /var/run/secrets/kubernetes.io/serviceaccount/namespace"
+      },
+      "lines": [
+        {
+          "code": "kubectl run plain -n ch10 --image=nginx:1.27-alpine",
+          "text": "ふつうの書き方で Pod plain を作る"
+        },
+        {
+          "code": "kubectl wait --for=condition=Ready pod/plain -n ch10 --timeout=120s",
+          "text": "plain が使えるようになるまで待つ"
+        },
+        {
+          "code": "kubectl exec plain -n ch10 -- id",
+          "text": "中のアプリが、どの利用者で動いているかを出す"
+        },
+        {
+          "code": "kubectl exec plain -n ch10 -- ls /var/run/secrets/kubernetes.io/serviceaccount",
+          "text": "トークンの置き場を出す"
+        },
+        {
+          "code": "kubectl exec plain -n ch10 -- cat /var/run/secrets/kubernetes.io/serviceaccount/namespace",
+          "text": "そこにある、名前空間の名前を出す"
+        }
+      ],
+      "output": "pod/plain created\npod/plain condition met\nuid=0(root) gid=0(root) groups=0(root),1(bin),2(daemon),3(sys),4(adm),6(disk),10(wheel),11(floppy),20(dialout),26(tape),27(video)\nca.crt\nnamespace\ntoken\nch10",
+      "read": "uid=0(root) は、いちばん強い利用者 (root) で動いていることです。置き場には ca.crt・namespace・token の 3 つがあり、token の中身は default のトークンです (画面に出しません)。default は、何も結んでいなければ、API の一覧や自分の名前を見るような、ごく基本のことしかできません。でも、アプリが乗っ取られたときに使われる鍵は、少ないほうが安全です。使わないなら、置かないようにします (次の手順)。",
+      "trouble": [
+        {
+          "symptom": "toomanyrequests や 429 と出る",
+          "check": "kubectl describe の Events で、Failed to pull image の行の終わりを見る",
+          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る。短い「429 Too Many Requests」だけのときは、使いすぎを防ぐ別の上限なので、数分待ってからもう一度行う"
+        },
+        {
+          "symptom": "timed out と出る",
+          "check": "kubectl describe pod plain -n ch10 の Events を見る",
+          "fix": "イメージを取っている途中なら待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/"
+    },
+    {
+      "id": "safe-pod",
+      "text": "守りを固めた Pod を書きます。トークンを置かず、root でなく動き、ファイルを書き換えられず、強い力 (capabilities) を全部捨てます。",
+      "why": "securityContext は、コンテナの権限を決める書き方です。この Pod では、許すことを狭める向きに使います。乗っ取られても、できることを減らすためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cat > safe.yaml <<'EOF'\napiVersion: v1\nkind: Pod\nmetadata:\n  name: safe\nspec:\n  automountServiceAccountToken: false\n  securityContext:\n    runAsNonRoot: true\n    runAsUser: 1000\n    seccompProfile:\n      type: RuntimeDefault\n  containers:\n  - name: app\n    image: busybox:1.37\n    command: ['sh', '-c', 'sleep 3600']\n    securityContext:\n      allowPrivilegeEscalation: false\n      readOnlyRootFilesystem: true\n      capabilities:\n        drop: ['ALL']\n    volumeMounts:\n    - name: tmp\n      mountPath: /tmp\n  volumes:\n  - name: tmp\n    emptyDir: {}\nEOF\nkubectl apply -f safe.yaml -n ch10\nkubectl wait --for=condition=Ready pod/safe -n ch10 --timeout=120s\nkubectl exec safe -n ch10 -- id"
+      },
+      "lines": [
+        {
+          "code": "cat > safe.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま safe.yaml というファイルに書く"
+        },
+        {
+          "code": "apiVersion: v1",
+          "text": "Pod のある API"
+        },
+        {
+          "code": "kind: Pod",
+          "text": "Pod を作る"
+        },
+        {
+          "code": "metadata:",
+          "text": "呼び名など"
+        },
+        {
+          "code": "  name: safe",
+          "text": "呼び名は safe"
+        },
+        {
+          "code": "spec:",
+          "text": "中身"
+        },
+        {
+          "code": "  automountServiceAccountToken: false",
+          "text": "トークンを置かない"
+        },
+        {
+          "code": "  securityContext:",
+          "text": "Pod 全体の守り"
+        },
+        {
+          "code": "    runAsNonRoot: true",
+          "text": "root で動こうとしたら、動かさない"
+        },
+        {
+          "code": "    runAsUser: 1000",
+          "text": "利用者の番号 1000 で動かす"
+        },
+        {
+          "code": "    seccompProfile:",
+          "text": "使えるしくみ (システムコール) を絞る設定"
+        },
+        {
+          "code": "      type: RuntimeDefault",
+          "text": "コンテナの動かし手 (containerd) の、ふつうの絞り方を使う"
+        },
+        {
+          "code": "  containers:",
+          "text": "コンテナたち"
+        },
+        {
+          "code": "  - name: app",
+          "text": "コンテナの呼び名"
+        },
+        {
+          "code": "    image: busybox:1.37",
+          "text": "小さな道具のイメージ"
+        },
+        {
+          "code": "    command: ['sh', '-c', 'sleep 3600']",
+          "text": "1 時間待つだけ"
+        },
+        {
+          "code": "    securityContext:",
+          "text": "このコンテナの守り"
+        },
+        {
+          "code": "      allowPrivilegeEscalation: false",
+          "text": "動いている途中で、強い利用者に上がらせない"
+        },
+        {
+          "code": "      readOnlyRootFilesystem: true",
+          "text": "イメージのファイルを書き換えさせない"
+        },
+        {
+          "code": "      capabilities:",
+          "text": "root の力を細かく分けたもの"
+        },
+        {
+          "code": "        drop: ['ALL']",
+          "text": "全部捨てる"
+        },
+        {
+          "code": "    volumeMounts:",
+          "text": "書いてよい場所だけ足す"
+        },
+        {
+          "code": "    - name: tmp",
+          "text": "下の tmp を"
+        },
+        {
+          "code": "      mountPath: /tmp",
+          "text": "/tmp に付ける"
+        },
+        {
+          "code": "  volumes:",
+          "text": "使う置き場"
+        },
+        {
+          "code": "  - name: tmp",
+          "text": "呼び名は tmp"
+        },
+        {
+          "code": "    emptyDir: {}",
+          "text": "Pod が消えるまでの、書ける置き場"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "kubectl apply -f safe.yaml -n ch10",
+          "text": "Pod を作る"
+        },
+        {
+          "code": "kubectl wait --for=condition=Ready pod/safe -n ch10 --timeout=120s",
+          "text": "safe が使えるようになるまで待つ"
+        },
+        {
+          "code": "kubectl exec safe -n ch10 -- id",
+          "text": "どの利用者で動いているかを出す"
+        }
+      ],
+      "output": "pod/safe created\npod/safe condition met\nuid=1000 gid=0(root) groups=0(root)",
+      "read": "uid=1000 で動いています。gid=0 は、runAsGroup を書かなかったときの既定の root の組です (runAsGroup で替えられます)。",
+      "trouble": [
+        {
+          "symptom": "toomanyrequests や 429 と出る",
+          "check": "kubectl describe の Events で、Failed to pull image の行の終わりを見る",
+          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る。短い「429 Too Many Requests」だけのときは、使いすぎを防ぐ別の上限なので、数分待ってからもう一度行う"
+        },
+        {
+          "symptom": "CreateContainerConfigError になる",
+          "check": "kubectl describe pod safe -n ch10 の Events を見る",
+          "fix": "runAsUser の行が抜けると、root で動くイメージは runAsNonRoot で止まる。行を足して作り直す"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/tasks/configure-pod-container/security-context/"
+    },
+    {
+      "id": "safe-check",
+      "text": "わざと、safe の中で、書けない所に書き、無いトークンを読みます。最後に、2 つの Pod の力の量を比べます。",
+      "why": "書いた守りが、本当に効いているかを、自分の目で見るためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl exec safe -n ch10 -- touch /hello\nkubectl exec safe -n ch10 -- touch /tmp/hello\nkubectl exec safe -n ch10 -- ls /var/run/secrets/kubernetes.io/serviceaccount\nkubectl exec safe -n ch10 -- grep CapEff /proc/1/status\nkubectl exec plain -n ch10 -- grep CapEff /proc/1/status"
+      },
+      "lines": [
+        {
+          "code": "kubectl exec safe -n ch10 -- touch /hello",
+          "text": "イメージの場所 (/) にファイルを作ろうとする"
+        },
+        {
+          "code": "kubectl exec safe -n ch10 -- touch /tmp/hello",
+          "text": "書いてよい /tmp に作る"
+        },
+        {
+          "code": "kubectl exec safe -n ch10 -- ls /var/run/secrets/kubernetes.io/serviceaccount",
+          "text": "トークンの置き場を出そうとする"
+        },
+        {
+          "code": "kubectl exec safe -n ch10 -- grep CapEff /proc/1/status",
+          "text": "safe のアプリの力の量を出す"
+        },
+        {
+          "code": "kubectl exec plain -n ch10 -- grep CapEff /proc/1/status",
+          "text": "plain のアプリの力の量を出す"
+        }
+      ],
+      "output": "touch: /hello: Read-only file system\ncommand terminated with exit code 1\nls: /var/run/secrets/kubernetes.io/serviceaccount: No such file or directory\ncommand terminated with exit code 1\nCapEff:\t0000000000000000\nCapEff:\t00000000a80425fb",
+      "read": "打った行の 1 つめは Read-only file system、3 つめは No such file or directory で断られ、2 つめ (/tmp に作る) は何も出さずに通ります。CapEff は、持っている力を 16 進数の札で並べたものです。safe は全部 0 (何も無い)、plain は 0 でない数で、いくつも持っています。command terminated with exit code 1 は、中の命令が失敗したという印です。",
+      "trouble": [
+        {
+          "symptom": "1 行目が通ってしまう",
+          "check": "kubectl get pod safe -n ch10 -o yaml | grep readOnly を打つ",
+          "fix": "readOnlyRootFilesystem の行が無い。safe.yaml を見直し、Pod を消して作り直す"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/tasks/configure-pod-container/security-context/"
+    },
+    {
+      "id": "psa",
+      "text": "名前空間に札を付けて、決まりに合わない Pod を、入口で断らせます (Pod Security Admission)。",
+      "why": "Pod Security は、3 つめの関所 (受け入れの検査) です。restricted は、いちばん厳しい決まりです。札の enforce は断る、warn は警告だけ出す、audit は記録だけ残す、という意味です。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl create namespace ch10-strict\nkubectl label namespace ch10-strict pod-security.kubernetes.io/enforce=restricted pod-security.kubernetes.io/warn=restricted\nkubectl wait --for=create serviceaccount/default -n ch10-strict --timeout=60s\nkubectl run plain -n ch10-strict --image=nginx:1.27-alpine\nkubectl apply -f safe.yaml -n ch10-strict\nkubectl wait --for=condition=Ready pod/safe -n ch10-strict --timeout=120s\nkubectl get pods -n ch10-strict"
+      },
+      "lines": [
+        {
+          "code": "kubectl create namespace ch10-strict",
+          "text": "名前空間 ch10-strict を作る"
+        },
+        {
+          "code": "kubectl label namespace ch10-strict pod-security.kubernetes.io/enforce=restricted pod-security.kubernetes.io/warn=restricted",
+          "text": "restricted に合わない Pod を断り、警告も出す札を付ける"
+        },
+        {
+          "code": "kubectl wait --for=create serviceaccount/default -n ch10-strict --timeout=60s",
+          "text": "Pod を作れるようになるまで待つ"
+        },
+        {
+          "code": "kubectl run plain -n ch10-strict --image=nginx:1.27-alpine",
+          "text": "守りを書いていない Pod を作ろうとする"
+        },
+        {
+          "code": "kubectl apply -f safe.yaml -n ch10-strict",
+          "text": "守りを固めた safe を作る"
+        },
+        {
+          "code": "kubectl wait --for=condition=Ready pod/safe -n ch10-strict --timeout=120s",
+          "text": "safe が使えるようになるまで待つ"
+        },
+        {
+          "code": "kubectl get pods -n ch10-strict",
+          "text": "ch10-strict の Pod を出す"
+        }
+      ],
+      "output": "namespace/ch10-strict created\nnamespace/ch10-strict labeled\nserviceaccount/default condition met\nError from server (Forbidden): pods \"plain\" is forbidden: violates PodSecurity \"restricted:latest\": allowPrivilegeEscalation != false (container \"plain\" must set securityContext.allowPrivilegeEscalation=false), unrestricted capabilities (container \"plain\" must set securityContext.capabilities.drop=[\"ALL\"]), runAsNonRoot != true (pod or container \"plain\" must set securityContext.runAsNonRoot=true), seccompProfile (pod or container \"plain\" must set securityContext.seccompProfile.type to \"RuntimeDefault\" or \"Localhost\")\npod/safe created\npod/safe condition met\nNAME   READY   STATUS    RESTARTS   AGE\nsafe   1/1     Running   0          2s",
+      "read": "4 行目は Forbidden で、violates PodSecurity \"restricted:latest\" のあとに、足りない 4 つ (allowPrivilegeEscalation・capabilities・runAsNonRoot・seccompProfile) と、どう書けばよいかが並びます。safe は通ります。restricted:latest の latest は、今の版の決まりという意味で、札で版を決めることもできます。k3s は、初めは札の無い名前空間を断りません。",
+      "trouble": [
+        {
+          "symptom": "plain が作れてしまう",
+          "check": "kubectl get namespace ch10-strict --show-labels を打つ",
+          "fix": "札のつづりを見直し、label の行を打ち直す"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/security/pod-security-admission/"
+    },
+    {
+      "id": "psa-dry-run",
+      "text": "札を付ける前に、今ある Pod が決まりに合うかを、試しだけで見ます。",
+      "why": "いきなり enforce を付けても、動いている Pod は止まりません。ただ、作り直す時に断られます。先に試すと、直すものが分かります。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl label namespace ch10 pod-security.kubernetes.io/enforce=restricted --dry-run=server\nkubectl label namespace ch10 pod-security.kubernetes.io/enforce=baseline --dry-run=server"
+      },
+      "lines": [
+        {
+          "code": "kubectl label namespace ch10 pod-security.kubernetes.io/enforce=restricted --dry-run=server",
+          "text": "ch10 に restricted の札を付けたらどうなるかを、試しだけで見る"
+        },
+        {
+          "code": "kubectl label namespace ch10 pod-security.kubernetes.io/enforce=baseline --dry-run=server",
+          "text": "ゆるめの baseline ならどうかを見る"
+        }
+      ],
+      "output": "Warning: existing pods in namespace \"ch10\" violate the new PodSecurity enforce level \"restricted:latest\"\nWarning: plain: allowPrivilegeEscalation != false, unrestricted capabilities, runAsNonRoot != true, seccompProfile\nnamespace/ch10 labeled (server dry run)\nnamespace/ch10 labeled (server dry run)",
+      "read": "restricted では、plain が合わないという Warning が出ます。safe の名前は出ません。baseline (よくある危ないことだけを止める決まり) では、警告が出ません。(server dry run) は、クラスターで試しただけで、札は付いていないという意味です。新しい名前空間なら warn から付けて、警告が消えてから enforce に進めます。",
+      "trouble": [
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/tasks/configure-pod-container/enforce-standards-namespace-labels/"
+    },
+    {
+      "id": "break",
+      "text": "ここで休めます。休む人は、exit で出てから、ホストでこの行を打ちます。休まない人は、打たずに印を付けて先へ進みます。",
+      "why": "長い章なので、区切りを置くためです。止めても、作ったものとファイルは残ります。再起動と同じことが起きるので、Pod の中のコンテナは始め直され、Pod の住所も変わります。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass stop kcna"
+      },
+      "lines": [
+        {
+          "code": "multipass stop kcna",
+          "text": "kcna を止める。動いている (Running) ときだけ打てる"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "何もエラーが出なければ止まっています。続けるときは、ホストで multipass shell kcna を打つと、動かして中に入れます。入ったら cd ~/ch10 を打ちます。TOKEN と kr は消えていますが、この先では使いません。戻った直後の 1〜2 分は、一覧が止める前の古い様子のことがあります。少し待ってもう一度見ます。",
+      "trouble": [
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "activating なら、1 分ほど待つ"
+        },
+        {
+          "symptom": "No such file or directory と出る",
+          "check": "pwd を打つ",
+          "fix": "作業のフォルダにいない。cd で移る"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/stop/"
+    },
+    {
+      "id": "debug-order",
+      "text": "ここから後半です。動かないものを直すときは、いつも同じ順で見ます。①kubectl get pods で STATUS と RESTARTS、②kubectl describe pod と kubectl events で、クラスターが残した出来事、③kubectl logs でアプリの記録 (始め直したあとなら --previous で前の回)、④それでも分からなければ、kubectl exec や kubectl debug で中に入る、です。",
+      "why": "STATUS で「どの段で止まったか」が分かります。取ってくる段 (ErrImagePull)、置き場所を決める段 (Pending)、始める前 (CreateContainerConfigError)、動いたあと (Error・OOMKilled と RESTARTS の増加、CrashLoopBackOff) で、見る所が違います。",
+      "source": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-pods/"
+    },
+    {
+      "id": "fix-image",
+      "text": "わざと、無い版のイメージで Deployment を作り、読む順のとおりに原因を探します。1 分ほどかかります。",
+      "why": "いちばんよくある失敗です。①の STATUS と、②の出来事で、取ってこられないことと、その理由が分かります。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl create deployment broken --image=nginx:no-such-tag -n ch10\nfor i in $(seq 30); do kubectl get pods -l app=broken -n ch10 --no-headers | grep -q -E 'ErrImagePull|ImagePullBackOff' && break; sleep 2; done\nkubectl get pods -l app=broken -n ch10\nkubectl events -n ch10 --types=Warning | grep broken"
+      },
+      "lines": [
+        {
+          "code": "kubectl create deployment broken --image=nginx:no-such-tag -n ch10",
+          "text": "無い版 (no-such-tag) のイメージで作る"
+        },
+        {
+          "code": "for i in $(seq 30); do kubectl get pods -l app=broken -n ch10 --no-headers | grep -q -E 'ErrImagePull|ImagePullBackOff' && break; sleep 2; done",
+          "text": "取ってこられないと分かるまで待つ (最大 1 分)"
+        },
+        {
+          "code": "kubectl get pods -l app=broken -n ch10",
+          "text": "① STATUS を見る"
+        },
+        {
+          "code": "kubectl events -n ch10 --types=Warning | grep broken",
+          "text": "② 警告の出来事のうち、broken の分を出す"
+        }
+      ],
+      "output": "deployment.apps/broken created\nNAME                      READY   STATUS         RESTARTS   AGE\nbroken-7644c7fcc9-nd7hm   0/1     ErrImagePull   0          5s\n3s          Warning   Failed   Pod/broken-7644c7fcc9-nd7hm   Failed to pull image \"nginx:no-such-tag\": rpc error: code = NotFound desc = failed to pull and unpack image \"docker.io/library/nginx:no-such-tag\": failed to resolve reference \"docker.io/library/nginx:no-such-tag\": docker.io/library/nginx:no-such-tag: not found\n3s          Warning   Failed   Pod/broken-7644c7fcc9-nd7hm   Error: ErrImagePull\n2s          Warning   Failed   Pod/broken-7644c7fcc9-nd7hm   Error: ImagePullBackOff",
+      "read": "STATUS は ErrImagePull (取れなかった) か ImagePullBackOff (間をおいて取り直している) です。出来事の Failed の行の終わりに not found とあり、その版が無いことが分かります。ほかに、名前のつづり違い、非公開の置き場で鍵が無い (unauthorized)、回数の上限 (429) もここに出ます。",
+      "trouble": [
+        {
+          "symptom": "toomanyrequests や 429 と出る",
+          "check": "kubectl describe の Events で、Failed to pull image の行の終わりを見る",
+          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る。短い「429 Too Many Requests」だけのときは、使いすぎを防ぐ別の上限なので、数分待ってからもう一度行う"
+        },
+        {
+          "symptom": "grep の行が何も出さない",
+          "check": "kubectl events -n ch10 を打つ",
+          "fix": "まだ出来事が出ていない。10 秒待ってもう一度打つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-pods/"
+    },
+    {
+      "id": "fix-image-set",
+      "text": "正しい版に差し替えて、直ったことを確かめます。",
+      "why": "Deployment なら、壊れた Pod を手で消さなくても、差し替えるだけで作り直されます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl set image deployment/broken nginx=nginx:1.27-alpine -n ch10\nkubectl rollout status deployment/broken -n ch10 --timeout=120s\nkubectl get pods -l app=broken -n ch10"
+      },
+      "lines": [
+        {
+          "code": "kubectl set image deployment/broken nginx=nginx:1.27-alpine -n ch10",
+          "text": "コンテナ nginx のイメージを差し替える"
+        },
+        {
+          "code": "kubectl rollout status deployment/broken -n ch10 --timeout=120s",
+          "text": "入れ替えが終わるまで待つ"
+        },
+        {
+          "code": "kubectl get pods -l app=broken -n ch10",
+          "text": "STATUS を見る"
+        }
+      ],
+      "output": "deployment.apps/broken image updated\nWaiting for deployment \"broken\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"broken\" rollout to finish: 1 old replicas are pending termination...\nWaiting for deployment \"broken\" rollout to finish: 1 old replicas are pending termination...\ndeployment \"broken\" successfully rolled out\nNAME                      READY   STATUS        RESTARTS   AGE\nbroken-655b68f88c-hgj8v   1/1     Running       0          3s\nbroken-7644c7fcc9-nd7hm   0/1     Terminating   0          10s",
+      "read": "successfully rolled out のあと、新しい Pod の STATUS が Running になります。古い Pod は、Terminating (消える途中) で並ぶか、もう消えています。コンテナの呼び名 nginx は、kubectl create deployment がイメージの名前から付けたものです。",
+      "trouble": [
+        {
+          "symptom": "container nginx is not valid と出る",
+          "check": "kubectl get deployment broken -n ch10 -o yaml | grep name: を打つ",
+          "fix": "コンテナの呼び名が違う。出た名前に替えて打ち直す"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_set/kubectl_set_image/"
+    },
+    {
+      "id": "broken-set",
+      "text": "課題のために、わざと壊れたものを、名前空間 practice に 5 つまとめて作ります。1 分半ほどかかります。",
+      "why": "1 つずつ違う段で止まるように作ってあります。直すのは課題で行います (答えは折りたたんであります)。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl create namespace practice\nkubectl wait --for=create serviceaccount/default -n practice --timeout=60s\ncat > broken.yaml <<'EOF'\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: crash\nspec:\n  selector:\n    matchLabels:\n      app: crash\n  template:\n    metadata:\n      labels:\n        app: crash\n    spec:\n      containers:\n      - name: app\n        image: busybox:1.37\n        command: ['sh', '-c', 'echo starting; test -n \"$MODE\" || { echo MODE is not set; exit 1; }; echo mode is $MODE; sleep 3600']\n---\napiVersion: v1\nkind: Pod\nmetadata:\n  name: big\nspec:\n  containers:\n  - name: app\n    image: busybox:1.37\n    command: ['sleep', '3600']\n    resources:\n      requests:\n        cpu: '8'\n---\napiVersion: v1\nkind: Pod\nmetadata:\n  name: hungry\nspec:\n  containers:\n  - name: app\n    image: busybox:1.37\n    command: ['sh', '-c', 'head -c 100m /dev/zero | tail; sleep 3600']\n    resources:\n      limits:\n        memory: 32Mi\n---\napiVersion: v1\nkind: Pod\nmetadata:\n  name: needs-config\nspec:\n  containers:\n  - name: app\n    image: busybox:1.37\n    command: ['sh', '-c', 'echo color is $COLOR; sleep 3600']\n    env:\n    - name: COLOR\n      valueFrom:\n        configMapKeyRef:\n          name: app-settings\n          key: color\n---\napiVersion: v1\nkind: Pod\nmetadata:\n  name: web\n  labels:\n    app: web\nspec:\n  containers:\n  - name: web\n    image: nginx:1.27-alpine\n---\napiVersion: v1\nkind: Service\nmetadata:\n  name: web\nspec:\n  selector:\n    app: website\n  ports:\n  - port: 80\nEOF\nkubectl apply -f broken.yaml -n practice\nfor i in $(seq 60); do [ \"$(kubectl get pods -n practice --no-headers | awk '$4 >= 2' | wc -l)\" -ge 2 ] && break; sleep 2; done\nkubectl get pods -n practice"
+      },
+      "lines": [
+        {
+          "code": "kubectl create namespace practice",
+          "text": "名前空間 practice を作る"
+        },
+        {
+          "code": "kubectl wait --for=create serviceaccount/default -n practice --timeout=60s",
+          "text": "Pod を作れるようになるまで待つ"
+        },
+        {
+          "code": "cat > broken.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま broken.yaml というファイルに書く"
+        },
+        {
+          "code": "apiVersion: apps/v1",
+          "text": "1 つめ (crash): Deployment のある API"
+        },
+        {
+          "code": "kind: Deployment",
+          "text": "Deployment を作る"
+        },
+        {
+          "code": "metadata:",
+          "text": "呼び名など"
+        },
+        {
+          "code": "  name: crash",
+          "text": "呼び名は crash"
+        },
+        {
+          "code": "spec:",
+          "text": "中身"
+        },
+        {
+          "code": "  selector:",
+          "text": "受け持つ Pod の選び方"
+        },
+        {
+          "code": "    matchLabels:",
+          "text": "札で選ぶ"
+        },
+        {
+          "code": "      app: crash",
+          "text": "app=crash の Pod"
+        },
+        {
+          "code": "  template:",
+          "text": "作る Pod のひな型"
+        },
+        {
+          "code": "    metadata:",
+          "text": "Pod の呼び名など"
+        },
+        {
+          "code": "      labels:",
+          "text": "Pod の札"
+        },
+        {
+          "code": "        app: crash",
+          "text": "app=crash"
+        },
+        {
+          "code": "    spec:",
+          "text": "Pod の中身"
+        },
+        {
+          "code": "      containers:",
+          "text": "コンテナたち"
+        },
+        {
+          "code": "      - name: app",
+          "text": "コンテナの呼び名"
+        },
+        {
+          "code": "        image: busybox:1.37",
+          "text": "小さな道具のイメージ"
+        },
+        {
+          "code": "        command: ['sh', '-c', 'echo starting; test -n \"$MODE\" || { echo MODE is not set; exit 1; }; echo mode is $MODE; sleep 3600']",
+          "text": "環境変数 MODE が空なら、記録に書いて失敗で終わる"
+        },
+        {
+          "code": "---",
+          "text": "ここで区切り、次のものを書く"
+        },
+        {
+          "code": "apiVersion: v1",
+          "text": "2 つめ (big): Pod のある API"
+        },
+        {
+          "code": "kind: Pod",
+          "text": "Pod を作る"
+        },
+        {
+          "code": "metadata:",
+          "text": "呼び名など"
+        },
+        {
+          "code": "  name: big",
+          "text": "呼び名は big"
+        },
+        {
+          "code": "spec:",
+          "text": "中身"
+        },
+        {
+          "code": "  containers:",
+          "text": "コンテナたち"
+        },
+        {
+          "code": "  - name: app",
+          "text": "コンテナの呼び名"
+        },
+        {
+          "code": "    image: busybox:1.37",
+          "text": "小さな道具のイメージ"
+        },
+        {
+          "code": "    command: ['sleep', '3600']",
+          "text": "1 時間待つだけ"
+        },
+        {
+          "code": "    resources:",
+          "text": "使う量"
+        },
+        {
+          "code": "      requests:",
+          "text": "置き場所を決める時に、空いていると約束させる量"
+        },
+        {
+          "code": "        cpu: '8'",
+          "text": "CPU を 8 コア"
+        },
+        {
+          "code": "---",
+          "text": "区切り"
+        },
+        {
+          "code": "apiVersion: v1",
+          "text": "3 つめ (hungry): Pod のある API"
+        },
+        {
+          "code": "kind: Pod",
+          "text": "Pod を作る"
+        },
+        {
+          "code": "metadata:",
+          "text": "呼び名など"
+        },
+        {
+          "code": "  name: hungry",
+          "text": "呼び名は hungry"
+        },
+        {
+          "code": "spec:",
+          "text": "中身"
+        },
+        {
+          "code": "  containers:",
+          "text": "コンテナたち"
+        },
+        {
+          "code": "  - name: app",
+          "text": "コンテナの呼び名"
+        },
+        {
+          "code": "    image: busybox:1.37",
+          "text": "小さな道具のイメージ"
+        },
+        {
+          "code": "    command: ['sh', '-c', 'head -c 100m /dev/zero | tail; sleep 3600']",
+          "text": "100 MB の 0 を流し、tail に全部ためさせる (メモリを 100 MB ほど使う)"
+        },
+        {
+          "code": "    resources:",
+          "text": "使う量"
+        },
+        {
+          "code": "      limits:",
+          "text": "超えてはいけない量"
+        },
+        {
+          "code": "        memory: 32Mi",
+          "text": "メモリは 32 MiB まで"
+        },
+        {
+          "code": "---",
+          "text": "区切り"
+        },
+        {
+          "code": "apiVersion: v1",
+          "text": "4 つめ (needs-config): Pod のある API"
+        },
+        {
+          "code": "kind: Pod",
+          "text": "Pod を作る"
+        },
+        {
+          "code": "metadata:",
+          "text": "呼び名など"
+        },
+        {
+          "code": "  name: needs-config",
+          "text": "呼び名は needs-config"
+        },
+        {
+          "code": "spec:",
+          "text": "中身"
+        },
+        {
+          "code": "  containers:",
+          "text": "コンテナたち"
+        },
+        {
+          "code": "  - name: app",
+          "text": "コンテナの呼び名"
+        },
+        {
+          "code": "    image: busybox:1.37",
+          "text": "小さな道具のイメージ"
+        },
+        {
+          "code": "    command: ['sh', '-c', 'echo color is $COLOR; sleep 3600']",
+          "text": "環境変数 COLOR を書いて、待つ"
+        },
+        {
+          "code": "    env:",
+          "text": "環境変数"
+        },
+        {
+          "code": "    - name: COLOR",
+          "text": "COLOR を"
+        },
+        {
+          "code": "      valueFrom:",
+          "text": "ほかから取る"
+        },
+        {
+          "code": "        configMapKeyRef:",
+          "text": "ConfigMap から"
+        },
+        {
+          "code": "          name: app-settings",
+          "text": "app-settings の"
+        },
+        {
+          "code": "          key: color",
+          "text": "color の値"
+        },
+        {
+          "code": "---",
+          "text": "区切り"
+        },
+        {
+          "code": "apiVersion: v1",
+          "text": "5 つめ (web): Pod のある API"
+        },
+        {
+          "code": "kind: Pod",
+          "text": "Pod を作る"
+        },
+        {
+          "code": "metadata:",
+          "text": "呼び名など"
+        },
+        {
+          "code": "  name: web",
+          "text": "呼び名は web"
+        },
+        {
+          "code": "  labels:",
+          "text": "札"
+        },
+        {
+          "code": "    app: web",
+          "text": "app=web"
+        },
+        {
+          "code": "spec:",
+          "text": "中身"
+        },
+        {
+          "code": "  containers:",
+          "text": "コンテナたち"
+        },
+        {
+          "code": "  - name: web",
+          "text": "コンテナの呼び名"
+        },
+        {
+          "code": "    image: nginx:1.27-alpine",
+          "text": "Web のイメージ"
+        },
+        {
+          "code": "---",
+          "text": "区切り"
+        },
+        {
+          "code": "apiVersion: v1",
+          "text": "web の窓口: Service のある API"
+        },
+        {
+          "code": "kind: Service",
+          "text": "Service を作る"
+        },
+        {
+          "code": "metadata:",
+          "text": "呼び名など"
+        },
+        {
+          "code": "  name: web",
+          "text": "呼び名は web"
+        },
+        {
+          "code": "spec:",
+          "text": "中身"
+        },
+        {
+          "code": "  selector:",
+          "text": "つなぐ Pod の選び方"
+        },
+        {
+          "code": "    app: website",
+          "text": "app=website の Pod につなぐ"
+        },
+        {
+          "code": "  ports:",
+          "text": "受ける番号"
+        },
+        {
+          "code": "  - port: 80",
+          "text": "80 番"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "kubectl apply -f broken.yaml -n practice",
+          "text": "5 つと窓口を作る"
+        },
+        {
+          "code": "for i in $(seq 60); do [ \"$(kubectl get pods -n practice --no-headers | awk '$4 >= 2' | wc -l)\" -ge 2 ] && break; sleep 2; done",
+          "text": "crash と hungry の 2 つが、2 回以上始め直すまで待つ (最大 2 分)"
+        },
+        {
+          "code": "kubectl get pods -n practice",
+          "text": "① STATUS を見る"
+        }
+      ],
+      "output": "namespace/practice created\nserviceaccount/default condition met\ndeployment.apps/crash created\npod/big created\npod/hungry created\npod/needs-config created\npod/web created\nservice/web created\nNAME                     READY   STATUS                       RESTARTS      AGE\nbig                      0/1     Pending                      0             20s\ncrash-659d69dc46-cqmzb   0/1     Error                        2 (16s ago)   20s\nhungry                   1/1     Running                      2 (14s ago)   20s\nneeds-config             0/1     CreateContainerConfigError   0             20s\nweb                      1/1     Running                      0             20s",
+      "read": "web は Running、big は Pending、needs-config は CreateContainerConfigError です。crash と hungry は RESTARTS (始め直した回数) が増えていき、STATUS は見た時によって Error・OOMKilled・Running のどれかです (この出力では crash が Error、hungry が始め直した直後の Running)。打つ時によっては、始め直しの間をおいている印の CrashLoopBackOff と出ます。どちらも「動いては止まるのをくり返している」という意味です。web の窓口は Running でも、まだ壊れています (課題で探します)。",
+      "trouble": [
+        {
+          "symptom": "toomanyrequests や 429 と出る",
+          "check": "kubectl describe の Events で、Failed to pull image の行の終わりを見る",
+          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る。短い「429 Too Many Requests」だけのときは、使いすぎを防ぐ別の上限なので、数分待ってからもう一度行う"
+        },
+        {
+          "symptom": "STATUS が ContainerCreating のまま",
+          "check": "30 秒待ってもう一度打つ",
+          "fix": "イメージを取っている途中"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-pods/"
+    },
+    {
+      "id": "broken-read",
+      "text": "5 つの様子を、まとめて読みます。直し方は、まだ打ちません。",
+      "why": "②の出来事と、Pod の中に残る「止まった理由」で、どの段の問題かを当てるためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl events -n practice --types=Warning\nkubectl get pods -n practice -o custom-columns='NAME:.metadata.name,WAITING:.status.containerStatuses[0].state.waiting.reason,LAST:.status.containerStatuses[0].lastState.terminated.reason'\nkubectl get endpointslices -n practice"
+      },
+      "lines": [
+        {
+          "code": "kubectl events -n practice --types=Warning",
+          "text": "警告の出来事を出す"
+        },
+        {
+          "code": "kubectl get pods -n practice -o custom-columns='NAME:.metadata.name,WAITING:.status.containerStatuses[0].state.waiting.reason,LAST:.status.containerStatuses[0].lastState.terminated.reason'",
+          "text": "Pod ごとに、今待っている理由と、前の回が止まった理由を並べる"
+        },
+        {
+          "code": "kubectl get endpointslices -n practice",
+          "text": "窓口の先につながる Pod の住所を出す"
+        }
+      ],
+      "output": "LAST SEEN          TYPE      REASON             OBJECT                       MESSAGE\n21s                Warning   FailedScheduling   Pod/big                      0/1 nodes are available: 1 Insufficient cpu. no new claims to deallocate, preemption: 0/1 nodes are available: 1 Preemption is not helpful for scheduling.\n7s (x3 over 19s)   Warning   Failed             Pod/needs-config             Error: configmap \"app-settings\" not found\n2s (x3 over 17s)   Warning   BackOff            Pod/crash-659d69dc46-cqmzb   Back-off restarting failed container app in pod crash-659d69dc46-cqmzb_practice(affbf4b0-7171-4a6c-8de9-15b64af239de)\n0s (x2 over 15s)   Warning   BackOff            Pod/hungry                   Back-off restarting failed container app in pod hungry_practice(d08c9ed6-27a1-4933-9507-ededfc1ecfc5)\nNAME                     WAITING                      LAST\nbig                      <none>                       <none>\ncrash-659d69dc46-cqmzb   <none>                       Error\nhungry                   <none>                       OOMKilled\nneeds-config             CreateContainerConfigError   <none>\nweb                      <none>                       <none>\nNAME        ADDRESSTYPE   PORTS     ENDPOINTS   AGE\nweb-k9khw   IPv4          <unset>   <unset>     22s",
+      "read": "big は FailedScheduling (Insufficient cpu: CPU が足りず、置ける所が無い)、needs-config は configmap \"app-settings\" not found、crash と hungry は BackOff (失敗したので、間をおいて始め直している) です。WAITING (今待っている理由) は、needs-config の CreateContainerConfigError だけです。LAST (前の回が止まった理由) は、hungry が OOMKilled (メモリの上限を超えて止められた)、crash が Error (アプリが失敗で終わった) です。窓口 web の ENDPOINTS は <unset> で、つながる Pod がありません。<none> は、その欄が無いという印です。",
+      "trouble": [
+        {
+          "symptom": "出来事が出ない",
+          "check": "kubectl get pods -n practice を打つ",
+          "fix": "まだ作っている途中。30 秒待ってもう一度打つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_events/"
+    },
+    {
+      "id": "events-keep",
+      "text": "出来事と記録が、どこに、いつまで残るかを見ます。",
+      "why": "調べるのが遅れると、手がかりが消えているからです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl get events -n ch10 --sort-by=.lastTimestamp | tail -3\nkubectl logs plain -n ch10 --tail=2 --timestamps\nsudo sh -c 'ls /var/log/pods/ch10_plain_*/plain/'"
+      },
+      "lines": [
+        {
+          "code": "kubectl get events -n ch10 --sort-by=.lastTimestamp | tail -3",
+          "text": "ch10 の出来事を古い順に並べ、終わりの 3 つ (いちばん新しい 3 つ) だけ出す"
+        },
+        {
+          "code": "kubectl logs plain -n ch10 --tail=2 --timestamps",
+          "text": "plain の記録の終わり 2 行を、時刻つきで出す"
+        },
+        {
+          "code": "sudo sh -c 'ls /var/log/pods/ch10_plain_*/plain/'",
+          "text": "ノードの、plain の記録のファイルを出す"
+        }
+      ],
+      "output": "27s         Normal    SuccessfulDelete    replicaset/broken-7644c7fcc9   Deleted pod: broken-7644c7fcc9-nd7hm\n27s         Normal    Started             pod/broken-655b68f88c-hgj8v    Container started\n27s         Normal    Created             pod/broken-655b68f88c-hgj8v    Container created\n2026-11-28T03:29:45.624214824Z 2026/11/28 03:29:45 [notice] 1#1: start worker process 30\n2026-11-28T03:29:45.624552226Z 2026/11/28 03:29:45 [notice] 1#1: start worker process 31\n0.log",
+      "read": "出来事は、初めの決まりでは 1 時間で消えます (API サーバーの --event-ttl)。記録は、ノードの /var/log/pods に、コンテナの始めた回ごとのファイル (0.log など) で置かれます。kubelet が大きさで回して古いものを消し、Pod を消すとファイルも消えます。あとで調べたいなら、記録を別の所へ集める仕組み (Fluent Bit などで送り、まとめて置く) を使います。",
+      "trouble": [
+        {
+          "symptom": "No such file or directory と出る",
+          "check": "sudo ls /var/log/pods を打つ",
+          "fix": "名前の途中が違う。ch10_plain_ で始まる名前を探す"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/cluster-administration/logging/"
+    },
+    {
+      "id": "debug",
+      "text": "わざと、シェルの入っていないコンテナに入ろうとし、代わりに kubectl debug で、道具の入ったコンテナを横に足して中を見ます。",
+      "why": "中身を絞ったイメージには、sh も ps もありません。kubectl debug は、動いている Pod に、使い捨てのコンテナ (ephemeral container) を足します。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl run quiet -n ch10 --image=rancher/mirrored-pause:3.10.2\nkubectl wait --for=condition=Ready pod/quiet -n ch10 --timeout=120s\nkubectl exec quiet -n ch10 -- sh\nkubectl debug quiet -n ch10 --image=busybox:1.37 -c dbg --target=quiet --profile=general -- ps\nkubectl wait --for=jsonpath='{.status.ephemeralContainerStatuses[0].state.terminated.reason}'=Completed pod/quiet -n ch10 --timeout=60s\nkubectl logs quiet -n ch10 -c dbg"
+      },
+      "lines": [
+        {
+          "code": "kubectl run quiet -n ch10 --image=rancher/mirrored-pause:3.10.2",
+          "text": "何もしない小さなイメージ (k3s が持っている pause) で Pod を作る"
+        },
+        {
+          "code": "kubectl wait --for=condition=Ready pod/quiet -n ch10 --timeout=120s",
+          "text": "quiet が使えるようになるまで待つ"
+        },
+        {
+          "code": "kubectl exec quiet -n ch10 -- sh",
+          "text": "中で sh を動かそうとする"
+        },
+        {
+          "code": "kubectl debug quiet -n ch10 --image=busybox:1.37 -c dbg --target=quiet --profile=general -- ps",
+          "text": "道具の入った busybox を dbg として足し、quiet の中のものを ps で並べる"
+        },
+        {
+          "code": "kubectl wait --for=jsonpath='{.status.ephemeralContainerStatuses[0].state.terminated.reason}'=Completed pod/quiet -n ch10 --timeout=60s",
+          "text": "dbg が終わるまで待つ"
+        },
+        {
+          "code": "kubectl logs quiet -n ch10 -c dbg",
+          "text": "dbg の出力を出す"
+        }
+      ],
+      "output": "pod/quiet created\npod/quiet condition met\nerror: Internal error occurred: Internal error occurred: error executing command in container: failed to exec in container: failed to start exec \"343dbee3d6c0cf4f70715963f34b849698dab3de20c4c2823dd3aa02065caa6d\": OCI runtime exec failed: exec failed: unable to start container process: exec: \"sh\": executable file not found in $PATH\nTargeting container \"quiet\". If you don't see processes from this container it may be because the container runtime doesn't support this feature.\npod/quiet condition met\nPID   USER     TIME  COMMAND\n    1 65535     0:00 /pause\n   13 root      0:00 ps",
+      "read": "exec は executable file not found で断られます。kubectl debug の --target は、相手のコンテナと同じプロセスの空間に入る指定です。ps には、相手の /pause (利用者の番号 65535 で動く) と、自分の ps が並びます。--profile=general は、道具がふつうに動く守りの強さです (restricted の名前空間では --profile=restricted にします)。足したコンテナは消せず、Pod を消すまで残ります。対話で入るときは -it を付けて、exit で出ます。",
+      "trouble": [
+        {
+          "symptom": "Targeting container と出たあと、何も出ない",
+          "check": "kubectl get pod quiet -n ch10 -o yaml | grep -A3 ephemeralContainerStatuses を打つ",
+          "fix": "まだ動いていない。待つ行をもう一度打つ"
+        },
+        {
+          "symptom": "toomanyrequests や 429 と出る",
+          "check": "kubectl describe の Events で、Failed to pull image の行の終わりを見る",
+          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る。短い「429 Too Many Requests」だけのときは、使いすぎを防ぐ別の上限なので、数分待ってからもう一度行う"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-running-pod/"
+    },
+    {
+      "id": "check-before-delete",
+      "text": "名前空間を消す前に、どのマシンにいるかを見ます。kcna と出なければ、次の手順を打ちません。",
+      "why": "名前空間と、その中の Role・RoleBinding・ServiceAccount・Pod を消すためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "hostname"
+      },
+      "lines": [
+        {
+          "code": "hostname",
+          "text": "このマシンの名前を出す"
+        }
+      ],
+      "output": "kcna",
+      "read": "kcna と出れば、仮想マシンの中です。",
+      "trouble": [
+        {
+          "symptom": "kcna ではない名前が出る",
+          "check": "行の頭が ubuntu@kcna かを見る",
+          "fix": "ホストにいる。multipass shell kcna で入り、もう一度打つ"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man1/hostname.1.html"
+    },
+    {
+      "id": "delete-namespace",
+      "text": "名前空間 ch10 と ch10-strict を消します。前の手順で kcna と出たときだけ打ちます。practice は、課題で使うので残します。",
+      "why": "名前空間の中の決まり (Role・RoleBinding) と ServiceAccount も、一緒に消えます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cd ~\nkubectl delete namespace ch10 ch10-strict\nkubectl get namespaces\nkubectl get rolebindings,serviceaccounts -n ch10"
+      },
+      "lines": [
+        {
+          "code": "cd ~",
+          "text": "ホームへ戻る"
+        },
+        {
+          "code": "kubectl delete namespace ch10 ch10-strict",
+          "text": "2 つの名前空間を、中のものごと消す。1 分ほどかかることがある"
+        },
+        {
+          "code": "kubectl get namespaces",
+          "text": "残りを出す"
+        },
+        {
+          "code": "kubectl get rolebindings,serviceaccounts -n ch10",
+          "text": "ch10 の RoleBinding と ServiceAccount が残っていないかを見る"
+        }
+      ],
+      "output": "namespace \"ch10\" deleted\nnamespace \"ch10-strict\" deleted\nNAME              STATUS   AGE\ndefault           Active   33m\nkube-node-lease   Active   33m\nkube-public       Active   33m\nkube-system       Active   33m\npractice          Active   76s\nNo resources found in ch10 namespace.",
+      "read": "初めからある 4 つと practice だけになり、最後の行が No resources found なら片付いています。この章ではクラスター全体の決まり (ClusterRole・ClusterRoleBinding) を作っていないので、名前空間を消せば残りません。",
+      "trouble": [
+        {
+          "symptom": "消す行がしばらく止まる",
+          "check": "1 分ほど待つ",
+          "fix": "中の Pod が終わるのを待っている"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/"
+    },
+    {
+      "id": "leave",
+      "text": "仮想マシンから出ます。",
+      "why": "次は、ホストで控えを取るためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "exit"
+      },
+      "lines": [
+        {
+          "code": "exit",
+          "text": "今の端末を終える。仮想マシンは動き続ける"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "行の頭が、自分の PC のものに戻ります。",
+      "trouble": [
+        {
+          "symptom": "行の頭が ubuntu@kcna のまま",
+          "check": "もう一度見る",
+          "fix": "もう一度 exit を打つ"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man1/bash.1.html"
+    },
+    {
+      "id": "snapshot",
+      "text": "ホストで、この章を終えた状態の控えを ch10-end という名前で取り、仮想マシンに入り直します。",
+      "why": "次の章で失敗しても、ここへ戻れるようにするためです。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass stop kcna\nmultipass snapshot --name ch10-end kcna\nmultipass list --snapshots\nmultipass shell kcna"
+      },
+      "lines": [
+        {
+          "code": "multipass stop kcna",
+          "text": "止める。控えは、止まっているときだけ取れる。stop は動いている (Running) ときだけ打てる"
+        },
+        {
+          "code": "multipass snapshot --name ch10-end kcna",
+          "text": "今の状態を ch10-end という名前で控える"
+        },
+        {
+          "code": "multipass list --snapshots",
+          "text": "控えの一覧を出す"
+        },
+        {
+          "code": "multipass shell kcna",
+          "text": "止まっている kcna を動かし、中に入り直す"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "一覧に ch10-end が並べば取れています。戻すときは、止めてから multipass restore kcna.ch10-end を打ちます。今の状態も控えるかを聞かれたら、要らなければ no と答えます。最後の行で、行の頭が ubuntu@kcna:~$ に変わります。課題と後片付けは、この中で続けます。",
+      "trouble": [
+        {
+          "symptom": "止まっていないので取れないと出る",
+          "check": "multipass list で State を見る",
+          "fix": "multipass stop kcna で止めてから取る"
+        },
+        {
+          "symptom": "ch10-end がもうあると出る",
+          "check": "multipass list --snapshots を打つ",
+          "fix": "前の控えを使うか、--name ch10-endb のように別の名前にする"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/snapshot/"
+    }
+  ],
+  "cleanup": [
+    {
+      "id": "check-vm",
+      "text": "仮想マシンの中で、どのマシンにいるかを見ます。kcna と出なければ止まり、multipass shell kcna で入ります。",
+      "why": "次の手順は、つないでいるクラスターのものを消します。自分の PC の別のクラスターで打たないためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "hostname"
+      },
+      "lines": [
+        {
+          "code": "hostname",
+          "text": "このマシンの名前を出す"
+        }
+      ],
+      "output": "kcna",
+      "read": "kcna と出れば、仮想マシンの中です。",
+      "trouble": [
+        {
+          "symptom": "kcna ではない名前が出る",
+          "check": "行の頭が ubuntu@kcna かを見る",
+          "fix": "ホストにいる。multipass shell kcna で入り、もう一度打つ"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man1/hostname.1.html"
+    },
+    {
+      "id": "delete-practice",
+      "text": "仮想マシンの中で、壊れたものと課題で直したものの入った、名前空間 practice を消します。",
+      "why": "次の章を、k3s の部品だけの状態から始めるためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl delete namespace practice --ignore-not-found\nkubectl get namespaces"
+      },
+      "lines": [
+        {
+          "code": "kubectl delete namespace practice --ignore-not-found",
+          "text": "practice を消す。無くてもエラーにしない (--ignore-not-found)"
+        },
+        {
+          "code": "kubectl get namespaces",
+          "text": "名前空間の一覧を出す"
+        }
+      ],
+      "output": "namespace \"practice\" deleted\nNAME              STATUS   AGE\ndefault           Active   34m\nkube-node-lease   Active   34m\nkube-public       Active   34m\nkube-system       Active   34m",
+      "read": "default と kube- で始まる 4 つだけになれば、片付いています。k3s は消しません。",
+      "trouble": [
+        {
+          "symptom": "消す行がしばらく止まる",
+          "check": "1 分ほど待つ",
+          "fix": "中の Pod が終わるのを待っている。そのまま待つ"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_delete/"
+    },
+    {
+      "id": "rest",
+      "text": "今日はここまでにするときは、exit で出てから、ホストで仮想マシンを止めます。止まっていれば (Stopped)、打ちません。",
+      "why": "動いている間は PC のメモリを使うためです。次の章でも使うので、消しません。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass stop kcna"
+      },
+      "lines": [
+        {
+          "code": "multipass stop kcna",
+          "text": "kcna を止める"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "続けるときは multipass shell kcna で、動かして中に入れます。k3s は自分で始まります。",
+      "trouble": [
+        {
+          "symptom": "止まったか分からない",
+          "check": "multipass list で State を見る",
+          "fix": "Stopped なら止まっている。Running なら、もう一度止める"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/stop/"
+    }
+  ],
+  "challenges": [
+    {
+      "task": "仮想マシンの中で、practice の Deployment crash が、始め直しをくり返しています。記録から理由を見つけ、直してください。",
+      "hint": "③の kubectl logs で、アプリが最後に書いた行を読みます。環境変数は kubectl set env で足せます。",
+      "answer": "kubectl get pods -n practice -l app=crash\nkubectl logs deployment/crash -n practice\nkubectl set env deployment/crash MODE=demo -n practice\nkubectl rollout status deployment/crash -n practice --timeout=120s\nkubectl logs deployment/crash -n practice",
+      "verify": "kubectl get pods -n practice -l app=crash で STATUS が Running、記録の終わりが mode is demo なら正解です。"
+    },
+    {
+      "task": "仮想マシンの中で、practice の Pod big が Pending のままです。理由を見つけ、CPU の約束を 100m に減らして動かしてください。",
+      "hint": "Pod の requests は、ふつうの書き換え (apply・edit) では変えられません (v1.35 からは resize という別の口もあります)。ここでは kubectl replace --force で、消して作り直します。 replace --force は、Pod を消して、同じ名前で作り直します (中身は別の Pod で、RESTARTS も 0 から数え直します)。",
+      "answer": "kubectl events -n practice --for=pod/big\nkubectl get pod big -n practice -o yaml | sed 's/cpu: \"8\"/cpu: 100m/' | kubectl replace --force -f -\nkubectl wait --for=condition=Ready pod/big -n practice --timeout=120s",
+      "verify": "kubectl get pod big -n practice で STATUS が Running なら正解です。"
+    },
+    {
+      "task": "仮想マシンの中で、practice の Pod hungry が始め直しをくり返しています。止まった理由を見つけ、メモリの上限を 256Mi に上げて動かしてください。",
+      "hint": "kubectl describe pod の Last State に、前の回が止まった理由と終わりの番号 (137) が出ます。 replace --force で作り直すと、RESTARTS は 0 に戻ります。limits だけを書いた Pod は、requests も同じ値になっているので、両方を替えます。",
+      "answer": "kubectl describe pod hungry -n practice | grep -A3 'Last State'\nkubectl get pod hungry -n practice -o yaml | sed 's/memory: 32Mi/memory: 256Mi/' | kubectl replace --force -f -\nkubectl wait --for=condition=Ready pod/hungry -n practice --timeout=120s",
+      "verify": "kubectl get pod hungry -n practice で STATUS が Running、RESTARTS が 0 なら正解です。"
+    },
+    {
+      "task": "仮想マシンの中で、practice の Pod needs-config が始まりません。足りないものを作って、動かしてください。値は blue にします。",
+      "hint": "出来事に、見つからないものの名前が出ます。足りないものを作れば、Pod は作り直さなくても自分で始まります。",
+      "answer": "kubectl events -n practice --for=pod/needs-config\nkubectl create configmap app-settings --from-literal=color=blue -n practice\nkubectl wait --for=condition=Ready pod/needs-config -n practice --timeout=120s\nkubectl logs needs-config -n practice",
+      "verify": "kubectl logs needs-config -n practice で color is blue と出れば正解です。"
+    },
+    {
+      "task": "仮想マシンの中で、practice の Pod web は Running なのに、窓口 web の先に何もつながっていません。理由を見つけ、直してください。",
+      "hint": "窓口の selector と、Pod の札 (--show-labels) を見比べます。",
+      "answer": "kubectl get endpointslices -n practice\nkubectl get pods -n practice --show-labels\nkubectl get service web -n practice -o jsonpath='{.spec.selector}{\"\\n\"}'\nkubectl patch service web -n practice -p '{\"spec\":{\"selector\":{\"app\":\"web\"}}}'\nfor i in $(seq 15); do [ -n \"$(kubectl get endpointslices -n practice -o jsonpath='{.items[0].endpoints}')\" ] && break; sleep 2; done\nkubectl get endpointslices -n practice",
+      "verify": "kubectl get endpointslices -n practice で、ENDPOINTS に Pod の住所 (10.42 で始まる) が出れば正解です。"
+    }
+  ],
+  "sources": [
+    {
+      "label": "Kubernetes: Controlling Access to the Kubernetes API",
+      "url": "https://kubernetes.io/docs/concepts/security/controlling-access/"
+    },
+    {
+      "label": "Kubernetes: Authenticating",
+      "url": "https://kubernetes.io/docs/reference/access-authn-authz/authentication/"
+    },
+    {
+      "label": "Kubernetes: Using RBAC Authorization",
+      "url": "https://kubernetes.io/docs/reference/access-authn-authz/rbac/"
+    },
+    {
+      "label": "Kubernetes: Role Based Access Control Good Practices",
+      "url": "https://kubernetes.io/docs/concepts/security/rbac-good-practices/"
+    },
+    {
+      "label": "Kubernetes: Service Accounts",
+      "url": "https://kubernetes.io/docs/concepts/security/service-accounts/"
+    },
+    {
+      "label": "Kubernetes: Configure Service Accounts for Pods",
+      "url": "https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/"
+    },
+    {
+      "label": "Kubernetes: Configure a Security Context for a Pod or Container",
+      "url": "https://kubernetes.io/docs/tasks/configure-pod-container/security-context/"
+    },
+    {
+      "label": "Kubernetes: Pod Security Standards",
+      "url": "https://kubernetes.io/docs/concepts/security/pod-security-standards/"
+    },
+    {
+      "label": "Kubernetes: Pod Security Admission",
+      "url": "https://kubernetes.io/docs/concepts/security/pod-security-admission/"
+    },
+    {
+      "label": "Kubernetes: Enforce Pod Security Standards with Namespace Labels",
+      "url": "https://kubernetes.io/docs/tasks/configure-pod-container/enforce-standards-namespace-labels/"
+    },
+    {
+      "label": "Kubernetes: Debug Pods",
+      "url": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-pods/"
+    },
+    {
+      "label": "Kubernetes: Debug Running Pods",
+      "url": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-running-pod/"
+    },
+    {
+      "label": "Kubernetes: Determine the Reason for Pod Failure",
+      "url": "https://kubernetes.io/docs/tasks/debug/debug-application/determine-reason-pod-failure/"
+    },
+    {
+      "label": "Kubernetes: Logging Architecture",
+      "url": "https://kubernetes.io/docs/concepts/cluster-administration/logging/"
+    },
+    {
+      "label": "kube-apiserver (--event-ttl)",
+      "url": "https://kubernetes.io/docs/reference/command-line-tools-reference/kube-apiserver/"
+    },
+    {
+      "label": "kubectl auth can-i",
+      "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_auth/kubectl_auth_can-i/"
+    },
+    {
+      "label": "kubectl debug",
+      "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_debug/"
+    },
+    {
+      "label": "K3s: Cluster Access",
+      "url": "https://docs.k3s.io/cluster-access"
+    },
+    {
+      "label": "Docker Hub: 取得の上限",
+      "url": "https://docs.docker.com/docker-hub/usage/"
+    },
+    {
+      "label": "Multipass: snapshot",
+      "url": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/snapshot/"
+    }
+  ]
+}

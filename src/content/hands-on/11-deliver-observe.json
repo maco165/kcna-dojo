@@ -1,0 +1,1498 @@
+{
+  "id": "deliver-observe",
+  "order": 11,
+  "title": "届ける・広げる・見る",
+  "summary": "Helm でチャートを入れて上げて戻し、同じものを Kustomize の土台と差分で書き直します。CRD で種類を足して Operator の考え方を見たあと、使用量・記録・数値でクラスターの様子を読み、部品の CNCF の段階を調べます。",
+  "goal": "Helm と Kustomize で同じアプリを入れ分け、CRD とコントローラーの役目を説明し、使用量・記録・数値を読み、部品の段階を調べられる",
+  "features": [
+    "Helm v4.3.2 を照合の値で確かめて入れ、install・upgrade・history・rollback・template を打つ",
+    "Kustomize の base と overlay で、名前空間・名前の頭・イメージ・ConfigMap の札を替える",
+    "CRD を足しても、コントローラーが無ければ何も起きない。k3s の HelmChart が Operator の例",
+    "kubectl top・logs の絞り方・/metrics の数値で、様子を読む",
+    "Prometheus・Grafana・OpenTelemetry・GitOps の役目と、CNCF の 3 つの段階"
+  ],
+  "minutes": 120,
+  "needs": [
+    "10 章を終えた仮想マシン kcna (k3s が動き、kubectl が使える)",
+    "インターネットへの接続 (Helm とイメージとチャートの一覧を取ってきます)",
+    "ホストのブラウザ (最後の段階の調べもの)",
+    "出力について: 「仮想マシンの中」の出力は、2026-11-28 に Linux の QEMU の上で、Ubuntu 24.04 の公式のクラウドイメージ (x86_64・2 コア・2 GB・20 GB) と k3s v1.36.6+k3s1 で取りました。Multipass を打つ手順は実機で確かめていないので、出力を載せていません。M 系の Mac でも手順は同じです。CPU の種類が出るところだけ arm64 か aarch64 になります。"
+  ],
+  "reads": [
+    {
+      "topic": "application-delivery",
+      "label": "アプリを届ける流れ"
+    },
+    {
+      "topic": "observability",
+      "label": "オブザーバビリティ"
+    },
+    {
+      "topic": "cloud-native-community",
+      "label": "クラウドネイティブのコミュニティ"
+    }
+  ],
+  "steps": [
+    {
+      "id": "enter",
+      "text": "10 章を終えた仮想マシンの中に入ります。ホストの端末で打ちます。",
+      "why": "この章のコマンドは、最初と最後のほかは全部、仮想マシンの中で打つためです。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass shell kcna"
+      },
+      "lines": [
+        {
+          "code": "multipass shell kcna",
+          "text": "kcna の中の端末を開く。止まっていれば、動かしてから開く"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "行の頭が ubuntu@kcna:~$ に変われば、中に入っています。",
+      "trouble": [
+        {
+          "symptom": "multipass: command not found、または「認識されません」と出る",
+          "check": "端末を閉じて開き直し、multipass version を打つ",
+          "fix": "開き直しても出るなら、Multipass を入れる手順をもう一度行う"
+        },
+        {
+          "symptom": "kcna が無いと出る",
+          "check": "multipass list で名前を見る",
+          "fix": "0 章から始める"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/shell/"
+    },
+    {
+      "id": "check-host",
+      "text": "仮想マシンの中で、どのマシンにいるかと、クラスターの様子を見ます。hostname が kcna でなければ、先へ進まず multipass shell kcna で入ります。枠は、迷ったら 1 行ずつ貼ります。sudo などのあとの行は、端末によって、まとめて貼ると消えることがあるためです (EOF で終わる書き込みの部分は、EOF まで続けて貼ります)。",
+      "why": "自分の PC の別のクラスターで打たないためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "hostname\nkubectl get nodes"
+      },
+      "lines": [
+        {
+          "code": "hostname",
+          "text": "このマシンの名前を出す"
+        },
+        {
+          "code": "kubectl get nodes",
+          "text": "ノードの一覧を出す"
+        }
+      ],
+      "output": "kcna\nNAME   STATUS   ROLES           AGE   VERSION\nkcna   Ready    control-plane   26m   v1.36.6+k3s1",
+      "read": "kcna と出て、ノードの STATUS が Ready なら進めます。VERSION が v1.36.6+k3s1 でない人は、出力の版を読み替えます。",
+      "trouble": [
+        {
+          "symptom": "kcna ではない名前が出る",
+          "check": "行の頭が ubuntu@kcna かを見る",
+          "fix": "ホストにいる。multipass shell kcna で入り、もう一度打つ"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        },
+        {
+          "symptom": "permission denied や localhost:8080 と出る",
+          "check": "echo $KUBECONFIG を打つ",
+          "fix": "空なら export KUBECONFIG=~/.kube/k3s.yaml を打つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/architecture/nodes/"
+    },
+    {
+      "id": "words",
+      "text": "最後の章は 3 つの話です。①届ける: 何十もの YAML を、Helm (包みにして配る) と Kustomize (土台に差分を重ねる) でまとめて扱います。②広げる: Kubernetes に新しい種類 (CRD) を足し、それを動かす仕組み (Operator) の考え方を見ます。③見る: 使用量・記録・数値で、動いているものの様子を知ります。",
+      "why": "どれも KCNA の「アプリを届ける」「クラウドネイティブの仕組み」「観測」の範囲で、名前と役目の違いがよく問われます。",
+      "source": "https://kubernetes.io/docs/concepts/overview/"
+    },
+    {
+      "id": "prepare",
+      "text": "作業のフォルダと、練習用の名前空間 ch11 を作ります。",
+      "why": "作るものを、まとめて片付けられるようにするためです。端末を開き直したときや再起動のあとは、cd ~/ch11 を打ちます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "mkdir -p ~/ch11\ncd ~/ch11\nkubectl create namespace ch11\nkubectl wait --for=create serviceaccount/default -n ch11 --timeout=60s"
+      },
+      "lines": [
+        {
+          "code": "mkdir -p ~/ch11",
+          "text": "ch11 というフォルダを作る"
+        },
+        {
+          "code": "cd ~/ch11",
+          "text": "ch11 へ移る"
+        },
+        {
+          "code": "kubectl create namespace ch11",
+          "text": "名前空間 ch11 を作る"
+        },
+        {
+          "code": "kubectl wait --for=create serviceaccount/default -n ch11 --timeout=60s",
+          "text": "ch11 で Pod を作れるようになるまで待つ"
+        }
+      ],
+      "output": "namespace/ch11 created\nserviceaccount/default condition met",
+      "read": "namespace/ch11 created が出れば次へ進めます。",
+      "trouble": [
+        {
+          "symptom": "AlreadyExists と出る",
+          "check": "kubectl get namespaces を打つ",
+          "fix": "前に作ったものがある。そのまま使う"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/"
+    },
+    {
+      "id": "check-before-helm",
+      "text": "Helm を /usr/local/bin に置く前に、どのマシンにいるかを見ます。kcna と出なければ、次の手順を打ちません。",
+      "why": "次の手順は sudo で /usr/local/bin/helm を置きます。自分の PC で打つと、PC に入っている helm を上書きします。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "hostname"
+      },
+      "lines": [
+        {
+          "code": "hostname",
+          "text": "このマシンの名前を出す"
+        }
+      ],
+      "output": "kcna",
+      "read": "kcna と出れば、仮想マシンの中です。",
+      "trouble": [
+        {
+          "symptom": "kcna ではない名前が出る",
+          "check": "行の頭が ubuntu@kcna かを見る",
+          "fix": "ホストにいる。multipass shell kcna で入り、もう一度打つ"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man1/hostname.1.html"
+    },
+    {
+      "id": "helm-install",
+      "text": "Helm を、公式の配り場所から版を決めて (v4.3.2) 入れます。取ってきたファイルが壊れていないかを、照合の値で確かめてから使います。",
+      "why": "Helm は、Kubernetes の YAML の包み (チャート) を入れたり、上げたり、戻したりする道具です。版を決めて入れると、この章と同じ出力になります。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "ARCH=$(dpkg --print-architecture)\ncurl -fsSLO https://get.helm.sh/helm-v4.3.2-linux-$ARCH.tar.gz\ncurl -fsSLO https://get.helm.sh/helm-v4.3.2-linux-$ARCH.tar.gz.sha256sum\nsha256sum -c helm-v4.3.2-linux-$ARCH.tar.gz.sha256sum\ntar -zxf helm-v4.3.2-linux-$ARCH.tar.gz\nsudo mv linux-$ARCH/helm /usr/local/bin/helm\nhelm version"
+      },
+      "lines": [
+        {
+          "code": "ARCH=$(dpkg --print-architecture)",
+          "text": "このマシンの CPU の種類 (amd64 か arm64) を ARCH に入れる"
+        },
+        {
+          "code": "curl -fsSLO https://get.helm.sh/helm-v4.3.2-linux-$ARCH.tar.gz",
+          "text": "Helm の固めたファイルを取ってくる"
+        },
+        {
+          "code": "curl -fsSLO https://get.helm.sh/helm-v4.3.2-linux-$ARCH.tar.gz.sha256sum",
+          "text": "照合の値 (sha256) のファイルを取ってくる"
+        },
+        {
+          "code": "sha256sum -c helm-v4.3.2-linux-$ARCH.tar.gz.sha256sum",
+          "text": "取ってきたファイルの値を計り、照合の値と同じかを見る"
+        },
+        {
+          "code": "tar -zxf helm-v4.3.2-linux-$ARCH.tar.gz",
+          "text": "固めたファイルをほどく"
+        },
+        {
+          "code": "sudo mv linux-$ARCH/helm /usr/local/bin/helm",
+          "text": "helm を、どこからでも打てる場所へ移す"
+        },
+        {
+          "code": "helm version",
+          "text": "入った版を出す"
+        }
+      ],
+      "output": "helm-v4.3.2-linux-amd64.tar.gz: OK\nversion.BuildInfo{Version:\"v4.3.2\", GitCommit:\"8346aaa55e7161f7c547212d0a87f01367976727\", GitTreeState:\"clean\", GoVersion:\"go1.27.4\", KubeClientVersion:\"v1.37\"}",
+      "read": "照合の行が OK なら、ファイルは取る途中で壊れていません。照合の値は同じ配り場所から取るので、すり替えまでは防げません。すり替えまで防ぐには、公式の手順の署名 (.asc) を確かめます。この章では省きます。FAILED と出たら使いません。helm version の Version が v4.3.2 なら入っています。KubeClientVersion は、Helm が中で使う Kubernetes の部品の版で、クラスター (v1.36) と 1 つ違っても使えます。Helm は、kubectl と同じ kubeconfig (KUBECONFIG) を読んで、クラスターに頼みます。",
+      "trouble": [
+        {
+          "symptom": "sha256sum の行が FAILED と出る",
+          "check": "ls -l helm-*.tar.gz で大きさを見る",
+          "fix": "取ってくる途中で切れた。ファイルを消して、curl の 2 行からやり直す"
+        },
+        {
+          "symptom": "curl: (22) と出る",
+          "check": "echo $ARCH を打つ",
+          "fix": "空なら ARCH= の行をもう一度打つ"
+        },
+        {
+          "symptom": "helm: command not found と出る",
+          "check": "ls -l /usr/local/bin/helm を打つ",
+          "fix": "無ければ、helm-install の手順を初めから打つ。sudo の行のあとが消えていないかも見る"
+        }
+      ],
+      "source": "https://helm.sh/docs/intro/install/"
+    },
+    {
+      "id": "helm-create",
+      "text": "見本のチャートのひな形を作り、中のファイルを見ます。",
+      "why": "チャートは、YAML のひな形 (templates) と、ひな形に入れる値 (values.yaml) と、チャートの名札 (Chart.yaml) でできています。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "helm create web\nfind web -type f | sort\ngrep -E '^(name|version|appVersion):' web/Chart.yaml\ngrep -A6 '^image:' web/values.yaml | grep -v '#'"
+      },
+      "lines": [
+        {
+          "code": "helm create web",
+          "text": "web というチャートのひな形を作る"
+        },
+        {
+          "code": "find web -type f | sort",
+          "text": "中のファイルを並べる"
+        },
+        {
+          "code": "grep -E '^(name|version|appVersion):' web/Chart.yaml",
+          "text": "チャートの名前と、チャートの版と、中のアプリの版を出す"
+        },
+        {
+          "code": "grep -A6 '^image:' web/values.yaml | grep -v '#'",
+          "text": "イメージについての値を出す"
+        }
+      ],
+      "output": "Creating web\nweb/.helmignore\nweb/Chart.yaml\nweb/templates/NOTES.txt\nweb/templates/_helpers.tpl\nweb/templates/deployment.yaml\nweb/templates/hpa.yaml\nweb/templates/httproute.yaml\nweb/templates/ingress.yaml\nweb/templates/service.yaml\nweb/templates/serviceaccount.yaml\nweb/templates/tests/test-connection.yaml\nweb/values.yaml\nname: web\nversion: 0.1.0\nappVersion: \"1.16.0\"\nimage:\n  repository: nginx\n  pullPolicy: IfNotPresent\n  tag: \"\"",
+      "read": "templates の中に、Deployment・Service・Ingress・HTTPRoute などのひな形があります。version はチャート自身の版、appVersion は中のアプリの版で、別々に上げます。image の tag が空 (\"\") なら、appVersion の 1.16.0 が使われます。古い版なので、この章では tag を 1.27-alpine にして入れます。",
+      "trouble": [
+        {
+          "symptom": "helm: command not found と出る",
+          "check": "ls -l /usr/local/bin/helm を打つ",
+          "fix": "無ければ、helm-install の手順を初めから打つ。sudo の行のあとが消えていないかも見る"
+        }
+      ],
+      "source": "https://helm.sh/docs/topics/charts/"
+    },
+    {
+      "id": "helm-template",
+      "text": "クラスターに入れる前に、値を入れたひな形が、どんな YAML になるかを手元で見ます。",
+      "why": "helm template は、クラスターに何も頼みません。入れる前に中身を読む、癖を付けるためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "helm lint ./web\nhelm template demo ./web --set image.tag=1.27-alpine | grep -E '^kind:|image:'"
+      },
+      "lines": [
+        {
+          "code": "helm lint ./web",
+          "text": "チャートの書き方に誤りが無いかを見る"
+        },
+        {
+          "code": "helm template demo ./web --set image.tag=1.27-alpine | grep -E '^kind:|image:'",
+          "text": "demo という名前で描いた YAML のうち、種類とイメージの行だけを出す"
+        }
+      ],
+      "output": "==> Linting ./web\n[INFO] Chart.yaml: icon is recommended\n\n1 chart(s) linted, 0 chart(s) failed\nkind: ServiceAccount\nkind: Service\nkind: Deployment\n          image: \"nginx:1.27-alpine\"\nkind: Pod\n      image: busybox",
+      "read": "lint は 1 chart(s) linted, 0 chart(s) failed で通ります ([INFO] の icon の行は、勧めだけです)。描いた YAML には、ServiceAccount・Service・Deployment と、テスト用の Pod が並び、イメージは nginx:1.27-alpine です。--set は、values.yaml の値をその場で上書きする書き方です。",
+      "trouble": [
+        {
+          "symptom": "helm: command not found と出る",
+          "check": "ls -l /usr/local/bin/helm を打つ",
+          "fix": "無ければ、helm-install の手順を初めから打つ。sudo の行のあとが消えていないかも見る"
+        }
+      ],
+      "source": "https://helm.sh/docs/helm/helm_template/"
+    },
+    {
+      "id": "helm-release",
+      "text": "チャートを、リリース demo として ch11 に入れます。",
+      "why": "リリースは「チャートを、ある名前で 1 回入れたもの」です。同じチャートを、名前を替えて何度でも入れられます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "helm install demo ./web -n ch11 --set image.tag=1.27-alpine\nkubectl rollout status deployment/demo-web -n ch11 --timeout=120s\nhelm list -n ch11\nkubectl get deployments,services -n ch11 -l app.kubernetes.io/instance=demo"
+      },
+      "lines": [
+        {
+          "code": "helm install demo ./web -n ch11 --set image.tag=1.27-alpine",
+          "text": "demo として入れる"
+        },
+        {
+          "code": "kubectl rollout status deployment/demo-web -n ch11 --timeout=120s",
+          "text": "動き始めるまで待つ"
+        },
+        {
+          "code": "helm list -n ch11",
+          "text": "ch11 のリリースを出す"
+        },
+        {
+          "code": "kubectl get deployments,services -n ch11 -l app.kubernetes.io/instance=demo",
+          "text": "demo が作ったものを出す"
+        }
+      ],
+      "output": "NAME: demo\nLAST DEPLOYED: Sat Nov 28 03:24:10 2026\nNAMESPACE: ch11\nSTATUS: deployed\nREVISION: 1\nDESCRIPTION: Install complete\nNOTES:\n1. Get the application URL by running these commands:\n  export POD_NAME=$(kubectl get pods --namespace ch11 -l \"app.kubernetes.io/name=web,app.kubernetes.io/instance=demo\" -o jsonpath=\"{.items[0].metadata.name}\")\n  export CONTAINER_PORT=$(kubectl get pod --namespace ch11 $POD_NAME -o jsonpath=\"{.spec.containers[0].ports[0].containerPort}\")\n  echo \"Visit http://127.0.0.1:8080 to use your application\"\n  kubectl --namespace ch11 port-forward $POD_NAME 8080:$CONTAINER_PORT\nWaiting for deployment \"demo-web\" rollout to finish: 0 of 1 updated replicas are available...\ndeployment \"demo-web\" successfully rolled out\nNAME\tNAMESPACE\tREVISION\tUPDATED                                \tSTATUS  \tCHART    \tAPP VERSION\ndemo\tch11     \t1       \t2026-11-28 03:24:10.579175422 +0000 UTC\tdeployed\tweb-0.1.0\t1.16.0\nNAME                       READY   UP-TO-DATE   AVAILABLE   AGE\ndeployment.apps/demo-web   1/1     1            1           2s\n\nNAME               TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)   AGE\nservice/demo-web   ClusterIP   10.43.127.157   <none>        80/TCP    2s",
+      "read": "STATUS: deployed、REVISION: 1 です。helm list の APP VERSION は Chart.yaml の appVersion (1.16.0) のままで、--set で替えたイメージの版ではありません。NOTES は、チャートを書いた人が残した使い方です。作られたものの名前は、リリース名とチャート名をつないだ demo-web です。Helm は、入れた中身をリリースの記録として、ch11 の Secret (sh.helm.release.v1.demo.v1) に残します。",
+      "trouble": [
+        {
+          "symptom": "helm: command not found と出る",
+          "check": "ls -l /usr/local/bin/helm を打つ",
+          "fix": "無ければ、helm-install の手順を初めから打つ。sudo の行のあとが消えていないかも見る"
+        },
+        {
+          "symptom": "cannot re-use a name that is still in use と出る",
+          "check": "helm list -n ch11 を打つ",
+          "fix": "もう入っている。そのまま次へ進む"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://helm.sh/docs/helm/helm_install/"
+    },
+    {
+      "id": "helm-upgrade",
+      "text": "値をファイルに書いて、Pod を 2 つに増やします。そのあと、リリースの歴史を見ます。",
+      "why": "値をファイルにすると、何を替えたかが残り、人に渡せます。上げるたびに REVISION が増えます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cat > values-dev.yaml <<'EOF'\nreplicaCount: 2\nimage:\n  tag: 1.27-alpine\nEOF\nhelm upgrade demo ./web -n ch11 -f values-dev.yaml\nkubectl rollout status deployment/demo-web -n ch11 --timeout=120s\nhelm history demo -n ch11\nhelm get values demo -n ch11"
+      },
+      "lines": [
+        {
+          "code": "cat > values-dev.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま values-dev.yaml というファイルに書く"
+        },
+        {
+          "code": "replicaCount: 2",
+          "text": "Pod を 2 つにする"
+        },
+        {
+          "code": "image:",
+          "text": "イメージについて"
+        },
+        {
+          "code": "  tag: 1.27-alpine",
+          "text": "版は 1.27-alpine"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "helm upgrade demo ./web -n ch11 -f values-dev.yaml",
+          "text": "値のファイルで上げる"
+        },
+        {
+          "code": "kubectl rollout status deployment/demo-web -n ch11 --timeout=120s",
+          "text": "入れ替えが終わるまで待つ"
+        },
+        {
+          "code": "helm history demo -n ch11",
+          "text": "リリースの歴史を出す"
+        },
+        {
+          "code": "helm get values demo -n ch11",
+          "text": "今のリリースに渡した値を出す"
+        }
+      ],
+      "output": "Release \"demo\" has been upgraded. Happy Helming!\nNAME: demo\nLAST DEPLOYED: Sat Nov 28 03:24:13 2026\nNAMESPACE: ch11\nSTATUS: deployed\nREVISION: 2\nDESCRIPTION: Upgrade complete\nNOTES:\n1. Get the application URL by running these commands:\n  export POD_NAME=$(kubectl get pods --namespace ch11 -l \"app.kubernetes.io/name=web,app.kubernetes.io/instance=demo\" -o jsonpath=\"{.items[0].metadata.name}\")\n  export CONTAINER_PORT=$(kubectl get pod --namespace ch11 $POD_NAME -o jsonpath=\"{.spec.containers[0].ports[0].containerPort}\")\n  echo \"Visit http://127.0.0.1:8080 to use your application\"\n  kubectl --namespace ch11 port-forward $POD_NAME 8080:$CONTAINER_PORT\nWaiting for deployment \"demo-web\" rollout to finish: 1 of 2 updated replicas are available...\ndeployment \"demo-web\" successfully rolled out\nREVISION\tUPDATED                 \tSTATUS    \tCHART    \tAPP VERSION\tDESCRIPTION\n1       \tSat Nov 28 03:24:10 2026\tsuperseded\tweb-0.1.0\t1.16.0     \tInstall complete\n2       \tSat Nov 28 03:24:13 2026\tdeployed  \tweb-0.1.0\t1.16.0     \tUpgrade complete\nUSER-SUPPLIED VALUES:\nimage:\n  tag: 1.27-alpine\nreplicaCount: 2",
+      "read": "REVISION 1 が superseded (置き換えられた)、2 が deployed です。helm get values は、upgrade で渡した値だけを出します。upgrade で値を 1 つでも渡すと、前に --set で渡した値は引き継がれません (何も渡さないときだけ、前の値をそのまま使います)。値は毎回、全部渡します (ファイルにしておく理由です)。",
+      "trouble": [
+        {
+          "symptom": "helm: command not found と出る",
+          "check": "ls -l /usr/local/bin/helm を打つ",
+          "fix": "無ければ、helm-install の手順を初めから打つ。sudo の行のあとが消えていないかも見る"
+        },
+        {
+          "symptom": "イメージが nginx:1.16.0 になる",
+          "check": "kubectl get deployment demo-web -n ch11 -o wide で IMAGES を見る",
+          "fix": "tag の行が抜けて、appVersion の 1.16.0 が使われた。values-dev.yaml を見直して、もう一度 upgrade する"
+        }
+      ],
+      "source": "https://helm.sh/docs/helm/helm_upgrade/"
+    },
+    {
+      "id": "helm-rollback",
+      "text": "リビジョン 1 (Pod 1 つ) に戻します。",
+      "why": "上げた版で困ったときに、前のリビジョンの中身へ、1 行で戻れることを見るためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "helm rollback demo 1 -n ch11\nhelm history demo -n ch11\nkubectl get deployment demo-web -n ch11"
+      },
+      "lines": [
+        {
+          "code": "helm rollback demo 1 -n ch11",
+          "text": "リビジョン 1 の中身に戻す"
+        },
+        {
+          "code": "helm history demo -n ch11",
+          "text": "歴史を出す"
+        },
+        {
+          "code": "kubectl get deployment demo-web -n ch11",
+          "text": "Pod の数を見る"
+        }
+      ],
+      "output": "Rollback was a success! Happy Helming!\nREVISION\tUPDATED                 \tSTATUS    \tCHART    \tAPP VERSION\tDESCRIPTION\n1       \tSat Nov 28 03:24:10 2026\tsuperseded\tweb-0.1.0\t1.16.0     \tInstall complete\n2       \tSat Nov 28 03:24:13 2026\tsuperseded\tweb-0.1.0\t1.16.0     \tUpgrade complete\n3       \tSat Nov 28 03:24:16 2026\tdeployed  \tweb-0.1.0\t1.16.0     \tRollback to 1\nNAME       READY   UP-TO-DATE   AVAILABLE   AGE\ndemo-web   1/1     1            1           5s",
+      "read": "戻すと、新しいリビジョン 3 ができ、DESCRIPTION が Rollback to 1 になります。歴史は消えずに増えます。Deployment の READY は 1/1 に戻ります。",
+      "trouble": [
+        {
+          "symptom": "helm: command not found と出る",
+          "check": "ls -l /usr/local/bin/helm を打つ",
+          "fix": "無ければ、helm-install の手順を初めから打つ。sudo の行のあとが消えていないかも見る"
+        }
+      ],
+      "source": "https://helm.sh/docs/helm/helm_rollback/"
+    },
+    {
+      "id": "helm-repo",
+      "text": "人が作って配っているチャートの置き場 (リポジトリ) を足して、探します。入れはしません。",
+      "why": "よく使う道具は、配られたチャートで入れます。Prometheus などの、観測の道具をまとめて入れるチャートも、こうして見つけます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "helm repo add prometheus-community https://prometheus-community.github.io/helm-charts\nhelm search repo prometheus-community/kube-prometheus-stack\nhelm show values prometheus-community/kube-prometheus-stack | grep -c ''"
+      },
+      "lines": [
+        {
+          "code": "helm repo add prometheus-community https://prometheus-community.github.io/helm-charts",
+          "text": "Prometheus の仲間が配るチャートの置き場を足す"
+        },
+        {
+          "code": "helm search repo prometheus-community/kube-prometheus-stack",
+          "text": "観測の道具一式のチャートを探す"
+        },
+        {
+          "code": "helm show values prometheus-community/kube-prometheus-stack | grep -c ''",
+          "text": "そのチャートの、既定の値のファイル (注釈を含む) の行の数を数える"
+        }
+      ],
+      "output": "\"prometheus-community\" has been added to your repositories\nNAME                                      \tCHART VERSION\tAPP VERSION\tDESCRIPTION\nprometheus-community/kube-prometheus-stack\t94.2.0       \tv0.95.2    \tkube-prometheus-stack collects Kubernetes manif...\n6404",
+      "read": "CHART VERSION と APP VERSION が出ます (配る人が上げるので、打つ日によって変わります)。値のファイルは数千行あり、Prometheus・Grafana・通知 (Alertmanager) などをまとめて入れる大きなチャートです。この仮想マシンの 2 GB では、メモリが足りないので入れません。入れるときは、helm install に --version を付けて、チャートの版を決めます。",
+      "trouble": [
+        {
+          "symptom": "helm: command not found と出る",
+          "check": "ls -l /usr/local/bin/helm を打つ",
+          "fix": "無ければ、helm-install の手順を初めから打つ。sudo の行のあとが消えていないかも見る"
+        },
+        {
+          "symptom": "could not resolve host と出る",
+          "check": "ping -c 1 github.com を打つ",
+          "fix": "インターネットにつながっていない。つながってからもう一度打つ"
+        }
+      ],
+      "source": "https://helm.sh/docs/intro/using_helm/"
+    },
+    {
+      "id": "kust-base",
+      "text": "同じものを Kustomize で書き直します。Helm で描いた YAML を土台 (base) にし、土台の一覧 (kustomization.yaml) を書きます。",
+      "why": "Kustomize は、ひな形を使わず、ふつうの YAML に差分を重ねる道具です。kubectl に入っているので、別に入れなくても使えます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "mkdir -p kust/base kust/overlays/dev\nhelm template demo ./web -f values-dev.yaml --skip-tests > kust/base/web.yaml\ncat > kust/base/kustomization.yaml <<'EOF'\nresources:\n- web.yaml\nEOF\nkubectl kustomize kust/base | grep -E '^kind:|  name:'"
+      },
+      "lines": [
+        {
+          "code": "mkdir -p kust/base kust/overlays/dev",
+          "text": "土台と、重ねる差分 (overlay) のフォルダを作る"
+        },
+        {
+          "code": "helm template demo ./web -f values-dev.yaml --skip-tests > kust/base/web.yaml",
+          "text": "Helm で描いた YAML (テストの Pod は除く) を、土台のファイルにする"
+        },
+        {
+          "code": "cat > kust/base/kustomization.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま kust/base/kustomization.yaml というファイルに書く"
+        },
+        {
+          "code": "resources:",
+          "text": "土台に入れるファイルの一覧"
+        },
+        {
+          "code": "- web.yaml",
+          "text": "web.yaml を入れる"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "kubectl kustomize kust/base | grep -E '^kind:|  name:'",
+          "text": "土台を組み立てて、種類と名前の行だけを出す"
+        }
+      ],
+      "output": "kind: ServiceAccount\n  name: demo-web\nkind: Service\n  name: demo-web\nkind: Deployment\n  name: demo-web\n        name: web\n          name: http",
+      "read": "組み立てた結果は、web.yaml と同じ ServiceAccount・Service・Deployment で、名前はどれも demo-web です。kubectl kustomize は、組み立てて見せるだけで、クラスターには何も頼みません。",
+      "trouble": [
+        {
+          "symptom": "the path ... does not exist と出る",
+          "check": "pwd と ls を打つ",
+          "fix": "作業のフォルダにいない。cd で移ってから打つ"
+        },
+        {
+          "symptom": "no such file or directory: kust/base と出る",
+          "check": "pwd を打つ",
+          "fix": "~/ch11 にいない。cd ~/ch11 で移る"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/"
+    },
+    {
+      "id": "kust-overlay",
+      "text": "差分 (overlay) を書きます。名前空間を ch11-kust に、名前の頭に k- を付け、イメージの版を替え、設定 (ConfigMap) を作らせます。",
+      "why": "土台はそのままに、環境ごとの違いだけを overlay に書くのが Kustomize の使い方です。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cat > kust/overlays/dev/kustomization.yaml <<'EOF'\nresources:\n- ../../base\nnamespace: ch11-kust\nnamePrefix: k-\nimages:\n- name: nginx\n  newTag: 1.28-alpine\nconfigMapGenerator:\n- name: greeting\n  literals:\n  - message=hello\nEOF\nkubectl kustomize kust/overlays/dev | grep -E '^kind:|  name:|namespace:|image:'"
+      },
+      "lines": [
+        {
+          "code": "cat > kust/overlays/dev/kustomization.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま kust/overlays/dev/kustomization.yaml というファイルに書く"
+        },
+        {
+          "code": "resources:",
+          "text": "重ねる相手"
+        },
+        {
+          "code": "- ../../base",
+          "text": "土台のフォルダ"
+        },
+        {
+          "code": "namespace: ch11-kust",
+          "text": "全部を ch11-kust に入れる"
+        },
+        {
+          "code": "namePrefix: k-",
+          "text": "名前の頭に k- を付ける"
+        },
+        {
+          "code": "images:",
+          "text": "イメージを差し替える"
+        },
+        {
+          "code": "- name: nginx",
+          "text": "nginx というイメージの"
+        },
+        {
+          "code": "  newTag: 1.28-alpine",
+          "text": "版を 1.28-alpine にする"
+        },
+        {
+          "code": "configMapGenerator:",
+          "text": "ConfigMap を作らせる"
+        },
+        {
+          "code": "- name: greeting",
+          "text": "呼び名は greeting"
+        },
+        {
+          "code": "  literals:",
+          "text": "中身をその場で書く"
+        },
+        {
+          "code": "  - message=hello",
+          "text": "message は hello"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "kubectl kustomize kust/overlays/dev | grep -E '^kind:|  name:|namespace:|image:'",
+          "text": "組み立てた結果の、種類・名前・名前空間・イメージの行を出す"
+        }
+      ],
+      "output": "kind: ServiceAccount\n  name: k-demo-web\n  namespace: ch11-kust\nkind: ConfigMap\n  name: k-greeting-76fh4ccc4d\n  namespace: ch11-kust\nkind: Service\n  name: k-demo-web\n  namespace: ch11-kust\nkind: Deployment\n  name: k-demo-web\n  namespace: ch11-kust\n      - image: nginx:1.28-alpine\n        name: web\n          name: http",
+      "read": "名前が k-demo-web に、名前空間が ch11-kust に、イメージが nginx:1.28-alpine に替わり、ConfigMap k-greeting- のあとに 10 文字の札が付きます。札は中身から計った値 (hash) で、中身が変わると名前も変わります。Service の選び方 (selector) の札は替わらないので、つながりはそのままです。",
+      "trouble": [
+        {
+          "symptom": "the path ... does not exist と出る",
+          "check": "pwd と ls を打つ",
+          "fix": "作業のフォルダにいない。cd で移ってから打つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/"
+    },
+    {
+      "id": "kust-apply",
+      "text": "組み立てたものを、kubectl apply -k でクラスターに入れます。",
+      "why": "Kustomize の結果は、ふつうの YAML なので、kubectl でそのまま入れられます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl create namespace ch11-kust\nkubectl apply -k kust/overlays/dev\nkubectl rollout status deployment/k-demo-web -n ch11-kust --timeout=180s\nkubectl get deployments,configmaps -n ch11-kust"
+      },
+      "lines": [
+        {
+          "code": "kubectl create namespace ch11-kust",
+          "text": "入れる先の名前空間を作る"
+        },
+        {
+          "code": "kubectl apply -k kust/overlays/dev",
+          "text": "組み立てて入れる"
+        },
+        {
+          "code": "kubectl rollout status deployment/k-demo-web -n ch11-kust --timeout=180s",
+          "text": "動き始めるまで待つ"
+        },
+        {
+          "code": "kubectl get deployments,configmaps -n ch11-kust",
+          "text": "入ったものを出す"
+        }
+      ],
+      "output": "namespace/ch11-kust created\nserviceaccount/k-demo-web created\nconfigmap/k-greeting-76fh4ccc4d created\nservice/k-demo-web created\ndeployment.apps/k-demo-web created\nWaiting for deployment \"k-demo-web\" rollout to finish: 0 of 2 updated replicas are available...\nWaiting for deployment \"k-demo-web\" rollout to finish: 1 of 2 updated replicas are available...\ndeployment \"k-demo-web\" successfully rolled out\nNAME                         READY   UP-TO-DATE   AVAILABLE   AGE\ndeployment.apps/k-demo-web   2/2     2            2           11s\n\nNAME                              DATA   AGE\nconfigmap/k-greeting-76fh4ccc4d   1      11s\nconfigmap/kube-root-ca.crt        1      12s",
+      "read": "Deployment k-demo-web が 2/2 で動き、ConfigMap に k-greeting-(札) が並びます。kube-root-ca.crt は、どの名前空間にも初めからある ConfigMap です。Helm と違って、Kustomize は「リリースの歴史」を持ちません。戻すときは、YAML を前の形に戻して、もう一度当てます。",
+      "trouble": [
+        {
+          "symptom": "toomanyrequests や 429 と出る",
+          "check": "kubectl describe の Events で、Failed to pull image の行の終わりを見る",
+          "fix": "Docker Hub には、決まった時間に取れる回数の上限がある。時間をおいて (上限は 6 時間ごとに数える)、もう一度行う。数は IP アドレスごとなので、同じ回線のほかの人の分も入る。短い「429 Too Many Requests」だけのときは、使いすぎを防ぐ別の上限なので、数分待ってからもう一度行う"
+        },
+        {
+          "symptom": "namespaces \"ch11-kust\" not found と出る",
+          "check": "kubectl get namespaces を打つ",
+          "fix": "名前空間を作る行を打ってから、apply をもう一度打つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_apply/"
+    },
+    {
+      "id": "kust-hash",
+      "text": "設定の中身を替えると、ConfigMap の名前が変わることを見ます。",
+      "why": "名前が変わると、それを使う Deployment の中身も変わるので、Pod が入れ替わり、新しい設定を確かに読みます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "sed -i 's/message=hello/message=bye/' kust/overlays/dev/kustomization.yaml\nkubectl apply -k kust/overlays/dev\nkubectl get configmaps -n ch11-kust"
+      },
+      "lines": [
+        {
+          "code": "sed -i 's/message=hello/message=bye/' kust/overlays/dev/kustomization.yaml",
+          "text": "hello を bye に替える"
+        },
+        {
+          "code": "kubectl apply -k kust/overlays/dev",
+          "text": "もう一度入れる"
+        },
+        {
+          "code": "kubectl get configmaps -n ch11-kust",
+          "text": "ConfigMap を出す"
+        }
+      ],
+      "output": "serviceaccount/k-demo-web unchanged\nconfigmap/k-greeting-88hbt4854k created\nservice/k-demo-web unchanged\ndeployment.apps/k-demo-web unchanged\nNAME                    DATA   AGE\nk-greeting-76fh4ccc4d   1      12s\nk-greeting-88hbt4854k   1      1s\nkube-root-ca.crt        1      13s",
+      "read": "k-greeting- で始まるものが 2 つになり、札が違います。古いものは自動では消えません。消し忘れを片付けるには、名前空間ごと消すか、古い名前を消します。この章の Deployment は greeting を使っていないので、Pod は入れ替わりません。",
+      "trouble": [
+        {
+          "symptom": "the path ... does not exist と出る",
+          "check": "pwd と ls を打つ",
+          "fix": "作業のフォルダにいない。cd で移ってから打つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/#configmapgenerator"
+    },
+    {
+      "id": "which",
+      "text": "Helm は、ひな形と値で、同じチャートを名前を替えて何度も入れられ、リリースの歴史 (rollback) を持ちます。人が配るチャートを使うのにも向きます。Kustomize は、ひな形を使わず、ふつうの YAML に環境ごとの差分を重ね、kubectl だけで使えます。2 つを組み合わせて、Helm で描いた YAML に Kustomize で重ねることもできます。どちらの YAML も、Git に置いて、Git の中身をクラスターに当て続ける仕組みに任せるのが GitOps です。Argo CD と Flux が代表で、どちらも CNCF の Graduated のプロジェクトです。人が kubectl apply を打つ代わりに、クラスターの中の仕組みが Git を見張り、ずれを見つけて、Git のとおりに戻します (自動で戻すかは設定で決めます)。この仮想マシンには入れません。",
+      "why": "どれも「同じものを、何度でも同じに入れる」ための道具で、試験でも違いが問われます。",
+      "source": "https://helm.sh/docs/intro/"
+    },
+    {
+      "id": "crd",
+      "text": "Kubernetes に、新しい種類 Note を足します (CRD)。足したあと、Note を 1 つ作ります。",
+      "why": "CRD を足すと、Pod や Service と同じように、kubectl で作ったり一覧にしたりできる種類が増えます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cat > note-crd.yaml <<'EOF'\napiVersion: apiextensions.k8s.io/v1\nkind: CustomResourceDefinition\nmetadata:\n  name: notes.dojo.example.com\nspec:\n  group: dojo.example.com\n  scope: Namespaced\n  names:\n    kind: Note\n    plural: notes\n    singular: note\n  versions:\n  - name: v1\n    served: true\n    storage: true\n    schema:\n      openAPIV3Schema:\n        type: object\n        properties:\n          spec:\n            type: object\n            properties:\n              message:\n                type: string\n    additionalPrinterColumns:\n    - name: Message\n      type: string\n      jsonPath: .spec.message\nEOF\nkubectl apply -f note-crd.yaml\nkubectl wait --for=condition=Established crd/notes.dojo.example.com --timeout=60s\nkubectl api-resources --api-group=dojo.example.com\ncat > note.yaml <<'EOF'\napiVersion: dojo.example.com/v1\nkind: Note\nmetadata:\n  name: first\nspec:\n  message: hello from CRD\nEOF\nkubectl apply -f note.yaml -n ch11\nkubectl get notes -n ch11\nkubectl get pods -n ch11 -l app.kubernetes.io/name=note"
+      },
+      "lines": [
+        {
+          "code": "cat > note-crd.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま note-crd.yaml というファイルに書く"
+        },
+        {
+          "code": "apiVersion: apiextensions.k8s.io/v1",
+          "text": "CRD のある API"
+        },
+        {
+          "code": "kind: CustomResourceDefinition",
+          "text": "新しい種類の定義"
+        },
+        {
+          "code": "metadata:",
+          "text": "呼び名など"
+        },
+        {
+          "code": "  name: notes.dojo.example.com",
+          "text": "名前は「複数形.組の名前」"
+        },
+        {
+          "code": "spec:",
+          "text": "中身"
+        },
+        {
+          "code": "  group: dojo.example.com",
+          "text": "組の名前 (example.com は例のための名前)"
+        },
+        {
+          "code": "  scope: Namespaced",
+          "text": "名前空間の中に作る種類"
+        },
+        {
+          "code": "  names:",
+          "text": "呼び方"
+        },
+        {
+          "code": "    kind: Note",
+          "text": "YAML の kind に書く名前"
+        },
+        {
+          "code": "    plural: notes",
+          "text": "一覧のときの名前"
+        },
+        {
+          "code": "    singular: note",
+          "text": "1 つのときの名前"
+        },
+        {
+          "code": "  versions:",
+          "text": "版の一覧"
+        },
+        {
+          "code": "  - name: v1",
+          "text": "版は v1"
+        },
+        {
+          "code": "    served: true",
+          "text": "この版で頼める"
+        },
+        {
+          "code": "    storage: true",
+          "text": "この版の形で保存する"
+        },
+        {
+          "code": "    schema:",
+          "text": "中身の形"
+        },
+        {
+          "code": "      openAPIV3Schema:",
+          "text": "形の書き方"
+        },
+        {
+          "code": "        type: object",
+          "text": "中身はひとまとまり"
+        },
+        {
+          "code": "        properties:",
+          "text": "中の欄"
+        },
+        {
+          "code": "          spec:",
+          "text": "spec 欄の"
+        },
+        {
+          "code": "            type: object",
+          "text": "中身もひとまとまり"
+        },
+        {
+          "code": "            properties:",
+          "text": "中の欄"
+        },
+        {
+          "code": "              message:",
+          "text": "message 欄は"
+        },
+        {
+          "code": "                type: string",
+          "text": "文字列"
+        },
+        {
+          "code": "    additionalPrinterColumns:",
+          "text": "一覧に出す欄"
+        },
+        {
+          "code": "    - name: Message",
+          "text": "欄の名前は Message"
+        },
+        {
+          "code": "      type: string",
+          "text": "文字列"
+        },
+        {
+          "code": "      jsonPath: .spec.message",
+          "text": "spec.message の値を出す"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "kubectl apply -f note-crd.yaml",
+          "text": "CRD を足す"
+        },
+        {
+          "code": "kubectl wait --for=condition=Established crd/notes.dojo.example.com --timeout=60s",
+          "text": "使えるようになるまで待つ"
+        },
+        {
+          "code": "kubectl api-resources --api-group=dojo.example.com",
+          "text": "増えた種類を出す"
+        },
+        {
+          "code": "cat > note.yaml <<'EOF'",
+          "text": "次の行から EOF の行までを、そのまま note.yaml というファイルに書く"
+        },
+        {
+          "code": "apiVersion: dojo.example.com/v1",
+          "text": "さっき足した組と版"
+        },
+        {
+          "code": "kind: Note",
+          "text": "新しい種類"
+        },
+        {
+          "code": "metadata:",
+          "text": "呼び名など"
+        },
+        {
+          "code": "  name: first",
+          "text": "呼び名は first"
+        },
+        {
+          "code": "spec:",
+          "text": "中身"
+        },
+        {
+          "code": "  message: hello from CRD",
+          "text": "書いておく文"
+        },
+        {
+          "code": "EOF",
+          "text": "ここまで (EOF) でファイルを書き終える"
+        },
+        {
+          "code": "kubectl apply -f note.yaml -n ch11",
+          "text": "Note を作る"
+        },
+        {
+          "code": "kubectl get notes -n ch11",
+          "text": "Note の一覧を出す"
+        },
+        {
+          "code": "kubectl get pods -n ch11 -l app.kubernetes.io/name=note",
+          "text": "Note のために動いた Pod があるかを見る"
+        }
+      ],
+      "output": "customresourcedefinition.apiextensions.k8s.io/notes.dojo.example.com created\ncustomresourcedefinition.apiextensions.k8s.io/notes.dojo.example.com condition met\nNAME    SHORTNAMES   APIVERSION            NAMESPACED   KIND\nnotes                dojo.example.com/v1   true         Note\nnote.dojo.example.com/first created\nNAME    MESSAGE\nfirst   hello from CRD\nNo resources found in ch11 namespace.",
+      "read": "api-resources に notes が並び、kubectl get notes で MESSAGE の欄に文が出ます。でも、Pod は何も動きません (No resources found)。CRD は「種類と形」を足すだけで、書いた中身のとおりに何かをする仕組み (コントローラー) は別に要ります。",
+      "trouble": [
+        {
+          "symptom": "no matches for kind \"Note\" と出る",
+          "check": "kubectl get crd notes.dojo.example.com を打つ",
+          "fix": "CRD が無いか、まだ使えない。CRD を足す行と待つ行を打ってから作る"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/"
+    },
+    {
+      "id": "operator",
+      "text": "k3s の中で、CRD とコントローラーが組になって動いている例を見ます。",
+      "why": "Operator は「CRD + その中身を読んで動くコントローラー」です。人が運用でしていたこと (入れる・上げる・直す) を、仕組みに任せます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl get helmcharts -n kube-system\nkubectl get crd helmcharts.helm.cattle.io -o jsonpath='{.spec.group}{\"\\n\"}'"
+      },
+      "lines": [
+        {
+          "code": "kubectl get helmcharts -n kube-system",
+          "text": "k3s の HelmChart という種類のものを出す"
+        },
+        {
+          "code": "kubectl get crd helmcharts.helm.cattle.io -o jsonpath='{.spec.group}{\"\\n\"}'",
+          "text": "その種類を足した CRD の組の名前を出す"
+        }
+      ],
+      "output": "NAME          REPO   CHART                                                                      VERSION   TARGETNAMESPACE   BOOTSTRAP   FAILED\ntraefik              https://%{KUBERNETES_API}%/static/charts/traefik-40.1.7+up40.1.0.tgz                                               False\ntraefik-crd          https://%{KUBERNETES_API}%/static/charts/traefik-crd-40.1.7+up40.1.0.tgz                                           False\nhelm.cattle.io",
+      "read": "traefik と traefik-crd が並びます。k3s に組み込まれたコントローラー (helm-controller) が、この HelmChart を読み、中に書かれたチャートを Helm で入れています。1 章から動いている traefik は、この仕組みで入りました。Note を読むコントローラーは無いので、Note は飾りのままです。",
+      "trouble": [
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/extend-kubernetes/operator/"
+    },
+    {
+      "id": "break",
+      "text": "ここで休めます。休む人は、exit で出てから、ホストでこの行を打ちます。休まない人は、打たずに印を付けて先へ進みます。",
+      "why": "長い章なので、区切りを置くためです。止めても、作ったものとファイルは残ります。再起動と同じことが起きるので、Pod の中のコンテナは始め直され、Pod の住所も変わります。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass stop kcna"
+      },
+      "lines": [
+        {
+          "code": "multipass stop kcna",
+          "text": "kcna を止める。動いている (Running) ときだけ打てる"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "何もエラーが出なければ止まっています。続けるときは、ホストで multipass shell kcna を打つと、動かして中に入れます。入ったら cd ~/ch11 を打ちます。戻った直後の 1〜2 分は、一覧が止める前の古い様子のことがあります。少し待ってもう一度見ます。",
+      "trouble": [
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "activating なら、1 分ほど待つ"
+        },
+        {
+          "symptom": "No such file or directory と出る",
+          "check": "pwd を打つ",
+          "fix": "作業のフォルダにいない。cd で移る"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/stop/"
+    },
+    {
+      "id": "top",
+      "text": "使用量を見ます。k3s は metrics-server という部品を初めから入れていて、ノードと Pod の CPU とメモリの量を集めています。",
+      "why": "kubectl top は、今の使用量を見るいちばん手軽な道具です。HPA (4 章) も、この値を使います。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl get deployment metrics-server -n kube-system\nfor i in $(seq 30); do kubectl top nodes > /dev/null 2>&1 && break; sleep 5; done\nkubectl top nodes\nkubectl top pods -A --sort-by=memory | head -6"
+      },
+      "lines": [
+        {
+          "code": "kubectl get deployment metrics-server -n kube-system",
+          "text": "metrics-server が動いているかを見る"
+        },
+        {
+          "code": "for i in $(seq 30); do kubectl top nodes > /dev/null 2>&1 && break; sleep 5; done",
+          "text": "値が集まるまで待つ (始まって 1 分ほどは、まだ値が無い。最大 2 分半)"
+        },
+        {
+          "code": "kubectl top nodes",
+          "text": "ノードの使用量を出す"
+        },
+        {
+          "code": "kubectl top pods -A --sort-by=memory | head -6",
+          "text": "全部の名前空間の Pod を、メモリの多い順に 5 つ出す"
+        }
+      ],
+      "output": "NAME             READY   UP-TO-DATE   AVAILABLE   AGE\nmetrics-server   1/1     1            1           26m\nNAME   CPU(cores)   CPU(%)   MEMORY(bytes)   MEMORY(%)\nkcna   756m         37%      1356Mi          68%\nNAMESPACE     NAME                                      CPU(cores)   MEMORY(bytes)\nkube-system   traefik-7c8677d4d9-2clgx                  2m           120Mi\nkube-system   metrics-server-6dc596dfb8-k6lrb           11m          72Mi\nkube-system   coredns-7cfb7bc9c7-65n4f                  3m           68Mi\nkube-system   local-path-provisioner-5598c9cb4c-88qrf   1m           45Mi\nch11          demo-web-565949cb54-sq7c6                 5m           2Mi",
+      "read": "READY が 1/1 なら使えます。CPU の m はミリコア (1000m で 1 コア)、MEMORY の Mi はメビバイトです。ノードのメモリの割合が大きいのは、k3s と、この章までに動かしたものの分です。いちばん多いのは、たいてい traefik か metrics-server か coredns です。値は、15 秒ごと (k3s の metrics-server の設定) に集めた、少し前の量です。",
+      "trouble": [
+        {
+          "symptom": "error: Metrics API not available と出る",
+          "check": "kubectl get pods -n kube-system | grep metrics を打つ",
+          "fix": "まだ始まっていない。1 分待ってもう一度打つ"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/tasks/debug/debug-cluster/resource-metrics-pipeline/"
+    },
+    {
+      "id": "inventory",
+      "text": "クラスターに入っている部品を、Pod とイメージの一覧と、ノードの様子で書き出します。",
+      "why": "どんな部品 (CNCF のプロジェクトなど) でこのクラスターができているかを知るためです。次のホストの手順で、部品の段階を調べます。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl get pods -A -o custom-columns='NAMESPACE:.metadata.namespace,NAME:.metadata.name,IMAGE:.spec.containers[*].image'\nkubectl get nodes -o wide"
+      },
+      "lines": [
+        {
+          "code": "kubectl get pods -A -o custom-columns='NAMESPACE:.metadata.namespace,NAME:.metadata.name,IMAGE:.spec.containers[*].image'",
+          "text": "全部の Pod の名前空間・名前・イメージを並べる"
+        },
+        {
+          "code": "kubectl get nodes -o wide",
+          "text": "ノードの OS・カーネル・コンテナの動かし手の版を出す"
+        }
+      ],
+      "output": "NAMESPACE     NAME                                      IMAGE\nch11-kust     k-demo-web-6d9dc888c9-6khmc               nginx:1.28-alpine\nch11-kust     k-demo-web-6d9dc888c9-lxmlx               nginx:1.28-alpine\nch11          demo-web-565949cb54-sq7c6                 nginx:1.27-alpine\nkube-system   coredns-7cfb7bc9c7-65n4f                  rancher/mirrored-coredns-coredns:1.14.7\nkube-system   helm-install-traefik-c8v4t                rancher/klipper-helm:v0.13.3-build20261021\nkube-system   helm-install-traefik-crd-t97h8            rancher/klipper-helm:v0.13.3-build20261021\nkube-system   local-path-provisioner-5598c9cb4c-88qrf   rancher/local-path-provisioner:v0.0.37\nkube-system   metrics-server-6dc596dfb8-k6lrb           rancher/mirrored-metrics-server:v0.9.0\nkube-system   svclb-traefik-082d037f-82bhv              rancher/klipper-lb:v0.4.17,rancher/klipper-lb:v0.4.17\nkube-system   traefik-7c8677d4d9-2clgx                  rancher/mirrored-library-traefik:3.7.15\nNAME   STATUS   ROLES           AGE   VERSION        INTERNAL-IP   EXTERNAL-IP   OS-IMAGE             KERNEL-VERSION              CONTAINER-RUNTIME\nkcna   Ready    control-plane   26m   v1.36.6+k3s1   10.0.2.15     <none>        Ubuntu 24.04.5 LTS   6.8.0-147-generic (amd64)   containerd://2.3.7-k3s1.36",
+      "read": "kube-system に coredns・traefik・local-path-provisioner・metrics-server、ch11 と ch11-kust に nginx が並びます。helm-install- で始まるものは、k3s の helm-controller が traefik を入れるときに動かした Job の Pod です。CONTAINER-RUNTIME の containerd は、k3s に組み込まれています。ネットワークの flannel も、k3s の中に組み込まれていて、Pod としては出ません。svclb-traefik は、k3s が LoadBalancer の Service (traefik) のために、ノードの口を開ける小さな Pod です。",
+      "trouble": [
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_get/"
+    },
+    {
+      "id": "logs",
+      "text": "記録 (ログ) を、絞り方を替えて読みます。",
+      "why": "記録は、多すぎると読めません。新しい分だけ、札で選んだ Pod だけ、と絞る書き方を知るためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl logs -l app.kubernetes.io/instance=demo -n ch11 --since=1h --prefix --tail=2\ntimeout 5 kubectl logs -f deployment/demo-web -n ch11 --tail=1 || true\nkubectl logs deployment/demo-web -n ch11 --previous --tail=1 || true"
+      },
+      "lines": [
+        {
+          "code": "kubectl logs -l app.kubernetes.io/instance=demo -n ch11 --since=1h --prefix --tail=2",
+          "text": "札で選んだ Pod の、1 時間以内の記録の終わり 2 行を、どの Pod のものかを付けて出す"
+        },
+        {
+          "code": "timeout 5 kubectl logs -f deployment/demo-web -n ch11 --tail=1 || true",
+          "text": "新しい行を待って出し続ける (-f)。ここでは 5 秒で止める"
+        },
+        {
+          "code": "kubectl logs deployment/demo-web -n ch11 --previous --tail=1 || true",
+          "text": "前の回のコンテナの記録を出そうとする"
+        }
+      ],
+      "output": "[pod/demo-web-565949cb54-sq7c6/web] 10.42.0.1 - - [28/Nov/2026:03:24:31 +0000] \"GET / HTTP/1.1\" 200 615 \"-\" \"kube-probe/1.36\" \"-\"\n[pod/demo-web-565949cb54-sq7c6/web] 10.42.0.1 - - [28/Nov/2026:03:24:32 +0000] \"GET / HTTP/1.1\" 200 615 \"-\" \"kube-probe/1.36\" \"-\"\n10.42.0.1 - - [28/Nov/2026:03:24:32 +0000] \"GET / HTTP/1.1\" 200 615 \"-\" \"kube-probe/1.36\" \"-\"\n10.42.0.1 - - [28/Nov/2026:03:24:41 +0000] \"GET / HTTP/1.1\" 200 615 \"-\" \"kube-probe/1.36\" \"-\"\n10.42.0.1 - - [28/Nov/2026:03:24:42 +0000] \"GET / HTTP/1.1\" 200 615 \"-\" \"kube-probe/1.36\" \"-\"\nError from server (BadRequest): previous terminated container \"web\" in pod \"demo-web-565949cb54-sq7c6\" not found",
+      "read": "--prefix は、行の頭に [pod/名前/コンテナ名] を付けます。-f は、手で打つときは Ctrl+C で止めます。--previous は、休んで (再起動して) いれば、前の回の終わりの行が出ます。休んでいなければ、前の回が無いので previous terminated container ... not found と出ます。|| true は、ここで失敗しても先へ進むための書き方です。",
+      "trouble": [
+        {
+          "symptom": "No resources found と出る",
+          "check": "kubectl get pods -n ch11 --show-labels を打つ",
+          "fix": "札が違う。出た札に替えて打つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_logs/"
+    },
+    {
+      "id": "metrics-raw",
+      "text": "Prometheus が集める形の数値を、API サーバーから直に取って見ます。",
+      "why": "Prometheus は、部品が /metrics で出す、この形の数値を、決まった間隔で取りに行って、時刻と一緒にためます。Grafana は、ためた値をグラフにします。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl get --raw /metrics | grep '^apiserver_request_total' | head -3"
+      },
+      "lines": [
+        {
+          "code": "kubectl get --raw /metrics | grep '^apiserver_request_total' | head -3",
+          "text": "API サーバーの数値のうち、受けた頼みの数を 3 行出す"
+        }
+      ],
+      "output": "apiserver_request_total{code=\"0\",component=\"apiserver\",dry_run=\"\",group=\"\",resource=\"pods\",scope=\"resource\",subresource=\"exec\",verb=\"CONNECT\",version=\"v1\"} 10\napiserver_request_total{code=\"200\",component=\"\",dry_run=\"\",group=\"\",resource=\"\",scope=\"\",subresource=\"/healthz\",verb=\"GET\",version=\"\"} 3\napiserver_request_total{code=\"200\",component=\"\",dry_run=\"\",group=\"\",resource=\"\",scope=\"\",subresource=\"/readyz\",verb=\"GET\",version=\"\"} 3",
+      "read": "名前 {札=\"値\",...} 数 の形で並びます。札 (code・resource・verb) の組ごとに、1 つの数です。Prometheus は、札で絞ったり足したりする問い合わせ (PromQL) で読みます。記録・数値に並ぶ 3 つめの手がかりが、1 つの頼みごとが部品をどう渡ったかの道のり (トレース) で、OpenTelemetry は、この 3 つを集める書き方と道具をそろえるプロジェクトです。",
+      "trouble": [
+        {
+          "symptom": "Forbidden と出る",
+          "check": "kubectl auth whoami を打つ",
+          "fix": "管理者でない名前で打っている。10 章の kr ではなく kubectl で打つ"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/concepts/cluster-administration/system-metrics/"
+    },
+    {
+      "id": "landscape",
+      "text": "ホストのブラウザで、CNCF のプロジェクトの一覧を開き、この仮想マシンに入っている部品の段階を調べます。landscape.cncf.io を開き、左の絞り込み (Project) で Graduated・Incubating・Sandbox を選ぶと、段階ごとに並びます。www.cncf.io/projects/ は、段階ごとの一覧です。2026-11-24 の一覧では、Kubernetes・containerd・CoreDNS・etcd・Helm・Prometheus・OpenTelemetry・Argo・Flux・Fluentd は Graduated、k3s は Sandbox です。Traefik と Flannel は CNCF のプロジェクトではありません。metrics-server と Kustomize は、Kubernetes の中の小さなプロジェクトです。段階は上がることがあるので、開いた日の一覧で確かめます。この手順はブラウザで行うもので、実機では確かめていません。段階は、CNCF の landscape のデータ (github.com/cncf/landscape、2026-11-24 の版) で確かめました。",
+      "why": "CNCF のプロジェクトは、Sandbox (試しの段階)、Incubating (育っている段階)、Graduated (広く使われる段階) の 3 つの段階に分かれます。試験では、名前と段階と役目が問われます。",
+      "where": "host",
+      "source": "https://www.cncf.io/projects/"
+    },
+    {
+      "id": "check-before-delete",
+      "text": "リリース・名前空間・CRD を消す前に、どのマシンにいるかを見ます。kcna と出なければ、次の手順を打ちません。",
+      "why": "名前空間を 2 つと、クラスター全体の CRD を消すためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "hostname"
+      },
+      "lines": [
+        {
+          "code": "hostname",
+          "text": "このマシンの名前を出す"
+        }
+      ],
+      "output": "kcna",
+      "read": "kcna と出れば、仮想マシンの中です。",
+      "trouble": [
+        {
+          "symptom": "kcna ではない名前が出る",
+          "check": "行の頭が ubuntu@kcna かを見る",
+          "fix": "ホストにいる。multipass shell kcna で入り、もう一度打つ"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man1/hostname.1.html"
+    },
+    {
+      "id": "delete-all",
+      "text": "入れたものを全部片付けます。前の手順で kcna と出たときだけ打ちます。CRD は、名前空間を消しても残るので、別に消します。",
+      "why": "CRD を消すと、その種類のもの (Note) も全部消えます。CRD はクラスター全体のものなので、名前空間を消しても残ります。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "cd ~/ch11\nhelm uninstall demo -n ch11\nkubectl delete -k kust/overlays/dev\nkubectl delete crd notes.dojo.example.com\ncd ~\nkubectl delete namespace ch11 ch11-kust\nkubectl get namespaces\nkubectl api-resources --api-group=dojo.example.com\nhelm list -A"
+      },
+      "lines": [
+        {
+          "code": "cd ~/ch11",
+          "text": "作業のフォルダへ移る"
+        },
+        {
+          "code": "helm uninstall demo -n ch11",
+          "text": "リリース demo を消す"
+        },
+        {
+          "code": "kubectl delete -k kust/overlays/dev",
+          "text": "Kustomize で入れたものを消す"
+        },
+        {
+          "code": "kubectl delete crd notes.dojo.example.com",
+          "text": "CRD を消す (Note も消える)"
+        },
+        {
+          "code": "cd ~",
+          "text": "ホームへ戻る"
+        },
+        {
+          "code": "kubectl delete namespace ch11 ch11-kust",
+          "text": "2 つの名前空間を消す。1 分ほどかかることがある"
+        },
+        {
+          "code": "kubectl get namespaces",
+          "text": "残りを出す"
+        },
+        {
+          "code": "kubectl api-resources --api-group=dojo.example.com",
+          "text": "足した種類が残っていないかを見る"
+        },
+        {
+          "code": "helm list -A",
+          "text": "残っているリリースを出す"
+        }
+      ],
+      "output": "release \"demo\" uninstalled\nserviceaccount \"k-demo-web\" deleted from ch11-kust namespace\nconfigmap \"k-greeting-88hbt4854k\" deleted from ch11-kust namespace\nservice \"k-demo-web\" deleted from ch11-kust namespace\ndeployment.apps \"k-demo-web\" deleted from ch11-kust namespace\ncustomresourcedefinition.apiextensions.k8s.io \"notes.dojo.example.com\" deleted\nnamespace \"ch11\" deleted\nnamespace \"ch11-kust\" deleted\nNAME              STATUS   AGE\ndefault           Active   26m\nkube-node-lease   Active   26m\nkube-public       Active   26m\nkube-system       Active   26m\nNAME   SHORTNAMES   APIVERSION   NAMESPACED   KIND\nNAME       \tNAMESPACE  \tREVISION\tUPDATED                                \tSTATUS  \tCHART                      \tAPP VERSION\ntraefik    \tkube-system\t1       \t2026-11-28 02:59:05.218674656 +0000 UTC\tdeployed\ttraefik-40.1.7+up40.1.0    \tv3.7.1\ntraefik-crd\tkube-system\t1       \t2026-11-28 02:58:51.325870018 +0000 UTC\tdeployed\ttraefik-crd-40.1.7+up40.1.0\tv3.7.1",
+      "read": "名前空間は初めからある 4 つだけ、api-resources は見出しの行だけになれば、片付いています。helm list -A には、traefik と traefik-crd が残ります。k3s の helm-controller も、中で Helm を使って入れているので、Helm のリリースとして見えます。これは消しません。helm 本体と、足したチャートの置き場 (helm repo) は残します。消すなら sudo rm /usr/local/bin/helm を打ちます。 ~/ch11 に残る Helm の箱 (tar.gz と linux-amd64 のフォルダ) は、もう使わないので消してかまいません。",
+      "trouble": [
+        {
+          "symptom": "消す行がしばらく止まる",
+          "check": "1 分ほど待つ",
+          "fix": "中の Pod が終わるのを待っている"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://helm.sh/docs/helm/helm_uninstall/"
+    },
+    {
+      "id": "leave",
+      "text": "仮想マシンから出ます。",
+      "why": "次は、ホストで控えを取るためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "exit"
+      },
+      "lines": [
+        {
+          "code": "exit",
+          "text": "今の端末を終える。仮想マシンは動き続ける"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "行の頭が、自分の PC のものに戻ります。",
+      "trouble": [
+        {
+          "symptom": "行の頭が ubuntu@kcna のまま",
+          "check": "もう一度見る",
+          "fix": "もう一度 exit を打つ"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man1/bash.1.html"
+    },
+    {
+      "id": "snapshot",
+      "text": "ホストで、この章を終えた状態の控えを ch11-end という名前で取り、仮想マシンに入り直します。",
+      "why": "この先、別の練習をして困っても、ここへ戻れるようにするためです。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass stop kcna\nmultipass snapshot --name ch11-end kcna\nmultipass list --snapshots\nmultipass shell kcna"
+      },
+      "lines": [
+        {
+          "code": "multipass stop kcna",
+          "text": "止める。控えは、止まっているときだけ取れる。stop は動いている (Running) ときだけ打てる"
+        },
+        {
+          "code": "multipass snapshot --name ch11-end kcna",
+          "text": "今の状態を ch11-end という名前で控える"
+        },
+        {
+          "code": "multipass list --snapshots",
+          "text": "控えの一覧を出す"
+        },
+        {
+          "code": "multipass shell kcna",
+          "text": "止まっている kcna を動かし、中に入り直す"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "一覧に ch11-end が並べば取れています。戻すときは、止めてから multipass restore kcna.ch11-end を打ちます。今の状態も控えるかを聞かれたら、要らなければ no と答えます。最後の行で、行の頭が ubuntu@kcna:~$ に変わります。課題と後片付けは、この中で続けます。",
+      "trouble": [
+        {
+          "symptom": "止まっていないので取れないと出る",
+          "check": "multipass list で State を見る",
+          "fix": "multipass stop kcna で止めてから取る"
+        },
+        {
+          "symptom": "ch11-end がもうあると出る",
+          "check": "multipass list --snapshots を打つ",
+          "fix": "前の控えを使うか、--name ch11-endb のように別の名前にする"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/snapshot/"
+    }
+  ],
+  "cleanup": [
+    {
+      "id": "check-vm",
+      "text": "仮想マシンの中で、どのマシンにいるかを見ます。kcna と出なければ止まり、multipass shell kcna で入ります。",
+      "why": "次の手順は、つないでいるクラスターのものを消します。自分の PC の別のクラスターで打たないためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "hostname"
+      },
+      "lines": [
+        {
+          "code": "hostname",
+          "text": "このマシンの名前を出す"
+        }
+      ],
+      "output": "kcna",
+      "read": "kcna と出れば、仮想マシンの中です。",
+      "trouble": [
+        {
+          "symptom": "kcna ではない名前が出る",
+          "check": "行の頭が ubuntu@kcna かを見る",
+          "fix": "ホストにいる。multipass shell kcna で入り、もう一度打つ"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man1/hostname.1.html"
+    },
+    {
+      "id": "delete-practice",
+      "text": "仮想マシンの中で、課題で作った名前空間を消します。課題をしていなければ、何も起きません。",
+      "why": "この先の練習を、k3s の部品だけの状態から始めるためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "kubectl delete namespace practice --ignore-not-found\nkubectl get namespaces"
+      },
+      "lines": [
+        {
+          "code": "kubectl delete namespace practice --ignore-not-found",
+          "text": "practice を消す。無くてもエラーにしない (--ignore-not-found)"
+        },
+        {
+          "code": "kubectl get namespaces",
+          "text": "名前空間の一覧を出す"
+        }
+      ],
+      "output": "namespace \"practice\" deleted\nNAME              STATUS   AGE\ndefault           Active   27m\nkube-node-lease   Active   27m\nkube-public       Active   27m\nkube-system       Active   27m",
+      "read": "default と kube- で始まる 4 つだけになれば、片付いています。k3s は消しません。",
+      "trouble": [
+        {
+          "symptom": "消す行がしばらく止まる",
+          "check": "1 分ほど待つ",
+          "fix": "中の Pod が終わるのを待っている。そのまま待つ"
+        },
+        {
+          "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
+          "check": "systemctl is-active k3s を打つ",
+          "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
+        }
+      ],
+      "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_delete/"
+    },
+    {
+      "id": "rest",
+      "text": "今日はここまでにするときは、exit で出てから、ホストで仮想マシンを止めます。止まっていれば (Stopped)、打ちません。",
+      "why": "動いている間は PC のメモリを使うためです。また使うかもしれないので、ここでは消しません (消すのは次の手順)。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass stop kcna"
+      },
+      "lines": [
+        {
+          "code": "multipass stop kcna",
+          "text": "kcna を止める"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "続けるときは multipass shell kcna で、動かして中に入れます。k3s は自分で始まります。",
+      "trouble": [
+        {
+          "symptom": "止まったか分からない",
+          "check": "multipass list で State を見る",
+          "fix": "Stopped なら止まっている。Running なら、もう一度止める"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/stop/"
+    },
+    {
+      "id": "remove-vm",
+      "text": "全部の章を終えて、仮想マシンが要らなくなったときだけ、ホストで kcna を消します。また使うなら打ちません。",
+      "why": "仮想マシンは、止めていても PC の場所 (20 GB まで) を使うためです。消すと、控え (snapshot) も一緒に消え、元に戻せません。",
+      "where": "host",
+      "code": {
+        "language": "bash",
+        "text": "multipass delete --purge kcna"
+      },
+      "lines": [
+        {
+          "code": "multipass delete --purge kcna",
+          "text": "kcna を、控えごと消す"
+        }
+      ],
+      "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
+      "read": "multipass list に kcna が出なくなれば、消えています。もう一度使うときは、0 章から作り直します。",
+      "trouble": [
+        {
+          "symptom": "kcna が無いと出る",
+          "check": "multipass list で名前を見る",
+          "fix": "もう消えている"
+        }
+      ],
+      "source": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/delete/"
+    }
+  ],
+  "challenges": [
+    {
+      "task": "仮想マシンの中で、~/ch11/web のチャートを、名前空間 practice にリリース try として、Pod 3 つ・イメージの版 1.27-alpine で入れてください。",
+      "hint": "--create-namespace で名前空間も作れます。値は --set で 2 つ渡せます。",
+      "answer": "cd ~/ch11\nhelm install try ./web -n practice --create-namespace --set replicaCount=3 --set image.tag=1.27-alpine\nkubectl rollout status deployment/try-web -n practice --timeout=180s",
+      "verify": "kubectl get deployment try-web -n practice で READY が 3/3 なら正解です。"
+    },
+    {
+      "task": "仮想マシンの中で、~/ch11/kust/base の土台に、名前の頭を p- にし、名前空間を practice にし、Pod を 1 つにする overlay を kust/overlays/prod に作って入れてください。",
+      "hint": "Pod の数は replicas で替えます (name に元の名前、count に数)。",
+      "answer": "cd ~/ch11\nkubectl create namespace practice --dry-run=client -o yaml | kubectl apply -f -\nmkdir -p kust/overlays/prod\nprintf 'resources:\\n- ../../base\\nnamespace: practice\\nnamePrefix: p-\\nreplicas:\\n- name: demo-web\\n  count: 1\\n' > kust/overlays/prod/kustomization.yaml\nkubectl apply -k kust/overlays/prod\nkubectl rollout status deployment/p-demo-web -n practice --timeout=180s",
+      "verify": "kubectl get deployment p-demo-web -n practice で READY が 1/1 なら正解です。"
+    },
+    {
+      "task": "仮想マシンの中で、practice の Pod を、CPU を多く使う順に並べてください。",
+      "hint": "kubectl top pods の並べ替えです。",
+      "answer": "for i in $(seq 30); do kubectl top pods -n practice > /dev/null 2>&1 && break; sleep 5; done\nkubectl top pods -n practice --sort-by=cpu",
+      "verify": "kubectl top pods -n practice --sort-by=cpu で、Pod が CPU の多い順に並べば正解です。できたばかりの Pod は、値が集まるまで 1 分ほど出ません。"
+    }
+  ],
+  "sources": [
+    {
+      "label": "Helm: Installing Helm",
+      "url": "https://helm.sh/docs/intro/install/"
+    },
+    {
+      "label": "Helm: Using Helm",
+      "url": "https://helm.sh/docs/intro/using_helm/"
+    },
+    {
+      "label": "Helm: Charts",
+      "url": "https://helm.sh/docs/topics/charts/"
+    },
+    {
+      "label": "Helm: helm rollback",
+      "url": "https://helm.sh/docs/helm/helm_rollback/"
+    },
+    {
+      "label": "Helm: helm template",
+      "url": "https://helm.sh/docs/helm/helm_template/"
+    },
+    {
+      "label": "Helm: releases (GitHub)",
+      "url": "https://github.com/helm/helm/releases"
+    },
+    {
+      "label": "Kubernetes: Declarative Management of Kubernetes Objects Using Kustomize",
+      "url": "https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/"
+    },
+    {
+      "label": "Kubernetes: Custom Resources",
+      "url": "https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/"
+    },
+    {
+      "label": "Kubernetes: Extend the Kubernetes API with CustomResourceDefinitions",
+      "url": "https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/"
+    },
+    {
+      "label": "Kubernetes: Operator pattern",
+      "url": "https://kubernetes.io/docs/concepts/extend-kubernetes/operator/"
+    },
+    {
+      "label": "K3s: Helm (HelmChart)",
+      "url": "https://docs.k3s.io/helm"
+    },
+    {
+      "label": "Kubernetes: Resource metrics pipeline",
+      "url": "https://kubernetes.io/docs/tasks/debug/debug-cluster/resource-metrics-pipeline/"
+    },
+    {
+      "label": "Kubernetes: Metrics For Kubernetes System Components",
+      "url": "https://kubernetes.io/docs/concepts/cluster-administration/system-metrics/"
+    },
+    {
+      "label": "Kubernetes: Traces For Kubernetes System Components",
+      "url": "https://kubernetes.io/docs/concepts/cluster-administration/system-traces/"
+    },
+    {
+      "label": "kubectl logs",
+      "url": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_logs/"
+    },
+    {
+      "label": "Prometheus: Overview",
+      "url": "https://prometheus.io/docs/introduction/overview/"
+    },
+    {
+      "label": "OpenTelemetry: What is OpenTelemetry?",
+      "url": "https://opentelemetry.io/docs/what-is-opentelemetry/"
+    },
+    {
+      "label": "Argo CD",
+      "url": "https://argo-cd.readthedocs.io/en/stable/"
+    },
+    {
+      "label": "Flux",
+      "url": "https://fluxcd.io/flux/"
+    },
+    {
+      "label": "CNCF: Projects",
+      "url": "https://www.cncf.io/projects/"
+    },
+    {
+      "label": "CNCF Landscape",
+      "url": "https://landscape.cncf.io/"
+    },
+    {
+      "label": "Multipass: delete",
+      "url": "https://canonical.com/multipass/docs/stable/reference/command-line-interface/delete/"
+    }
+  ]
+}

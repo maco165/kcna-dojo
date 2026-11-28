@@ -9,7 +9,7 @@ import SiteLogo from '../components/SiteLogo';
 import { dueReviewCount } from '../content';
 import { chapterNo, listedLabs, restLabs, restLead } from '../content/coveredLabs';
 import { WEEKS } from '../content/curriculum';
-import { CHAPTERS_LEAD, HANDS_ON, HANDS_ON_LEAD, HANDS_ON_TITLE, HANDS_ON_WHO, LABS_LEAD, NO_CHAPTERS } from '../content/handsOn';
+import { CHAPTERS_LEAD, HANDS_ON, HANDS_ON_LEAD, HANDS_ON_TITLE, HANDS_ON_WHO, LABS_LEAD, NO_CHAPTERS, NO_LABS } from '../content/handsOn';
 import type { HandsOnMeta } from '../content/types';
 import { chapterStatus, doneChapters, handsOnOs } from '../lib/handsOn';
 import { doneLessons } from '../lib/lessonStatus';
@@ -33,7 +33,7 @@ function Card({ href, kicker, title, lead, done, status }: { href: string; kicke
   );
 }
 
-export function HandsOnIndex({ progress, chapters = HANDS_ON }: { progress: Progress; chapters?: HandsOnMeta[] }) {
+export function HandsOnIndex({ progress, chapters = HANDS_ON, labs = LABS }: { progress: Progress; chapters?: HandsOnMeta[]; labs?: typeof LABS }) {
   const os = handsOnOs(progress);
   return (
     <div className="hb cmp">
@@ -63,10 +63,10 @@ export function HandsOnIndex({ progress, chapters = HANDS_ON }: { progress: Prog
       <section className="hb-section" aria-labelledby="ho-labs">
         <h2 id="ho-labs" className="hb-domain__head">
           <span>週ごとの実習</span>
-          <span className="hb-muted">{`${doneLessons(LABS.map((x) => x.lab), progress)} / ${LABS.length} 完了`}</span>
+          {labs.length > 0 && <span className="hb-muted">{`${doneLessons(labs.map((x) => x.lab), progress)} / ${labs.length} 完了`}</span>}
         </h2>
         <p className="hb-muted">
-          {LABS_LEAD}
+          {labs.length > 0 ? LABS_LEAD : NO_LABS}
           {restLabs(WEEKS).map((lab) => (
             <span key={lab.id}>
               {' '}
@@ -74,12 +74,14 @@ export function HandsOnIndex({ progress, chapters = HANDS_ON }: { progress: Prog
             </span>
           ))}
         </p>
-        <ul className="cmp-list">
-          {LABS.map(({ lab, week }) => {
-            const done = progress.lessons[lab.id]?.done === true;
-            return <Card key={lab.id} href={lessonHref(lab.id)} kicker={`第 ${week} 週 · ${lab.steps.length} 手順`} title={lab.title} lead={lab.goal} done={done} status={done ? '完了' : '未着手'} />;
-          })}
-        </ul>
+        {labs.length > 0 && (
+          <ul className="cmp-list">
+            {labs.map(({ lab, week }) => {
+              const done = progress.lessons[lab.id]?.done === true;
+              return <Card key={lab.id} href={lessonHref(lab.id)} kicker={`第 ${week} 週 · ${lab.steps.length} 手順`} title={lab.title} lead={lab.goal} done={done} status={done ? '完了' : '未着手'} />;
+            })}
+          </ul>
+        )}
       </section>
     </div>
   );
