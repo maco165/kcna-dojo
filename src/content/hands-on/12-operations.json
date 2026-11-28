@@ -108,7 +108,7 @@
       "id": "words",
       "text": "最後の章は、クラスターを長く使うための運用です。①記録の控えを取り、②k3s を v1.36 から v1.37 に上げ、③困ったときに控えから戻し、④ノードを空けてから作業する方法 (cordon・drain) を練習します。⑤任意で 2 台目のノードを足して外し、最後に k3s と仮想マシンを片付けます。",
       "why": "Kubernetes は 1 年に 3 回ほど新しいマイナー版が出て、それぞれ 1 年ほどで直し (patch) が出なくなります。上げる・戻す・空けるは、使い続けるなら避けられない作業です。",
-      "source": "https://kubernetes.io/docs/releases/"
+      "source": "https://kubernetes.io/releases/"
     },
     {
       "id": "prepare",
@@ -244,7 +244,7 @@
           "fix": "000 ならつながっていない。インターネットにつながってから打つ"
         }
       ],
-      "source": "https://kubernetes.io/docs/releases/version-skew-policy/"
+      "source": "https://kubernetes.io/releases/version-skew-policy/"
     },
     {
       "id": "check-before-backup",
@@ -471,7 +471,7 @@
           "fix": "inactive なら sudo systemctl start k3s で始める。activating なら、起動の途中なので 1 分ほど待つ"
         }
       ],
-      "source": "https://kubernetes.io/docs/releases/version-skew-policy/"
+      "source": "https://kubernetes.io/releases/version-skew-policy/"
     },
     {
       "id": "kubeconfig-copy",
@@ -545,7 +545,7 @@
         }
       ],
       "unverified": "Multipass はこの章を書いた環境に入れられず、実機で確かめていません。公式の文書のとおりです。",
-      "read": "何もエラーが出なければ止まっています。続けるときは、ホストで multipass shell kcna を打つと、動かして中に入れます。続けるときは cd ~/ch12 を打ちます。戻った直後の 1〜2 分は、一覧が止める前の古い様子のことがあります。少し待ってもう一度見ます。",
+      "read": "何もエラーが出なければ止まっています。続けるときは、ホストで multipass shell kcna を打つと、動かして中に入れます。入ったら cd ~/ch12 を打ちます。戻った直後の 1〜2 分は、一覧が止める前の古い様子のことがあります。少し待ってもう一度見ます。",
       "trouble": [
         {
           "symptom": "The connection to the server 127.0.0.1:6443 was refused と出る",
@@ -589,7 +589,7 @@
     {
       "id": "rollback-binary",
       "text": "巻き戻しの練習です。まず、古い版 (v1.36.6+k3s1) の k3s を、始めずに入れます。",
-      "why": "公式の巻き戻しは、①古い版の k3s と、②その版で取った記録の控えの 2 つがそろって、初めてできます。公式の文書は「記録を戻せなければ、前のマイナー版には戻せない」と書いています。INSTALL_K3S_SKIP_START=true を付けると、k3s のファイルを入れ替えるだけで、始め直しません。今動いている k3s は、そのまま動き続けます。",
+      "why": "公式の巻き戻しは、①古い版の k3s と、②その版で取った記録の控えの 2 つがそろって、初めてできます。公式の文書は「記録を戻せなければ、前のマイナー版には戻せない」と書いています。INSTALL_K3S_SKIP_START=true を付けると、k3s のファイルを入れ替えるだけで、始め直しません。今動いている k3s は、そのまま動き続けます。INSTALL_K3S_EXEC を付けていなければ、server として入ります。",
       "where": "vm",
       "code": {
         "language": "bash",
@@ -619,7 +619,7 @@
     {
       "id": "rollback-db",
       "text": "k3s を止め、今の記録の置き場を脇へ移してから、控えの記録を戻し、k3s を始めます。",
-      "why": "SQLite の巻き戻しは、記録のファイルを、控えのものに差し替えることです。今の記録は消さずに名前を替えて残し、うまくいかなければ戻せるようにします。",
+      "why": "SQLite の巻き戻しは、記録のファイルを、控えのものに差し替えることです。今の記録は消さずに名前を替えて残し、うまくいかなければ戻せるようにします。公式の文書の手順は今の記録の置き場を消してから戻しますが、ここでは消さずに mv で脇へ移します (公式と違うところです)。",
       "where": "vm",
       "code": {
         "language": "bash",
@@ -1494,6 +1494,32 @@
       "source": "https://docs.k3s.io/installation/uninstall"
     },
     {
+      "id": "check-before-tidy",
+      "text": "自分で作った写しと helm を消す前に、どのマシンにいるかを見ます。kcna と出なければ、次の手順を打ちません。自分の PC の kubeconfig と helm を消してしまうためです。",
+      "why": "次の手順は、~/.kube・helm とその設定・~/.bashrc の行を消します。自分の PC で打つと、PC のクラスターにつなぐ設定や helm を消してしまうためです。",
+      "where": "vm",
+      "code": {
+        "language": "bash",
+        "text": "hostname"
+      },
+      "lines": [
+        {
+          "code": "hostname",
+          "text": "このマシンの名前を出す"
+        }
+      ],
+      "output": "kcna",
+      "read": "kcna と出れば、仮想マシンの中です。",
+      "trouble": [
+        {
+          "symptom": "kcna ではない名前が出る",
+          "check": "行の頭が ubuntu@kcna かを見る",
+          "fix": "ホストにいる。multipass shell kcna で入り、もう一度打つ"
+        }
+      ],
+      "source": "https://man7.org/linux/man-pages/man1/hostname.1.html"
+    },
+    {
       "id": "tidy",
       "text": "自分で作った写しと記録と、11 章で入れた helm とその設定を消し、~/.bashrc の KUBECONFIG の行を取ります。",
       "why": "k3s が無いのに残っていても、使えないからです。",
@@ -1551,7 +1577,7 @@
       "lines": [
         {
           "code": "exit",
-          "text": "kcna から出る"
+          "text": "kcna から出る。仮想マシンの中にいるときだけ打つ (ホストの端末で打つと、その端末が閉じる)"
         },
         {
           "code": "multipass delete --purge kcna",
@@ -1637,11 +1663,11 @@
     },
     {
       "label": "Kubernetes: Version Skew Policy",
-      "url": "https://kubernetes.io/docs/releases/version-skew-policy/"
+      "url": "https://kubernetes.io/releases/version-skew-policy/"
     },
     {
       "label": "Kubernetes: Releases",
-      "url": "https://kubernetes.io/docs/releases/"
+      "url": "https://kubernetes.io/releases/"
     },
     {
       "label": "Kubernetes: Safely Drain a Node",
