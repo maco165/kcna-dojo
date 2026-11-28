@@ -87,7 +87,7 @@ export async function buildPages(load, { chapters } = {}) {
   const { COMMAND_BRIEFS } = await load('/src/content/commandBriefs.ts');
   const { HANDBOOK_PARTS, HANDBOOK_TOPICS, isAppendixDomain, sectionName: shortName } = await load('/src/content/handbook.ts');
   const sectionName = (d) => (isAppendixDomain(d) ? `${shortName(d)} (資格の範囲の外)` : d);
-  const { CURRICULUM, DEFINITION } = await load('/src/content/guide.ts');
+  const { CURRICULUM, DEFINITION, EXAM_DAY, EXAM_DAY_CHECKED_AT } = await load('/src/content/guide.ts');
   const glossary = (await load('/src/content/glossary.json')).default;
   const pages = [];
   // レッスンの本文は問題の全文 (lessons.ts) から書く (curriculum.ts の WEEKS は問題を id・形・問題文だけにした軽い形)
@@ -116,7 +116,7 @@ export async function buildPages(load, { chapters } = {}) {
   pages.push({
     path: 'guide/',
     title: 'Kubernetes とこのサイト',
-    description: 'KCNA-JP の試験の目的と形式、出題範囲 (学習要領の 4 分野と細目)、このサイトの問題の作り方と出典をまとめたページ。',
+    description: 'KCNA-JP の試験の目的と形式、出題範囲 (学習要領の 4 分野と細目)、申し込み・本人確認・当日の流れ・結果・更新、このサイトの問題の作り方と出典をまとめたページ。',
     body: [
       '<h1>Kubernetes とこのサイト</h1>',
       `<p>${esc(DEFINITION)}</p>`,
@@ -125,6 +125,9 @@ export async function buildPages(load, { chapters } = {}) {
       '<h2>出題範囲 (学習要領)</h2>',
       ...CURRICULUM.map((c) => `<h3>${esc(c.domain)}</h3><ul>${c.competencies.map((x) => `<li>${esc(x.ja)} (${esc(x.en)})</li>`).join('')}</ul>`),
       `<p>${link('handbook/', 'ハンドブック')}・${link('glossary/', '用語集')}</p>`,
+      '<h2 id="exam-day">申し込みから結果まで</h2>',
+      `<p>LF の公式の文書から書き写しました (${EXAM_DAY_CHECKED_AT} に確認)。申し込む前に出典を開いて確かめてください。</p>`,
+      ...EXAM_DAY.map((g) => `<h3>${esc(g.title)}</h3><ul>${g.items.map((x) => `<li>${esc(x.text)} 出典: ${x.sources.map((s) => `<a href="${esc(s.url)}">${esc(s.label)}</a>`).join('・')}</li>`).join('')}</ul>`),
     ].join('\n'),
   });
 
@@ -332,8 +335,8 @@ export async function buildPages(load, { chapters } = {}) {
       `<p>${esc(chapterList.length > 0 ? handsOn.CHAPTERS_LEAD : handsOn.NO_CHAPTERS)}</p>`,
       chapterList.length > 0 ? `<ul>${chapterList.map((c) => `<li>${esc(chapterNo(c))}: ${link(`hands-on/${c.id}/`, c.title)} (約 ${c.minutes} 分): ${esc(c.summary)}</li>`).join('')}</ul>` : '',
       '<h2>週ごとの実習</h2>',
-      `<p>${esc(handsOn.LABS_LEAD)}${restLabs(WEEKS).map((l) => ` ${esc(restLead(l.id))} ${link(`lesson/${l.id}/`, l.title)}`).join('')}</p>`,
-      `<ul>${labList.map(({ lab, week }) => `<li>第 ${week} 週: ${link(`lesson/${lab.id}/`, lab.title)}: ${esc(lab.goal)}</li>`).join('')}</ul>`,
+      `<p>${esc(labList.length > 0 ? handsOn.LABS_LEAD : handsOn.NO_LABS)}${restLabs(WEEKS).map((l) => ` ${esc(restLead(l.id))} ${link(`lesson/${l.id}/`, l.title)}`).join('')}</p>`,
+      labList.length > 0 ? `<ul>${labList.map(({ lab, week }) => `<li>第 ${week} 週: ${link(`lesson/${lab.id}/`, lab.title)}: ${esc(lab.goal)}</li>`).join('')}</ul>` : '',
     ]
       .filter(Boolean)
       .join('\n'),

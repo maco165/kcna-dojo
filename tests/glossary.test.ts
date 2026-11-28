@@ -84,3 +84,12 @@ describe('termDomain', () => {
   it('同じ数なら order の先', () => expect(termDomain(t(['l4', 'l1']), (id) => dom[id], order)).toBe('A'));
   it('見つからなければ undefined', () => expect(termDomain(t(['zz']), (id) => dom[id], order)).toBeUndefined());
 });
+
+describe('レッスンに出てくる用語', () => {
+  // 前からのレッスンには 0 語のもの (w1-l1) があるので、後から足したレッスン (since) だけを見る
+  it('後から足した問題演習のレッスンには、「出てくる用語」が 1 語以上ある', () => {
+    const quiz = WEEKS.flatMap((w) => (w.content?.lessons ?? []).filter((l) => l.kind === 'quiz' && (l as { since?: string }).since).map((l) => l.id));
+    expect(quiz).toHaveLength(3);
+    expect(quiz.filter((id) => !terms.some((t) => t.lessons.includes(id)))).toEqual([]);
+  });
+});

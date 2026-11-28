@@ -12,6 +12,8 @@ import SiteLogo from '../components/SiteLogo';
 import { dueReviewCount, isExamQuestionId, isKnownQuestion } from '../content';
 import { ReviewForecast, StudyCalendar } from '../components/StudyCalendar';
 import MasteryCard from '../components/MasteryCard';
+import ReadinessCard from '../components/ReadinessCard';
+import { readiness } from '../lib/readiness';
 import { cardData } from '../lib/summaryCard';
 import { useMemo, useState } from 'react';
 import SummaryCard from '../components/SummaryCard';
@@ -38,6 +40,7 @@ function Body({ progress }: { progress: Progress }) {
   const due = dueReviewCount(progress, now);
   const freeze = freezeStatus(progress, now);
   const mastery = useMemo(() => masteryByDomain(progress), [progress]);
+  const ready = useMemo(() => readiness(progress), [progress]);
   const labs = listedLabs(WEEKS).map((x) => x.lab);
   const planText =
     plan.expected === 0 ? 'これから' : plan.done >= plan.expected ? '予定どおり' : `${plan.expected - plan.done} レッスン遅れ`;
@@ -101,6 +104,8 @@ function Body({ progress }: { progress: Progress }) {
           })}
         </VStack>
       </Card>
+
+      <ReadinessCard r={ready} />
 
       <MasteryCard rows={mastery} />
 
@@ -171,7 +176,7 @@ function Body({ progress }: { progress: Progress }) {
 
       <List hasDividers header={<h2 className="h-sm">実践</h2>}>
         <ListItem href={handsOnHref()} label="章" endContent={<Text type="supporting">{HANDS_ON.length > 0 ? `${doneChapters(HANDS_ON, progress)} / ${HANDS_ON.length}` : '準備中'}</Text>} />
-        <ListItem href={handsOnHref()} label="週ごとの実習" endContent={<Text type="supporting">{`${doneLessons(labs, progress)} / ${labs.length}`}</Text>} />
+        {labs.length > 0 && <ListItem href={handsOnHref()} label="週ごとの実習" endContent={<Text type="supporting">{`${doneLessons(labs, progress)} / ${labs.length}`}</Text>} />}
       </List>
     </VStack>
   );

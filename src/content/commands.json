@@ -380,6 +380,18 @@
             "--container"
           ],
           "text": "調べるためのコンテナの名前。--copy-to と一緒に元からあるコンテナの名前を指定すると、写しの中のそのコンテナのコマンドを -- の後ろのものに替える"
+        },
+        {
+          "flags": [
+            "--share-processes"
+          ],
+          "text": "--copy-to で作る写しで、コンテナどうしがほかのコンテナのプロセスを見られるようにする"
+        },
+        {
+          "flags": [
+            "--set-image"
+          ],
+          "text": "--copy-to で作る写しのコンテナのイメージを替える。書き方は kubectl set image と同じ <コンテナの名前>=<イメージ> で、*=<イメージ> は全部のコンテナ"
         }
       ],
       "source": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_debug/"

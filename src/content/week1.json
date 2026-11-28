@@ -7,6 +7,7 @@
       "title": "コンテナと VM",
       "summary": "4 択 · 5 問",
       "domain": "Kubernetes Fundamentals",
+      "competency": "Containerization",
       "questions": [
         {
           "id": "w1-l1-q1",
@@ -161,6 +162,7 @@
       "title": "イメージとレイヤー",
       "summary": "Dockerfile とコマンドの穴埋め · 5 問",
       "domain": "Kubernetes Fundamentals",
+      "competency": "Containerization",
       "questions": [
         {
           "id": "w1-l2-q1",
@@ -300,6 +302,7 @@
       "title": "OCI と CRI",
       "summary": "コマンドの穴埋めと 4 択 · 5 問",
       "domain": "Kubernetes Fundamentals",
+      "competency": "Containerization",
       "questions": [
         {
           "id": "w1-l3-q1",
@@ -444,6 +447,7 @@
       "title": "containerd と k3s",
       "summary": "出力を読む・コマンドの穴埋め · 5 問",
       "domain": "Kubernetes Fundamentals",
+      "competency": "Containerization",
       "questions": [
         {
           "id": "w1-l4-q1",

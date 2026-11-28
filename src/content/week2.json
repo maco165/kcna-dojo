@@ -7,6 +7,7 @@
       "title": "コントロールプレーン",
       "summary": "4 択とコマンドの穴埋め · 7 問",
       "domain": "Kubernetes Fundamentals",
+      "competency": "Kubernetes Core Concepts",
       "questions": [
         {
           "id": "w2-l1-q1",
@@ -209,6 +210,7 @@
       "title": "ノードの部品と Pod が動くまで",
       "summary": "出力を読む・穴埋めと 4 択 · 7 問",
       "domain": "Kubernetes Fundamentals",
+      "competency": "Kubernetes Core Concepts",
       "questions": [
         {
           "id": "w2-l2-q1",
@@ -409,6 +411,7 @@
       "title": "etcd と望ましい状態",
       "summary": "コマンドとマニフェストの穴埋めと 4 択 · 8 問",
       "domain": "Kubernetes Fundamentals",
+      "competency": "Kubernetes Core Concepts",
       "questions": [
         {
           "id": "w2-l3-q1",
@@ -629,6 +632,7 @@
       "title": "k3s が違うところ",
       "summary": "出力を読む・コマンドの穴埋めと 4 択 · 8 問",
       "domain": "Kubernetes Fundamentals",
+      "competency": "Kubernetes Core Concepts",
       "questions": [
         {
           "id": "w2-l4-q1",

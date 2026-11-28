@@ -7,6 +7,7 @@
       "title": "kubectl とコンテキスト",
       "summary": "コマンドの穴埋めと 4 択 · 8 問",
       "domain": "Kubernetes Fundamentals",
+      "competency": "Administration",
       "questions": [
         {
           "id": "w4-l1-q1",
@@ -224,6 +225,7 @@
       "title": "requests と limits、HPA",
       "summary": "YAML とコマンドの穴埋め・出力を読む · 7 問",
       "domain": "Kubernetes Fundamentals",
+      "competency": "Scheduling",
       "questions": [
         {
           "id": "w4-l2-q1",
@@ -423,6 +425,7 @@
       "title": "スケジューラと Node affinity",
       "summary": "出力を読む・YAML とコマンドの穴埋め · 6 問",
       "domain": "Kubernetes Fundamentals",
+      "competency": "Scheduling",
       "questions": [
         {
           "id": "w4-l3-q1",
@@ -599,6 +602,7 @@
       "title": "taint と toleration",
       "summary": "コマンドと YAML の穴埋めと 4 択 · 6 問",
       "domain": "Kubernetes Fundamentals",
+      "competency": "Scheduling",
       "questions": [
         {
           "id": "w4-l4-q1",

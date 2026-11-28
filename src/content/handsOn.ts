@@ -17,6 +17,8 @@ export const HANDS_ON_WHO = 'Kubernetes が初めての人は、問題演習と�
 export const CHAPTERS_LEAD = '手順ごとに、なぜするのか・コマンドの意味・出力の読み方・つまずいた時の直し方まで書いた章です。';
 export const LABS_LEAD = '問題演習の週に合わせた、短い実習です。k3s のクラスタを用意してから始めます。中身を章に入れた実習は、ここには並べません。';
 export const NO_CHAPTERS = '章は準備中です。';
+/** 週ごとの実習を全部、章が覆ったときに、一覧の数と並びの代わりに出す文 */
+export const NO_LABS = '週ごとの実習の中身は、全部実践の章に入りました。実習のページと記録は残しています。';
 
 /** 章のページの短い題名 (画面・書き出す HTML で共通) */
 export const chapterTitle = (id: string, chapters: Pick<HandsOnMeta, 'id' | 'title' | 'short'>[] = HANDS_ON) => {

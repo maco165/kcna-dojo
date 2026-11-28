@@ -1,4 +1,4 @@
-// 章が覆った旧い実習と、その章。w2-lab は、ノード 1 台で見える範囲を章が覆った。複数ノードの見え方 (agent・置き場所の分かれ方) は実習のページに残す。 w4-lab は、requests を付ける順番が章では逆 (無いまま失敗させてから足す)。w3-lab の CronJob は、章では tick (毎分) で動かす。w5-lab は、使い捨ての Pod の代わりに置いたままの Pod から試し、クラスターの外からの道はホストの手順 (実機で未確認) と仮想マシンの中の両方で見る。
+// 章が覆った旧い実習と、その章。w2-lab は、ノード 1 台で見える範囲を章が覆った。複数ノードの見え方 (agent・置き場所の分かれ方) は実習のページに残す。 w4-lab は、requests を付ける順番が章では逆 (無いまま失敗させてから足す)。w3-lab の CronJob は、章では tick (毎分) で動かす。w5-lab は、使い捨ての Pod の代わりに置いたままの Pod から試し、クラスターの外からの道はホストの手順 (実機で未確認) と仮想マシンの中の両方で見る。w6-lab は、8 章の PVC と、10 章の RBAC (読むだけの ServiceAccount と can-i --as)・無い版のイメージを直す手順で覆った。w7-lab は、11 章で名前空間を ch11・ch11-kust に、イメージの版を 1.27-alpine にして同じ流れを行う。w8-lab の部品の段階は、章でもホストのブラウザの手順 (実機で未確認) にした。
 // ホームが最初に読むので、章のデータ (handsOn.ts) は読まず、章の id・番号・題だけをここに持つ
 // (週の「先に読む」と同じ持ち方。実在と、番号と題が章のデータと同じことは tests/handsOn.test.tsx が見る)。対応の中身は docs/design.md
 import { labsOf } from '../lib/lessonStatus';
@@ -20,6 +20,12 @@ export const COVERED_LABS: Record<string, readonly ChapterRef[]> = {
     { id: 'batch', order: 9, title: '決まった仕事を動かす' },
   ],
   'w5-lab': [{ id: 'networking', order: 6, title: 'つなぐ' }],
+  'w6-lab': [
+    { id: 'storage', order: 8, title: '消えない所に保存する' },
+    { id: 'security-troubleshoot', order: 10, title: '守る・直す' },
+  ],
+  'w7-lab': [{ id: 'deliver-observe', order: 11, title: '届ける・広げる・見る' }],
+  'w8-lab': [{ id: 'deliver-observe', order: 11, title: '届ける・広げる・見る' }],
 };
 
 /** 初めに進める章。章は前の章で作った仮想マシンを使うので、週の画面から章へ送るときは先頭に置く */

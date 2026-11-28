@@ -50,6 +50,16 @@ export type QuizLesson = {
   title: string;
   summary: string;
   domain: Domain;
+  /**
+   * 学習要領の細目 (src/content/guide.ts の CURRICULUM の en。週のレッスンだけが持ち、模擬試験用の問題のファイルは持たない)。
+   * 13 細目すべてに専用のレッスンがあることは tests/competency.test.ts が見る
+   */
+  competency?: string;
+  /**
+   * 公開のあとに足したレッスンの、足した日 (YYYY-MM-DD)。計画との差 (lib/lessonStatus.ts の planStatus) は、利用者の週の最後の日がこの日より前の週では、
+   * このレッスンを「終わっているはずの数」に入れない (足す前にその週を終えた人を遅れにしない)。週の n/m と「次」には入れる
+   */
+  since?: string;
   questions: Question[];
 };
 
@@ -83,7 +93,7 @@ export type WeekContent = {
  * ホームと本体は週のファイルを ?light で読み (vite.config.ts の lightLessons)、問題の全文は lessons.ts から読む
  */
 export type QuestionMeta = Pick<Question, 'id' | 'type' | 'prompt'>;
-export type QuizLessonMeta = Omit<QuizLesson, 'questions'> & { questions: QuestionMeta[] };
+export type QuizLessonMeta = Omit<QuizLesson, 'questions' | 'competency'> & { questions: QuestionMeta[] };
 export type LessonMeta = QuizLessonMeta | LabLesson;
 export type WeekIndex = { week: number; lessons: LessonMeta[] };
 

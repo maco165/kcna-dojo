@@ -7,6 +7,7 @@
       "title": "Service の種類",
       "summary": "YAML とコマンドの穴埋めと 4 択 · 7 問",
       "domain": "Container Orchestration",
+      "competency": "Networking",
       "questions": [
         {
           "id": "w5-l1-q1",
@@ -198,6 +199,7 @@
       "title": "名前で引く: DNS と EndpointSlice",
       "summary": "出力を読む・コマンドと YAML の穴埋め · 6 問",
       "domain": "Container Orchestration",
+      "competency": "Networking",
       "questions": [
         {
           "id": "w5-l2-q1",
@@ -371,6 +373,7 @@
       "title": "Ingress と Gateway API",
       "summary": "YAML の穴埋めと 4 択 · 7 問",
       "domain": "Container Orchestration",
+      "competency": "Networking",
       "questions": [
         {
           "id": "w5-l3-q1",
@@ -567,6 +570,7 @@
       "title": "CNI・NetworkPolicy・サービスメッシュ",
       "summary": "YAML の穴埋めと 4 択 · 8 問",
       "domain": "Container Orchestration",
+      "competency": "Networking",
       "questions": [
         {
           "id": "w5-l4-q1",

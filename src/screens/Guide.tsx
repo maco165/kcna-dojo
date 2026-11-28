@@ -16,6 +16,8 @@ import {
   CURRICULUM,
   CURRICULUM_VERSION,
   DEFINITION,
+  EXAM_DAY,
+  EXAM_DAY_CHECKED_AT,
   EXAM_FACTS,
   EXAM_PURPOSE,
   ORIGIN,
@@ -59,7 +61,7 @@ function Ext({ s }: { s: Source }) {
   );
 }
 
-function Sources({ list, dark }: { list: Source[]; dark?: boolean }) {
+function Sources({ list, dark, checked = CHECKED_AT }: { list: Source[]; dark?: boolean; checked?: string }) {
   return (
     <p className={dark ? 'guide-src guide-src--dark' : 'guide-src'}>
       出典:{' '}
@@ -69,7 +71,7 @@ function Sources({ list, dark }: { list: Source[]; dark?: boolean }) {
           <Ext s={s} />
         </span>
       ))}{' '}
-      ({CHECKED_AT} に確認)
+      ({checked} に確認)
     </p>
   );
 }
@@ -454,6 +456,27 @@ function Body() {
               />
             </div>
           </div>
+        </section>
+
+        <section id="exam-day" aria-labelledby="guide-day" className="guide-section">
+          <p className="guide-kicker">KCNA-JP を受ける人へ</p>
+          <h2 id="guide-day" className="guide-h2">
+            申し込みから結果まで
+          </h2>
+          <p className="guide-muted">受験者ハンドブックなど、LF の公式の文書から書き写しました。変わることがあるので、申し込む前に出典を開いて確かめてください。</p>
+          {EXAM_DAY.map((g) => (
+            <div key={g.id} className="guide-day">
+              <h3 className="guide-h3">{g.title}</h3>
+              <ul className="guide-steps">
+                {g.items.map((x) => (
+                  <li key={x.text}>
+                    {x.text}
+                    <Sources list={x.sources} checked={EXAM_DAY_CHECKED_AT} />
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </section>
 
         <section aria-labelledby="guide-how" className="guide-section guide-section--wide">
